@@ -11,6 +11,8 @@ from simple_rl.utils.chart_utils import color_ls
 def _draw_state(screen,
                 taxi_oomdp,
                 state,
+                show_value=True,
+                agent=None,
                 draw_statics=False,
                 agent_shape=None):
     '''
@@ -53,7 +55,7 @@ def _draw_state(screen,
         top_left_point = int(width_buffer + cell_width*(pass_x - 1) + taxi_size + 38) , int(height_buffer + cell_height*(taxi_oomdp.height - pass_y) + taxi_size + 35)
         dest_col = (max(color_ls[-i-1][0]-30, 0), max(color_ls[-i-1][1]-30, 0), max(color_ls[-i-1][2]-30, 0))
         pygame.draw.circle(screen, dest_col, top_left_point, taxi_size)
-    
+
     # Statics
     if draw_statics:
         # For each row:

@@ -17,10 +17,10 @@ def main(open_plot=True):
     mdp = TaxiOOMDP(width=4, height=4, agent=agent, walls=walls, passengers=passengers)
 
     # Agents.
-    ql_agent = QLearningAgent(actions=mdp.get_actions()) 
+    ql_agent = QLearningAgent(actions=mdp.get_actions())
     rand_agent = RandomAgent(actions=mdp.get_actions())
 
-    viz = False
+    viz = True
     if viz:
         # Visualize Taxi.
         run_single_agent_on_mdp(ql_agent, mdp, episodes=50, steps=1000)
