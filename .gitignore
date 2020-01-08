@@ -15,3 +15,4 @@ examples/blank_example.py
 *.pdf
 docs/sphinx/
 examples/experiments_to_reproduce/*
+models/*
