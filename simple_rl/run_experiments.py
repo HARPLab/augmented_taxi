@@ -281,8 +281,6 @@ def run_agents_on_mdp(agents,
             print("  Instance " + str(instance) + " of " + str(instances) + ".")
             sys.stdout.flush()
             run_single_agent_on_mdp(agent, mdp, episodes, steps, experiment, verbose, track_disc_reward, reset_at_terminal=reset_at_terminal)
-            if "fixed" in agent.name:
-                break
 
             # Reset the agent.
             agent.reset()
@@ -291,7 +289,7 @@ def run_agents_on_mdp(agents,
         end = time.clock()
         time_dict[agent] = round(end - start, 3)
         print()
-        
+
 
     # Time stuff.
     print("\n--- TIMES ---")
@@ -359,7 +357,7 @@ def run_single_agent_on_mdp(agent, mdp, episodes, steps, experiment=None, verbos
                     continue
                 break
 
-            # Execute in MDP.
+            # Execute in MDP. Reward corresponds to landing in the next state
             reward, next_state = mdp.execute_agent_action(action)
 
             # Track value.
@@ -578,14 +576,14 @@ def _get_params_from_lines(lines, start_index):
         # Grab param name, value, and type.
         next_line = [item.strip() for item in lines[i].split("=")]
         param_name, param_val, param_type = next_line[0], next_line[1], next_line[2][next_line[2].find("'") + 1 : next_line[2].rfind("'")]
-        
+
         if param_type == "bool":
             param_val = bool(param_val == "True")
         elif param_type == "tuple":
             param_val = make_tuple(param_val)
         elif param_type == "list":
             param_val = ast.literal_eval(param_val)
-        else:         
+        else:
             param_val = eval(param_type)(param_val)
         agent_param_dict[param_name] = param_val
 
@@ -654,7 +652,7 @@ def main():
 
     # Setup agents.
     from simple_rl.agents import RandomAgent, QLearningAgent
-    
+
     random_agent = RandomAgent(actions)
     qlearner_agent = QLearningAgent(actions, gamma=gamma, explore="uniform")
     agents = [qlearner_agent, random_agent]

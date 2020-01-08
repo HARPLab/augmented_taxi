@@ -169,11 +169,11 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
     # Setup and draw initial state.
     cur_state = mdp.get_init_state() if cur_state is None else cur_state
     reward = 0
-    rpl = 0 
+    rpl = 0
     score = 0
     default_goal_x, default_goal_y = mdp.width, mdp.height
     agent_shape = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
-    
+
     pygame.display.update()
     done = False
 
@@ -253,7 +253,7 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
                 action = agent.act(cur_state, reward)
                 reward, cur_state = mdp.execute_agent_action(action)
                 agent_shape = draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True,agent_shape=agent_shape)
-                
+
                 score = round(rpl)
                 rpl += reward
 
@@ -267,7 +267,7 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
                     mdp.reset()
                     agent_shape = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
                     break
-            
+
             i+=1
             cur_state = mdp.get_init_state()
             mdp.reset()
@@ -401,7 +401,7 @@ def convert_x_y_to_grid_cell(x, y, scr_width, scr_height, mdp_width, mdp_height)
     height_buffer = 30 + (scr_height / 10.0) # Add 30 for title.
 
     lower_left_x, lower_left_y = x - width_buffer, scr_height - y - height_buffer
-    
+
     cell_width = (scr_width - width_buffer * 2) / mdp_width
     cell_height = (scr_height - height_buffer * 2) / mdp_height
 

@@ -41,7 +41,7 @@ class QLearningAgent(Agent):
             self.q_func = self.custom_q_init
         else:
             self.q_func = defaultdict(lambda: defaultdict(lambda: self.default_q))
-        
+
         # Key: state
         # Val: dict
             #   Key: action
@@ -153,7 +153,7 @@ class QLearningAgent(Agent):
         max_q_curr_state = self.get_max_q_value(next_state)
         prev_q_val = self.get_q_value(state, action)
         self.q_func[state][action] = (1 - self.alpha) * prev_q_val + self.alpha * (reward + self.gamma*max_q_curr_state)
-        
+
 
     def _anneal(self):
         # Taken from "Note on learning rate schedules for stochastic optimization, by Darken and Moody (Yale)":

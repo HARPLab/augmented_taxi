@@ -31,7 +31,7 @@ class BanditMDP(MDP):
         MDP.__init__(self, BanditMDP.ACTIONS, self._transition_func, self._reward_func, init_state=State(1), gamma=1.0)
         self.num_arms = num_arms
         self.distr_family = distr_family
-        self.distr_params = self.init_distr_params() if distr_params is None else distr_params    
+        self.distr_params = self.init_distr_params() if distr_params is None else distr_params
 
     def get_parameters(self):
         '''
@@ -42,7 +42,7 @@ class BanditMDP(MDP):
         param_dict["num_arms"] = self.num_arms
         param_dict["distr_family"] = self.distr_family
         param_dict["distr_params"] = self.distr_params
-   
+
         return param_dict
 
     def init_distr_params(self):
@@ -56,7 +56,7 @@ class BanditMDP(MDP):
             (dict)
         '''
         distr_params = defaultdict(lambda: defaultdict(list))
-        
+
         for i in range(self.num_arms):
             next_mu = np.random.uniform(-1.0, 1.0)
             next_sigma = np.random.uniform(0, 2.0)
@@ -93,4 +93,4 @@ class BanditMDP(MDP):
         return state
 
     def __str__(self):
-        return str(self.num_arms) + "_Armed_Bandit" 
+        return str(self.num_arms) + "_Armed_Bandit"

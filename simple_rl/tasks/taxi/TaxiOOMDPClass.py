@@ -142,10 +142,10 @@ class TaxiOOMDP(OOMDP):
     def __str__(self):
         return "taxi_h-" + str(self.height) + "_w-" + str(self.width)
 
-    def visualize_agent(self, agent):
+    def visualize_agent(self, agent, width_scr_scale=180, height_scr_scale=180):
         from ...utils.mdp_visualizer import visualize_agent
         from .taxi_visualizer import _draw_state
-        visualize_agent(self, agent, _draw_state)
+        visualize_agent(self, agent, _draw_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
         _ = input("Press anything to quit ")
         sys.exit(1)
 

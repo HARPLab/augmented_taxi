@@ -36,6 +36,15 @@ def _move_pass_in_taxi(state, dx=0, dy=0):
             passenger_attr_dict_ls[i]["x"] += dx
             passenger_attr_dict_ls[i]["y"] += dy
 
+def _moved_off_of_toll(state, next_state):
+    for toll in state.get_objects_of_class("toll"):
+        # if current state's agent x, y coincides with any x, y of the tolls
+        if toll.attributes['x'] == state.get_agent_x() and toll.attributes['y'] == state.get_agent_y():
+            # and if the next state's agent x, y moved off of the x, y of the toll
+            if toll.attributes['x'] != next_state.get_agent_x() or toll.attributes['y'] != next_state.get_agent_y():
+                return True, toll.attributes['fee']
+    return False, 0
+
 def is_taxi_terminal_state(state):
     '''
     Args:

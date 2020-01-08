@@ -22,6 +22,8 @@ from simple_rl.tasks.random.RandomMDPClass import RandomMDP
 from simple_rl.tasks.random.RandomStateClass import RandomState
 from simple_rl.tasks.taxi.TaxiOOMDPClass import TaxiOOMDP
 from simple_rl.tasks.taxi.TaxiStateClass import TaxiState
+from simple_rl.tasks.taxi.AugmentedTaxiOOMDPClass import AugmentedTaxiOOMDP
+from simple_rl.tasks.taxi.AugmentedTaxiStateClass import AugmentedTaxiState
 from simple_rl.tasks.trench.TrenchOOMDPClass import TrenchOOMDP
 from simple_rl.tasks.rock_paper_scissors.RockPaperScissorsMDPClass import RockPaperScissorsMDP
 try:
