@@ -151,19 +151,40 @@ class AugmentedTaxiOOMDP(OOMDP):
     def __str__(self):
         return "taxi_h-" + str(self.height) + "_w-" + str(self.width)
 
+    # Visualize the agent's policy. --> Press <spacebar> to advance the agent.
     def visualize_agent(self, agent, width_scr_scale=180, height_scr_scale=180):
-        from ...utils.mdp_visualizer import visualize_agent
+        from simple_rl.utils.mdp_visualizer import visualize_agent
         from .taxi_visualizer import _draw_state
         visualize_agent(self, agent, _draw_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
-        _ = input("Press anything to quit ")
-        sys.exit(1)
 
-    def visualize_interaction(self):
+    # Press <1>, <2>, <3>, and so on to execute action 1, action 2, etc.
+    def visualize_interaction(self, width_scr_scale=180, height_scr_scale=180):
         from simple_rl.utils.mdp_visualizer import visualize_interaction
         from .taxi_visualizer import _draw_state
-        visualize_interaction(self, _draw_state)
-        raw_input("Press anything to quit ")
-        sys.exit(1)
+        visualize_interaction(self, _draw_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
+
+    # Visualize the value of each of the grid cells. --> Color corresponds to higher value.
+    # (Currently not very helpful - see first comment in taxi_visualizer.py)
+    def visualize_value(self, agent=None, width_scr_scale=180, height_scr_scale=180):
+        from simple_rl.utils.mdp_visualizer import visualize_value
+        from .taxi_visualizer import _draw_state
+        visualize_value(self, _draw_state, agent, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
+
+    # Visualize the optimal action for each of the grid cells
+    # (Currently not very helpful - see first comment in taxi_visualizer.py)
+    def visualize_policy(self, policy, width_scr_scale=180, height_scr_scale=180):
+        from simple_rl.utils.mdp_visualizer import visualize_policy
+        from .taxi_visualizer import _draw_state
+
+        action_char_dict = {
+            "up": "^",       #u"\u2191",
+            "down": "v",     #u"\u2193",
+            "left": "<",     #u"\u2190",
+            "right": ">",  # u"\u2192"
+            "pickup": "pk",  # u"\u2192"
+            "dropoff": "dp",  # u"\u2192"
+        }
+        visualize_policy(self, policy, _draw_state, action_char_dict, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
 
 
     # ----------------------------

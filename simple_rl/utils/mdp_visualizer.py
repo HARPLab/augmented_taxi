@@ -119,7 +119,7 @@ def visualize_policy(mdp, policy, draw_state, action_char_dict, cur_state=None, 
 
         time.sleep(0.1)
 
-def visualize_value(mdp, draw_state, cur_state=None, scr_width=720, scr_height=720):
+def visualize_value(mdp, draw_state, agent=None, cur_state=None, scr_width=720, scr_height=720):
     '''
     Args:
         mdp (MDP)
@@ -135,7 +135,7 @@ def visualize_value(mdp, draw_state, cur_state=None, scr_width=720, scr_height=7
     cur_state = mdp.get_init_state() if cur_state is None else cur_state
 
     agent_shape = _vis_init(screen, mdp, draw_state, cur_state, value=True)
-    draw_state(screen, mdp, cur_state, show_value=True, draw_statics=True)
+    draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True)
     pygame.display.flip()
 
     while True:
@@ -147,6 +147,15 @@ def visualize_value(mdp, draw_state, cur_state=None, scr_width=720, scr_height=7
                 sys.exit()
 
         time.sleep(0.1)
+
+    print("Press ESC to quit")
+    while True:
+        # Check for key presses.
+        for event in pygame.event.get():
+            if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
+                # Quit.
+                pygame.quit()
+                sys.exit()
 
 def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_height=720, delay=0, num_ep=None, num_steps=None):
     '''
@@ -275,6 +284,14 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
 
     pygame.display.flip()
 
+    print("Press ESC to quit")
+    while True:
+        # Check for key presses.
+        for event in pygame.event.get():
+            if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
+                # Quit.
+                pygame.quit()
+                sys.exit()
 
 def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_height=720):
     '''
@@ -324,6 +341,15 @@ def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_h
 
         pygame.display.flip()
 
+    print("Press ESC to quit")
+    while True:
+        # Check for key presses.
+        for event in pygame.event.get():
+            if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
+                # Quit.
+                pygame.quit()
+                sys.exit()
+
 def visualize_interaction(mdp, draw_state, cur_state=None, scr_width=720, scr_height=720):
     '''
     Args:
@@ -335,13 +361,9 @@ def visualize_interaction(mdp, draw_state, cur_state=None, scr_width=720, scr_he
     '''
     screen = pygame.display.set_mode((scr_width, scr_height))
 
-    from simple_rl.agents import RandomAgent
-    agent = RandomAgent
-
     # Setup and draw initial state.
     cur_state = mdp.get_init_state() if cur_state is None else cur_state
-    reward = 0
-    agent_shape = _vis_init(screen, mdp, draw_state, cur_state, agent)
+    agent_shape = _vis_init(screen, mdp, draw_state, cur_state)
 
     actions = mdp.get_actions()
 
@@ -373,7 +395,16 @@ def visualize_interaction(mdp, draw_state, cur_state=None, scr_width=720, scr_he
             screen.blit(goal_text_rendered, goal_text_point)
             done = True
 
-        pygame.display.update()
+        pygame.display.flip()
+
+    print("Press ESC to quit")
+    while True:
+        # Check for key presses.
+        for event in pygame.event.get():
+            if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
+                # Quit.
+                pygame.quit()
+                sys.exit()
 
 def _vis_init(screen, mdp, draw_state, cur_state, agent=None, value=False, score=-1):
     # Pygame setup.
@@ -384,7 +415,7 @@ def _vis_init(screen, mdp, draw_state, cur_state, agent=None, value=False, score
 
     if score != -1:
         _draw_lower_left_text("Score: " + str(score), screen)
-    agent_shape = draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True)
+    agent_shape = draw_state(screen, mdp, cur_state, agent=agent, draw_statics=True)
 
     return agent_shape
 

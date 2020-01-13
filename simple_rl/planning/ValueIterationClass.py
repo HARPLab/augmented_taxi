@@ -2,7 +2,7 @@
 from __future__ import print_function
 from collections import defaultdict
 import random
-import copy 
+import copy
 
 # Check python version for queue module.
 import sys
@@ -96,7 +96,7 @@ class ValueIteration(Planner):
             if not s.is_terminal():
                 expected_future_val += self.trans_dict[s][a][s_prime] * self.reward_func(s, a, s_prime) + \
                                        self.gamma * self.trans_dict[s][a][s_prime] * self.value_func[s_prime]
-                
+
         return expected_future_val
 
     def _compute_reachable_state_space(self):
@@ -176,10 +176,10 @@ class ValueIteration(Planner):
             (tuple):
                 1. (int): num iterations taken.
                 2. (float): value.
-                3. (list of dict of state and float): 
+                3. (list of dict of state and float):
                     histories of the previous iterations.
         Summary:
-            Runs ValueIteration and fills in the self.value_func and returns histories        
+            Runs ValueIteration and fills in the self.value_func and returns histories
         '''
         # Algorithm bookkeeping params.
         iterations = 0
@@ -195,7 +195,7 @@ class ValueIteration(Planner):
             max_diff = 0
             for s in state_space:
                 self.bellman_backups += 1
-                if s.is_terminal():                    
+                if s.is_terminal():
                     continue
 
                 max_q = float("-inf")

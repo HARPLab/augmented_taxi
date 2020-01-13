@@ -62,7 +62,7 @@ def _draw_state(screen,
     scr_width, scr_height = screen.get_width(), screen.get_height()
     width_buffer = scr_width / 10.0
     height_buffer = 30 + (scr_height / 10.0) # Add 30 for title.
-    cell_width = (scr_width - width_buffer * 2) / grid_mdp.width 
+    cell_width = (scr_width - width_buffer * 2) / grid_mdp.width
     cell_height = (scr_height - height_buffer * 2) / grid_mdp.height
     goal_locs = grid_mdp.get_goal_locs()
     lava_locs = grid_mdp.get_lava_locs()

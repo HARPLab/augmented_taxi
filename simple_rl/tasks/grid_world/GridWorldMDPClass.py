@@ -184,7 +184,7 @@ class GridWorldMDP(MDP):
         '''
         if state.is_terminal():
             return state
-        
+
         if not(self._is_goal_state_action(state, action)) and self.slip_prob > random.random():
             # Flip dir.
             if action == "up":

@@ -3,6 +3,12 @@
 # Other imports.
 from simple_rl.mdp.oomdp.OOMDPObjectClass import OOMDPObject
 
+def is_wall(state, x, y):
+    for wall in state.objects["wall"]:
+        if wall["x"] == x and wall["y"] == y:
+            return True
+    return False
+
 def _is_wall_in_the_way(state, dx=0, dy=0):
     '''
     Args:

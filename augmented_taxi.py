@@ -2,11 +2,13 @@
 
 # Python imports.
 import sys
+import dill as pickle
 
 # Other imports.
 sys.path.append("simple_rl")
 from simple_rl.agents import QLearningAgent, RandomAgent, FixedPolicyAgent
 from simple_rl.tasks import AugmentedTaxiOOMDP
+from simple_rl.planning import ValueIteration
 from simple_rl.run_experiments import run_agents_on_mdp, run_single_agent_on_mdp
 
 def main(open_plot=True):
@@ -26,11 +28,25 @@ def main(open_plot=True):
     run_single_agent_on_mdp(ql_agent, mdp, episodes=500, steps=1000)
 
     # Test on training domain
-    fixed_agent = FixedPolicyAgent(ql_agent.epsilon_greedy_q_policy)
-    run_agents_on_mdp([fixed_agent, rand_agent], mdp, instances=10, episodes=1, steps=500, reset_at_terminal=False, open_plot=open_plot)
+    # fixed_agent = FixedPolicyAgent(ql_agent.epsilon_greedy_q_policy)
+    # fixed_agent = FixedPolicyAgent(vi.policy)
+    # run_agents_on_mdp([fixed_agent, rand_agent], mdp, instances=10, episodes=1, steps=500, reset_at_terminal=False, open_plot=open_plot)
     viz = True
     if viz:
-        mdp.visualize_agent(fixed_agent)
+        # visualize agent
+        mdp.visualize_agent(ql_agent)
+
+        value_iter = ValueIteration(mdp)
+        value_iter.run_vi()
+        # visualize value (incomplete)
+        mdp.visualize_value(value_iter)
+
+        # visualize policy (incomplete)
+        policy = value_iter.policy
+        mdp.visualize_policy(policy)
+
+        # visualize interaction
+        mdp.visualize_interaction()
 
 if __name__ == "__main__":
     main(open_plot=not sys.argv[-1] == "no_plot")
