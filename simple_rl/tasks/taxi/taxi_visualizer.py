@@ -118,6 +118,13 @@ def _draw_state(screen,
                     taxi_oomdp.height - t_y) + 5
             pygame.draw.rect(screen, (224, 230, 67), top_left_point + (cell_width - 10, cell_height - 10), 0)
 
+        # Draw traffic cells.
+        for t in objects["traffic"]:
+            t_x, t_y = t["x"], t["y"]
+            top_left_point = width_buffer + cell_width * (t_x - 1) + 5, height_buffer + cell_height * (
+                    taxi_oomdp.height - t_y) + 5
+            pygame.draw.rect(screen, (58, 28, 232), top_left_point + (cell_width - 10, cell_height - 10), 0)
+
     # Draw the destination.
     for i, p in enumerate(objects["passenger"]):
         # Dest.

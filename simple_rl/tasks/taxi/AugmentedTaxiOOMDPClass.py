@@ -27,9 +27,9 @@ class AugmentedTaxiOOMDP(OOMDP):
     # Static constants.
     ACTIONS = ["up", "down", "left", "right", "pickup", "dropoff"]
     ATTRIBUTES = ["x", "y", "has_passenger", "in_taxi", "dest_x", "dest_y"]
-    CLASSES = ["agent", "wall", "passenger", "toll"]
+    CLASSES = ["agent", "wall", "passenger", "toll", "traffic"]
 
-    def __init__(self, width, height, agent, walls, passengers, tolls, slip_prob=0, gamma=0.99):
+    def __init__(self, width, height, agent, walls, passengers, tolls, traffic, slip_prob=0, gamma=0.99):
         self.height = height
         self.width = width
 
@@ -37,18 +37,20 @@ class AugmentedTaxiOOMDP(OOMDP):
         wall_objs = self._make_oomdp_objs_from_list_of_dict(walls, "wall")
         pass_objs = self._make_oomdp_objs_from_list_of_dict(passengers, "passenger")
         toll_objs = self._make_oomdp_objs_from_list_of_dict(tolls, "toll")
+        traffic_objs = self._make_oomdp_objs_from_list_of_dict(traffic, "traffic")
 
-        init_state = self._create_state(agent_obj, wall_objs, pass_objs, toll_objs)
+        init_state = self._create_state(agent_obj, wall_objs, pass_objs, toll_objs, traffic_objs)
         OOMDP.__init__(self, AugmentedTaxiOOMDP.ACTIONS, self._taxi_transition_func, self._taxi_reward_func, init_state=init_state, gamma=gamma)
         self.slip_prob = slip_prob
 
-    def _create_state(self, agent_oo_obj, walls, passengers, tolls):
+    def _create_state(self, agent_oo_obj, walls, passengers, tolls, traffic):
         '''
         Args:
             agent_oo_obj (OOMDPObjects)
             walls (list of OOMDPObject)
             passengers (list of OOMDPObject)
             tolls (list of OOMDPObject)
+            traffic (list of OOMDPObject)
 
         Returns:
             (OOMDP State)
@@ -71,6 +73,10 @@ class AugmentedTaxiOOMDP(OOMDP):
         # Make tolls.
         for t in tolls:
             objects["toll"].append(t)
+
+        # Make traffic cells.
+        for t in traffic:
+            objects["traffic"].append(t)
 
         return AugmentedTaxiState(objects)
 
@@ -120,18 +126,25 @@ class AugmentedTaxiOOMDP(OOMDP):
         _error_check(state, action)
 
         # if there is a slip, prevent a navigation action from occurring
-        slip = False
+        stuck = False
         if self.slip_prob > random.random():
-            slip = True
+            stuck = True
 
-        if action == "up" and state.get_agent_y() < self.height and not slip:
-            next_state = self.move_agent(state, self.slip_prob, dy=1)
-        elif action == "down" and state.get_agent_y() > 1 and not slip:
-            next_state = self.move_agent(state, self.slip_prob, dy=-1)
-        elif action == "right" and state.get_agent_x() < self.width and not slip:
-            next_state = self.move_agent(state, self.slip_prob, dx=1)
-        elif action == "left" and state.get_agent_x() > 1 and not slip:
-            next_state = self.move_agent(state, self.slip_prob, dx=-1)
+        # if you're at a traffic cell, determine whether you're stuck or not with the corresponding traffic probability
+        at_traffic, prob_traffic = taxi_helpers.at_traffic(state, state.get_agent_x(), state.get_agent_y())
+
+        if at_traffic:
+            if prob_traffic > random.random():
+                stuck = True
+
+        if action == "up" and state.get_agent_y() < self.height and not stuck:
+            next_state = self.move_agent(state, dy=1)
+        elif action == "down" and state.get_agent_y() > 1 and not stuck:
+            next_state = self.move_agent(state, dy=-1)
+        elif action == "right" and state.get_agent_x() < self.width and not stuck:
+            next_state = self.move_agent(state, dx=1)
+        elif action == "left" and state.get_agent_x() > 1 and not stuck:
+            next_state = self.move_agent(state, dx=-1)
         elif action == "dropoff":
             next_state = self.agent_dropoff(state)
         elif action == "pickup":
@@ -191,7 +204,7 @@ class AugmentedTaxiOOMDP(OOMDP):
     # -- Action Implementations --
     # ----------------------------
 
-    def move_agent(self, state, slip_prob=0, dx=0, dy=0):
+    def move_agent(self, state, dx=0, dy=0):
         '''
         Args:
             state (AugmentedTaxiState)

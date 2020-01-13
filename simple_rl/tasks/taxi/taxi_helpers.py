@@ -9,6 +9,13 @@ def is_wall(state, x, y):
             return True
     return False
 
+def at_traffic(state, x, y):
+    for traffic in state.objects["traffic"]:
+        if traffic["x"] == x and traffic["y"] == y:
+            return True, traffic["prob"]
+
+    return False, 0
+
 def _is_wall_in_the_way(state, dx=0, dy=0):
     '''
     Args:
