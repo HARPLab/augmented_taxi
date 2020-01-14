@@ -33,7 +33,7 @@ class GridWorldMDP(MDP):
                 lava_locs=[()],
                 walls=[],
                 is_goal_terminal=True,
-                is_lava_terminal=False,
+                is_lava_terminal=True,
                 gamma=0.99,
                 slip_prob=0.0,
                 step_cost=0.0,
@@ -210,11 +210,13 @@ class GridWorldMDP(MDP):
 
         landed_in_term_goal = (next_state.x, next_state.y) in self.goal_locs and self.is_goal_terminal
         landed_in_term_lava = (next_state.x, next_state.y) in self.lava_locs and self.is_lava_terminal
-        if landed_in_term_goal or landed_in_term_lava:
-            next_state.set_terminal(True)
 
-        if (next_state.x, next_state.y) in self.lava_locs:
+        if landed_in_term_goal:
             next_state.set_terminal(True)
+            next_state.set_goal(True)
+        if landed_in_term_lava:
+            next_state.set_terminal(True)
+            next_state.set_goal(False)
 
         return next_state
 

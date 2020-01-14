@@ -30,6 +30,10 @@ class AugmentedTaxiState(OOMDPState):
     def decrement_fuel(self):
         self.objects["agent"][0]["fuel"] -= 1
 
+    # selectively return attributes of the state to print out
+    def abbr_str(self):
+        return "Fuel: " + str(self.objects["agent"][0]["fuel"])
+
     def __hash__(self):
 
         state_hash = str(self.get_agent_x()) + str(self.get_agent_y()) + "00"

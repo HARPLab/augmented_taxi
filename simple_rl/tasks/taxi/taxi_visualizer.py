@@ -3,6 +3,7 @@ from __future__ import print_function
 from collections import defaultdict
 try:
     import pygame
+    title_font = pygame.font.SysFont("CMU Serif", 48)
 except ImportError:
     print("Warning: pygame not installed (needed for visuals).")
 

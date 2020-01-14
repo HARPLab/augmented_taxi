@@ -80,8 +80,12 @@ def _draw_lower_left_text(state, screen, score=-1):
     # Clear.
     formatted_state_text = str(state) if score == -1 else score
     if len(formatted_state_text) > 20:
+        # See if state has an abbreviated version of state information
+        try:
+            formatted_state_text = state.abbr_str()
         # State text is too long, ignore.
-        return
+        except:
+            return
     state_text_point = (scr_width / 4.0 - len(formatted_state_text)*7, 18*scr_height / 20.0)
     pygame.draw.rect(screen, (255,255,255), (state_text_point[0] - 20, state_text_point[1]) + (200,40))
     state_text = title_font.render(formatted_state_text, True, (46, 49, 49))

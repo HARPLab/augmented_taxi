@@ -26,12 +26,12 @@ def main(open_plot=True):
 
     # Train
     value_iter = ValueIteration(mdp)
-    value_iter.run_vi()
-    fixed_agent = FixedPolicyAgent(value_iter.policy)
+    # value_iter.run_vi()
+    # fixed_agent = FixedPolicyAgent(value_iter.policy)
 
     # Visualize agent
-    mdp.visualize_agent(fixed_agent)
-    # mdp.visualize_interaction()
+    # mdp.visualize_agent(fixed_agent)
+    mdp.visualize_interaction()
 
 if __name__ == "__main__":
     main(open_plot=not sys.argv[-1] == "no_plot")
