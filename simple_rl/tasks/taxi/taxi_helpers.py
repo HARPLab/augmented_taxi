@@ -4,15 +4,51 @@
 from simple_rl.mdp.oomdp.OOMDPObjectClass import OOMDPObject
 
 def is_wall(state, x, y):
+    '''
+    Args:
+        state (TaxiState)
+        x (int) [agent's x]
+        y (int) [agent's y]
+
+    Returns:
+        (bool): true iff the current loc of the agent is occupied by a wall.
+    '''
     for wall in state.objects["wall"]:
         if wall["x"] == x and wall["y"] == y:
             return True
     return False
 
 def at_traffic(state, x, y):
+    '''
+    Args:
+        state (TaxiState)
+        x (int) [agent's x]
+        y (int) [agent's y]
+
+    Returns:
+        (bool): true iff the current loc of the agent is a traffic cell.
+        (float): probability of getting stuck at this traffic cell
+    '''
     for traffic in state.objects["traffic"]:
         if traffic["x"] == x and traffic["y"] == y:
             return True, traffic["prob"]
+
+    return False, 0.
+
+def at_fuel_station(state, x, y):
+    '''
+    Args:
+        state (TaxiState)
+        x (int) [agent's x]
+        y (int) [agent's y]
+
+    Returns:
+        (bool): true iff the current loc of the agent is a traffic cell.
+        (int): fuel capacity to fill up to
+    '''
+    for fuel_station in state.objects["fuel_station"]:
+        if fuel_station["x"] == x and fuel_station["y"] == y:
+            return True, fuel_station["max_fuel_capacity"]
 
     return False, 0
 
@@ -66,8 +102,37 @@ def is_taxi_terminal_state(state):
     Returns:
         (bool): True iff all passengers at at their destinations, not in the taxi.
     '''
+    # check fuel level if applicable
+    if state.track_fuel():
+        if state.objects["agent"][0]["fuel"] <= 0:
+            return True
+
+    # check if all passengers are at destination
     for p in state.get_objects_of_class("passenger"):
         if p.get_attribute("in_taxi") == 1 or p.get_attribute("x") != p.get_attribute("dest_x") or \
             p.get_attribute("y") != p.get_attribute("dest_y"):
             return False
     return True
+
+def is_taxi_terminal_and_goal_state(state):
+    '''
+    Args:
+        state (OOMDPState)
+
+    Returns:
+        (bool): True iff all passengers at at their destinations, not in the taxi.
+    '''
+    # check fuel level if applicable
+    if state.track_fuel():
+        if state.objects["agent"][0]["fuel"] <= 0:
+            # is terminal, but not goal state
+            return True, False
+
+    # check if all passengers are at destination
+    for p in state.get_objects_of_class("passenger"):
+        if p.get_attribute("in_taxi") == 1 or p.get_attribute("x") != p.get_attribute("dest_x") or \
+            p.get_attribute("y") != p.get_attribute("dest_y"):
+            # is neither terminal nor goal state
+            return False, False
+    # is terminal and goal state
+    return True, True

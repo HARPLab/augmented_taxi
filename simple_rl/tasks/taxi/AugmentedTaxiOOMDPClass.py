@@ -25,11 +25,11 @@ class AugmentedTaxiOOMDP(OOMDP):
     ''' Class for a Taxi OO-MDP '''
 
     # Static constants.
-    ACTIONS = ["up", "down", "left", "right", "pickup", "dropoff"]
+    ACTIONS = ["up", "down", "left", "right", "pickup", "dropoff", "refuel"]
     ATTRIBUTES = ["x", "y", "has_passenger", "in_taxi", "dest_x", "dest_y"]
-    CLASSES = ["agent", "wall", "passenger", "toll", "traffic"]
+    CLASSES = ["agent", "wall", "passenger", "toll", "traffic", "fuel_station"]
 
-    def __init__(self, width, height, agent, walls, passengers, tolls, traffic, slip_prob=0, gamma=0.99):
+    def __init__(self, width, height, agent, walls, passengers, tolls, traffic, fuel_stations, slip_prob=0, gamma=0.99):
         self.height = height
         self.width = width
 
@@ -38,12 +38,13 @@ class AugmentedTaxiOOMDP(OOMDP):
         pass_objs = self._make_oomdp_objs_from_list_of_dict(passengers, "passenger")
         toll_objs = self._make_oomdp_objs_from_list_of_dict(tolls, "toll")
         traffic_objs = self._make_oomdp_objs_from_list_of_dict(traffic, "traffic")
+        fuel_station_objs = self._make_oomdp_objs_from_list_of_dict(fuel_stations, "fuel_station")
 
-        init_state = self._create_state(agent_obj, wall_objs, pass_objs, toll_objs, traffic_objs)
+        init_state = self._create_state(agent_obj, wall_objs, pass_objs, toll_objs, traffic_objs, fuel_station_objs)
         OOMDP.__init__(self, AugmentedTaxiOOMDP.ACTIONS, self._taxi_transition_func, self._taxi_reward_func, init_state=init_state, gamma=gamma)
         self.slip_prob = slip_prob
 
-    def _create_state(self, agent_oo_obj, walls, passengers, tolls, traffic):
+    def _create_state(self, agent_oo_obj, walls, passengers, tolls, traffic, fuel_stations):
         '''
         Args:
             agent_oo_obj (OOMDPObjects)
@@ -51,6 +52,7 @@ class AugmentedTaxiOOMDP(OOMDP):
             passengers (list of OOMDPObject)
             tolls (list of OOMDPObject)
             traffic (list of OOMDPObject)
+            fuel_stations (list of OOMDPObject)
 
         Returns:
             (OOMDP State)
@@ -77,6 +79,10 @@ class AugmentedTaxiOOMDP(OOMDP):
         # Make traffic cells.
         for t in traffic:
             objects["traffic"].append(t)
+
+        # Make fuel stations.
+        for f in fuel_stations:
+            objects["fuel_station"].append(f)
 
         return AugmentedTaxiState(objects)
 
@@ -137,6 +143,10 @@ class AugmentedTaxiOOMDP(OOMDP):
             if prob_traffic > random.random():
                 stuck = True
 
+        # decrement fuel if it exists
+        if state.track_fuel():
+            state.decrement_fuel()
+
         if action == "up" and state.get_agent_y() < self.height and not stuck:
             next_state = self.move_agent(state, dy=1)
         elif action == "down" and state.get_agent_y() > 1 and not stuck:
@@ -149,12 +159,17 @@ class AugmentedTaxiOOMDP(OOMDP):
             next_state = self.agent_dropoff(state)
         elif action == "pickup":
             next_state = self.agent_pickup(state)
+        elif action == "refuel":
+            next_state = self.agent_refuel(state)
         else:
             next_state = state
 
         # Make terminal.
-        if taxi_helpers.is_taxi_terminal_state(next_state):
+        is_terminal, is_goal = taxi_helpers.is_taxi_terminal_and_goal_state(next_state)
+        if is_terminal:
             next_state.set_terminal(True)
+        if is_goal:
+            next_state.set_goal(True)
 
         # All OOMDP states must be updated.
         next_state.update()
@@ -236,6 +251,8 @@ class AugmentedTaxiOOMDP(OOMDP):
         Args:
             state (AugmentedTaxiState)
 
+        Returns:
+            (AugmentedTaxiState)
         '''
         next_state = copy.deepcopy(state)
 
@@ -276,6 +293,26 @@ class AugmentedTaxiOOMDP(OOMDP):
                     # Drop off the passenger.
                     passengers[i].set_attribute("in_taxi", 0)
                     agent.set_attribute("has_passenger", 0)
+
+        return next_state
+
+    def agent_refuel(self, state):
+        '''
+        Args:
+            state (AugmentedTaxiState)
+
+        Returns:
+            (AugmentedTaxiState)
+        '''
+        next_state = copy.deepcopy(state)
+
+        # Get Agent, Walls, Passengers.
+        agent = next_state.get_first_obj_of_class("agent")
+
+        at_fuel_station, max_fuel_capacity = taxi_helpers.at_fuel_station(state, state.get_agent_x(), state.get_agent_y())
+
+        if at_fuel_station:
+            agent["fuel"] = max_fuel_capacity
 
         return next_state
 

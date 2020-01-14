@@ -15,14 +15,32 @@ class AugmentedTaxiState(OOMDPState):
     def get_agent_y(self):
         return self.objects["agent"][0]["y"]
 
+    def get_fuel(self):
+        return self.objects["agent"][0]["fuel"]
+
+    def track_fuel(self):
+        try:
+            if self.objects["agent"][0]["fuel"] is not None:
+                return True
+            else:
+                return False
+        except:
+            return False
+
+    def decrement_fuel(self):
+        self.objects["agent"][0]["fuel"] -= 1
+
     def __hash__(self):
 
-    	state_hash = str(self.get_agent_x()) + str(self.get_agent_y()) + "00"
+        state_hash = str(self.get_agent_x()) + str(self.get_agent_y()) + "00"
 
-    	for p in self.objects["passenger"]:
-    		state_hash += str(p["x"]) + str(p["y"]) + str(p["in_taxi"])
+        for p in self.objects["passenger"]:
+            state_hash += str(p["x"]) + str(p["y"]) + str(p["in_taxi"])
 
-    	return int(state_hash)
+        if self.track_fuel():
+            state_hash += str(self.get_fuel())
+
+        return int(state_hash)
 
     def __eq__(self, other_taxi_state):
         return hash(self) == hash(other_taxi_state)

@@ -125,6 +125,13 @@ def _draw_state(screen,
                     taxi_oomdp.height - t_y) + 5
             pygame.draw.rect(screen, (58, 28, 232), top_left_point + (cell_width - 10, cell_height - 10), 0)
 
+        # Draw fuel stations.
+        for f in objects["fuel_station"]:
+            f_x, f_y = f["x"], f["y"]
+            top_left_point = width_buffer + cell_width * (f_x - 1) + 5, height_buffer + cell_height * (
+                    taxi_oomdp.height - f_y) + 5
+            pygame.draw.rect(screen, (144, 0, 255), top_left_point + (cell_width - 10, cell_height - 10), 0)
+
     # Draw the destination.
     for i, p in enumerate(objects["passenger"]):
         # Dest.

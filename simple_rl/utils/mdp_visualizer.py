@@ -332,8 +332,12 @@ def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_h
                 _draw_lower_left_text(cur_state, screen)
 
         if cur_state.is_terminal():
-            # Done! Agent found goal.
-            goal_text = "Victory!"
+            if cur_state.is_goal():
+                # Done! Agent found goal.
+                goal_text = "Success!"
+            else:
+                # Done! Agent failed.
+                goal_text = "Fail!"
             goal_text_rendered = title_font.render(goal_text, True, (206, 147, 66))
             goal_text_point = scr_width / 2.0 - (len(goal_text)*7), 18*scr_height / 20.0
             screen.blit(goal_text_rendered, goal_text_point)
@@ -367,7 +371,7 @@ def visualize_interaction(mdp, draw_state, cur_state=None, scr_width=720, scr_he
 
     actions = mdp.get_actions()
 
-    keys = [K_1, K_2, K_3, K_4, K_5, K_6]
+    keys = [K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, K_9, K_0]
     keys = keys[:len(actions)]
 
     done = False
@@ -388,8 +392,12 @@ def visualize_interaction(mdp, draw_state, cur_state=None, scr_width=720, scr_he
                 _draw_lower_left_text(cur_state, screen)
 
         if cur_state.is_terminal():
-            # Done! Agent found goal. Not if the state is lava!! (Tofix)
-            goal_text = "Victory!"
+            if cur_state.is_goal():
+                # Done! Agent found goal.
+                goal_text = "Success!"
+            else:
+                # Done! Agent failed.
+                goal_text = "Fail!"
             goal_text_rendered = title_font.render(goal_text, True, (246, 207, 106))
             goal_text_point = scr_width / 2.0 - (len(goal_text)*7), 18*scr_height / 20.0
             screen.blit(goal_text_rendered, goal_text_point)

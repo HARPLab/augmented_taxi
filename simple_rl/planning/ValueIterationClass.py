@@ -51,7 +51,7 @@ class ValueIteration(Planner):
         for s in self.get_states():
             for a in self.actions:
                 for sample in range(self.sample_rate):
-                    s_prime = self.transition_func(s, a)
+                    s_prime = self.transition_func(copy.deepcopy(s), a)
                     self.trans_dict[s][a][s_prime] += 1.0 / self.sample_rate
 
         self.has_computed_matrix = True
@@ -117,9 +117,9 @@ class ValueIteration(Planner):
             s = state_queue.get()
             for a in self.actions:
                 for samples in range(self.sample_rate): # Take @sample_rate samples to estimate E[V]
-                    next_state = self.transition_func(s,a)
+                    next_state = self.transition_func(copy.deepcopy(s), a)
 
-                    if next_state not in self.states:
+                    if next_state not in self.states and not next_state.is_terminal():
                         self.states.add(next_state)
                         state_queue.put(next_state)
 

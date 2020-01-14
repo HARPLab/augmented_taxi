@@ -6,9 +6,10 @@ import numpy as np
 class State(object):
     ''' Abstract State class '''
 
-    def __init__(self, data=[], is_terminal=False):
+    def __init__(self, data=[], is_terminal=False, is_goal=False):
         self.data = data
         self._is_terminal = is_terminal
+        self._is_goal = is_goal
 
     def features(self):
         '''
@@ -32,6 +33,12 @@ class State(object):
 
     def set_terminal(self, is_term=True):
         self._is_terminal = is_term
+
+    def is_goal(self):
+        return self._is_goal
+
+    def set_goal(self, is_goal=True):
+        self._is_goal = is_goal
 
     def __hash__(self):
         if type(self.data).__module__ == np.__name__:
