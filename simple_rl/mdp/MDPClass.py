@@ -2,10 +2,16 @@
 
 # Python imports.
 import copy
+import sys
+if sys.version_info[0] < 3:
+	import Queue as queue
+else:
+	import queue
+
 
 class MDP(object):
     ''' Abstract class for a Markov Decision Process. '''
-    
+
     def __init__(self, actions, transition_func, reward_func, init_state, gamma=0.99, step_cost=0):
         self.actions = actions
         self.transition_func = transition_func
@@ -14,6 +20,9 @@ class MDP(object):
         self.init_state = copy.deepcopy(init_state)
         self.cur_state = init_state
         self.step_cost = step_cost
+        self.states = set([])
+        self.reachability_done = False
+        self.sample_rate = 5
 
     # ---------------
     # -- Accessors --
@@ -57,6 +66,18 @@ class MDP(object):
     def get_name(self):
         return str(self)
 
+    def get_num_states(self):
+        if not self.reachability_done:
+            self._compute_reachable_state_space()
+        return len(self.states)
+
+    def get_states(self):
+        if self.reachability_done:
+            return list(self.states)
+        else:
+            self._compute_reachable_state_space()
+            return list(self.states)
+
     # --------------
     # -- Mutators --
     # --------------
@@ -76,6 +97,32 @@ class MDP(object):
     # ----------
     # -- Core --
     # ----------
+
+    def _compute_reachable_state_space(self):
+        '''
+        Summary:
+            Starting with @self.start_state, determines all reachable states
+            and stores them in self.states.
+        '''
+
+        if self.reachability_done:
+            return
+
+        state_queue = queue.Queue()
+        state_queue.put(self.init_state)
+        self.states.add(self.init_state)
+
+        while not state_queue.empty():
+            s = state_queue.get()
+            for a in self.actions:
+                for samples in range(self.sample_rate): # Take @sample_rate samples to estimate E[V]
+                    next_state = self.transition_func(copy.deepcopy(s), a)
+
+                    if next_state not in self.states and not next_state.is_terminal():
+                        self.states.add(next_state)
+                        state_queue.put(next_state)
+
+        self.reachability_done = True
 
     def execute_agent_action(self, action):
         '''

@@ -16,7 +16,7 @@ from simple_rl.planning.PlannerClass import Planner
 
 class ValueIteration(Planner):
 
-    def __init__(self, mdp, name="value_iter", delta=0.0001, max_iterations=500, sample_rate=3):
+    def __init__(self, mdp, name="value_iter", delta=0.0001, max_iterations=500, sample_rate=5):
         '''
         Args:
             mdp (MDP)
@@ -32,14 +32,13 @@ class ValueIteration(Planner):
         self.sample_rate = sample_rate
         self.value_func = defaultdict(float)
         self.max_q_act_histories = defaultdict(str)
-        self.reachability_done = False
         self.has_computed_matrix = False
         self.bellman_backups = 0
         self.trans_dict = defaultdict(lambda:defaultdict(lambda:defaultdict(float)))
 
     def _compute_matrix_from_trans_func(self):
         if self.has_computed_matrix:
-            self._compute_reachable_state_space()
+            self.mdp._compute_reachable_state_space()
             # We've already run this, just return.
             return
 
@@ -60,16 +59,16 @@ class ValueIteration(Planner):
         return self.mdp.get_gamma()
 
     def get_num_states(self):
-        if not self.reachability_done:
-            self._compute_reachable_state_space()
-        return len(self.states)
+        if not self.mdp.reachability_done:
+            self.mdp._compute_reachable_state_space()
+        return len(self.mdp.states)
 
     def get_states(self):
-        if self.reachability_done:
-            return list(self.states)
+        if self.mdp.reachability_done:
+            return list(self.mdp.states)
         else:
-            self._compute_reachable_state_space()
-            return list(self.states)
+            self.mdp._compute_reachable_state_space()
+            return list(self.mdp.states)
 
     def get_value(self, s):
         '''
@@ -99,31 +98,6 @@ class ValueIteration(Planner):
 
         return expected_future_val
 
-    def _compute_reachable_state_space(self):
-        '''
-        Summary:
-            Starting with @self.start_state, determines all reachable states
-            and stores them in self.states.
-        '''
-
-        if self.reachability_done:
-            return
-
-        state_queue = queue.Queue()
-        state_queue.put(self.init_state)
-        self.states.add(self.init_state)
-
-        while not state_queue.empty():
-            s = state_queue.get()
-            for a in self.actions:
-                for samples in range(self.sample_rate): # Take @sample_rate samples to estimate E[V]
-                    next_state = self.transition_func(copy.deepcopy(s), a)
-
-                    if next_state not in self.states and not next_state.is_terminal():
-                        self.states.add(next_state)
-                        state_queue.put(next_state)
-
-        self.reachability_done = True
 
     def run_vi(self):
         '''
@@ -320,3 +294,24 @@ class ValueIteration(Planner):
                 best_action = action
 
         return max_q_val, best_action
+
+    def _compute_min_qval_action_pair(self, state):
+        '''
+        Args:
+            state (State)
+
+        Returns:
+            (tuple) --> (float, str): where the float is the Qval, str is the action.
+        '''
+        # Grab random initial action in case all equal
+        min_q_val = float("inf")
+        worst_action = self.actions[0]
+
+        # Find best action (action w/ current max predicted Q value)
+        for action in self.actions:
+            q_s_a = self.get_q_value(state, action)
+            if q_s_a < min_q_val:
+                min_q_val = q_s_a
+                worst_action = action
+
+        return min_q_val, worst_action

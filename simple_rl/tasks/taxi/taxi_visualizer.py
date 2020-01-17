@@ -3,6 +3,7 @@ from __future__ import print_function
 from collections import defaultdict
 try:
     import pygame
+    import pygame.gfxdraw
     title_font = pygame.font.SysFont("CMU Serif", 48)
 except ImportError:
     print("Warning: pygame not installed (needed for visuals).")
@@ -53,19 +54,11 @@ def _draw_state(screen,
                     # val_text_dict[s.get_agent_x()][s.get_agent_y()][
                     #     s.get_first_obj_of_class("passenger")["in_taxi"]] += agent.get_value(s)
             # slightly abusing the distinction between agents and planning modules...
-            elif agent.name == 'value_iter':
-                for s in agent.get_states():
+            else:
+                for s in taxi_oomdp.get_states():
                     val_text_dict[s.get_agent_x()][s.get_agent_y()] = agent.get_value(s)
                     # val_text_dict[s.get_agent_x()][s.get_agent_y()][
                     #     s.get_first_obj_of_class("passenger")["in_taxi"]] += agent.get_value(s)
-            else:
-                # Use Value Iteration to compute value.
-                vi = ValueIteration(taxi_oomdp, sample_rate=10)
-                vi.run_vi()
-                for s in vi.get_states():
-                    val_text_dict[s.get_agent_x()][s.get_agent_y()] = vi.get_value(s)
-                    # val_text_dict[s.get_agent_x()][s.get_agent_y()][
-                    #     s.get_first_obj_of_class("passenger")["in_taxi"]] += vi.get_value(s)
         else:
             # Use Value Iteration to compute value.
             vi = ValueIteration(taxi_oomdp, sample_rate=10)
@@ -79,10 +72,7 @@ def _draw_state(screen,
     policy_dict = defaultdict(lambda : defaultdict(str))
     # policy_dict = defaultdict(lambda: defaultdict(lambda : defaultdict(str)))
     if policy:
-        # could check if an instance of value iteration was provided as an agent to benefit from pre-enumeration of
-        # states (would complicate code though)
-        vi = ValueIteration(taxi_oomdp, sample_rate=10)
-        for s in vi.get_states():
+        for s in taxi_oomdp.get_states():
             policy_dict[s.get_agent_x()][s.get_agent_y()] = policy(s)
             # if policy_dict[s.get_agent_x()][s.get_agent_y()][s.get_first_obj_of_class("passenger")["in_taxi"]] != '':
             #     policy_dict[s.get_agent_x()][s.get_agent_y()][s.get_first_obj_of_class("passenger")["in_taxi"]] = policy(s)
@@ -115,16 +105,32 @@ def _draw_state(screen,
         # Draw tolls.
         for t in objects["toll"]:
             t_x, t_y = t["x"], t["y"]
+            if t["fee"] != 0:
+                alpha = t["fee"] / 1.                             # divide by whatever the max fee is expected to be
+                scaled_alpha = int(min(((1 / .75) * alpha + 0.15), 1) * 255)  # scale so that the alpha is at least 0.15
+            else:
+                scaled_alpha = 0
             top_left_point = width_buffer + cell_width * (t_x - 1) + 5, height_buffer + cell_height * (
                     taxi_oomdp.height - t_y) + 5
-            pygame.draw.rect(screen, (224, 230, 67), top_left_point + (cell_width - 10, cell_height - 10), 0)
+            # Clear the space and redraw with correct transparency (instead of simply adding a new layer which would
+            # affect the transparency
+            pygame.draw.rect(screen, (255, 255, 255), top_left_point + (cell_width - 10, cell_height - 10), 0)
+            pygame.gfxdraw.box(screen, top_left_point + (cell_width - 10, cell_height - 10), (224, 230, 67, scaled_alpha))
 
         # Draw traffic cells.
         for t in objects["traffic"]:
             t_x, t_y = t["x"], t["y"]
+            if t["prob"] != 0:
+                alpha = t["prob"] / 1.                             # divide by whatever the max fee is expected to be
+                scaled_alpha = int(min(((1 / .75) * alpha + 0.15), 1) * 255)  # scale so that the alpha is at least 0.15
+            else:
+                scaled_alpha = 0
             top_left_point = width_buffer + cell_width * (t_x - 1) + 5, height_buffer + cell_height * (
                     taxi_oomdp.height - t_y) + 5
-            pygame.draw.rect(screen, (58, 28, 232), top_left_point + (cell_width - 10, cell_height - 10), 0)
+            # Clear the space and redraw with correct transparency (instead of simply adding a new layer which would
+            # affect the transparency
+            pygame.draw.rect(screen, (255, 255, 255), top_left_point + (cell_width - 10, cell_height - 10), 0)
+            pygame.gfxdraw.box(screen, top_left_point + (cell_width - 10, cell_height - 10), (58, 28, 232, scaled_alpha))
 
         # Draw fuel stations.
         for f in objects["fuel_station"]:

@@ -211,8 +211,15 @@ class AugmentedTaxiOOMDP(OOMDP):
             "right": ">",  # u"\u2192"
             "pickup": "pk",  # u"\u2192"
             "dropoff": "dp",  # u"\u2192"
+            "refuel": "rf",  # u"\u2192"
         }
         visualize_policy(self, policy, _draw_state, action_char_dict, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
+
+    def visualize_state(self, cur_state, width_scr_scale=180, height_scr_scale=180):
+        from simple_rl.utils.mdp_visualizer import visualize_state
+        from .taxi_visualizer import _draw_state
+
+        visualize_state(self, _draw_state, cur_state=cur_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
 
 
     # ----------------------------
