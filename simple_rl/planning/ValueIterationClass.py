@@ -307,7 +307,7 @@ class ValueIteration(Planner):
         min_q_val = float("inf")
         worst_action = self.actions[0]
 
-        # Find best action (action w/ current max predicted Q value)
+        # Find worst action (action w/ current worst predicted Q value)
         for action in self.actions:
             q_s_a = self.get_q_value(state, action)
             if q_s_a < min_q_val:

@@ -16,3 +16,4 @@ examples/blank_example.py
 docs/sphinx/
 examples/experiments_to_reproduce/*
 models/*
+scratch.py

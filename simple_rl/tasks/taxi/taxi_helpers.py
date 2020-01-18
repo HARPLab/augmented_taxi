@@ -102,17 +102,22 @@ def is_taxi_terminal_state(state):
     Returns:
         (bool): True iff all passengers at at their destinations, not in the taxi.
     '''
-    # check fuel level if applicable
-    if state.track_fuel():
-        if state.objects["agent"][0]["fuel"] <= 0:
-            return True
+    all_passengers_at_destination = True
 
     # check if all passengers are at destination
     for p in state.get_objects_of_class("passenger"):
         if p.get_attribute("in_taxi") == 1 or p.get_attribute("x") != p.get_attribute("dest_x") or \
             p.get_attribute("y") != p.get_attribute("dest_y"):
-            return False
-    return True
+            all_passengers_at_destination = False
+
+    if all_passengers_at_destination:
+        return True
+    else:
+        # check fuel level if applicable
+        if state.track_fuel():
+            if state.objects["agent"][0]["fuel"] <= 0:
+                return True
+        return False
 
 def is_taxi_terminal_and_goal_state(state):
     '''
@@ -122,17 +127,22 @@ def is_taxi_terminal_and_goal_state(state):
     Returns:
         (bool): True iff all passengers at at their destinations, not in the taxi.
     '''
-    # check fuel level if applicable
-    if state.track_fuel():
-        if state.objects["agent"][0]["fuel"] <= 0:
-            # is terminal, but not goal state
-            return True, False
+    all_passengers_at_destination = True
 
     # check if all passengers are at destination
     for p in state.get_objects_of_class("passenger"):
         if p.get_attribute("in_taxi") == 1 or p.get_attribute("x") != p.get_attribute("dest_x") or \
             p.get_attribute("y") != p.get_attribute("dest_y"):
-            # is neither terminal nor goal state
-            return False, False
-    # is terminal and goal state
-    return True, True
+            all_passengers_at_destination = False
+
+    if all_passengers_at_destination:
+        # is terminal and goal state
+        return True, True
+    else:
+        # check fuel level if applicable
+        if state.track_fuel():
+            if state.objects["agent"][0]["fuel"] <= 0:
+                # is terminal, but not goal state
+                return True, False
+        # is neither terminal nor goal state
+        return False, False
