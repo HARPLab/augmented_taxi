@@ -25,7 +25,8 @@ class AugmentedTaxiOOMDP(OOMDP):
     ''' Class for a Taxi OO-MDP '''
 
     # Static constants.
-    ACTIONS = ["up", "down", "left", "right", "pickup", "dropoff", "refuel"]
+    BASE_ACTIONS = ["up", "down", "left", "right", "pickup", "dropoff"]
+    AUGMENTED_ACTIONS = ["up", "down", "left", "right", "pickup", "dropoff", "refuel"]
     ATTRIBUTES = ["x", "y", "has_passenger", "in_taxi", "dest_x", "dest_y"]
     CLASSES = ["agent", "wall", "passenger", "toll", "traffic", "fuel_station"]
 
@@ -41,7 +42,12 @@ class AugmentedTaxiOOMDP(OOMDP):
         fuel_station_objs = self._make_oomdp_objs_from_list_of_dict(fuel_stations, "fuel_station")
 
         init_state = self._create_state(agent_obj, wall_objs, pass_objs, toll_objs, traffic_objs, fuel_station_objs)
-        OOMDP.__init__(self, AugmentedTaxiOOMDP.ACTIONS, self._taxi_transition_func, self._taxi_reward_func, init_state=init_state, gamma=gamma)
+        if init_state.track_fuel():
+            OOMDP.__init__(self, AugmentedTaxiOOMDP.AUGMENTED_ACTIONS, self._taxi_transition_func, self._taxi_reward_func,
+                           init_state=init_state, gamma=gamma)
+        else:
+            OOMDP.__init__(self, AugmentedTaxiOOMDP.BASE_ACTIONS, self._taxi_transition_func, self._taxi_reward_func,
+                           init_state=init_state, gamma=gamma)
         self.slip_prob = slip_prob
 
     def _create_state(self, agent_oo_obj, walls, passengers, tolls, traffic, fuel_stations):
@@ -333,8 +339,12 @@ def _error_check(state, action):
         Checks to make sure the received state and action are of the right type.
     '''
 
-    if action not in AugmentedTaxiOOMDP.ACTIONS:
-        raise ValueError("Error: the action provided (" + str(action) + ") was invalid.")
+    if state.track_fuel():
+        if action not in AugmentedTaxiOOMDP.AUGMENTED_ACTIONS:
+            raise ValueError("Error: the action provided (" + str(action) + ") was invalid.")
+    else:
+        if action not in AugmentedTaxiOOMDP.BASE_ACTIONS:
+            raise ValueError("Error: the action provided (" + str(action) + ") was invalid.")
 
     if not isinstance(state, AugmentedTaxiState):
         raise ValueError("Error: the given state (" + str(state) + ") was not of the correct class.")
