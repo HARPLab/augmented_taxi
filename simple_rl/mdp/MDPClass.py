@@ -94,6 +94,9 @@ class MDP(object):
     def set_init_state(self, new_init_state):
         self.init_state = copy.deepcopy(new_init_state)
 
+    def set_curr_state(self, cur_state):
+        self.cur_state = cur_state
+
     # ----------
     # -- Core --
     # ----------

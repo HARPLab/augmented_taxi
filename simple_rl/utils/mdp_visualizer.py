@@ -66,6 +66,21 @@ def _draw_agent_text(agent, screen):
     agent_text = title_font.render(formatted_agent_text, True, (46, 49, 49))
     screen.blit(agent_text, agent_text_point)
 
+def _draw_lower_right_text(text, screen):
+    '''
+    Args:
+        text (str)
+        screen (pygame.Surface)
+
+    Summary:
+        Draws the desired text to the bottom right of the screen
+    '''
+    scr_width, scr_height = screen.get_width(), screen.get_height()
+    text_point = (scr_width / 2.0 + len(text)*6, 18*scr_height / 20.0)
+    pygame.draw.rect(screen, (255,255,255), (text_point[0] - 20, text_point[1]) + (200,40))
+    state_text = title_font.render(text, True, (46, 49, 49))
+    screen.blit(state_text, text_point)
+
 def _draw_lower_left_text(state, screen, score=-1):
     '''
     Args:
@@ -95,12 +110,10 @@ def visualize_state(mdp, draw_state, cur_state=None, scr_width=720, scr_height=7
     '''
     Args:
         mdp (MDP)
-        policy (lambda: S --> A)
         draw_state (lambda)
-        action_char_dict (dict):
-            Key: action
-            Val: str
         cur_state (State)
+        scr_width (int)
+        scr_height (int)
 
     Summary:
 
@@ -135,6 +148,8 @@ def visualize_policy(mdp, policy, draw_state, action_char_dict, cur_state=None, 
             Key: action
             Val: str
         cur_state (State)
+        scr_width (int)
+        scr_height (int)
 
     Summary:
 
@@ -162,6 +177,8 @@ def visualize_value(mdp, draw_state, agent=None, cur_state=None, scr_width=720, 
     Args:
         mdp (MDP)
         draw_state (State)
+        scr_width (int)
+        scr_height (int)
 
     Summary:
         Draws the MDP with values labeled on states.
@@ -331,6 +348,75 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
                 pygame.display.quit()
                 return
 
+def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=None, cur_state=None, scr_width=720, scr_height=720):
+    '''
+    Args:
+        mdp (MDP)
+        trajectory (list of states and actions)
+        draw_state (lambda: State --> pygame.Rect)
+        marked_state_importances (list of state importances)
+        cur_state (State)
+        scr_width (int)
+        scr_height (int)
+
+    Summary:
+        Visualizes the sequence of states and actions stored in the trajectory.
+    '''
+    screen = pygame.display.set_mode((scr_width, scr_height))
+    cur_state = trajectory[0][0]
+
+    # Setup and draw initial state.
+    agent_shape = _vis_init(screen, mdp, draw_state, cur_state)
+    step = 0
+
+    if marked_state_importances is not None:
+        # indicate if this is the critical state by displaying its state importance value
+        if marked_state_importances[step] != float('-inf'):
+            _draw_lower_right_text('SI: {}'.format(round(marked_state_importances[step], 3)), screen)
+
+    while True and step != len(trajectory):
+
+        # Check for key presses.
+        for event in pygame.event.get():
+            if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
+                # Quit.
+                pygame.display.quit()
+                return
+            if event.type == KEYDOWN and event.key == K_SPACE:
+                action = trajectory[step][1]
+                if step + 1 < len(trajectory):
+                    cur_state = trajectory[step + 1][0]
+
+                    if marked_state_importances is not None:
+                        # indicate if this is the critical state by displaying its state importance value
+                        if marked_state_importances[step + 1] != float('-inf'):
+                            _draw_lower_right_text('SI: {}'.format(round(marked_state_importances[step + 1], 3)), screen)
+                        else:
+                            # clear the text
+                            _draw_lower_right_text('       ', screen)
+                # show what could've been the outcome of the final action (note that this wasn't recorded)
+                else:
+                    mdp.set_curr_state(cur_state)
+                    _, cur_state = mdp.execute_agent_action(action)
+                agent_shape = draw_state(screen, mdp, cur_state, agent_shape=agent_shape)
+                print("A: " + str(action))
+
+                # Update state text.
+                _draw_lower_left_text(cur_state, screen)
+
+                step += 1
+
+        pygame.display.flip()
+
+    print("Press ESC to quit")
+    while True:
+        # Check for key presses.
+        for event in pygame.event.get():
+            if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
+                # Quit.
+                pygame.display.quit()
+                return
+
 
 def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_height=720):
     '''
@@ -406,6 +492,9 @@ def visualize_interaction(mdp, draw_state, cur_state=None, scr_width=720, scr_he
     Args:
         mdp (MDP)
         draw_state (lambda: State --> pygame.Rect)
+        cur_state (State)
+        scr_width (int)
+        scr_height (int)
 
     Summary:
         Creates a 2d visual of the agent's interactions with the MDP.
@@ -470,6 +559,9 @@ def _vis_init(screen, mdp, draw_state, cur_state, agent=None, value=False, score
 
     if score != -1:
         _draw_lower_left_text("Score: " + str(score), screen)
+    else:
+        _draw_lower_left_text(cur_state, screen)
+
     agent_shape = draw_state(screen, mdp, cur_state, agent=agent, draw_statics=True)
 
     return agent_shape

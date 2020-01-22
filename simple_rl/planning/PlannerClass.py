@@ -15,11 +15,14 @@ class Planner(object):
         self.gamma = mdp.gamma
         self.has_planned = False
 
-        def plan(self, state):
-            pass
+    def plan(self, state):
+        pass
 
-        def policy(self, state):
-            pass
+    def policy(self, state):
+        pass
 
-        def __str__(self):
-            return self.name
+    def act(self, state, reward):
+        return self.policy(state)
+
+    def __str__(self):
+        return self.name

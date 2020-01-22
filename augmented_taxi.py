@@ -9,7 +9,7 @@ sys.path.append("simple_rl")
 from simple_rl.agents import QLearningAgent, RandomAgent, FixedPolicyAgent
 from simple_rl.tasks import AugmentedTaxiOOMDP
 from simple_rl.planning import ValueIteration
-from simple_rl.run_experiments import run_agents_on_mdp, run_single_agent_on_mdp
+from policy_summarization import highlights
 
 def main(open_plot=True):
     # Taxi initial state attributes..
@@ -31,33 +31,20 @@ def main(open_plot=True):
     vi_name = 'purple'
     with open('models/vi_{}.pickle'.format(vi_name), 'wb') as f:
         pickle.dump((mdp, value_iter), f)
-    with open('models/vi_{}.pickle'.format(vi_name), 'rb') as f:
-        mdp, value_iter = pickle.load(f)
+    # with open('models/vi_{}.pickle'.format(vi_name), 'rb') as f:
+    #     mdp, value_iter = pickle.load(f)
 
     # Visualize agent
-    fixed_agent = FixedPolicyAgent(value_iter.policy)
-    mdp.visualize_agent(fixed_agent)
-    mdp.reset()  # reset the current state to the initial state
-    mdp.visualize_interaction()
-    mdp.reset()
-    mdp.visualize_value(value_iter)
-    mdp.reset()
-    mdp.visualize_policy(value_iter.policy)
+    # fixed_agent = FixedPolicyAgent(value_iter.policy)
+    # mdp.visualize_agent(fixed_agent)
+    # mdp.reset()  # reset the current state to the initial state
+    # mdp.visualize_interaction()
 
-    # Compare the best and worst actions for each state and find the biggest differences
-    q_val_diffs = []
-    for s in value_iter.get_states():
-        max_q_val, best_action = value_iter._compute_max_qval_action_pair(s)
-        min_q_val, worst_action = value_iter._compute_min_qval_action_pair(s)
-        q_val_diffs.append([max_q_val - min_q_val, best_action, worst_action, s])
-    q_val_diffs.sort(key=lambda x: x[0], reverse=True)
-
-    # Visualize the top 50 states
-    for state_number in range(50):
-        print("Best action: {}".format(q_val_diffs[state_number][1]))
-        print("Worst action: {}".format(q_val_diffs[state_number][2]))
-        print("Q-val difference: {}".format(q_val_diffs[state_number][0]))
-        mdp.visualize_state(q_val_diffs[state_number][3])
+    # (mdp, agent, max_summary_count=10, trajectory_length=5, n_simulations=10, interval_size=3, n_trailing_states=2):
+    summary = highlights.obtain_summary(mdp, value_iter, max_summary_count=15, trajectory_length=5, n_simulations=1, interval_size=3, n_trailing_states=2)
+    while not summary.empty():
+        state_importance, _, trajectory, marked_state_importances = summary.get()
+        mdp.visualize_trajectory(trajectory, marked_state_importances=marked_state_importances)
 
 if __name__ == "__main__":
     main(open_plot=not sys.argv[-1] == "no_plot")
