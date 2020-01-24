@@ -1,8 +1,17 @@
 from queue import PriorityQueue
 from datetime import datetime
 import copy
+from termcolor import colored
 
-def computeHighlightsStateImportance(agent, state):
+'''
+An implementation of 'HIGHLIGHTS: Summarizing Agent Behavior to People' (Amir et al. AAMAS2018).
+
+Minor differences from the original algorithm include 1) storing trajectories cut off by the end of the
+episode if the corresponding state importances are high enough, 2) marking of the critical state in the stored trajectory
+through marked_state_importances, 3) the use of different indexing variables (e.g. interval_count_down in place of c).
+'''
+
+def compute_highlights_state_importance(agent, state):
     '''
     Args:
         agent (Agent)
@@ -17,6 +26,35 @@ def computeHighlightsStateImportance(agent, state):
     max_q_val, best_action = agent._compute_max_qval_action_pair(state)
     min_q_val, worst_action = agent._compute_min_qval_action_pair(state)
     return max_q_val - min_q_val, best_action
+
+def compare_state_importances(state_importance, summary, state_importances, trailing_count_up):
+    '''
+    Args:
+        state_importance (float)
+        summary (PriorityQueue)
+        state_importances (list of floats)
+        trailing_count_up (list of ints)
+
+    Returns:
+        bool
+
+    Summary:
+        Check if the state importance value of the current state exceeds the values of states already in the summary or
+        currently being tracked to place into the summary
+    '''
+    # if the state importance of the current state is less than all other states currently being tracked return False
+    for x in range(len(trailing_count_up)):
+        if state_importance < state_importances[-(x+1)]:
+            return False
+
+    if len(summary.queue) > 0:
+        # can peak with summary.queue[0][0] since the smallest element of a heap is always the root
+        if state_importance > summary.queue[0][0]:
+            return True
+        else:
+            return False
+
+    return True
 
 def mark_critical_state(location, state_importances):
     '''
@@ -70,16 +108,14 @@ def obtain_summary(mdp, agent, max_summary_count=10, trajectory_length=5, n_simu
     while simulation < n_simulations:
         # initialize the simulation
         mdp.reset()
-        cur_state = mdp.get_init_state() # todo
+        cur_state = mdp.get_init_state()
         trajectory = []                     # a list of consecutive states
         state_importances = []              # corresponding state_importances of states in the trajectory
         trailing_count_up = []              # track number of states passed since tracking a particular state
-        interval_count_down = [1]           # track number of states passed since tracking a particular state
-                                            # (seeded with a one for the first pass through the code)
+        interval_count_down = 0             # track number of states passed since tracking the last critical state
         reward = 0
-        tracking_trajectory = False
 
-        while not cur_state.is_terminal(): # todo
+        while not cur_state.is_terminal():
             action = agent.act(cur_state, reward)
             reward, next_state = mdp.execute_agent_action(action)
 
@@ -90,12 +126,12 @@ def obtain_summary(mdp, agent, max_summary_count=10, trajectory_length=5, n_simu
             # housekeeping
             for x in range(len(trailing_count_up)):
                 trailing_count_up[x] += 1
-            for x in range(len(interval_count_down)):
-                interval_count_down[x] -= 1
+            if interval_count_down > 0:
+                interval_count_down -= 1
 
             # compute importance of this state
-            state_importance, best_action = computeHighlightsStateImportance(agent, cur_state) # todo
-            # state_importance += 1
+            state_importance, best_action = compute_highlights_state_importance(agent, cur_state)
+            # print(state_importance)
 
             if len(state_importances) == trajectory_length:
                 state_importances.pop(0)
@@ -104,16 +140,10 @@ def obtain_summary(mdp, agent, max_summary_count=10, trajectory_length=5, n_simu
 
             # if summary is incomplete or this state is superior, and a sufficient number of states have passed
             # since the last critical state, count this state as critical
-            # (note: can peak with summary.queue[0][0] since the smallest element of a heap is always the root)
-            if (summary.qsize() < max_summary_count or state_importance > summary.queue[0][0]) and (interval_count_down[0] == 0):
-                if summary.qsize() == max_summary_count:
-                    summary.get()
-                tracking_trajectory = True
-
+            if ((summary.qsize() + len(trailing_count_up)) < max_summary_count or compare_state_importances(state_importance, summary, state_importances, trailing_count_up)) and (interval_count_down== 0):
                 # housekeeping
                 trailing_count_up.append(0)
-                interval_count_down.pop(0)
-                interval_count_down.append(interval_size)
+                interval_count_down = interval_size
 
             if len(trailing_count_up) > 0:
                 # if a sufficient number of trailing states have been observed, return the trajectory with the state
@@ -122,21 +152,31 @@ def obtain_summary(mdp, agent, max_summary_count=10, trajectory_length=5, n_simu
                 if trailing_count_up[0] == n_trailing_states:
                     marked_state_importance, marked_state_importances = mark_critical_state(trailing_count_up[0],
                                                                         copy.deepcopy(state_importances))
+                    if summary.qsize() == max_summary_count:
+                        summary.get()
+                        # removed_state_importance, _, _, _ = summary.get()
+                        # print(colored(removed_state_importance, 'blue'))
                     # also store the time as a unique tiebreaker in the case of equal state importances
                     summary.put(
                         (marked_state_importance, str(datetime.now()), copy.deepcopy(trajectory), copy.deepcopy(marked_state_importances)))
                     trailing_count_up.pop(0)
-                    tracking_trajectory = False
+                    # print(colored(marked_state_importance, 'red'))
 
-            cur_state = copy.deepcopy(next_state) # todo
+            cur_state = copy.deepcopy(next_state)
 
         # return any portion of a trajectory being tracked that was cut off due to the end of an episode
-        if tracking_trajectory:
-            marked_state_importance, marked_state_importances = mark_critical_state(trailing_count_up[0],
-                                                                 copy.deepcopy(state_importances))
-            # include preceding states and include as many of the desired number of trailing states as possible
-            summary.put((marked_state_importance, str(datetime.now()), copy.deepcopy(trajectory[-(trajectory_length - n_trailing_states + trailing_count_up[0]):]),
-                         copy.deepcopy(marked_state_importances[-(trajectory_length - n_trailing_states + trailing_count_up[0]):])))
+        if len(trailing_count_up) > 0:
+            for x in range(len(trailing_count_up)):
+                if summary.qsize() == max_summary_count:
+                    summary.get()
+                    # removed_state_importance, _, _, _ = summary.get()
+                    # print(colored(removed_state_importance, 'blue'))
+                marked_state_importance, marked_state_importances = mark_critical_state(trailing_count_up[x],
+                                                                     copy.deepcopy(state_importances))
+                # include preceding states and include as many of the desired number of trailing states as possible
+                summary.put((marked_state_importance, str(datetime.now()), copy.deepcopy(trajectory[-(trajectory_length - n_trailing_states + trailing_count_up[0]):]),
+                             copy.deepcopy(marked_state_importances[-(trajectory_length - n_trailing_states + trailing_count_up[0]):])))
+                # print(colored(marked_state_importance, 'red'))
         simulation += 1
 
     return summary
