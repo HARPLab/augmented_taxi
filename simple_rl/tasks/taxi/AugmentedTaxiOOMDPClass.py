@@ -34,12 +34,20 @@ class AugmentedTaxiOOMDP(OOMDP):
         self.height = height
         self.width = width
 
+        # objects that belong in the state (changing)
         agent_obj = OOMDPObject(attributes=agent, name="agent")
-        wall_objs = self._make_oomdp_objs_from_list_of_dict(walls, "wall")
         pass_objs = self._make_oomdp_objs_from_list_of_dict(passengers, "passenger")
+
+        # objects that belong to the MDP (static)
+        wall_objs = self._make_oomdp_objs_from_list_of_dict(walls, "wall")
         toll_objs = self._make_oomdp_objs_from_list_of_dict(tolls, "toll")
         traffic_objs = self._make_oomdp_objs_from_list_of_dict(traffic, "traffic")
         fuel_station_objs = self._make_oomdp_objs_from_list_of_dict(fuel_stations, "fuel_station")
+        self.tolls = toll_objs
+        self.traffic_cells = traffic_objs
+        self.walls = wall_objs
+        self.fuel_stations = fuel_station_objs
+        self.slip_prob = slip_prob
 
         init_state = self._create_state(agent_obj, wall_objs, pass_objs, toll_objs, traffic_objs, fuel_station_objs)
         if init_state.track_fuel():
@@ -48,7 +56,6 @@ class AugmentedTaxiOOMDP(OOMDP):
         else:
             OOMDP.__init__(self, AugmentedTaxiOOMDP.BASE_ACTIONS, self._taxi_transition_func, self._taxi_reward_func,
                            init_state=init_state, gamma=gamma)
-        self.slip_prob = slip_prob
 
     def _create_state(self, agent_oo_obj, walls, passengers, tolls, traffic, fuel_stations):
         '''
@@ -70,25 +77,9 @@ class AugmentedTaxiOOMDP(OOMDP):
 
         objects["agent"].append(agent_oo_obj)
 
-        # Make walls.
-        for w in walls:
-            objects["wall"].append(w)
-
         # Make passengers.
         for p in passengers:
             objects["passenger"].append(p)
-
-        # Make tolls.
-        for t in tolls:
-            objects["toll"].append(t)
-
-        # Make traffic cells.
-        for t in traffic:
-            objects["traffic"].append(t)
-
-        # Make fuel stations.
-        for f in fuel_stations:
-            objects["fuel_station"].append(f)
 
         return AugmentedTaxiState(objects)
 
@@ -106,9 +97,10 @@ class AugmentedTaxiOOMDP(OOMDP):
 
         reward = 0
 
-        [moved_off_of_toll, toll_fee] = taxi_helpers._moved_off_of_toll(state, next_state)
-        if moved_off_of_toll:
-            reward -= toll_fee
+        if len(self.tolls) != 0:
+            [moved_off_of_toll, toll_fee] = taxi_helpers._moved_off_of_toll(self, state, next_state)
+            if moved_off_of_toll:
+                reward -= toll_fee
 
         # Stacked if statements for efficiency.
         if action == "dropoff":
@@ -143,7 +135,7 @@ class AugmentedTaxiOOMDP(OOMDP):
             stuck = True
 
         # if you're at a traffic cell, determine whether you're stuck or not with the corresponding traffic probability
-        at_traffic, prob_traffic = taxi_helpers.at_traffic(state, state.get_agent_x(), state.get_agent_y())
+        at_traffic, prob_traffic = taxi_helpers.at_traffic(self, state.get_agent_x(), state.get_agent_y())
 
         if at_traffic:
             if prob_traffic > random.random():
@@ -248,7 +240,7 @@ class AugmentedTaxiOOMDP(OOMDP):
             (AugmentedTaxiState)
         '''
 
-        if taxi_helpers._is_wall_in_the_way(state, dx=dx, dy=dy):
+        if taxi_helpers._is_wall_in_the_way(self, state, dx=dx, dy=dy):
             # There's a wall in the way.
             return state
 
@@ -327,7 +319,7 @@ class AugmentedTaxiOOMDP(OOMDP):
         # Get Agent, Walls, Passengers.
         agent = next_state.get_first_obj_of_class("agent")
 
-        at_fuel_station, max_fuel_capacity = taxi_helpers.at_fuel_station(state, state.get_agent_x(), state.get_agent_y())
+        at_fuel_station, max_fuel_capacity = taxi_helpers.at_fuel_station(self, state.get_agent_x(), state.get_agent_y())
 
         if at_fuel_station:
             agent["fuel"] = max_fuel_capacity

@@ -96,14 +96,14 @@ def _draw_state(screen,
     # Statics
     if draw_statics:
         # Draw walls.
-        for w in objects["wall"]:
+        for w in taxi_oomdp.walls:
             w_x, w_y = w["x"], w["y"]
             top_left_point = width_buffer + cell_width * (w_x - 1) + 5, height_buffer + cell_height * (
                     taxi_oomdp.height - w_y) + 5
             pygame.draw.rect(screen, (46, 49, 49), top_left_point + (cell_width - 10, cell_height - 10), 0)
 
         # Draw tolls.
-        for t in objects["toll"]:
+        for t in taxi_oomdp.tolls:
             t_x, t_y = t["x"], t["y"]
             if t["fee"] != 0:
                 alpha = t["fee"] / 1.                             # divide by whatever the max fee is expected to be
@@ -118,7 +118,7 @@ def _draw_state(screen,
             pygame.gfxdraw.box(screen, top_left_point + (cell_width - 10, cell_height - 10), (224, 230, 67, scaled_alpha))
 
         # Draw traffic cells.
-        for t in objects["traffic"]:
+        for t in taxi_oomdp.traffic_cells:
             t_x, t_y = t["x"], t["y"]
             if t["prob"] != 0:
                 alpha = t["prob"] / 1.                             # divide by whatever the max fee is expected to be
@@ -133,7 +133,7 @@ def _draw_state(screen,
             pygame.gfxdraw.box(screen, top_left_point + (cell_width - 10, cell_height - 10), (58, 28, 232, scaled_alpha))
 
         # Draw fuel stations.
-        for f in objects["fuel_station"]:
+        for f in taxi_oomdp.fuel_stations:
             f_x, f_y = f["x"], f["y"]
             top_left_point = width_buffer + cell_width * (f_x - 1) + 5, height_buffer + cell_height * (
                     taxi_oomdp.height - f_y) + 5
@@ -172,7 +172,7 @@ def _draw_state(screen,
                 r = pygame.draw.rect(screen, (46, 49, 49), top_left_point + (cell_width, cell_height), 3)
 
                 # Show value of states.
-                if show_value and not taxi_helpers.is_wall(state, i + 1, taxi_oomdp.height - j):
+                if show_value and not taxi_helpers.is_wall(taxi_oomdp, i + 1, taxi_oomdp.height - j):
                     # Draw the value.
                     val = val_text_dict[i + 1][taxi_oomdp.height - j]
                     color = mdpv.val_to_color(val)
@@ -199,7 +199,7 @@ def _draw_state(screen,
                     # screen.blit(value_text, text_center_point)
 
                 # Show optimal action to take in each grid cell.
-                if policy and not taxi_helpers.is_wall(state, i + 1, taxi_oomdp.height - j):
+                if policy and not taxi_helpers.is_wall(taxi_oomdp, i + 1, taxi_oomdp.height - j):
                     a = policy_dict[i+1][taxi_oomdp.height - j]
                     if a not in action_char_dict:
                         text_a = a

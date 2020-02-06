@@ -3,7 +3,7 @@
 # Other imports.
 from simple_rl.mdp.oomdp.OOMDPObjectClass import OOMDPObject
 
-def is_wall(state, x, y):
+def is_wall(mdp, x, y):
     '''
     Args:
         state (TaxiState)
@@ -13,12 +13,12 @@ def is_wall(state, x, y):
     Returns:
         (bool): true iff the current loc of the agent is occupied by a wall.
     '''
-    for wall in state.objects["wall"]:
+    for wall in mdp.walls:
         if wall["x"] == x and wall["y"] == y:
             return True
     return False
 
-def at_traffic(state, x, y):
+def at_traffic(mdp, x, y):
     '''
     Args:
         state (TaxiState)
@@ -29,13 +29,13 @@ def at_traffic(state, x, y):
         (bool): true iff the current loc of the agent is a traffic cell.
         (float): probability of getting stuck at this traffic cell
     '''
-    for traffic in state.objects["traffic"]:
+    for traffic in mdp.traffic_cells:
         if traffic["x"] == x and traffic["y"] == y:
             return True, traffic["prob"]
 
     return False, 0.
 
-def at_fuel_station(state, x, y):
+def at_fuel_station(mdp, x, y):
     '''
     Args:
         state (TaxiState)
@@ -46,13 +46,13 @@ def at_fuel_station(state, x, y):
         (bool): true iff the current loc of the agent is a traffic cell.
         (int): fuel capacity to fill up to
     '''
-    for fuel_station in state.objects["fuel_station"]:
+    for fuel_station in mdp.fuel_stations:
         if fuel_station["x"] == x and fuel_station["y"] == y:
             return True, fuel_station["max_fuel_capacity"]
 
     return False, 0
 
-def _is_wall_in_the_way(state, dx=0, dy=0):
+def _is_wall_in_the_way(mdp, state, dx=0, dy=0):
     '''
     Args:
         state (TaxiState)
@@ -62,11 +62,12 @@ def _is_wall_in_the_way(state, dx=0, dy=0):
     Returns:
         (bool): true iff the new loc of the agent is occupied by a wall.
     '''
-    for wall in state.objects["wall"]:
+    for wall in mdp.walls:
         if wall["x"] == state.objects["agent"][0]["x"] + dx and \
             wall["y"] == state.objects["agent"][0]["y"] + dy:
             return True
     return False
+
 
 def _move_pass_in_taxi(state, dx=0, dy=0):
     '''
@@ -85,8 +86,8 @@ def _move_pass_in_taxi(state, dx=0, dy=0):
             passenger_attr_dict_ls[i]["x"] += dx
             passenger_attr_dict_ls[i]["y"] += dy
 
-def _moved_off_of_toll(state, next_state):
-    for toll in state.get_objects_of_class("toll"):
+def _moved_off_of_toll(mdp, state, next_state):
+    for toll in mdp.tolls:
         # if current state's agent x, y coincides with any x, y of the tolls
         if toll.attributes['x'] == state.get_agent_x() and toll.attributes['y'] == state.get_agent_y():
             # and if the next state's agent x, y moved off of the x, y of the toll

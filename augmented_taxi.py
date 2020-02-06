@@ -22,21 +22,21 @@ def main(open_plot=True):
     fuel_station = [{"x": 2, "y": 3, "max_fuel_capacity": max_fuel_capacity}]
     gamma = 0.95
 
-    mdp = AugmentedTaxiOOMDP(width=3, height=5, agent=agent, walls=walls, passengers=passengers, tolls=tolls, traffic=traffic, fuel_stations=fuel_station, gamma=gamma)
-
     # Train
-    value_iter = ValueIteration(mdp)
-    value_iter.run_vi()
+    mdp_agent = AugmentedTaxiOOMDP(width=3, height=5, agent=agent, walls=walls, passengers=passengers, tolls=tolls, traffic=traffic, fuel_stations=fuel_station, gamma=gamma)
+    vi_agent = ValueIteration(mdp_agent)
+    vi_agent.run_vi()
 
-    vi_name = 'purple'
-    with open('models/vi_{}.pickle'.format(vi_name), 'wb') as f:
-        pickle.dump((mdp, value_iter), f)
-    # with open('models/vi_{}.pickle'.format(vi_name), 'rb') as f:
-    #     mdp, value_iter = pickle.load(f)
+    vi_name = 'fuel'
+    with open('models/vi_{}_agent.pickle'.format(vi_name), 'wb') as f:
+        pickle.dump((mdp_agent, vi_agent), f)
+    # with open('models/vi_{}_agent.pickle'.format(vi_name), 'rb') as f:
+    #     mdp_agent, vi_agent = pickle.load(f)
 
-    # Visualize agent
-    # fixed_agent = FixedPolicyAgent(value_iter.policy)
-    # mdp.visualize_agent(fixed_agent)
+    # Visualize agents
+    fixed_agent = FixedPolicyAgent(vi_agent.policy)
+    mdp_agent.visualize_agent(fixed_agent)
+
     # mdp.reset()  # reset the current state to the initial state
     # mdp.visualize_interaction()
 
