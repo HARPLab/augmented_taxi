@@ -153,8 +153,7 @@ def obtain_summary(mdp, agent, max_summary_count=10, trajectory_length=5, n_simu
                     marked_state_importance, marked_state_importances = mark_critical_state(trailing_count_up[0],
                                                                         copy.deepcopy(state_importances))
                     if summary.qsize() == max_summary_count:
-                        summary.get()
-                        # removed_state_importance, _, _, _ = summary.get()
+                        removed_state_importance, _, _, _ = summary.get()
                         # print(colored(removed_state_importance, 'blue'))
                     # also store the time as a unique tiebreaker in the case of equal state importances
                     summary.put(
@@ -168,8 +167,7 @@ def obtain_summary(mdp, agent, max_summary_count=10, trajectory_length=5, n_simu
         if len(trailing_count_up) > 0:
             for x in range(len(trailing_count_up)):
                 if summary.qsize() == max_summary_count:
-                    summary.get()
-                    # removed_state_importance, _, _, _ = summary.get()
+                    removed_state_importance, _, _, _ = summary.get()
                     # print(colored(removed_state_importance, 'blue'))
                 marked_state_importance, marked_state_importances = mark_critical_state(trailing_count_up[x],
                                                                      copy.deepcopy(state_importances))

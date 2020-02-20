@@ -13,7 +13,7 @@ from simple_rl.mdp.oomdp.OOMDPObjectClass import OOMDPObject
 
 class OOMDP(MDP):
     ''' Abstract class for an Object Oriented Markov Decision Process. '''
-    
+
     def __init__(self, actions, transition_func, reward_func, init_state, gamma=0.99):
         MDP.__init__(self, actions, transition_func, reward_func, init_state=init_state, gamma=gamma)
 
