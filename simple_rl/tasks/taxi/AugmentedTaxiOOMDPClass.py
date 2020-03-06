@@ -13,6 +13,7 @@ Author: David Abel (cs.brown.edu/~dabel/)
 from __future__ import print_function
 import random
 import copy
+import numpy as np
 
 # Other imports.
 from simple_rl.mdp.oomdp.OOMDPClass import OOMDP
@@ -95,12 +96,60 @@ class AugmentedTaxiOOMDP(OOMDP):
         '''
         _error_check(state, action)
 
-        reward = 0
+        # 1) MDP-based reward
+        # reward = 0
+        #
+        # if len(self.tolls) != 0:
+        #     [moved_off_of_toll, toll_fee] = taxi_helpers._moved_off_of_toll(self, state, next_state)
+        #     if moved_off_of_toll:
+        #         reward -= toll_fee
+        #
+        # # Stacked if statements for efficiency.
+        # if action == "dropoff":
+        #     # If agent is dropping off.
+        #     agent = state.get_first_obj_of_class("agent")
+        #
+        #     # Check to see if all passengers at destination.
+        #     if agent.get_attribute("has_passenger"):
+        #         for p in state.get_objects_of_class("passenger"):
+        #             if p.get_attribute("x") != p.get_attribute("dest_x") or p.get_attribute("y") != p.get_attribute("dest_y"):
+        #                 reward += 0 - self.step_cost
+        #                 return reward
+        #         reward += 1 - self.step_cost
+        #         passenger_flag = 1
+        #         return reward
+        # reward += 0 - self.step_cost
+        # return reward
+
+        # weighting over reward variables (on the goal with the passenger, on a toll, on a traffic cell)
+        weights = np.array([[2, -0.4, -0.5]])
+
+        # 2) feature-based reward
+        return weights.dot(self.compute_reward_features(state, action, next_state).T) - self.step_cost
+
+    def compute_reward_features(self, state, action, next_state=None):
+        '''
+        Args:
+            state (OOMDP State)
+            action (str)
+            next_state (OOMDP State)
+
+        Returns
+            array of reward features
+        '''
+        # reward features = [successfully dropped off passenger, moved off of toll, at traffic]
+        passenger_flag = 0
+        toll_flag = 0
+        traffic_flag = 0
 
         if len(self.tolls) != 0:
             [moved_off_of_toll, toll_fee] = taxi_helpers._moved_off_of_toll(self, state, next_state)
             if moved_off_of_toll:
-                reward -= toll_fee
+                toll_flag = 1
+
+        at_traffic, prob_traffic = taxi_helpers.at_traffic(self, state.get_agent_x(), state.get_agent_y())
+        if at_traffic:
+            traffic_flag = 1
 
         # Stacked if statements for efficiency.
         if action == "dropoff":
@@ -111,12 +160,11 @@ class AugmentedTaxiOOMDP(OOMDP):
             if agent.get_attribute("has_passenger"):
                 for p in state.get_objects_of_class("passenger"):
                     if p.get_attribute("x") != p.get_attribute("dest_x") or p.get_attribute("y") != p.get_attribute("dest_y"):
-                        reward += 0 - self.step_cost
-                        return reward
-                reward += 1 - self.step_cost
-                return reward
-        reward += 0 - self.step_cost
-        return reward
+                        return np.array([[passenger_flag, toll_flag, traffic_flag]])
+                passenger_flag = 1
+                return np.array([[passenger_flag, toll_flag, traffic_flag]])
+
+        return np.array([[passenger_flag, toll_flag, traffic_flag]])
 
     def _taxi_transition_func(self, state, action):
         '''

@@ -384,22 +384,16 @@ def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=N
                 return
             if event.type == KEYDOWN and event.key == K_SPACE:
                 action = trajectory[step][1]
-                if step + 1 < len(trajectory):
-                    cur_state = trajectory[step + 1][0]
+                cur_state = trajectory[step][2]
 
-                    if marked_state_importances is not None:
-                        # indicate if this is the critical state by displaying its state importance value
-                        if marked_state_importances[step + 1] != float('-inf'):
-                            _draw_lower_right_text('SI: {}'.format(round(marked_state_importances[step + 1], 3)), screen)
-                        else:
-                            # clear the text
-                            _draw_lower_right_text('       ', screen)
-                # show what could've been the outcome of the final action (note that this wasn't recorded)
-                else:
-                    mdp.set_curr_state(cur_state)
-                    _, cur_state = mdp.execute_agent_action(action)
-                    # clear the text
-                    _draw_lower_right_text('       ', screen)
+                if marked_state_importances is not None:
+                    # indicate if this is the critical state by displaying its state importance value
+                    if marked_state_importances[step] != float('-inf'):
+                        _draw_lower_right_text('SI: {}'.format(round(marked_state_importances[step], 3)), screen)
+                    else:
+                        # clear the text
+                        _draw_lower_right_text('       ', screen)
+
                 agent_shape = draw_state(screen, mdp, cur_state, agent_shape=agent_shape)
                 print("A: " + str(action))
 

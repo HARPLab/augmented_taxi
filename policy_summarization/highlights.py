@@ -25,7 +25,7 @@ def compute_highlights_state_importance(agent, state):
     '''
     max_q_val, best_action = agent._compute_max_qval_action_pair(state)
     min_q_val, worst_action = agent._compute_min_qval_action_pair(state)
-    return max_q_val - min_q_val, best_action
+    return max_q_val[0][0] - min_q_val[0][0], best_action
 
 def compare_state_importances(state_importance, summary, state_importances, trailing_count_up):
     '''
@@ -121,7 +121,7 @@ def obtain_summary(mdp, agent, max_summary_count=10, trajectory_length=5, n_simu
 
             if len(trajectory) == trajectory_length:
                 trajectory.pop(0)
-            trajectory.append((cur_state, action))
+            trajectory.append((cur_state, action, next_state))
 
             # housekeeping
             for x in range(len(trailing_count_up)):

@@ -20,7 +20,7 @@ def main(open_plot=True):
     passengers = [{"x": 1, "y": 1, "dest_x": 2, "dest_y": 5, "in_taxi": 0}]
     walls = [{"x": 2, "y": 2}, {"x": 3, "y": 4}]
     tolls = [{"x": 1, "y": 2, "fee": 0.4}]
-    traffic = [{"x": 2, "y": 4, "prob": 0.75}, {"x": 1, "y": 4, "prob": 0.5}] # probability that you're stuck
+    traffic = [{"x": 2, "y": 4, "prob": 0.5}] # probability that you're stuck
     fuel_station = []
     gamma = 0.95
 
@@ -41,21 +41,21 @@ def main(open_plot=True):
     vi_human = ValueIteration(mdp_human, sample_rate=20)
     vi_human.run_vi()
 
-    vi_name = 'fuelless'
-    # with open('models/vi_{}_agent.pickle'.format(vi_name), 'wb') as f:
-    #     pickle.dump((mdp_agent, vi_agent), f)
-    # with open('models/vi_{}_human.pickle'.format(vi_name), 'wb') as f:
-    #     pickle.dump((mdp_human, vi_human), f)
-    # with open('models/vi_{}_agent.pickle'.format(vi_name), 'rb') as f:
-    #     mdp_agent, vi_agent = pickle.load(f)
-    # with open('models/vi_{}_human.pickle'.format(vi_name), 'rb') as f:
-    #     mdp_human, vi_human = pickle.load(f)
+    vi_name = 'feature-based'
+    with open('models/vi_{}_agent.pickle'.format(vi_name), 'wb') as f:
+        pickle.dump((mdp_agent, vi_agent), f)
+    with open('models/vi_{}_human.pickle'.format(vi_name), 'wb') as f:
+        pickle.dump((mdp_human, vi_human), f)
+    with open('models/vi_{}_agent.pickle'.format(vi_name), 'rb') as f:
+        mdp_agent, vi_agent = pickle.load(f)
+    with open('models/vi_{}_human.pickle'.format(vi_name), 'rb') as f:
+        mdp_human, vi_human = pickle.load(f)
 
     # Visualize agents
-    # fixed_agent = FixedPolicyAgent(vi_agent.policy)
-    # fixed_human = FixedPolicyAgent(vi_human.policy)
-    # mdp_agent.visualize_agent(fixed_agent)
-    # mdp_human.visualize_agent(fixed_human)
+    fixed_agent = FixedPolicyAgent(vi_agent.policy)
+    fixed_human = FixedPolicyAgent(vi_human.policy)
+    mdp_agent.visualize_agent(fixed_agent)
+    mdp_human.visualize_agent(fixed_human)
     # mdp.reset()  # reset the current state to the initial state
     # mdp.visualize_interaction()
 
