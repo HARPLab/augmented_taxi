@@ -31,9 +31,14 @@ class AugmentedTaxiOOMDP(OOMDP):
     ATTRIBUTES = ["x", "y", "has_passenger", "in_taxi", "dest_x", "dest_y"]
     CLASSES = ["agent", "wall", "passenger", "toll", "traffic", "fuel_station"]
 
-    def __init__(self, width, height, agent, walls, passengers, tolls, traffic, fuel_stations, slip_prob=0, gamma=0.99):
+    def __init__(self, width, height, agent, walls, passengers, tolls, traffic, fuel_stations, slip_prob=0, gamma=0.99, weights=None):
         self.height = height
         self.width = width
+        if weights is not None:
+            self.weights = weights
+        else:
+            # use true weighting over reward variables (on the goal with the passenger, on a toll, on a traffic cell)
+            self.weights = np.array([[2, -0.4, -0.5]])
 
         # objects that belong in the state (changing)
         agent_obj = OOMDPObject(attributes=agent, name="agent")
@@ -121,11 +126,8 @@ class AugmentedTaxiOOMDP(OOMDP):
         # reward += 0 - self.step_cost
         # return reward
 
-        # weighting over reward variables (on the goal with the passenger, on a toll, on a traffic cell)
-        weights = np.array([[2, -0.4, -0.5]])
-
         # 2) feature-based reward
-        return weights.dot(self.compute_reward_features(state, action, next_state).T) - self.step_cost
+        return self.weights.dot(self.compute_reward_features(state, action, next_state).T) - self.step_cost
 
     def compute_reward_features(self, state, action, next_state=None):
         '''
@@ -165,6 +167,15 @@ class AugmentedTaxiOOMDP(OOMDP):
                 return np.array([[passenger_flag, toll_flag, traffic_flag]])
 
         return np.array([[passenger_flag, toll_flag, traffic_flag]])
+
+    def accumulate_reward_features(self, trajectory):
+        reward_features = np.zeros(self.weights.shape)
+
+        for sas in trajectory:
+            reward_features += self.compute_reward_features(sas[0], sas[1], sas[2])
+
+        return reward_features
+
 
     def _taxi_transition_func(self, state, action):
         '''
