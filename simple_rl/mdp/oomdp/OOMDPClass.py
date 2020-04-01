@@ -14,8 +14,8 @@ from simple_rl.mdp.oomdp.OOMDPObjectClass import OOMDPObject
 class OOMDP(MDP):
     ''' Abstract class for an Object Oriented Markov Decision Process. '''
 
-    def __init__(self, actions, transition_func, reward_func, init_state, gamma=0.99):
-        MDP.__init__(self, actions, transition_func, reward_func, init_state=init_state, gamma=gamma)
+    def __init__(self, actions, transition_func, reward_func, init_state, gamma=0.99, step_cost=0):
+        MDP.__init__(self, actions, transition_func, reward_func, init_state=init_state, gamma=gamma, step_cost=step_cost)
 
     def _make_oomdp_objs_from_list_of_dict(self, list_of_attr_dicts, name):
         '''

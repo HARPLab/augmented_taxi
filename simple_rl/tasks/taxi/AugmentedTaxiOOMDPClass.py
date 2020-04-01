@@ -31,7 +31,7 @@ class AugmentedTaxiOOMDP(OOMDP):
     ATTRIBUTES = ["x", "y", "has_passenger", "in_taxi", "dest_x", "dest_y"]
     CLASSES = ["agent", "wall", "passenger", "toll", "traffic", "fuel_station"]
 
-    def __init__(self, width, height, agent, walls, passengers, tolls, traffic, fuel_stations, slip_prob=0, gamma=0.99, weights=None):
+    def __init__(self, width, height, agent, walls, passengers, tolls, traffic, fuel_stations, slip_prob=0, gamma=0.99, step_cost=0, weights=None):
         self.height = height
         self.width = width
         if weights is not None:
@@ -58,10 +58,10 @@ class AugmentedTaxiOOMDP(OOMDP):
         init_state = self._create_state(agent_obj, wall_objs, pass_objs, toll_objs, traffic_objs, fuel_station_objs)
         if init_state.track_fuel():
             OOMDP.__init__(self, AugmentedTaxiOOMDP.AUGMENTED_ACTIONS, self._taxi_transition_func, self._taxi_reward_func,
-                           init_state=init_state, gamma=gamma)
+                           init_state=init_state, gamma=gamma, step_cost=step_cost)
         else:
             OOMDP.__init__(self, AugmentedTaxiOOMDP.BASE_ACTIONS, self._taxi_transition_func, self._taxi_reward_func,
-                           init_state=init_state, gamma=gamma)
+                           init_state=init_state, gamma=gamma, step_cost=step_cost)
 
     def _create_state(self, agent_oo_obj, walls, passengers, tolls, traffic, fuel_stations):
         '''
@@ -139,19 +139,19 @@ class AugmentedTaxiOOMDP(OOMDP):
         Returns
             array of reward features
         '''
-        # reward features = [successfully dropped off passenger, moved off of toll, at traffic]
+        # reward features = [successfully dropped off passenger, moved off of toll]
         passenger_flag = 0
         toll_flag = 0
-        traffic_flag = 0
+        # traffic_flag = 0
 
         if len(self.tolls) != 0:
             [moved_off_of_toll, toll_fee] = taxi_helpers._moved_off_of_toll(self, state, next_state)
             if moved_off_of_toll:
                 toll_flag = 1
 
-        at_traffic, prob_traffic = taxi_helpers.at_traffic(self, state.get_agent_x(), state.get_agent_y())
-        if at_traffic:
-            traffic_flag = 1
+        # at_traffic, prob_traffic = taxi_helpers.at_traffic(self, state.get_agent_x(), state.get_agent_y())
+        # if at_traffic:
+        #     traffic_flag = 1
 
         # Stacked if statements for efficiency.
         if action == "dropoff":
@@ -162,11 +162,11 @@ class AugmentedTaxiOOMDP(OOMDP):
             if agent.get_attribute("has_passenger"):
                 for p in state.get_objects_of_class("passenger"):
                     if p.get_attribute("x") != p.get_attribute("dest_x") or p.get_attribute("y") != p.get_attribute("dest_y"):
-                        return np.array([[passenger_flag, toll_flag, traffic_flag]])
+                        return np.array([[passenger_flag, toll_flag]])
                 passenger_flag = 1
-                return np.array([[passenger_flag, toll_flag, traffic_flag]])
+                return np.array([[passenger_flag, toll_flag]])
 
-        return np.array([[passenger_flag, toll_flag, traffic_flag]])
+        return np.array([[passenger_flag, toll_flag]])
 
     def accumulate_reward_features(self, trajectory):
         reward_features = np.zeros(self.weights.shape)
