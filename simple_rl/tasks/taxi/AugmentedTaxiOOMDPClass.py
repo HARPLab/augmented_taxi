@@ -168,11 +168,20 @@ class AugmentedTaxiOOMDP(OOMDP):
 
         return np.array([[passenger_flag, toll_flag]])
 
-    def accumulate_reward_features(self, trajectory):
+    def accumulate_reward_features(self, trajectory, discount=False):
         reward_features = np.zeros(self.weights.shape)
 
-        for sas in trajectory:
-            reward_features += self.compute_reward_features(sas[0], sas[1], sas[2])
+        # discount the accumulated reward features directly here as you're considering the entire trajectory and likely
+        # won't be discounting per (s, a, s') tuple
+        if discount:
+            step = 0
+            for sas in trajectory:
+                reward_features += self.gamma ** step * self.compute_reward_features(sas[0], sas[1], sas[2])
+                step += 1
+        # but still provide the option to return undiscounted accumulated reward features as well
+        else:
+            for sas in trajectory:
+                reward_features += self.compute_reward_features(sas[0], sas[1], sas[2])
 
         return reward_features
 

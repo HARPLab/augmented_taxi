@@ -42,10 +42,10 @@ def generate_env(env_code):
 
     return requested_passenger, requested_tolls
 
-def generate_agent(agent_a, walls_a, traffic_a, fuel_station_a, passengers_a, tolls_a, gamma_a, width_a, height_a, weights, visualize=False):
+def generate_agent(data_loc, agent_a, walls_a, traffic_a, fuel_station_a, passengers_a, tolls_a, gamma_a, width_a, height_a, weights, visualize=False):
 
     try:
-        with open('models/vi_agent.pickle', 'rb') as f:
+        with open('models/' + data_loc + '/vi_agent.pickle', 'rb') as f:
             mdp_agent, vi_agent = pickle.load(f)
     except:
         mdp_agent = AugmentedTaxiOOMDP(width=width_a, height=height_a, agent=agent_a, walls=walls_a,
@@ -54,7 +54,7 @@ def generate_agent(agent_a, walls_a, traffic_a, fuel_station_a, passengers_a, to
         vi_agent = ValueIteration(mdp_agent, sample_rate=5)
         vi_agent.run_vi()
 
-        with open('models/vi_agent.pickle', 'wb') as f:
+        with open('models/' + data_loc + '/vi_agent.pickle', 'wb') as f:
             pickle.dump((mdp_agent, vi_agent), f)
 
     # Visualize agent
@@ -64,16 +64,16 @@ def generate_agent(agent_a, walls_a, traffic_a, fuel_station_a, passengers_a, to
         # mdp.reset()  # reset the current state to the initial state
         # mdp.visualize_interaction()
 
-def obtain_summary(n_demonstrations, agent_a, walls_a, traffic_a, fuel_station_a, gamma_a, width_a, height_a, weights, eval_fn):
+def obtain_summary(data_loc, n_demonstrations, agent_a, walls_a, traffic_a, fuel_station_a, gamma_a, width_a, height_a, weights, eval_fn):
     # obtain uniformly the discretized reward weight candidates
-    n_wt_partitions = 2
+    n_wt_partitions = 9
     try:
-        with open('models/wt_candidates.pickle', 'rb') as f:
+        with open('models/' + data_loc + '/wt_candidates.pickle', 'rb') as f:
             wt_uniform_sampling = pickle.load(f)
     except:
-        wt_uniform_sampling = ps_helpers.discretize_wt_candidates(weights, weights_lb, weights_ub, n_wt_partitions)
+        wt_uniform_sampling = ps_helpers.discretize_wt_candidates(weights, weights_lb, weights_ub, n_wt_partitions, iter_idx=0)
 
-        with open('models/wt_candidates.pickle', 'wb') as f:
+        with open('models/' + data_loc + '/wt_candidates.pickle', 'wb') as f:
             pickle.dump(wt_uniform_sampling, f)
 
     # come up with an optimal policy for each of the candidates
@@ -83,7 +83,7 @@ def obtain_summary(n_demonstrations, agent_a, walls_a, traffic_a, fuel_station_a
 
     save_mark = 50
     try:
-        with open('models/wt_vi_traj_candidates.pickle', 'rb') as f:
+        with open('models/' + data_loc + '/wt_vi_traj_candidates.pickle', 'rb') as f:
             wt_vi_traj_candidates = pickle.load(f)
 
         if len(wt_vi_traj_candidates) == len(env_codes) and len(env_codes[-1]) == len(wt_uniform_sampling):
@@ -123,29 +123,29 @@ def obtain_summary(n_demonstrations, agent_a, walls_a, traffic_a, fuel_station_a
             print('Finished analyzing environment {}'.format(n_processed_envs))
 
             if n_processed_envs % save_mark == 0:
-                with open('models/wt_vi_traj_candidates.pickle', 'wb') as f:
+                with open('models/' + data_loc + '/wt_vi_traj_candidates.pickle', 'wb') as f:
                     pickle.dump(wt_vi_traj_candidates, f)
 
                 # make a backup in case the overwriting in the code above fails
-                shutil.copy2('models/wt_vi_traj_candidates.pickle', 'models/wt_vi_traj_candidates_backup.pickle')
+                shutil.copy2('models/' + data_loc + '/wt_vi_traj_candidates.pickle', 'models/' + data_loc + '/wt_vi_traj_candidates_backup.pickle')
 
                 print("Saved!")
 
-        with open('models/wt_vi_traj_candidates.pickle', 'wb') as f:
+        with open('models/' + data_loc + '/wt_vi_traj_candidates.pickle', 'wb') as f:
             pickle.dump(wt_vi_traj_candidates, f)
 
         # make a backup in case the overwriting in the code above fails
-        shutil.copy2('models/wt_vi_traj_candidates.pickle', 'models/wt_vi_traj_candidates_backup.pickle')
+        shutil.copy2('models/' + data_loc + '/wt_vi_traj_candidates.pickle', 'models/' + data_loc + '/wt_vi_traj_candidates_backup.pickle')
 
     # compute the Bayesian IRL-based policy summary
     bayesian_IRL_summary, wt_uniform_sampling, history_priors = bayesian_IRL.obtain_summary(n_demonstrations, weights, wt_uniform_sampling, wt_vi_traj_candidates, eval_fn)
 
-    with open('models/BIRL_summary_{}.pickle'.format(eval_fn), 'wb') as f:
+    with open('models/' + data_loc + '/BIRL_summary_{}.pickle'.format(eval_fn), 'wb') as f:
         pickle.dump((bayesian_IRL_summary, wt_uniform_sampling, history_priors), f)
 
 
-def visualize_summary(eval_fn, visualize_demos=True, visualize_history_priors=True):
-    with open('models/BIRL_summary_{}.pickle'.format(eval_fn), 'rb') as f:
+def visualize_summary(data_loc, eval_fn, visualize_demos=True, visualize_history_priors=True):
+    with open('models/' + data_loc + '/BIRL_summary_{}.pickle'.format(eval_fn), 'rb') as f:
         bayesian_IRL_summary, wt_uniform_sampling, history_priors = pickle.load(f)
 
     if visualize_demos:
@@ -159,7 +159,7 @@ def visualize_summary(eval_fn, visualize_demos=True, visualize_history_priors=Tr
         x = range(len(wt_uniform_sampling))
 
         # group the priors by demo, and not by weight
-        for j in range(len(bayesian_IRL_summary)):
+        for j in range(len(bayesian_IRL_summary) + 1):
             priors_per_wt_candidate = []
             for wt_candidate in wt_uniform_sampling:
                 priors_per_wt_candidate.append(history_priors[wt_candidate.tostring()][j])
@@ -170,10 +170,12 @@ def visualize_summary(eval_fn, visualize_demos=True, visualize_history_priors=Tr
             *list(itertools.chain.from_iterable([(x, history_priors_per_demo[j]) for j in range(len(history_priors_per_demo))])))
         plt.xlabel('Candidate reward weight vectors')
         plt.ylabel('Probability of candidates')
-        plt.legend(['{}'.format(x) for x in range(len(bayesian_IRL_summary))])
+        plt.legend(['{}'.format(x) for x in range(len(bayesian_IRL_summary) + 1)], bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
+        plt.xticks(range(len(wt_uniform_sampling)), wt_uniform_sampling, rotation=90)
         plt.show()
 
 if __name__ == "__main__":
+    data_loc = '512_env_10_wts_iter_idx_0'
     eval_fn = 'approx_MP'
     n_demonstrations = 10
 
@@ -194,6 +196,6 @@ if __name__ == "__main__":
     weights_lb = np.array([-3., -1.])
     weights_ub = np.array([3., 1.])
 
-    generate_agent(agent_a, walls_a, traffic_a, fuel_station_a, passengers_a, tolls_a, gamma_a, width_a, height_a, weights, visualize=True)
-    obtain_summary(n_demonstrations, agent_a, walls_a, traffic_a, fuel_station_a, gamma_a, width_a, height_a, weights, eval_fn)
-    visualize_summary(eval_fn, visualize_demos=True, visualize_history_priors=True)
+    generate_agent(data_loc, agent_a, walls_a, traffic_a, fuel_station_a, passengers_a, tolls_a, gamma_a, width_a, height_a, weights, visualize=True)
+    obtain_summary(data_loc, n_demonstrations, agent_a, walls_a, traffic_a, fuel_station_a, gamma_a, width_a, height_a, weights, eval_fn)
+    visualize_summary(data_loc, eval_fn, visualize_demos=True, visualize_history_priors=True)

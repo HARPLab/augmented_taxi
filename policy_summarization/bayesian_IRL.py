@@ -48,9 +48,9 @@ def obtain_summary(n_demonstrations, weights, wt_uniform_sampling, wt_vi_traj_ca
         cond_trajectory_likelihoods_trajectories = []
 
         # for each environment
-        for k in range(len(wt_vi_traj_candidates)):
+        for env_idx in range(len(wt_vi_traj_candidates)):
             Z = 0    # normalization factor
-            wt_vi_traj_candidates_tuples = wt_vi_traj_candidates[k]
+            wt_vi_traj_candidates_tuples = wt_vi_traj_candidates[env_idx]
             trajectory = wt_vi_traj_candidates_tuples[idx_of_true_wt][2]
             cond_trajectory_likelihoods = {}
 
@@ -62,7 +62,7 @@ def obtain_summary(n_demonstrations, weights, wt_uniform_sampling, wt_vi_traj_ca
 
                 if inf_type == 'exact':
                     # a) exact inference IRL
-                    reward_diff = wt_candidate.dot(vi_candidate.mdp.accumulate_reward_features(trajectory).T) - wt_candidate.dot(vi_candidate.mdp.accumulate_reward_features(trajectory_candidate).T)
+                    reward_diff = wt_candidate.dot(vi_candidate.mdp.accumulate_reward_features(trajectory, discount=True).T) - wt_candidate.dot(vi_candidate.mdp.accumulate_reward_features(trajectory_candidate, discount=True).T)
                     if reward_diff >= 0:
                         cond_trajectory_likelihood = 1
                     else:
@@ -71,8 +71,8 @@ def obtain_summary(n_demonstrations, weights, wt_uniform_sampling, wt_vi_traj_ca
                     # b) approximate inference IRL
                     # take the abs value in case you're working with partial trajectories, in which the comparative rewards
                     # for short term behavior differs from comparative rewards for long term behavior
-                    reward_diff = abs((wt_candidate.dot(vi_candidate.mdp.accumulate_reward_features(trajectory_candidate).T) \
-                                   - wt_candidate.dot(vi_candidate.mdp.accumulate_reward_features(trajectory).T))[0][0])
+                    reward_diff = abs((wt_candidate.dot(vi_candidate.mdp.accumulate_reward_features(trajectory_candidate, discount=True).T) \
+                                   - wt_candidate.dot(vi_candidate.mdp.accumulate_reward_features(trajectory, discount=True).T))[0][0])
                     cond_trajectory_likelihood = np.exp(-update_coeff * reward_diff)
                 else:
                     raise ValueError("Error: The requested inference type is invalid.")
@@ -85,41 +85,38 @@ def obtain_summary(n_demonstrations, weights, wt_uniform_sampling, wt_vi_traj_ca
 
             if eval_type == 'MP':
                 # calculate what the new condition probability of the true weight vector would be given this demonstration
-                cond_posteriors[k] = 1. / Z * cond_trajectory_likelihoods[weights.tostring()] * priors[weights.tostring()]
+                cond_posteriors[env_idx] = 1. / Z * cond_trajectory_likelihoods[weights.tostring()] * priors[weights.tostring()]
             else:
-                for j in range(len(wt_uniform_sampling)):
-                    wt_candidate = wt_uniform_sampling[j]
-                    cond_posteriors[k, j] = 1. / Z * cond_trajectory_likelihoods[wt_candidate.tostring()] * priors[wt_candidate.tostring()]
+                for wt_cand_idx in range(len(wt_uniform_sampling)):
+                    wt_candidate = wt_uniform_sampling[wt_cand_idx]
+                    cond_posteriors[env_idx, wt_cand_idx] = 1. / Z * cond_trajectory_likelihoods[wt_candidate.tostring()] * priors[wt_candidate.tostring()]
 
         if eval_type == 'MP':
             # a) select the demonstration that maximally increases the conditional posterior probability of the true weight vector (MP)
             best_env = np.argmax(cond_posteriors)
         elif eval_type == 'GP':
             # b) select the demonstration that maximally increases gap between the conditional posteriors of the true and the second best weight vector (GP)
-            a = 2
+            acq_vals = np.zeros(len(wt_vi_traj_candidates))
             cond_posteriors_sans = np.delete(cond_posteriors, idx_of_true_wt, 1)
             max_idx = np.argmax(cond_posteriors_sans, axis=1)
             max_vals = [cond_posteriors_sans[j][max_idx[j]] for j in range(max_idx.shape[0])]
-            max_diff = float('-inf')
-            best_env = 0
-            for j in range(len(max_vals)):
-                diff = cond_posteriors[j][idx_of_true_wt] - max_vals[j]
-                if diff > max_diff:
-                    max_diff = diff
-                    best_env = j
+            for env_idx in range(len(max_vals)):
+                diff = cond_posteriors[env_idx][idx_of_true_wt] - max_vals[env_idx]
+                acq_vals[env_idx] = diff
+            best_env = np.argmax(acq_vals)
         elif eval_type == 'VOL':
             # c) select the demonstration that maximally increases the conditional posterior probability of the true weight vector
             # and minimizes the condition posterior probabilities of incorrect weight vectors (VOL)
             acq_vals = np.zeros(len(wt_vi_traj_candidates))
-            for env in range(len(wt_vi_traj_candidates)):
+            for env_idx in range(len(wt_vi_traj_candidates)):
                 acq_val = 0
                 for wt_cand_idx in range(len(wt_uniform_sampling)):
                     wt_candidate = wt_uniform_sampling[wt_cand_idx]
                     if wt_cand_idx == idx_of_true_wt:
-                        acq_val += cond_posteriors[env, wt_cand_idx] - priors[wt_candidate.tostring()]
+                        acq_val += cond_posteriors[env_idx, wt_cand_idx] - priors[wt_candidate.tostring()]
                     else:
-                        acq_val += priors[wt_candidate.tostring()] - cond_posteriors[env, wt_cand_idx]
-                acq_vals[env] = acq_val
+                        acq_val += priors[wt_candidate.tostring()] - cond_posteriors[env_idx, wt_cand_idx]
+                acq_vals[env_idx] = acq_val
             best_env = np.argmax(acq_vals)
             print(colored("Best acq_val: {}".format(np.max(acq_vals)), 'red'))
         else:
