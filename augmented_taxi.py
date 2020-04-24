@@ -18,6 +18,7 @@ from simple_rl.planning import ValueIteration
 from policy_summarization import bayesian_IRL
 from policy_summarization import policy_summarization_helpers as ps_helpers
 from simple_rl.utils import mdp_helpers
+from policy_summarization import BEC
 
 def generate_env(env_code):
 
@@ -71,7 +72,7 @@ def obtain_summary(data_loc, n_demonstrations, agent_a, walls_a, traffic_a, fuel
         with open('models/' + data_loc + '/wt_candidates.pickle', 'rb') as f:
             wt_uniform_sampling = pickle.load(f)
     except:
-        wt_uniform_sampling = ps_helpers.discretize_wt_candidates(weights, weights_lb, weights_ub, n_wt_partitions, iter_idx=0)
+        wt_uniform_sampling = ps_helpers.discretize_wt_candidates(weights, weights_lb, weights_ub, n_wt_partitions)
 
         with open('models/' + data_loc + '/wt_candidates.pickle', 'wb') as f:
             pickle.dump(wt_uniform_sampling, f)
@@ -143,13 +144,9 @@ def obtain_summary(data_loc, n_demonstrations, agent_a, walls_a, traffic_a, fuel
     with open('models/' + data_loc + '/BIRL_summary_{}.pickle'.format(eval_fn), 'wb') as f:
         pickle.dump((bayesian_IRL_summary, wt_uniform_sampling, history_priors), f)
 
-
-def visualize_summary(data_loc, eval_fn, visualize_demos=True, visualize_history_priors=True):
-    with open('models/' + data_loc + '/BIRL_summary_{}.pickle'.format(eval_fn), 'rb') as f:
-        bayesian_IRL_summary, wt_uniform_sampling, history_priors = pickle.load(f)
-
+def visualize_summary(summary, wt_uniform_sampling, history_priors, visualize_demos=True, visualize_history_priors=True):
     if visualize_demos:
-        for policy_traj_tuple in bayesian_IRL_summary:
+        for policy_traj_tuple in summary:
             mdp_demo = policy_traj_tuple[0].mdp
             mdp_demo.visualize_trajectory(policy_traj_tuple[1])
 
@@ -159,7 +156,7 @@ def visualize_summary(data_loc, eval_fn, visualize_demos=True, visualize_history
         x = range(len(wt_uniform_sampling))
 
         # group the priors by demo, and not by weight
-        for j in range(len(bayesian_IRL_summary) + 1):
+        for j in range(len(summary) + 1):
             priors_per_wt_candidate = []
             for wt_candidate in wt_uniform_sampling:
                 priors_per_wt_candidate.append(history_priors[wt_candidate.tostring()][j])
@@ -170,12 +167,12 @@ def visualize_summary(data_loc, eval_fn, visualize_demos=True, visualize_history
             *list(itertools.chain.from_iterable([(x, history_priors_per_demo[j]) for j in range(len(history_priors_per_demo))])))
         plt.xlabel('Candidate reward weight vectors')
         plt.ylabel('Probability of candidates')
-        plt.legend(['{}'.format(x) for x in range(len(bayesian_IRL_summary) + 1)], bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
+        plt.legend(['{}'.format(x) for x in range(len(summary) + 1)], bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
         plt.xticks(range(len(wt_uniform_sampling)), wt_uniform_sampling, rotation=90)
         plt.show()
 
 if __name__ == "__main__":
-    data_loc = '512_env_10_wts_iter_idx_0'
+    data_loc = '512_env_50_wts_uniform'
     eval_fn = 'approx_MP'
     n_demonstrations = 10
 
@@ -191,11 +188,19 @@ if __name__ == "__main__":
     passengers_a = [{"x": 4, "y": 1, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
     tolls_a = [{"x": 3, "y": 1, "fee": 1}]
 
-    # (on the goal with the passenger, on a toll
-    weights = np.array([[0.5, -0.075]])
-    weights_lb = np.array([-3., -1.])
-    weights_ub = np.array([3., 1.])
+    # (on the goal with the passenger, on a toll). assume the L2 norm of the weights is equal 1. WLOG
+    weights = np.array([[0.98893635, -0.14834045]])
+    weights_lb = np.array([-1., -1.])
+    weights_ub = np.array([1., 1.])
 
-    generate_agent(data_loc, agent_a, walls_a, traffic_a, fuel_station_a, passengers_a, tolls_a, gamma_a, width_a, height_a, weights, visualize=True)
-    obtain_summary(data_loc, n_demonstrations, agent_a, walls_a, traffic_a, fuel_station_a, gamma_a, width_a, height_a, weights, eval_fn)
-    visualize_summary(data_loc, eval_fn, visualize_demos=True, visualize_history_priors=True)
+    # generate_agent(data_loc, agent_a, walls_a, traffic_a, fuel_station_a, passengers_a, tolls_a, gamma_a, width_a, height_a, weights, visualize=True)
+
+    # obtain_summary(data_loc, n_demonstrations, agent_a, walls_a, traffic_a, fuel_station_a, gamma_a, width_a, height_a, weights, eval_fn)
+
+    # with open('models/' + data_loc + '/BIRL_summary_{}.pickle'.format(eval_fn), 'rb') as f:
+    #     bayesian_IRL_summary, wt_uniform_sampling, history_priors = pickle.load(f)
+    # visualize_summary(bayesian_IRL_summary, wt_uniform_sampling, history_priors, visualize_demos=True, visualize_history_priors=True)
+
+    with open('models/' + data_loc + '/wt_vi_traj_candidates.pickle', 'rb') as f:
+        wt_vi_traj_candidates = pickle.load(f)
+    constraints = BEC.extract_constraints(wt_vi_traj_candidates, visualize=True, gt_weight=weights)
