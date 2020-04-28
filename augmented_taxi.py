@@ -144,33 +144,6 @@ def obtain_summary(data_loc, n_demonstrations, agent_a, walls_a, traffic_a, fuel
     with open('models/' + data_loc + '/BIRL_summary_{}.pickle'.format(eval_fn), 'wb') as f:
         pickle.dump((bayesian_IRL_summary, wt_uniform_sampling, history_priors), f)
 
-def visualize_summary(summary, wt_uniform_sampling, history_priors, visualize_demos=True, visualize_history_priors=True):
-    if visualize_demos:
-        for policy_traj_tuple in summary:
-            mdp_demo = policy_traj_tuple[0].mdp
-            mdp_demo.visualize_trajectory(policy_traj_tuple[1])
-
-    if visualize_history_priors:
-        # visualize the evolution of the prior distribution with each new demonstration
-        history_priors_per_demo = []
-        x = range(len(wt_uniform_sampling))
-
-        # group the priors by demo, and not by weight
-        for j in range(len(summary) + 1):
-            priors_per_wt_candidate = []
-            for wt_candidate in wt_uniform_sampling:
-                priors_per_wt_candidate.append(history_priors[wt_candidate.tostring()][j])
-            history_priors_per_demo.append(priors_per_wt_candidate)
-
-        # flatten the list of (x, history_priors_per_demo) tuples
-        plt.plot(
-            *list(itertools.chain.from_iterable([(x, history_priors_per_demo[j]) for j in range(len(history_priors_per_demo))])))
-        plt.xlabel('Candidate reward weight vectors')
-        plt.ylabel('Probability of candidates')
-        plt.legend(['{}'.format(x) for x in range(len(summary) + 1)], bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
-        plt.xticks(range(len(wt_uniform_sampling)), wt_uniform_sampling, rotation=90)
-        plt.show()
-
 if __name__ == "__main__":
     data_loc = '512_env_50_wts_uniform'
     eval_fn = 'approx_MP'
@@ -199,8 +172,23 @@ if __name__ == "__main__":
 
     # with open('models/' + data_loc + '/BIRL_summary_{}.pickle'.format(eval_fn), 'rb') as f:
     #     bayesian_IRL_summary, wt_uniform_sampling, history_priors = pickle.load(f)
-    # visualize_summary(bayesian_IRL_summary, wt_uniform_sampling, history_priors, visualize_demos=True, visualize_history_priors=True)
+    # bayesian_IRL.visualize_summary(bayesian_IRL_summary, wt_uniform_sampling, history_priors, visualize_demos=True, visualize_history_priors=True)
 
     with open('models/' + data_loc + '/wt_vi_traj_candidates.pickle', 'rb') as f:
         wt_vi_traj_candidates = pickle.load(f)
-    constraints = BEC.extract_constraints(wt_vi_traj_candidates, visualize=True, gt_weight=weights)
+    try:
+        with open('models/' + data_loc + '/BEC_constraints.pickle'.format(eval_fn), 'rb') as f:
+            constraints = pickle.load(f)
+    except:
+        constraints = BEC.extract_constraints(wt_vi_traj_candidates, visualize=True, gt_weight=weights)
+
+        with open('models/' + data_loc + '/BEC_constraints.pickle'.format(eval_fn), 'wb') as f:
+            pickle.dump(constraints, f)
+
+    BEC.visualize_constraints(constraints, gt_weight=weights)
+
+    opt_mdp_trajs = BEC.obtain_summary(wt_vi_traj_candidates, constraints)
+    for mdp_traj in opt_mdp_trajs:
+        mdp_traj[0].visualize_trajectory(mdp_traj[1])
+    with open('models/' + data_loc + '/BEC_summary.pickle'.format(eval_fn), 'wb') as f:
+        pickle.dump(opt_mdp_trajs, f)

@@ -2,26 +2,26 @@
 import matplotlib.pyplot as plt
 from termcolor import colored
 import numpy as np
-from itertools import chain
+import itertools
 
 # Other imports
 from simple_rl.agents import FixedPolicyAgent
 
-'''
-Args:
-    n_demonstrations (int): number of demonstrations to return in summary
-    weights (list of floats): ground truth reward weights used by agent to derive its optimal policy
-    wt_uniform_sampling (list of candidate reward weights)
-    wt_vi_traj_candidates (nested list of candidate reward weights, and corresponding policies and trajectories)
-    visualize (Boolean): visualize the progression of the prior probabilities of reward weights candidates
-
-Returns:
-    IRL_summary (list of MDP/policy and corresponding trajectories of best demonstrations)
-
-Summary:
-    An implementation of 'Enabling Robots to Communicate their Objectives' (Huang et al. AURO2019).
-'''
 def obtain_summary(n_demonstrations, weights, wt_uniform_sampling, wt_vi_traj_candidates, eval_fn):
+    '''
+    Args:
+        n_demonstrations (int): number of demonstrations to return in summary
+        weights (list of floats): ground truth reward weights used by agent to derive its optimal policy
+        wt_uniform_sampling (list of candidate reward weights)
+        wt_vi_traj_candidates (nested list of candidate reward weights, and corresponding policies and trajectories)
+        visualize (Boolean): visualize the progression of the prior probabilities of reward weights candidates
+
+    Returns:
+        IRL_summary (list of MDP/policy and corresponding trajectories of best demonstrations)
+
+    Summary:
+        An implementation of 'Enabling Robots to Communicate their Objectives' (Huang et al. AURO2019).
+    '''
     priors = {}                # up-to-date priors on candidates
     history_priors = {}        # a history of updated priors for debugging
 
@@ -150,3 +150,40 @@ def obtain_summary(n_demonstrations, weights, wt_uniform_sampling, wt_vi_traj_ca
         demo_count += 1
 
     return IRL_summary, wt_uniform_sampling, history_priors
+
+def visualize_summary(summary, wt_uniform_sampling, history_priors, visualize_demos=True, visualize_history_priors=True):
+    '''
+    :param summary: Bayesian IRL summary (nested list of [MDP/policy, trajectory])
+    :param wt_uniform_sampling: Candidate weights considered (numpy ndarray)
+    :param history_priors: History of normalized probabilities of each candidate weight being to the true weight (nested list)
+    :param visualize_demos: Boolean
+    :param visualize_history_priors: Boolean
+
+    Summary: Visualize the demonstrations comprising the Bayesian IRL summary and/or the update history of the
+    probabilities of the candidate weights
+    '''
+    if visualize_demos:
+        for policy_traj_tuple in summary:
+            mdp_demo = policy_traj_tuple[0].mdp
+            mdp_demo.visualize_trajectory(policy_traj_tuple[1])
+
+    if visualize_history_priors:
+        # visualize the evolution of the prior distribution with each new demonstration
+        history_priors_per_demo = []
+        x = range(len(wt_uniform_sampling))
+
+        # group the priors by demo, and not by weight
+        for j in range(len(summary) + 1):
+            priors_per_wt_candidate = []
+            for wt_candidate in wt_uniform_sampling:
+                priors_per_wt_candidate.append(history_priors[wt_candidate.tostring()][j])
+            history_priors_per_demo.append(priors_per_wt_candidate)
+
+        # flatten the list of (x, history_priors_per_demo) tuples
+        plt.plot(
+            *list(itertools.chain.from_iterable([(x, history_priors_per_demo[j]) for j in range(len(history_priors_per_demo))])))
+        plt.xlabel('Candidate reward weight vectors')
+        plt.ylabel('Probability of candidates')
+        plt.legend(['{}'.format(x) for x in range(len(summary) + 1)], bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
+        plt.xticks(range(len(wt_uniform_sampling)), wt_uniform_sampling, rotation=90)
+        plt.show()
