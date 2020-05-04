@@ -4,11 +4,6 @@
 import sys
 import dill as pickle
 import numpy as np
-from termcolor import colored
-import matplotlib.pyplot as plt
-import time
-import itertools
-import shutil
 
 # Other imports.
 sys.path.append("simple_rl")
@@ -17,31 +12,7 @@ from simple_rl.tasks import AugmentedTaxiOOMDP
 from simple_rl.planning import ValueIteration
 from policy_summarization import bayesian_IRL
 from policy_summarization import policy_summarization_helpers as ps_helpers
-from simple_rl.utils import mdp_helpers
 from policy_summarization import BEC
-
-def generate_env(env_code):
-
-    # first entry currently dictates where the passenger begins
-    if env_code[0] == 0:
-        requested_passenger = [{"x": 4, "y": 1, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
-    else:
-        requested_passenger = [{"x": 2, "y": 3, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
-
-    # the last eight entries currently dictate the presence of tolls
-    available_tolls = [{"x": 2, "y": 3, "fee": 1}, {"x": 3, "y": 3, "fee": 1}, {"x": 4, "y": 3, "fee": 1},
-               {"x": 2, "y": 2, "fee": 1}, {"x": 3, "y": 2, "fee": 1}, {"x": 4, "y": 2, "fee": 1},
-               {"x": 2, "y": 1, "fee": 1}, {"x": 3, "y": 1, "fee": 1}]
-
-    requested_tolls = []
-
-    offset = 1
-    for x in range(offset, len(env_code)):
-        entry = env_code[x]
-        if entry:
-            requested_tolls.append(available_tolls[x - offset])
-
-    return requested_passenger, requested_tolls
 
 def generate_agent(data_loc, agent_a, walls_a, traffic_a, fuel_station_a, passengers_a, tolls_a, gamma_a, width_a, height_a, weights, visualize=False):
 
@@ -65,91 +36,54 @@ def generate_agent(data_loc, agent_a, walls_a, traffic_a, fuel_station_a, passen
         # mdp.reset()  # reset the current state to the initial state
         # mdp.visualize_interaction()
 
-def obtain_summary(data_loc, n_demonstrations, agent_a, walls_a, traffic_a, fuel_station_a, gamma_a, width_a, height_a, weights, eval_fn):
-    # obtain uniformly the discretized reward weight candidates
-    n_wt_partitions = 9
+def obtain_BIRL_summary(data_loc, n_env, weights, weights_lb, weights_ub, n_wt_partitions, visualize_history_priors=False, visualize_summary=False):
     try:
-        with open('models/' + data_loc + '/wt_candidates.pickle', 'rb') as f:
-            wt_uniform_sampling = pickle.load(f)
+        with open('models/' + data_loc + '/BIRL_summary_{}.pickle'.format(eval_fn), 'rb') as f:
+            bayesian_IRL_summary, wt_candidates, history_priors = pickle.load(f)
     except:
-        wt_uniform_sampling = ps_helpers.discretize_wt_candidates(weights, weights_lb, weights_ub, n_wt_partitions)
+        wt_candidates = ps_helpers.obtain_wt_candidates(data_loc, weights, weights_lb, weights_ub, n_wt_partitions=n_wt_partitions)
+        wt_vi_traj_candidates = ps_helpers.obtain_env_policies(data_loc, n_env, wt_candidates, agent_a, walls_a, traffic_a, fuel_station_a, gamma_a, width_a, height_a)
+        bayesian_IRL_summary, wt_candidates, history_priors = bayesian_IRL.obtain_summary(n_demonstrations, weights, wt_candidates, wt_vi_traj_candidates, eval_fn)
 
-        with open('models/' + data_loc + '/wt_candidates.pickle', 'wb') as f:
-            pickle.dump(wt_uniform_sampling, f)
+        with open('models/' + data_loc + '/BIRL_summary_{}.pickle'.format(eval_fn), 'wb') as f:
+            pickle.dump((bayesian_IRL_summary, wt_candidates, history_priors), f)
 
-    # come up with an optimal policy for each of the candidates
+    if visualize_history_priors or visualize_summary:
+        bayesian_IRL.visualize_summary(bayesian_IRL_summary, wt_candidates, history_priors, visualize_summary=visualize_summary, visualize_history_priors=visualize_history_priors)
 
-    # generate codes that govern passenger's initial position and status of the eight tolls in the 4x3 environment
-    env_codes = list(map(list, itertools.product([0, 1], repeat=9)))
+    return bayesian_IRL_summary, wt_candidates, history_priors
 
-    save_mark = 50
+def obtain_BEC_summary(data_loc, n_env, weights, visualize_constraints=False, visualize_summary=False):
     try:
-        with open('models/' + data_loc + '/wt_vi_traj_candidates.pickle', 'rb') as f:
-            wt_vi_traj_candidates = pickle.load(f)
+        with open('models/' + data_loc + '/BEC_summary.pickle'.format(eval_fn), 'rb') as f:
+            BEC_summary = pickle.load(f)
 
-        if len(wt_vi_traj_candidates) == len(env_codes) and len(env_codes[-1]) == len(wt_uniform_sampling):
-            # all environments and weights have been processed
-            n_processed_envs = len(env_codes)
-        else:
-            # a portion of the environments and weights have been processed
-            n_processed_envs = len(wt_vi_traj_candidates)
+        with open('models/' + data_loc + '/BEC_constraints.pickle'.format(eval_fn), 'rb') as f:
+            constraints = pickle.load(f)
     except:
-        wt_vi_traj_candidates = []
-        n_processed_envs = 0
+        wt_vi_traj_candidates = ps_helpers.obtain_env_policies(data_loc, n_env, np.expand_dims(weights, axis=0), agent_a, walls_a, traffic_a, fuel_station_a, gamma_a, width_a, height_a)
+        try:
+            with open('models/' + data_loc + '/BEC_constraints.pickle'.format(eval_fn), 'rb') as f:
+                constraints = pickle.load(f)
 
-    # enumeration of all possible optimal policies from possible environments x weight candidates
-    # if there are environments and weights yet to be processed
-    if n_processed_envs < len(env_codes):
-        for env_idx in range(n_processed_envs, len(env_codes)):
-            env_code = env_codes[env_idx]
-            passengers_a, tolls_a = generate_env(env_code)
-            wt_counter = 0
-            # a per-environment tuple of corresponding reward weight, optimal policy, and optimal trajectory
-            wt_vi_traj_env = []
-            for wt_candidate in wt_uniform_sampling:
-                mdp_candidate = AugmentedTaxiOOMDP(width=width_a, height=height_a, agent=agent_a, walls=walls_a,
-                                               passengers=passengers_a, tolls=tolls_a, traffic=traffic_a,
-                                               fuel_stations=fuel_station_a, gamma=gamma_a, weights=wt_candidate)
-                vi_candidate = ValueIteration(mdp_candidate, sample_rate=1)
-                iterations, value_of_init_state = vi_candidate.run_vi()
-                trajectory = mdp_helpers.rollout_policy(mdp_candidate, vi_candidate)
-                wt_vi_traj_env.append((wt_candidate, vi_candidate, trajectory))
+            if visualize_constraints:
+                BEC.visualize_constraints(constraints, gt_weight=weights)
+        except:
+            constraints = BEC.extract_constraints(wt_vi_traj_candidates)
+            with open('models/' + data_loc + '/BEC_constraints.pickle'.format(eval_fn), 'wb') as f:
+                pickle.dump(constraints, f)
 
-                wt_counter += 1
-                print('wt_counter: {}, iterations: {}, init_val: {}, wt_candidate: {}'.format(wt_counter, iterations,
-                                                                                       value_of_init_state,
-                                                                                       wt_candidate))
-            wt_vi_traj_candidates.append(wt_vi_traj_env)
-            n_processed_envs += 1
-            print('Finished analyzing environment {}'.format(n_processed_envs))
+        BEC_summary = BEC.obtain_summary(wt_vi_traj_candidates, constraints)
+        with open('models/' + data_loc + '/BEC_summary.pickle'.format(eval_fn), 'wb') as f:
+            pickle.dump(BEC_summary, f)
 
-            if n_processed_envs % save_mark == 0:
-                with open('models/' + data_loc + '/wt_vi_traj_candidates.pickle', 'wb') as f:
-                    pickle.dump(wt_vi_traj_candidates, f)
+    if visualize_summary:
+        BEC.visualize_summary(BEC_summary)
 
-                # make a backup in case the overwriting in the code above fails
-                shutil.copy2('models/' + data_loc + '/wt_vi_traj_candidates.pickle', 'models/' + data_loc + '/wt_vi_traj_candidates_backup.pickle')
-
-                print("Saved!")
-
-        with open('models/' + data_loc + '/wt_vi_traj_candidates.pickle', 'wb') as f:
-            pickle.dump(wt_vi_traj_candidates, f)
-
-        # make a backup in case the overwriting in the code above fails
-        shutil.copy2('models/' + data_loc + '/wt_vi_traj_candidates.pickle', 'models/' + data_loc + '/wt_vi_traj_candidates_backup.pickle')
-
-    # compute the Bayesian IRL-based policy summary
-    bayesian_IRL_summary, wt_uniform_sampling, history_priors = bayesian_IRL.obtain_summary(n_demonstrations, weights, wt_uniform_sampling, wt_vi_traj_candidates, eval_fn)
-
-    with open('models/' + data_loc + '/BIRL_summary_{}.pickle'.format(eval_fn), 'wb') as f:
-        pickle.dump((bayesian_IRL_summary, wt_uniform_sampling, history_priors), f)
+    return constraints, BEC_summary
 
 if __name__ == "__main__":
-    data_loc = '512_env_50_wts_uniform'
-    eval_fn = 'approx_MP'
-    n_demonstrations = 10
-
-    # Augmented Taxi details
+    # Augmented Taxi details (note that I'm allowing functions below to directly access these taxi variables w/o passing them in)
     agent_a = {"x": 4, "y": 1, "has_passenger": 0}
     walls_a = [{"x": 1, "y": 3, "fee": 1}, {"x": 1, "y": 2, "fee": 1}]
     traffic_a = [] # probability that you're stuck
@@ -166,29 +100,33 @@ if __name__ == "__main__":
     weights_lb = np.array([-1., -1.])
     weights_ub = np.array([1., 1.])
 
+    # Joint BIRL and BEC parameters
+    n_env = 512                  # number of environments / demonstrations to consider
+                                 # tip: select so that np.log(n_env) / np.log(2) yields an int for predictable behavior
+                                 # see ps_helpers.obtain_env_policies()
+    # BIRL parameters
+    n_wt = 10                    # total number of weight candidates (including the ground truth)
+                                 # tip: select n_wt to such that n_wt_partitions is an int to ensure that the exact
+                                 # number of desired weight candidates is actually incorporated. see ps_helpers.obtain_wt_candidates()
+                                 # also note that n_wt = n_wt_partitions ** weights.shape[1] + 1
+
+    iter_idx = None              # weight dimension to discretize over. If None, discretize uniformly over all dimensions
+    eval_fn = 'approx_MP'        # desired likelihood function for computing the posterior probability of weight candidates
+    n_demonstrations = 10        # total number of demonstrations sought, in order of decreasing effectiveness
+
+    if iter_idx == None:
+        data_loc_BIRL = str(n_env) + '_env_' + str(n_wt) + '_wt_' + 'uniform'
+        n_wt_partitions = (n_wt - 1) ** (1.0 / weights.shape[1])
+    else:
+        data_loc_BIRL = str(n_env) + '_env_' + str(n_wt) + '_wt_' + 'iter_idx_' + str(iter_idx)
+        n_wt_partitions = n_wt - 1
+    data_loc_BEC = str(n_env) + '_env_gt_wt'
+
+    # a) generate an agent if you want to explore the Augmented Taxi MDP
     # generate_agent(data_loc, agent_a, walls_a, traffic_a, fuel_station_a, passengers_a, tolls_a, gamma_a, width_a, height_a, weights, visualize=True)
 
-    # obtain_summary(data_loc, n_demonstrations, agent_a, walls_a, traffic_a, fuel_station_a, gamma_a, width_a, height_a, weights, eval_fn)
+    # b) obtain a Bayesian IRL summary of the agent's policy
+    bayesian_IRL_summary, wt_candidates, history_priors = obtain_BIRL_summary(data_loc_BIRL, n_env, weights, weights_lb, weights_ub, n_wt_partitions, visualize_history_priors=True, visualize_summary=True)
 
-    # with open('models/' + data_loc + '/BIRL_summary_{}.pickle'.format(eval_fn), 'rb') as f:
-    #     bayesian_IRL_summary, wt_uniform_sampling, history_priors = pickle.load(f)
-    # bayesian_IRL.visualize_summary(bayesian_IRL_summary, wt_uniform_sampling, history_priors, visualize_demos=True, visualize_history_priors=True)
-
-    with open('models/' + data_loc + '/wt_vi_traj_candidates.pickle', 'rb') as f:
-        wt_vi_traj_candidates = pickle.load(f)
-    try:
-        with open('models/' + data_loc + '/BEC_constraints.pickle'.format(eval_fn), 'rb') as f:
-            constraints = pickle.load(f)
-    except:
-        constraints = BEC.extract_constraints(wt_vi_traj_candidates, visualize=True, gt_weight=weights)
-
-        with open('models/' + data_loc + '/BEC_constraints.pickle'.format(eval_fn), 'wb') as f:
-            pickle.dump(constraints, f)
-
-    BEC.visualize_constraints(constraints, gt_weight=weights)
-
-    opt_mdp_trajs = BEC.obtain_summary(wt_vi_traj_candidates, constraints)
-    for mdp_traj in opt_mdp_trajs:
-        mdp_traj[0].visualize_trajectory(mdp_traj[1])
-    with open('models/' + data_loc + '/BEC_summary.pickle'.format(eval_fn), 'wb') as f:
-        pickle.dump(opt_mdp_trajs, f)
+    # c) obtain a BEC summary of the agent's policy
+    constraints, BEC_summary = obtain_BEC_summary(data_loc_BEC, n_env, weights, visualize_constraints=True, visualize_summary=True)

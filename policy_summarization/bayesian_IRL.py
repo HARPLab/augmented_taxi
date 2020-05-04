@@ -4,8 +4,6 @@ from termcolor import colored
 import numpy as np
 import itertools
 
-# Other imports
-from simple_rl.agents import FixedPolicyAgent
 
 def obtain_summary(n_demonstrations, weights, wt_uniform_sampling, wt_vi_traj_candidates, eval_fn):
     '''
@@ -14,7 +12,7 @@ def obtain_summary(n_demonstrations, weights, wt_uniform_sampling, wt_vi_traj_ca
         weights (list of floats): ground truth reward weights used by agent to derive its optimal policy
         wt_uniform_sampling (list of candidate reward weights)
         wt_vi_traj_candidates (nested list of candidate reward weights, and corresponding policies and trajectories)
-        visualize (Boolean): visualize the progression of the prior probabilities of reward weights candidates
+        eval_fn (string): desired likelihood function for computing the posterior probability of weight candidates
 
     Returns:
         IRL_summary (list of MDP/policy and corresponding trajectories of best demonstrations)
@@ -151,7 +149,7 @@ def obtain_summary(n_demonstrations, weights, wt_uniform_sampling, wt_vi_traj_ca
 
     return IRL_summary, wt_uniform_sampling, history_priors
 
-def visualize_summary(summary, wt_uniform_sampling, history_priors, visualize_demos=True, visualize_history_priors=True):
+def visualize_summary(summary, wt_uniform_sampling, history_priors, visualize_summary=True, visualize_history_priors=True):
     '''
     :param summary: Bayesian IRL summary (nested list of [MDP/policy, trajectory])
     :param wt_uniform_sampling: Candidate weights considered (numpy ndarray)
@@ -162,7 +160,7 @@ def visualize_summary(summary, wt_uniform_sampling, history_priors, visualize_de
     Summary: Visualize the demonstrations comprising the Bayesian IRL summary and/or the update history of the
     probabilities of the candidate weights
     '''
-    if visualize_demos:
+    if visualize_summary:
         for policy_traj_tuple in summary:
             mdp_demo = policy_traj_tuple[0].mdp
             mdp_demo.visualize_trajectory(policy_traj_tuple[1])

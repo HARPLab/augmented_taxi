@@ -226,3 +226,12 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints):
         print("{}/{} BEC constraints covered".format(total_covered, n_BEC_constraints))
 
     return summary
+
+def visualize_summary(BEC_summary):
+    '''
+    :param BEC_summary: Nested list of [mdp, trajectory]
+
+    Summary: visualize the BEC demonstrations
+    '''
+    for mdp_traj in BEC_summary:
+        mdp_traj[0].visualize_trajectory(mdp_traj[1])
