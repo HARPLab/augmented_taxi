@@ -9,12 +9,13 @@ from simple_rl.planning import ValueIteration
 from simple_rl.utils import mdp_helpers
 
 
-def obtain_wt_candidates(data_loc, weights, weights_lb, weights_ub, n_wt_partitions=0, iter_idx=None):
+def obtain_wt_candidates(data_loc, weights, weights_lb, weights_ub, step_cost_flag, n_wt_partitions=0, iter_idx=None):
     '''
     Args:
         weights: Ground truth weights (numpy array)
         weights_lb: Lowerbound for weights (numpy array)
         weights_ub: Upperbound for weights (numpy array)
+        step_cost_flag: Whether the final element of the reward weight vector is a step cost (and should not be estimated)
         n_wt_partitions: Number of partitions to discretize weights into. 0 corresponds to only considering the ground truth weight
         iter_idx: Weight dimension to discretize over. If None, discretize uniformly over all dimensions
 
@@ -31,9 +32,16 @@ def obtain_wt_candidates(data_loc, weights, weights_lb, weights_ub, n_wt_partiti
     except:
         # if a specific reward weight wasn't specified for discretization, uniformly discretize over all reward weights
         if iter_idx is None:
-            mesh = np.array(np.meshgrid(
-                *[np.linspace(weights_lb[x], weights_ub[x], n_wt_partitions) for x in np.arange(len(weights[0]))]))
-            wt_uniform_sampling = np.hstack([mesh[x].reshape(-1, 1) for x in np.arange(len(weights[0]))])
+            # if the last element of the reward weight vector is the step cost,
+            if step_cost_flag:
+                mesh = np.array(np.meshgrid(
+                    *[np.linspace(weights_lb[x], weights_ub[x], n_wt_partitions) for x in np.arange(len(weights[0]) - 1)]))
+                wt_uniform_sampling = np.hstack([mesh[x].reshape(-1, 1) for x in np.arange(len(weights[0]) - 1)])
+                wt_uniform_sampling = np.hstack((wt_uniform_sampling, weights[0, -1] * np.ones((wt_uniform_sampling.shape[0], 1))))
+            else:
+                mesh = np.array(np.meshgrid(
+                    *[np.linspace(weights_lb[x], weights_ub[x], n_wt_partitions) for x in np.arange(len(weights[0]))]))
+                wt_uniform_sampling = np.hstack([mesh[x].reshape(-1, 1) for x in np.arange(len(weights[0]))])
             wt_uniform_sampling = np.vstack((wt_uniform_sampling, weights))
             wt_uniform_sampling = wt_uniform_sampling.reshape(wt_uniform_sampling.shape[0], 1,
                                                               wt_uniform_sampling.shape[1])  # for future dot products
@@ -43,8 +51,7 @@ def obtain_wt_candidates(data_loc, weights, weights_lb, weights_ub, n_wt_partiti
             wt_uniform_sampling = np.tile(weights, (len(discretized_weights), 1))
             wt_uniform_sampling[:, iter_idx] = discretized_weights
             wt_uniform_sampling = np.vstack((wt_uniform_sampling, weights))
-            wt_uniform_sampling = wt_uniform_sampling.reshape(wt_uniform_sampling.shape[0], 1,
-                                                              wt_uniform_sampling.shape[1])
+            wt_uniform_sampling = wt_uniform_sampling.reshape(wt_uniform_sampling.shape[0], 1, wt_uniform_sampling.shape[1])
 
         with open('models/' + data_loc + '/wt_candidates.pickle', 'wb') as f:
             pickle.dump(wt_uniform_sampling, f)

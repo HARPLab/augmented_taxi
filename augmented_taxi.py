@@ -36,12 +36,12 @@ def generate_agent(data_loc, agent_a, walls_a, traffic_a, fuel_station_a, passen
         # mdp.reset()  # reset the current state to the initial state
         # mdp.visualize_interaction()
 
-def obtain_BIRL_summary(data_loc, eval_fn, n_env, weights, weights_lb, weights_ub, n_wt_partitions, visualize_history_priors=False, visualize_summary=False):
+def obtain_BIRL_summary(data_loc, eval_fn, n_env, weights, weights_lb, weights_ub, n_wt_partitions, iter_idx, step_cost_flag, visualize_history_priors=False, visualize_summary=False):
     try:
         with open('models/' + data_loc + '/BIRL_summary_{}.pickle'.format(eval_fn), 'rb') as f:
             bayesian_IRL_summary, wt_candidates, history_priors = pickle.load(f)
     except:
-        wt_candidates = ps_helpers.obtain_wt_candidates(data_loc, weights, weights_lb, weights_ub, n_wt_partitions=n_wt_partitions)
+        wt_candidates = ps_helpers.obtain_wt_candidates(data_loc, weights, weights_lb, weights_ub, step_cost_flag, n_wt_partitions=n_wt_partitions, iter_idx=iter_idx)
         wt_vi_traj_candidates = ps_helpers.obtain_env_policies(data_loc, n_env, wt_candidates, agent_a, walls_a, traffic_a, fuel_station_a, gamma_a, width_a, height_a)
         bayesian_IRL_summary, wt_candidates, history_priors = bayesian_IRL.obtain_summary(n_demonstrations, weights, wt_candidates, wt_vi_traj_candidates, eval_fn)
 
@@ -94,29 +94,33 @@ if __name__ == "__main__":
     height_a = 3
 
     # (on the goal with the passenger, on a toll, step cost). assume the L2 norm of the weights is equal 1. WLOG
-    weights_lb = np.array([-1., -1., -1.])
-    weights_ub = np.array([1., 1., 1.])
+    weights_lb = np.array([-1., -1., -0.0350311])
+    weights_ub = np.array([1., 1., -0.0350311])
 
     weights = np.array([[0.9908798, -0.13011553, -0.0350311]])
     gamma_a = 1.
+    step_cost_flag = True
 
     # Joint BIRL and BEC parameters
     n_env = 512                  # number of environments to consider
                                  # tip: select so that np.log(n_env) / np.log(2) yields an int for predictable behavior
                                  # see ps_helpers.obtain_env_policies()
     # BIRL parameters
-    n_wt = 1                    # total number of weight candidates (including the ground truth)
+    n_wt = 10                    # total number of weight candidates (including the ground truth)
                                  # tip: select n_wt to such that n_wt_partitions is an int to ensure that the exact
                                  # number of desired weight candidates is actually incorporated. see ps_helpers.obtain_wt_candidates()
                                  # also note that n_wt = n_wt_partitions ** weights.shape[1] + 1
 
-    iter_idx = None              # weight dimension to discretize over. If None, discretize uniformly over all dimensions
+    iter_idx = 0              # weight dimension to discretize over. If None, discretize uniformly over all dimensions
     eval_fn = 'approx_MP'        # desired likelihood function for computing the posterior probability of weight candidates
     n_demonstrations = 10        # total number of demonstrations sought, in order of decreasing effectiveness
 
     if iter_idx == None:
         data_loc_BIRL = str(n_env) + '_env_' + str(n_wt) + '_wt_' + 'uniform'
-        n_wt_partitions = (n_wt - 1) ** (1.0 / weights.shape[1])
+        if step_cost_flag:
+            n_wt_partitions = (n_wt - 1) ** (1.0 / (weights.shape[1] - 1))
+        else:
+            n_wt_partitions = (n_wt - 1) ** (1.0 / weights.shape[1])
     else:
         data_loc_BIRL = str(n_env) + '_env_' + str(n_wt) + '_wt_' + 'iter_idx_' + str(iter_idx)
         n_wt_partitions = n_wt - 1
@@ -126,7 +130,7 @@ if __name__ == "__main__":
     # generate_agent('base', agent_a, walls_a, traffic_a, fuel_station_a, passengers_a, tolls_a, gamma_a, width_a, height_a, weights, visualize=True)
 
     # b) obtain a Bayesian IRL summary of the agent's policy
-    # bayesian_IRL_summary, wt_candidates, history_priors = obtain_BIRL_summary(data_loc_BIRL, eval_fn, n_env, weights, weights_lb, weights_ub, n_wt_partitions, visualize_history_priors=False, visualize_summary=True)
+    bayesian_IRL_summary, wt_candidates, history_priors = obtain_BIRL_summary(data_loc_BIRL, eval_fn, n_env, weights, weights_lb, weights_ub, n_wt_partitions, iter_idx, step_cost_flag, visualize_history_priors=False, visualize_summary=True)
 
     # c) obtain a BEC summary of the agent's policy
-    constraints, BEC_summary = obtain_BEC_summary(data_loc_BEC, n_env, weights, visualize_constraints=True, visualize_summary=True)
+    # constraints, BEC_summary = obtain_BEC_summary(data_loc_BEC, n_env, weights, visualize_constraints=True, visualize_summary=True)
