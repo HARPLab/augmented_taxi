@@ -21,7 +21,7 @@ def remove_duplicate_constraints(constraints):
     Summary: Remove any duplicate constraints
     '''
     nonredundant_constraints = []
-    zero_constraint = np.array([[0., 0.]])
+    zero_constraint = np.zeros(constraints[0].shape)
 
     for query in constraints:
         add_it = True
@@ -63,9 +63,7 @@ def remove_redundant_constraints(constraints):
         # min_x a^Tx, st -Ax >= -b
         a = np.ndarray.tolist(query_constraint[0])
         b = [0] * len(constraints_other)
-        x0_bounds = (-1, 1)
-        x1_bounds = (-1, 1)
-        res = linprog(a, A_ub=constraints_other, b_ub=b, bounds=[x0_bounds, x1_bounds])
+        res = linprog(a, A_ub=constraints_other, b_ub=b, bounds=[(-1, 1)] * constraints[0].shape[1])
 
         # if query_constraint * res.x^T >= 0, then this constraint is redundant. copy over everything except this constraint
         if query_constraint.dot(res.x.reshape(-1, 1))[0][0] >= -1e-05: # account for slight numerical instability

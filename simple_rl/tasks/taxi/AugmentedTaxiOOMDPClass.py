@@ -26,8 +26,8 @@ class AugmentedTaxiOOMDP(OOMDP):
     ''' Class for a Taxi OO-MDP '''
 
     # Static constants.
-    BASE_ACTIONS = ["up", "down", "left", "right", "pickup", "dropoff"]
-    AUGMENTED_ACTIONS = ["up", "down", "left", "right", "pickup", "dropoff", "refuel"]
+    BASE_ACTIONS = ["up", "down", "left", "right", "pickup", "dropoff", "exit"]
+    AUGMENTED_ACTIONS = ["up", "down", "left", "right", "pickup", "dropoff", "refuel", "exit"]
     ATTRIBUTES = ["x", "y", "has_passenger", "in_taxi", "dest_x", "dest_y"]
     CLASSES = ["agent", "wall", "passenger", "toll", "traffic", "fuel_station"]
 
@@ -42,6 +42,7 @@ class AugmentedTaxiOOMDP(OOMDP):
 
         # objects that belong in the state (changing)
         agent_obj = OOMDPObject(attributes=agent, name="agent")
+        agent_exit = {"x": 0, "y": 0, "has_passenger": 0}  # grid world indices start at (1, 1) so (0, 0) is unreserved
         pass_objs = self._make_oomdp_objs_from_list_of_dict(passengers, "passenger")
 
         # objects that belong to the MDP (static)
@@ -55,7 +56,9 @@ class AugmentedTaxiOOMDP(OOMDP):
         self.fuel_stations = fuel_station_objs
         self.slip_prob = slip_prob
 
-        init_state = self._create_state(agent_obj, wall_objs, pass_objs, toll_objs, traffic_objs, fuel_station_objs)
+        init_state = self._create_state(agent_obj, pass_objs)
+        self.exit_state = self._create_state(OOMDPObject(attributes=agent_exit, name="agent_exit"), pass_objs)
+        self.exit_state.set_terminal(True)
         if init_state.track_fuel():
             OOMDP.__init__(self, AugmentedTaxiOOMDP.AUGMENTED_ACTIONS, self._taxi_transition_func, self._taxi_reward_func,
                            init_state=init_state, gamma=gamma, step_cost=step_cost)
@@ -63,7 +66,7 @@ class AugmentedTaxiOOMDP(OOMDP):
             OOMDP.__init__(self, AugmentedTaxiOOMDP.BASE_ACTIONS, self._taxi_transition_func, self._taxi_reward_func,
                            init_state=init_state, gamma=gamma, step_cost=step_cost)
 
-    def _create_state(self, agent_oo_obj, walls, passengers, tolls, traffic, fuel_stations):
+    def _create_state(self, agent_oo_obj, passengers):
         '''
         Args:
             agent_oo_obj (OOMDPObjects)
@@ -127,7 +130,7 @@ class AugmentedTaxiOOMDP(OOMDP):
         # return reward
 
         # 2) feature-based reward
-        return self.weights.dot(self.compute_reward_features(state, action, next_state).T) - self.step_cost
+        return self.weights.dot(self.compute_reward_features(state, action, next_state).T)
 
     def compute_reward_features(self, state, action, next_state=None):
         '''
@@ -143,10 +146,11 @@ class AugmentedTaxiOOMDP(OOMDP):
         passenger_flag = 0
         toll_flag = 0
         # traffic_flag = 0
+        step_cost_flag = 1
 
         if len(self.tolls) != 0:
             [moved_off_of_toll, toll_fee] = taxi_helpers._moved_off_of_toll(self, state, next_state)
-            if moved_off_of_toll:
+            if moved_off_of_toll and not next_state == self.exit_state:
                 toll_flag = 1
 
         # at_traffic, prob_traffic = taxi_helpers.at_traffic(self, state.get_agent_x(), state.get_agent_y())
@@ -162,11 +166,11 @@ class AugmentedTaxiOOMDP(OOMDP):
             if agent.get_attribute("has_passenger"):
                 for p in state.get_objects_of_class("passenger"):
                     if p.get_attribute("x") != p.get_attribute("dest_x") or p.get_attribute("y") != p.get_attribute("dest_y"):
-                        return np.array([[passenger_flag, toll_flag]])
+                        return np.array([[passenger_flag, toll_flag, step_cost_flag]])
                 passenger_flag = 1
-                return np.array([[passenger_flag, toll_flag]])
+                return np.array([[passenger_flag, toll_flag, step_cost_flag]])
 
-        return np.array([[passenger_flag, toll_flag]])
+        return np.array([[passenger_flag, toll_flag, step_cost_flag]])
 
     def accumulate_reward_features(self, trajectory, discount=False):
         reward_features = np.zeros(self.weights.shape)
@@ -227,6 +231,8 @@ class AugmentedTaxiOOMDP(OOMDP):
             next_state = self.agent_pickup(state)
         elif action == "refuel":
             next_state = self.agent_refuel(state)
+        elif action == "exit":
+            next_state = copy.deepcopy(self.exit_state)
         else:
             next_state = state
 

@@ -23,7 +23,7 @@ def generate_agent(data_loc, agent_a, walls_a, traffic_a, fuel_station_a, passen
         mdp_agent = AugmentedTaxiOOMDP(width=width_a, height=height_a, agent=agent_a, walls=walls_a,
                                        passengers=passengers_a, tolls=tolls_a, traffic=traffic_a,
                                        fuel_stations=fuel_station_a, gamma=gamma_a, weights=weights)
-        vi_agent = ValueIteration(mdp_agent, sample_rate=5)
+        vi_agent = ValueIteration(mdp_agent, sample_rate=1)
         vi_agent.run_vi()
 
         with open('models/' + data_loc + '/vi_agent.pickle', 'wb') as f:
@@ -36,7 +36,7 @@ def generate_agent(data_loc, agent_a, walls_a, traffic_a, fuel_station_a, passen
         # mdp.reset()  # reset the current state to the initial state
         # mdp.visualize_interaction()
 
-def obtain_BIRL_summary(data_loc, n_env, weights, weights_lb, weights_ub, n_wt_partitions, visualize_history_priors=False, visualize_summary=False):
+def obtain_BIRL_summary(data_loc, eval_fn, n_env, weights, weights_lb, weights_ub, n_wt_partitions, visualize_history_priors=False, visualize_summary=False):
     try:
         with open('models/' + data_loc + '/BIRL_summary_{}.pickle'.format(eval_fn), 'rb') as f:
             bayesian_IRL_summary, wt_candidates, history_priors = pickle.load(f)
@@ -55,27 +55,27 @@ def obtain_BIRL_summary(data_loc, n_env, weights, weights_lb, weights_ub, n_wt_p
 
 def obtain_BEC_summary(data_loc, n_env, weights, visualize_constraints=False, visualize_summary=False):
     try:
-        with open('models/' + data_loc + '/BEC_summary.pickle'.format(eval_fn), 'rb') as f:
+        with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
             BEC_summary = pickle.load(f)
 
-        with open('models/' + data_loc + '/BEC_constraints.pickle'.format(eval_fn), 'rb') as f:
+        with open('models/' + data_loc + '/BEC_constraints.pickle', 'rb') as f:
             constraints = pickle.load(f)
     except:
         wt_vi_traj_candidates = ps_helpers.obtain_env_policies(data_loc, n_env, np.expand_dims(weights, axis=0), agent_a, walls_a, traffic_a, fuel_station_a, gamma_a, width_a, height_a)
         try:
-            with open('models/' + data_loc + '/BEC_constraints.pickle'.format(eval_fn), 'rb') as f:
+            with open('models/' + data_loc + '/BEC_constraints.pickle', 'rb') as f:
                 constraints = pickle.load(f)
-
-            if visualize_constraints:
-                BEC.visualize_constraints(constraints, gt_weight=weights)
         except:
             constraints = BEC.extract_constraints(wt_vi_traj_candidates)
-            with open('models/' + data_loc + '/BEC_constraints.pickle'.format(eval_fn), 'wb') as f:
+            with open('models/' + data_loc + '/BEC_constraints.pickle', 'wb') as f:
                 pickle.dump(constraints, f)
 
         BEC_summary = BEC.obtain_summary(wt_vi_traj_candidates, constraints)
-        with open('models/' + data_loc + '/BEC_summary.pickle'.format(eval_fn), 'wb') as f:
+        with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
             pickle.dump(BEC_summary, f)
+
+    if visualize_constraints:
+        BEC.visualize_constraints(constraints, gt_weight=weights)
 
     if visualize_summary:
         BEC.visualize_summary(BEC_summary)
@@ -86,26 +86,26 @@ if __name__ == "__main__":
     # Augmented Taxi details (note that I'm allowing functions below to directly access these taxi variables w/o passing them in)
     agent_a = {"x": 4, "y": 1, "has_passenger": 0}
     walls_a = [{"x": 1, "y": 3, "fee": 1}, {"x": 1, "y": 2, "fee": 1}]
+    passengers_a = [{"x": 4, "y": 1, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
+    tolls_a = [{"x": 3, "y": 1, "fee": 1}]
     traffic_a = [] # probability that you're stuck
     fuel_station_a = []
-    gamma_a = 0.95
     width_a = 4
     height_a = 3
 
-    passengers_a = [{"x": 4, "y": 1, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
-    tolls_a = [{"x": 3, "y": 1, "fee": 1}]
+    # (on the goal with the passenger, on a toll, step cost). assume the L2 norm of the weights is equal 1. WLOG
+    weights_lb = np.array([-1., -1., -1.])
+    weights_ub = np.array([1., 1., 1.])
 
-    # (on the goal with the passenger, on a toll). assume the L2 norm of the weights is equal 1. WLOG
-    weights = np.array([[0.98893635, -0.14834045]])
-    weights_lb = np.array([-1., -1.])
-    weights_ub = np.array([1., 1.])
+    weights = np.array([[0.9908798, -0.13011553, -0.0350311]])
+    gamma_a = 1.
 
     # Joint BIRL and BEC parameters
-    n_env = 512                  # number of environments / demonstrations to consider
+    n_env = 512                  # number of environments to consider
                                  # tip: select so that np.log(n_env) / np.log(2) yields an int for predictable behavior
                                  # see ps_helpers.obtain_env_policies()
     # BIRL parameters
-    n_wt = 10                    # total number of weight candidates (including the ground truth)
+    n_wt = 1                    # total number of weight candidates (including the ground truth)
                                  # tip: select n_wt to such that n_wt_partitions is an int to ensure that the exact
                                  # number of desired weight candidates is actually incorporated. see ps_helpers.obtain_wt_candidates()
                                  # also note that n_wt = n_wt_partitions ** weights.shape[1] + 1
@@ -123,10 +123,10 @@ if __name__ == "__main__":
     data_loc_BEC = str(n_env) + '_env_gt_wt'
 
     # a) generate an agent if you want to explore the Augmented Taxi MDP
-    # generate_agent(data_loc, agent_a, walls_a, traffic_a, fuel_station_a, passengers_a, tolls_a, gamma_a, width_a, height_a, weights, visualize=True)
+    # generate_agent('base', agent_a, walls_a, traffic_a, fuel_station_a, passengers_a, tolls_a, gamma_a, width_a, height_a, weights, visualize=True)
 
     # b) obtain a Bayesian IRL summary of the agent's policy
-    bayesian_IRL_summary, wt_candidates, history_priors = obtain_BIRL_summary(data_loc_BIRL, n_env, weights, weights_lb, weights_ub, n_wt_partitions, visualize_history_priors=True, visualize_summary=True)
+    # bayesian_IRL_summary, wt_candidates, history_priors = obtain_BIRL_summary(data_loc_BIRL, eval_fn, n_env, weights, weights_lb, weights_ub, n_wt_partitions, visualize_history_priors=False, visualize_summary=True)
 
     # c) obtain a BEC summary of the agent's policy
     constraints, BEC_summary = obtain_BEC_summary(data_loc_BEC, n_env, weights, visualize_constraints=True, visualize_summary=True)
