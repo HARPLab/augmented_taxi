@@ -44,7 +44,7 @@ def equal_constraints(c1, c2):
     else:
         return False
 
-def remove_redundant_constraints(constraints):
+def remove_redundant_constraints(constraints, weights, step_cost_flag):
     '''
     Summary: Remove redundant constraint that do not change the underlying BEC region
     '''
@@ -60,10 +60,14 @@ def remove_redundant_constraints(constraints):
                 constraints_other.append(list(-nonredundant_constraint[0]))
 
         # solve linear program
-        # min_x a^Tx, st -Ax >= -b
+        # min_x a^Tx, st -Ax >= -b (note that scipy traditionally accepts bounds as Ax <= b, hence the negative multiplier to the constraints)
         a = np.ndarray.tolist(query_constraint[0])
         b = [0] * len(constraints_other)
-        res = linprog(a, A_ub=constraints_other, b_ub=b, bounds=[(-1, 1)] * constraints[0].shape[1])
+        if step_cost_flag:
+            # the last weight is the step cost, which is assumed to be known by the learner. adjust the bounds accordingly
+            res = linprog(a, A_ub=constraints_other, b_ub=b, bounds=[(-1, 1), (-1, 1), (weights[0, -1], weights[0, -1])])
+        else:
+            res = linprog(a, A_ub=constraints_other, b_ub=b, bounds=[(-1, 1)] * constraints[0].shape[1])
 
         # if query_constraint * res.x^T >= 0, then this constraint is redundant. copy over everything except this constraint
         if query_constraint.dot(res.x.reshape(-1, 1))[0][0] >= -1e-05: # account for slight numerical instability
@@ -76,48 +80,77 @@ def remove_redundant_constraints(constraints):
     return nonredundant_constraints
 
 
-def visualize_constraints(constraints, gt_weight=None):
+def visualize_constraints(constraints, weights, step_cost_flag):
     '''
     Summary: Visualize the constraints
     '''
-    # for higher dimensional constraints, update this visualization function must be updated
+    # This visualization function is currently specialized to handle plotting problems with two unknown weights or two
+    # unknown and one known weight. For higher dimensional constraints, this visualization function must be updated.
+
     plt.xlim(-1, 1)
     plt.ylim(-1, 1)
     wt_shading = 1. / len(constraints)
 
-    for constraint in constraints:
-        if constraint[0, 0] == 1.:
-            # completely vertical line going through zero
-            plt.plot([constraint[0, 1] / constraint[0, 0], -constraint[0, 1] / constraint[0, 0]], [-1, 1])
+    if step_cost_flag:
+        # if the final weight is the step cost, it is assumed that there are three weights, which must be accounted for
+        # differently to plot the BEC region for the first two weights
+        for constraint in constraints:
+            if constraint[0, 0] == 1.:
+                # completely vertical line going through zero
+                plt.plot([constraint[0, 1] / constraint[0, 0], -constraint[0, 1] / constraint[0, 0]], [-1, 1])
 
-            # use (1, 0) as a test point to decide which half space to color
-            if constraint[0, 0] >= 0:
-                # color the right side of the line
-                plt.axvspan(0, 1, alpha=wt_shading, color='blue')
+                # use (1, 0) as a test point to decide which half space to color
+                if constraint[0, 0] >= 0:
+                    # color the right side of the line
+                    plt.axvspan(0, 1, alpha=wt_shading, color='blue')
+                else:
+                    # color the left side of the line
+                    plt.axvspan(-1, 0, alpha=wt_shading, color='blue')
             else:
-                # color the left side of the line
-                plt.axvspan(-1, 0, alpha=wt_shading, color='blue')
-        else:
-            plt.plot([-1, 1], [constraint[0, 0] / constraint[0, 1], -constraint[0, 0] / constraint[0, 1]])
+                pt_1 = (constraint[0, 0] - (weights[0, -1] * constraint[0, 2])) / constraint[0, 1]
+                pt_2 = (-constraint[0, 0] - (weights[0, -1] * constraint[0, 2])) / constraint[0, 1]
+                plt.plot([-1, 1], [pt_1, pt_2])
 
-            # use (0, 1) as a test point to decide which half space to color
-            if constraint[0, 1] >= 0:
-                plt.fill_between([-1, 1], [constraint[0, 0] / constraint[0, 1], -constraint[0, 0] / constraint[0, 1]],
-                                 [1, 1], alpha=wt_shading, color='blue')
+                # use (0, 1) as a test point to decide which half space to color
+                if constraint[0, 1] + (weights[0, -1] * constraint[0, 2]) >= 0:
+                    plt.fill_between([-1, 1], [pt_1, pt_2], [1, 1], alpha=wt_shading, color='blue')
+                else:
+                    plt.fill_between([-1, 1], [pt_1, pt_2], [-1, -1], alpha=wt_shading, color='blue')
+    else:
+        for constraint in constraints:
+            if constraint[0, 0] == 1.:
+                # completely vertical line going through zero
+                plt.plot([constraint[0, 1] / constraint[0, 0], -constraint[0, 1] / constraint[0, 0]], [-1, 1])
+
+                # use (1, 0) as a test point to decide which half space to color
+                if constraint[0, 0] >= 0:
+                    # color the right side of the line
+                    plt.axvspan(0, 1, alpha=wt_shading, color='blue')
+                else:
+                    # color the left side of the line
+                    plt.axvspan(-1, 0, alpha=wt_shading, color='blue')
             else:
-                plt.fill_between([-1, 1], [constraint[0, 0] / constraint[0, 1], -constraint[0, 0] / constraint[0, 1]],
-                                 [-1, -1], alpha=wt_shading, color='blue')
+                pt_1 = constraint[0, 0] / constraint[0, 1]
+                pt_2 = -constraint[0, 0] / constraint[0, 1]
+                plt.plot([-1, 1], [pt_1, pt_2])
+
+                # use (0, 1) as a test point to decide which half space to color
+                if constraint[0, 1] >= 0:
+                    plt.fill_between([-1, 1], [pt_1, pt_2], [1, 1], alpha=wt_shading, color='blue')
+                else:
+                    plt.fill_between([-1, 1], [pt_1, pt_2], [-1, -1], alpha=wt_shading, color='blue')
 
     # plot ground truth weight
-    if gt_weight is not None:
-        plt.scatter(gt_weight[0, 0], gt_weight[0, 1], s=200, color='red')
+    plt.scatter(weights[0, 0], weights[0, 1], s=200, color='red')
     plt.xlabel(r'$\theta_0$')
     plt.ylabel(r'$\theta_1$')
     plt.show()
 
-def extract_constraints(wt_vi_traj_candidates):
+def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag):
     '''
     :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
+    :param weights (numpy array): Ground truth reward weights used by agent to derive its optimal policy
+    :param step_cost_flag (bool): Indicates that the last weight element is a known step cost
     :return: min_subset_constraints: List of constraints
 
     Summary: Obtain the constraints that comprise the BEC region of a set of demonstrations
@@ -150,11 +183,14 @@ def extract_constraints(wt_vi_traj_candidates):
         counter += 1
 
     normalized_constraints = normalize_constraints(constraints)
-    nonduplicate_constraints = remove_duplicate_constraints(normalized_constraints)
-    if len(nonduplicate_constraints) > 1:
-        min_subset_constraints = remove_redundant_constraints(nonduplicate_constraints)
+    if len(normalized_constraints) > 0:
+        nonduplicate_constraints = remove_duplicate_constraints(normalized_constraints)
+        if len(nonduplicate_constraints) > 1:
+            min_subset_constraints = remove_redundant_constraints(nonduplicate_constraints, weights, step_cost_flag)
+        else:
+            min_subset_constraints = nonduplicate_constraints
     else:
-        min_subset_constraints = nonduplicate_constraints
+        min_subset_constraints = normalized_constraints
 
     return min_subset_constraints
 
@@ -188,10 +224,13 @@ def update_covered_constraints(constraints_added, BEC_constraints, covered_BEC_c
                 covered_BEC_constraints[BEC_constraint_idx] = True
 
 
-def obtain_summary(wt_vi_traj_candidates, BEC_constraints):
+def obtain_summary(wt_vi_traj_candidates, BEC_constraints, weights, step_cost_flag):
     '''
     :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
     :param BEC_constraints: Minimum set of constraints defining the BEC of a set of demos / policy (list of constraints)
+    :param weights (numpy array): Ground truth reward weights used by agent to derive its optimal policy
+    :param step_cost_flag (bool): Indicates that the last weight element is a known step cost
+
     :return: summary: Nested list of [mdp, trajectory]
 
     Summary: Obtain a minimal set of a demonstrations that recovers the behavioral equivalence class (BEC) of a set of demos / policy.
@@ -207,7 +246,7 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints):
 
         for traj_idx in range(len(wt_vi_traj_candidates)):
             print("Extracting constraints from environment {}".format(traj_idx))
-            new_constraints = extract_constraints([wt_vi_traj_candidates[traj_idx]])
+            new_constraints = extract_constraints([wt_vi_traj_candidates[traj_idx]], weights, step_cost_flag)
 
             count = count_new_covers(new_constraints, BEC_constraints, covered_BEC_constraints)
 

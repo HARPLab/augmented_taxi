@@ -34,7 +34,7 @@ def obtain_summary(n_demonstrations, weights, wt_uniform_sampling, wt_vi_traj_ca
         history_priors[wt_candidate.tostring()] = [1. / len(wt_uniform_sampling)]
 
     IRL_summary = []
-    update_coeff = 0.01 # 10^-5 to 10^5 used by Huang et al. for approximate inference
+    update_coeff = 1. # 10^-5 to 10^5 used by Huang et al. for approximate inference
     idx_of_true_wt = np.ndarray.tolist(wt_uniform_sampling).index(np.ndarray.tolist(weights))
     demo_count = 0
 
@@ -184,4 +184,5 @@ def visualize_summary(summary, wt_uniform_sampling, history_priors, visualize_su
         plt.ylabel('Probability of candidates')
         plt.legend(['{}'.format(x) for x in range(len(summary) + 1)], bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
         plt.xticks(range(len(wt_uniform_sampling)), wt_uniform_sampling, rotation=90)
+        # plt.savefig('prior_history.png', bbox_inches='tight')
         plt.show()

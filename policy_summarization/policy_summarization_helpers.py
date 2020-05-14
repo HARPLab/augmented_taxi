@@ -93,7 +93,7 @@ def obtain_env_policies(data_loc, n_env, wt_candidates, agent_a, walls_a, traffi
     # generate codes that govern passenger's initial position and status of the eight tolls in the 4x3 environment
     env_codes = list(map(list, itertools.product([0, 1], repeat=int(np.log(n_env) / np.log(2)))))
 
-    save_mark = 50
+    save_mark = 750
     try:
         with open('models/' + data_loc + '/wt_vi_traj_candidates.pickle', 'rb') as f:
             wt_vi_traj_candidates = pickle.load(f)

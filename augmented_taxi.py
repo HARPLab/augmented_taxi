@@ -53,7 +53,7 @@ def obtain_BIRL_summary(data_loc, eval_fn, n_env, weights, weights_lb, weights_u
 
     return bayesian_IRL_summary, wt_candidates, history_priors
 
-def obtain_BEC_summary(data_loc, n_env, weights, visualize_constraints=False, visualize_summary=False):
+def obtain_BEC_summary(data_loc, n_env, weights, step_cost_flag, visualize_constraints=False, visualize_summary=False):
     try:
         with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
             BEC_summary = pickle.load(f)
@@ -66,16 +66,16 @@ def obtain_BEC_summary(data_loc, n_env, weights, visualize_constraints=False, vi
             with open('models/' + data_loc + '/BEC_constraints.pickle', 'rb') as f:
                 constraints = pickle.load(f)
         except:
-            constraints = BEC.extract_constraints(wt_vi_traj_candidates)
+            constraints = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag)
             with open('models/' + data_loc + '/BEC_constraints.pickle', 'wb') as f:
                 pickle.dump(constraints, f)
 
-        BEC_summary = BEC.obtain_summary(wt_vi_traj_candidates, constraints)
+        BEC_summary = BEC.obtain_summary(wt_vi_traj_candidates, constraints, weights, step_cost_flag)
         with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
             pickle.dump(BEC_summary, f)
 
     if visualize_constraints:
-        BEC.visualize_constraints(constraints, gt_weight=weights)
+        BEC.visualize_constraints(constraints, weights, step_cost_flag)
 
     if visualize_summary:
         BEC.visualize_summary(BEC_summary)
@@ -99,7 +99,8 @@ if __name__ == "__main__":
 
     weights = np.array([[0.9908798, -0.13011553, -0.0350311]])
     gamma_a = 1.
-    step_cost_flag = True
+    step_cost_flag = True   # indicates that the last weight element is a known step cost. code currently assumes a 2D
+                            # weight vector if step_cost_flag = False, and a 3D weight vector if step_cost_flag = True
 
     # Joint BIRL and BEC parameters
     n_env = 512                  # number of environments to consider
@@ -109,18 +110,18 @@ if __name__ == "__main__":
     n_wt = 10                    # total number of weight candidates (including the ground truth)
                                  # tip: select n_wt to such that n_wt_partitions is an int to ensure that the exact
                                  # number of desired weight candidates is actually incorporated. see ps_helpers.obtain_wt_candidates()
-                                 # also note that n_wt = n_wt_partitions ** weights.shape[1] + 1
+                                 # also note that n_wt = n_wt_partitions ** (# of weights you're discretizing over) + 1
 
-    iter_idx = 0              # weight dimension to discretize over. If None, discretize uniformly over all dimensions
+    iter_idx = None              # weight dimension to discretize over. If None, discretize uniformly over all dimensions
     eval_fn = 'approx_MP'        # desired likelihood function for computing the posterior probability of weight candidates
     n_demonstrations = 10        # total number of demonstrations sought, in order of decreasing effectiveness
 
     if iter_idx == None:
         data_loc_BIRL = str(n_env) + '_env_' + str(n_wt) + '_wt_' + 'uniform'
         if step_cost_flag:
-            n_wt_partitions = (n_wt - 1) ** (1.0 / (weights.shape[1] - 1))
+            n_wt_partitions = int((n_wt - 1) ** (1.0 / (weights.shape[1] - 1)))
         else:
-            n_wt_partitions = (n_wt - 1) ** (1.0 / weights.shape[1])
+            n_wt_partitions = int((n_wt - 1) ** (1.0 / weights.shape[1]))
     else:
         data_loc_BIRL = str(n_env) + '_env_' + str(n_wt) + '_wt_' + 'iter_idx_' + str(iter_idx)
         n_wt_partitions = n_wt - 1
@@ -130,7 +131,7 @@ if __name__ == "__main__":
     # generate_agent('base', agent_a, walls_a, traffic_a, fuel_station_a, passengers_a, tolls_a, gamma_a, width_a, height_a, weights, visualize=True)
 
     # b) obtain a Bayesian IRL summary of the agent's policy
-    bayesian_IRL_summary, wt_candidates, history_priors = obtain_BIRL_summary(data_loc_BIRL, eval_fn, n_env, weights, weights_lb, weights_ub, n_wt_partitions, iter_idx, step_cost_flag, visualize_history_priors=False, visualize_summary=True)
+    # bayesian_IRL_summary, wt_candidates, history_priors = obtain_BIRL_summary(data_loc_BIRL, eval_fn, n_env, weights, weights_lb, weights_ub, n_wt_partitions, iter_idx, step_cost_flag, visualize_history_priors=True, visualize_summary=True)
 
     # c) obtain a BEC summary of the agent's policy
-    # constraints, BEC_summary = obtain_BEC_summary(data_loc_BEC, n_env, weights, visualize_constraints=True, visualize_summary=True)
+    constraints, BEC_summary = obtain_BEC_summary(data_loc_BEC, n_env, weights, step_cost_flag, visualize_constraints=True, visualize_summary=True)
