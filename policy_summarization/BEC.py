@@ -6,13 +6,13 @@ from scipy.optimize import linprog
 
 def normalize_constraints(constraints):
     '''
-    Summary: Normalize all constraints such that the L2 norm is equal to 1
+    Summary: Normalize all constraints such that the L1 norm is equal to 1
     '''
     normalized_constraints = []
     zero_constraint = np.zeros(constraints[0].shape)
     for constraint in constraints:
         if not equal_constraints(constraint, zero_constraint):
-            normalized_constraints.append(constraint / np.linalg.norm(constraint))
+            normalized_constraints.append(constraint / np.linalg.norm(constraint[0, :], ord=1))
 
     return normalized_constraints
 
@@ -59,23 +59,27 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
             if not equal_constraints(query_constraint, nonredundant_constraint):
                 constraints_other.append(list(-nonredundant_constraint[0]))
 
-        # solve linear program
-        # min_x a^Tx, st -Ax >= -b (note that scipy traditionally accepts bounds as Ax <= b, hence the negative multiplier to the constraints)
-        a = np.ndarray.tolist(query_constraint[0])
-        b = [0] * len(constraints_other)
-        if step_cost_flag:
-            # the last weight is the step cost, which is assumed to be known by the learner. adjust the bounds accordingly
-            res = linprog(a, A_ub=constraints_other, b_ub=b, bounds=[(-1, 1), (-1, 1), (weights[0, -1], weights[0, -1])])
-        else:
-            res = linprog(a, A_ub=constraints_other, b_ub=b, bounds=[(-1, 1)] * constraints[0].shape[1])
+        # if there are other constraints left to compare to
+        if len(constraints_other) > 0:
+            # solve linear program
+            # min_x a^Tx, st -Ax >= -b (note that scipy traditionally accepts bounds as Ax <= b, hence the negative multiplier to the constraints)
+            a = np.ndarray.tolist(query_constraint[0])
+            b = [0] * len(constraints_other)
+            if step_cost_flag:
+                # the last weight is the step cost, which is assumed to be known by the learner. adjust the bounds accordingly
+                res = linprog(a, A_ub=constraints_other, b_ub=b, bounds=[(-1, 1), (-1, 1), (weights[0, -1], weights[0, -1])])
+            else:
+                res = linprog(a, A_ub=constraints_other, b_ub=b, bounds=[(-1, 1)] * constraints[0].shape[1])
 
-        # if query_constraint * res.x^T >= 0, then this constraint is redundant. copy over everything except this constraint
-        if query_constraint.dot(res.x.reshape(-1, 1))[0][0] >= -1e-05: # account for slight numerical instability
-            copy = []
-            for nonredundant_constraint in nonredundant_constraints:
-                if not equal_constraints(query_constraint, nonredundant_constraint):
-                    copy.append(nonredundant_constraint)
-            nonredundant_constraints = copy
+            # if query_constraint * res.x^T >= 0, then this constraint is redundant. copy over everything except this constraint
+            if query_constraint.dot(res.x.reshape(-1, 1))[0][0] >= -1e-05: # account for slight numerical instability
+                copy_array = []
+                for nonredundant_constraint in nonredundant_constraints:
+                    if not equal_constraints(query_constraint, nonredundant_constraint):
+                        copy_array.append(nonredundant_constraint)
+                nonredundant_constraints = copy_array
+        else:
+            break
 
     return nonredundant_constraints
 
@@ -95,17 +99,18 @@ def visualize_constraints(constraints, weights, step_cost_flag):
         # if the final weight is the step cost, it is assumed that there are three weights, which must be accounted for
         # differently to plot the BEC region for the first two weights
         for constraint in constraints:
-            if constraint[0, 0] == 1.:
+            if constraint[0, 1] == 0.:
                 # completely vertical line going through zero
-                plt.plot([constraint[0, 1] / constraint[0, 0], -constraint[0, 1] / constraint[0, 0]], [-1, 1])
+                pt = (-weights[0, -1] * constraint[0, 2]) / constraint[0, 0]
+                plt.plot([pt, pt], [-1, 1])
 
                 # use (1, 0) as a test point to decide which half space to color
-                if constraint[0, 0] >= 0:
+                if 1 >= pt:
                     # color the right side of the line
-                    plt.axvspan(0, 1, alpha=wt_shading, color='blue')
+                    plt.axvspan(pt, 1, alpha=wt_shading, color='blue')
                 else:
                     # color the left side of the line
-                    plt.axvspan(-1, 0, alpha=wt_shading, color='blue')
+                    plt.axvspan(-1, pt, alpha=wt_shading, color='blue')
             else:
                 pt_1 = (constraint[0, 0] - (weights[0, -1] * constraint[0, 2])) / constraint[0, 1]
                 pt_2 = (-constraint[0, 0] - (weights[0, -1] * constraint[0, 2])) / constraint[0, 1]
@@ -116,6 +121,12 @@ def visualize_constraints(constraints, weights, step_cost_flag):
                     plt.fill_between([-1, 1], [pt_1, pt_2], [1, 1], alpha=wt_shading, color='blue')
                 else:
                     plt.fill_between([-1, 1], [pt_1, pt_2], [-1, -1], alpha=wt_shading, color='blue')
+
+        # visualize the L1 norm == 1 constraints
+        plt.plot([-1 + abs(weights[0, -1]), 0], [0, 1 - abs(weights[0, -1])], color='grey')
+        plt.plot([0, 1 - abs(weights[0, -1])], [1 - abs(weights[0, -1]), 0], color='grey')
+        plt.plot([1 - abs(weights[0, -1]), 0], [0, -1 + abs(weights[0, -1])], color='grey')
+        plt.plot([0, -1 + abs(weights[0, -1])], [-1 + abs(weights[0, -1]), 0], color='grey')
     else:
         for constraint in constraints:
             if constraint[0, 0] == 1.:
@@ -140,13 +151,14 @@ def visualize_constraints(constraints, weights, step_cost_flag):
                 else:
                     plt.fill_between([-1, 1], [pt_1, pt_2], [-1, -1], alpha=wt_shading, color='blue')
 
+    wt_marker_size = 200
     # plot ground truth weight
-    plt.scatter(weights[0, 0], weights[0, 1], s=200, color='red')
+    plt.scatter(weights[0, 0], weights[0, 1], s=wt_marker_size, color='red')
     plt.xlabel(r'$\theta_0$')
     plt.ylabel(r'$\theta_1$')
     plt.show()
 
-def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag):
+def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, trajectories=None):
     '''
     :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
     :param weights (numpy array): Ground truth reward weights used by agent to derive its optimal policy
@@ -160,26 +172,44 @@ def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag):
     counter = 0
     for wt_vi_traj_candidate in wt_vi_traj_candidates:
         # print("Extracting constraints from environment {}".format(counter))
-        mdp_demo = wt_vi_traj_candidate[0][1].mdp
-        traj_demo = wt_vi_traj_candidate[0][2]
+        mdp = wt_vi_traj_candidate[0][1].mdp
 
-        # BEC constraints are obtained by ensuring that the optimal actions accumulate at least as much reward as
-        # all other possible actions along a trajectory
-        for sas_idx in range(len(traj_demo)):
-            # reward features of optimal action
-            mu_sa = mdp_demo.accumulate_reward_features(traj_demo[sas_idx:], discount=True)
+        if trajectories is not None:
+            # a) demonstration-driven BEC
+            # BEC constraints are obtained by ensuring that the optimal actions accumulate at least as much reward as
+            # all other possible actions along a trajectory
+            traj = trajectories[counter]
+            for sas_idx in range(len(traj)):
+                # reward features of optimal action
+                mu_sa = mdp.accumulate_reward_features(traj[sas_idx:], discount=True)
 
-            sas = traj_demo[sas_idx]
-            cur_state = sas[0]
-            cur_action = sas[1]
+                sas = traj[sas_idx]
+                cur_state = sas[0]
+                cur_action = sas[1]
 
-            # currently assumes that all actions are executable from all states
-            for action in mdp_demo.actions:
-                if cur_action != action:
-                    traj_hyp = mdp_helpers.rollout_policy(mdp_demo, FixedPolicyAgent(wt_vi_traj_candidate[0][1].policy), cur_state, action)
-                    mu_sb = mdp_demo.accumulate_reward_features(traj_hyp, discount=True)
+                # currently assumes that all actions are executable from all states
+                for action in mdp.actions:
+                    if cur_action != action:
+                        traj_hyp = mdp_helpers.rollout_policy(mdp, FixedPolicyAgent(wt_vi_traj_candidate[0][1].policy), cur_state, action)
+                        mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
 
-                    constraints.append(mu_sa - mu_sb)
+                        constraints.append(mu_sa - mu_sb)
+        else:
+            # b) policy-driven BEC
+            agent = FixedPolicyAgent(wt_vi_traj_candidate[0][1].policy)
+
+            for state in mdp.states:
+                action_opt = agent.act(state, 0)
+                traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state, cur_action=action_opt)
+                mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
+
+                # currently assumes that all actions are executable from all states
+                for action in mdp.actions:
+                    if action_opt != action:
+                        traj_hyp = mdp_helpers.rollout_policy(mdp, agent, cur_state=state, cur_action=action)
+                        mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
+
+                        constraints.append(mu_sa - mu_sb)
         counter += 1
 
     normalized_constraints = normalize_constraints(constraints)
@@ -224,7 +254,7 @@ def update_covered_constraints(constraints_added, BEC_constraints, covered_BEC_c
                 covered_BEC_constraints[BEC_constraint_idx] = True
 
 
-def obtain_summary(wt_vi_traj_candidates, BEC_constraints, weights, step_cost_flag):
+def obtain_summary(wt_vi_traj_candidates, BEC_constraints, weights, step_cost_flag, summary_type):
     '''
     :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
     :param BEC_constraints: Minimum set of constraints defining the BEC of a set of demos / policy (list of constraints)
@@ -242,33 +272,56 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints, weights, step_cost_fl
 
     total_covered = 0
     while total_covered < n_BEC_constraints:
-        max_count = 0
+        max_count = float("-inf")
 
-        for traj_idx in range(len(wt_vi_traj_candidates)):
-            print("Extracting constraints from environment {}".format(traj_idx))
-            new_constraints = extract_constraints([wt_vi_traj_candidates[traj_idx]], weights, step_cost_flag)
+        for env_idx in range(len(wt_vi_traj_candidates)):
+            print("Extracting constraints from environment {}".format(env_idx))
 
-            count = count_new_covers(new_constraints, BEC_constraints, covered_BEC_constraints)
+            if summary_type == 'demo':
+                # a) only consider the optimal trajectories from the start states
+                new_constraints = extract_constraints([wt_vi_traj_candidates[env_idx]], weights, step_cost_flag, [wt_vi_traj_candidates[env_idx][0][2]])
+                count = count_new_covers(new_constraints, BEC_constraints, covered_BEC_constraints)
+                if count > max_count:
+                    max_count = count
+                    constraints_added = new_constraints
+                    # I don't think a shallow copy is required since this won't be getting changed
+                    best_traj = wt_vi_traj_candidates[env_idx][0][2]
+                    best_mdp = wt_vi_traj_candidates[env_idx][0][1].mdp
+                    print('New max count: {}'.format(max_count))
+            else:
+                # b) consider all possible trajectories by the optimal policy
+                mdp = wt_vi_traj_candidates[env_idx][0][1].mdp
+                agent = FixedPolicyAgent(wt_vi_traj_candidates[env_idx][0][1].policy)
+                for state in mdp.states:
+                    action_opt = agent.act(state, 0)
+                    traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state, cur_action=action_opt)
+                    new_constraints = extract_constraints([wt_vi_traj_candidates[env_idx]], weights, step_cost_flag, [traj_opt])
+                    count = count_new_covers(new_constraints, BEC_constraints, covered_BEC_constraints)
 
-            if count > max_count:
-                max_count = count
-                constraints_added = new_constraints
-                # I don't think a shallow copy is required since this won't be getting changed
-                best_traj = wt_vi_traj_candidates[traj_idx][0][2]
-                best_mdp = wt_vi_traj_candidates[traj_idx][0][1].mdp
+                    if count > max_count:
+                        max_count = count
+                        constraints_added = new_constraints
+                        # I don't think a shallow copy is required since this won't be getting changed
+                        best_traj = traj_opt
+                        best_mdp = mdp
+                        print('New max count: {}'.format(max_count))
 
-        summary.append((best_mdp, best_traj))
+        summary.append((best_mdp, best_traj, constraints_added))
         update_covered_constraints(constraints_added, BEC_constraints, covered_BEC_constraints)
         total_covered += max_count
         print("{}/{} BEC constraints covered".format(total_covered, n_BEC_constraints))
 
     return summary
 
-def visualize_summary(BEC_summary):
+def visualize_summary(BEC_summary, weights, step_cost_flag):
     '''
     :param BEC_summary: Nested list of [mdp, trajectory]
 
     Summary: visualize the BEC demonstrations
     '''
-    for mdp_traj in BEC_summary:
-        mdp_traj[0].visualize_trajectory(mdp_traj[1])
+    for mdp_traj_constraint in BEC_summary:
+        # visualize demonstration
+        mdp_traj_constraint[0].visualize_trajectory(mdp_traj_constraint[1])
+        # visualize constraints enforced by demonstration above
+        # print(mdp_traj_constraint[2])
+        # visualize_constraints(mdp_traj_constraint[2], weights, step_cost_flag)

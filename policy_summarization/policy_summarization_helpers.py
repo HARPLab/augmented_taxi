@@ -137,7 +137,6 @@ def obtain_env_policies(data_loc, n_env, wt_candidates, agent_a, walls_a, traffi
     '''
 
     # generate codes that govern passenger's initial position and status of the eight tolls in the 4x3 environment
-    # todo: can't n_env be recovered by the size of wt_candidates?
     env_codes = list(map(list, itertools.product([0, 1], repeat=int(np.log(n_env) / np.log(2)))))
 
     save_mark = 750

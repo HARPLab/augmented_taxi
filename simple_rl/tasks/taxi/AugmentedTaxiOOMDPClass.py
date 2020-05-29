@@ -44,6 +44,7 @@ class AugmentedTaxiOOMDP(OOMDP):
         agent_obj = OOMDPObject(attributes=agent, name="agent")
         agent_exit = {"x": 0, "y": 0, "has_passenger": 0}  # grid world indices start at (1, 1) so (0, 0) is unreserved
         pass_objs = self._make_oomdp_objs_from_list_of_dict(passengers, "passenger")
+        pass_objs_exit = self._make_oomdp_objs_from_list_of_dict([], "passenger")
 
         # objects that belong to the MDP (static)
         wall_objs = self._make_oomdp_objs_from_list_of_dict(walls, "wall")
@@ -57,7 +58,7 @@ class AugmentedTaxiOOMDP(OOMDP):
         self.slip_prob = slip_prob
 
         init_state = self._create_state(agent_obj, pass_objs)
-        self.exit_state = self._create_state(OOMDPObject(attributes=agent_exit, name="agent_exit"), pass_objs)
+        self.exit_state = self._create_state(OOMDPObject(attributes=agent_exit, name="agent_exit"), pass_objs_exit)
         self.exit_state.set_terminal(True)
         if init_state.track_fuel():
             OOMDP.__init__(self, AugmentedTaxiOOMDP.AUGMENTED_ACTIONS, self._taxi_transition_func, self._taxi_reward_func,
@@ -108,8 +109,8 @@ class AugmentedTaxiOOMDP(OOMDP):
         # reward = 0
         #
         # if len(self.tolls) != 0:
-        #     [moved_off_of_toll, toll_fee] = taxi_helpers._moved_off_of_toll(self, state, next_state)
-        #     if moved_off_of_toll:
+        #     [on_toll, toll_fee] = taxi_helpers.on_toll(self, state)
+        #     if on_toll:
         #         reward -= toll_fee
         #
         # # Stacked if statements for efficiency.
@@ -148,9 +149,12 @@ class AugmentedTaxiOOMDP(OOMDP):
         # traffic_flag = 0
         step_cost_flag = 1
 
+        if next_state == self.exit_state:
+            step_cost_flag = 0
+
         if len(self.tolls) != 0:
-            [moved_off_of_toll, toll_fee] = taxi_helpers._moved_off_of_toll(self, state, next_state)
-            if moved_off_of_toll and not next_state == self.exit_state:
+            [on_toll, toll_fee] = taxi_helpers._on_toll(self, state)
+            if on_toll and not next_state == self.exit_state:
                 toll_flag = 1
 
         # at_traffic, prob_traffic = taxi_helpers.at_traffic(self, state.get_agent_x(), state.get_agent_y())

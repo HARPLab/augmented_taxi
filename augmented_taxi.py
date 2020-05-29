@@ -53,7 +53,7 @@ def obtain_BIRL_summary(data_loc, eval_fn, n_env, weights, weights_lb, weights_u
 
     return bayesian_IRL_summary, wt_candidates, history_priors
 
-def obtain_BEC_summary(data_loc, n_env, weights, step_cost_flag, visualize_constraints=False, visualize_summary=False):
+def obtain_BEC_summary(data_loc, n_env, weights, step_cost_flag, summary_type, visualize_constraints=False, visualize_summary=False):
     try:
         with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
             BEC_summary = pickle.load(f)
@@ -66,11 +66,19 @@ def obtain_BEC_summary(data_loc, n_env, weights, step_cost_flag, visualize_const
             with open('models/' + data_loc + '/BEC_constraints.pickle', 'rb') as f:
                 constraints = pickle.load(f)
         except:
-            constraints = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag)
+            if summary_type == 'demo':
+                # a) use optimal trajectories from starting states to extract constraints
+                opt_trajs = []
+                for wt_vi_traj_candidate in wt_vi_traj_candidates:
+                    opt_trajs.append(wt_vi_traj_candidate[0][2])
+                constraints = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, trajectories=opt_trajs)
+            else:
+                # b) use full policy to extract constraints
+                constraints = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag)
             with open('models/' + data_loc + '/BEC_constraints.pickle', 'wb') as f:
                 pickle.dump(constraints, f)
 
-        BEC_summary = BEC.obtain_summary(wt_vi_traj_candidates, constraints, weights, step_cost_flag)
+        BEC_summary = BEC.obtain_summary(wt_vi_traj_candidates, constraints, weights, step_cost_flag, summary_type)
         with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
             pickle.dump(BEC_summary, f)
 
@@ -78,7 +86,7 @@ def obtain_BEC_summary(data_loc, n_env, weights, step_cost_flag, visualize_const
         BEC.visualize_constraints(constraints, weights, step_cost_flag)
 
     if visualize_summary:
-        BEC.visualize_summary(BEC_summary)
+        BEC.visualize_summary(BEC_summary, weights, step_cost_flag)
 
     return constraints, BEC_summary
 
@@ -101,10 +109,11 @@ if __name__ == "__main__":
     height_a = 3
 
     # reward weight parameters (on the goal with the passenger, on a toll, step cost).
-    # assume the L2 norm of the weights is equal 1. WLOG
-    weights_lb = np.array([-1., -1., -0.0350311])
-    weights_ub = np.array([1., 1., -0.0350311])
-    weights = np.array([[0.9908798, -0.13011553, -0.0350311]])
+    # assume the L1 norm of the weights is equal 1. WLOG
+    weights_lb = np.array([-1., -1., -0.03076923])
+    weights_ub = np.array([1., 1., -0.03076923])
+    weights = np.array([[0.86153846, -0.10769231, -0.03076923]])
+
     gamma_a = 1.
     step_cost_flag = True   # indicates that the last weight element is a known step cost. code currently assumes a 2D
                             # weight vector if step_cost_flag = False, and a 3D weight vector if step_cost_flag = True
@@ -140,6 +149,9 @@ if __name__ == "__main__":
         n_wt_partitions = n_wt - 1
     data_loc = str(n_env) + '_env'
 
+    BEC_summary_type = 'policy' # demo or policy: whether constratints are extraced from just the optimal demo from the
+                                # starting state or from all possible states from the full policy
+
     # a) generate an agent if you want to explore the Augmented Taxi MDP
     # generate_agent('base', agent_a, walls_a, traffic_a, fuel_station_a, passengers_a, tolls_a, gamma_a, width_a, height_a, weights, visualize=True)
 
@@ -147,7 +159,7 @@ if __name__ == "__main__":
     # bayesian_IRL_summary, wt_candidates, history_priors = obtain_BIRL_summary(data_loc_BIRL, eval_fn, n_env, weights, weights_lb, weights_ub, n_wt_partitions, iter_idx, step_cost_flag, visualize_history_priors=False, visualize_summary=True)
 
     # c) obtain a BEC summary of the agent's policy
-    # constraints, BEC_summary = obtain_BEC_summary(data_loc, n_env, weights, step_cost_flag, visualize_constraints=True, visualize_summary=True)
+    constraints, BEC_summary = obtain_BEC_summary(data_loc, n_env, weights, step_cost_flag, BEC_summary_type, visualize_constraints=True, visualize_summary=True)
 
     # d) obtain test environments
-    obtain_test_environments(data_loc, weights, n_env, n_samples, sample_radius, n_desired_test_env, step_cost_flag)
+    # obtain_test_environments(data_loc, weights, n_env, n_samples, sample_radius, n_desired_test_env, step_cost_flag)

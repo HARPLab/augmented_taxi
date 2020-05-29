@@ -500,6 +500,9 @@ def visualize_interaction(mdp, draw_state, cur_state=None, scr_width=720, scr_he
     # Setup and draw initial state.
     cur_state = mdp.get_init_state() if cur_state is None else cur_state
     agent_shape = _vis_init(screen, mdp, draw_state, cur_state)
+    cumulative_reward = 0
+    gamma = mdp.gamma
+    step = 0
 
     actions = mdp.get_actions()
 
@@ -518,11 +521,13 @@ def visualize_interaction(mdp, draw_state, cur_state=None, scr_width=720, scr_he
             if event.type == KEYDOWN and event.key in keys:
                 action = actions[keys.index(event.key)]
                 reward, cur_state = mdp.execute_agent_action(action=action)
+                cumulative_reward += reward * gamma ** step
                 agent_shape = draw_state(screen, mdp, cur_state, agent_shape=agent_shape)
 
                 # Update state text.
                 _draw_lower_left_text(cur_state, screen)
 
+                step += 1
         if cur_state.is_terminal():
             if cur_state.is_goal():
                 # Done! Agent found goal.
@@ -534,7 +539,7 @@ def visualize_interaction(mdp, draw_state, cur_state=None, scr_width=720, scr_he
             goal_text_point = scr_width / 2.0 - (len(goal_text)*7), 18*scr_height / 20.0
             screen.blit(goal_text_rendered, goal_text_point)
             done = True
-
+            print(cumulative_reward)
         pygame.display.flip()
 
     print("Press ESC to quit")
