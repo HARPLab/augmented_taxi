@@ -11,7 +11,7 @@ Returns:
 Summary:
     Roll out the agent's policy on the designated MDP and return the corresponding trajectory
 '''
-def rollout_policy(mdp, agent, cur_state=None, cur_action=None, max_depth=50, timeout=10):
+def rollout_policy(mdp, agent, cur_state=None, action_seq=None, max_depth=50, timeout=10):
     mdp.reset()
     depth = 0
     reward = 0
@@ -25,14 +25,15 @@ def rollout_policy(mdp, agent, cur_state=None, cur_action=None, max_depth=50, ti
         mdp.set_curr_state(cur_state)
 
     # execute the specified action first, if relevant
-    if cur_action is not None:
-        reward, next_state = mdp.execute_agent_action(cur_action)
-        trajectory.append((cur_state, cur_action, next_state))
+    if action_seq is not None:
+        for idx in range(len(action_seq)):
+            reward, next_state = mdp.execute_agent_action(action_seq[idx])
+            trajectory.append((cur_state, action_seq[idx], next_state))
 
-        # deepcopy occurs within transition function
-        cur_state = next_state
+            # deepcopy occurs within transition function
+            cur_state = next_state
 
-        depth += 1
+            depth += 1
 
     while not cur_state.is_terminal() and depth < max_depth and timeout_counter <= timeout:
         action = agent.act(cur_state, reward)

@@ -53,7 +53,7 @@ def obtain_BIRL_summary(data_loc, eval_fn, n_env, weights, weights_lb, weights_u
 
     return bayesian_IRL_summary, wt_candidates, history_priors
 
-def obtain_BEC_summary(data_loc, n_env, weights, step_cost_flag, summary_type, visualize_constraints=False, visualize_summary=False):
+def obtain_BEC_summary(data_loc, n_env, weights, step_cost_flag, summary_type, BEC_depth=1, visualize_constraints=False, visualize_summary=False):
     try:
         with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
             BEC_summary = pickle.load(f)
@@ -71,14 +71,14 @@ def obtain_BEC_summary(data_loc, n_env, weights, step_cost_flag, summary_type, v
                 opt_trajs = []
                 for wt_vi_traj_candidate in wt_vi_traj_candidates:
                     opt_trajs.append(wt_vi_traj_candidate[0][2])
-                constraints = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, trajectories=opt_trajs)
+                constraints = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_depth=BEC_depth, trajectories=opt_trajs)
             else:
                 # b) use full policy to extract constraints
                 constraints = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag)
             with open('models/' + data_loc + '/BEC_constraints.pickle', 'wb') as f:
                 pickle.dump(constraints, f)
 
-        BEC_summary = BEC.obtain_summary(wt_vi_traj_candidates, constraints, weights, step_cost_flag, summary_type)
+        BEC_summary = BEC.obtain_summary(wt_vi_traj_candidates, constraints, weights, step_cost_flag, summary_type, BEC_depth)
         with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
             pickle.dump(BEC_summary, f)
 
@@ -151,6 +151,8 @@ if __name__ == "__main__":
 
     BEC_summary_type = 'policy' # demo or policy: whether constratints are extraced from just the optimal demo from the
                                 # starting state or from all possible states from the full policy
+    BEC_depth = 1               # number of suboptimal actions to take before following the optimal policy to obtain the
+                                # suboptimal trajectory (and the corresponding suboptimal expected feature counts)
 
     # a) generate an agent if you want to explore the Augmented Taxi MDP
     # generate_agent('base', agent_a, walls_a, traffic_a, fuel_station_a, passengers_a, tolls_a, gamma_a, width_a, height_a, weights, visualize=True)
@@ -159,7 +161,7 @@ if __name__ == "__main__":
     # bayesian_IRL_summary, wt_candidates, history_priors = obtain_BIRL_summary(data_loc_BIRL, eval_fn, n_env, weights, weights_lb, weights_ub, n_wt_partitions, iter_idx, step_cost_flag, visualize_history_priors=False, visualize_summary=True)
 
     # c) obtain a BEC summary of the agent's policy
-    constraints, BEC_summary = obtain_BEC_summary(data_loc, n_env, weights, step_cost_flag, BEC_summary_type, visualize_constraints=True, visualize_summary=True)
+    constraints, BEC_summary = obtain_BEC_summary(data_loc, n_env, weights, step_cost_flag, BEC_summary_type, BEC_depth=BEC_depth, visualize_constraints=True, visualize_summary=True)
 
     # d) obtain test environments
     # obtain_test_environments(data_loc, weights, n_env, n_samples, sample_radius, n_desired_test_env, step_cost_flag)

@@ -3,6 +3,7 @@ from simple_rl.utils import mdp_helpers
 from simple_rl.agents import FixedPolicyAgent
 import numpy as np
 from scipy.optimize import linprog
+import itertools
 
 def normalize_constraints(constraints):
     '''
@@ -158,11 +159,13 @@ def visualize_constraints(constraints, weights, step_cost_flag):
     plt.ylabel(r'$\theta_1$')
     plt.show()
 
-def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, trajectories=None):
+def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_depth=1, trajectories=None):
     '''
     :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
     :param weights (numpy array): Ground truth reward weights used by agent to derive its optimal policy
     :param step_cost_flag (bool): Indicates that the last weight element is a known step cost
+    :param BEC_depth (int): number of suboptimal actions to take before following the optimal policy to obtain the
+                            suboptimal trajectory (and the corresponding suboptimal expected feature counts)
     :return: min_subset_constraints: List of constraints
 
     Summary: Obtain the constraints that comprise the BEC region of a set of demonstrations
@@ -170,6 +173,7 @@ def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, trajecto
     # go through each environment and corresponding optimal trajectory, and extract the behavior equivalence class (BEC) constraints
     constraints = []
     counter = 0
+
     for wt_vi_traj_candidate in wt_vi_traj_candidates:
         # print("Extracting constraints from environment {}".format(counter))
         mdp = wt_vi_traj_candidate[0][1].mdp
@@ -178,6 +182,8 @@ def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, trajecto
             # a) demonstration-driven BEC
             # BEC constraints are obtained by ensuring that the optimal actions accumulate at least as much reward as
             # all other possible actions along a trajectory
+            action_seq_list = list(itertools.product(mdp.actions, repeat=BEC_depth))
+
             traj = trajectories[counter]
             for sas_idx in range(len(traj)):
                 # reward features of optimal action
@@ -185,28 +191,26 @@ def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, trajecto
 
                 sas = traj[sas_idx]
                 cur_state = sas[0]
-                cur_action = sas[1]
 
                 # currently assumes that all actions are executable from all states
-                for action in mdp.actions:
-                    if cur_action != action:
-                        traj_hyp = mdp_helpers.rollout_policy(mdp, FixedPolicyAgent(wt_vi_traj_candidate[0][1].policy), cur_state, action)
-                        mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
+                for action_seq in action_seq_list:
+                    traj_hyp = mdp_helpers.rollout_policy(mdp, FixedPolicyAgent(wt_vi_traj_candidate[0][1].policy), cur_state, action_seq)
+                    mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
 
-                        constraints.append(mu_sa - mu_sb)
+                    constraints.append(mu_sa - mu_sb)
         else:
             # b) policy-driven BEC
             agent = FixedPolicyAgent(wt_vi_traj_candidate[0][1].policy)
 
             for state in mdp.states:
                 action_opt = agent.act(state, 0)
-                traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state, cur_action=action_opt)
+                traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state, action_seq=[action_opt])
                 mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
 
                 # currently assumes that all actions are executable from all states
                 for action in mdp.actions:
                     if action_opt != action:
-                        traj_hyp = mdp_helpers.rollout_policy(mdp, agent, cur_state=state, cur_action=action)
+                        traj_hyp = mdp_helpers.rollout_policy(mdp, agent, cur_state=state, action_seq=[action])
                         mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
 
                         constraints.append(mu_sa - mu_sb)
@@ -254,7 +258,7 @@ def update_covered_constraints(constraints_added, BEC_constraints, covered_BEC_c
                 covered_BEC_constraints[BEC_constraint_idx] = True
 
 
-def obtain_summary(wt_vi_traj_candidates, BEC_constraints, weights, step_cost_flag, summary_type):
+def obtain_summary(wt_vi_traj_candidates, BEC_constraints, weights, step_cost_flag, summary_type, BEC_depth):
     '''
     :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
     :param BEC_constraints: Minimum set of constraints defining the BEC of a set of demos / policy (list of constraints)
@@ -279,7 +283,7 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints, weights, step_cost_fl
 
             if summary_type == 'demo':
                 # a) only consider the optimal trajectories from the start states
-                new_constraints = extract_constraints([wt_vi_traj_candidates[env_idx]], weights, step_cost_flag, [wt_vi_traj_candidates[env_idx][0][2]])
+                new_constraints = extract_constraints([wt_vi_traj_candidates[env_idx]], weights, step_cost_flag, BEC_depth=BEC_depth, trajectories=[wt_vi_traj_candidates[env_idx][0][2]])
                 count = count_new_covers(new_constraints, BEC_constraints, covered_BEC_constraints)
                 if count > max_count:
                     max_count = count
@@ -294,8 +298,8 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints, weights, step_cost_fl
                 agent = FixedPolicyAgent(wt_vi_traj_candidates[env_idx][0][1].policy)
                 for state in mdp.states:
                     action_opt = agent.act(state, 0)
-                    traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state, cur_action=action_opt)
-                    new_constraints = extract_constraints([wt_vi_traj_candidates[env_idx]], weights, step_cost_flag, [traj_opt])
+                    traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state, action_seq=[action_opt])
+                    new_constraints = extract_constraints([wt_vi_traj_candidates[env_idx]], weights, step_cost_flag, trajectories=[traj_opt])
                     count = count_new_covers(new_constraints, BEC_constraints, covered_BEC_constraints)
 
                     if count > max_count:

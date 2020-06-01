@@ -109,8 +109,8 @@ class AugmentedTaxiOOMDP(OOMDP):
         # reward = 0
         #
         # if len(self.tolls) != 0:
-        #     [on_toll, toll_fee] = taxi_helpers.on_toll(self, state)
-        #     if on_toll:
+        #     [moved_into_toll, toll_fee] = taxi_helpers._moved_into_toll(self, next_state)
+        #     if moved_into_toll:
         #         reward -= toll_fee
         #
         # # Stacked if statements for efficiency.
@@ -153,8 +153,8 @@ class AugmentedTaxiOOMDP(OOMDP):
             step_cost_flag = 0
 
         if len(self.tolls) != 0:
-            [on_toll, toll_fee] = taxi_helpers._on_toll(self, state)
-            if on_toll and not next_state == self.exit_state:
+            [moved_into_toll, toll_fee] = taxi_helpers._moved_into_toll(self, next_state)
+            if moved_into_toll and not next_state == self.exit_state:
                 toll_flag = 1
 
         # at_traffic, prob_traffic = taxi_helpers.at_traffic(self, state.get_agent_x(), state.get_agent_y())
@@ -205,51 +205,54 @@ class AugmentedTaxiOOMDP(OOMDP):
         '''
         _error_check(state, action)
 
-        # if there is a slip, prevent a navigation action from occurring
-        stuck = False
-        if self.slip_prob > random.random():
-            stuck = True
-
-        # if you're at a traffic cell, determine whether you're stuck or not with the corresponding traffic probability
-        at_traffic, prob_traffic = taxi_helpers.at_traffic(self, state.get_agent_x(), state.get_agent_y())
-
-        if at_traffic:
-            if prob_traffic > random.random():
+        state_is_terminal, state_is_goal = taxi_helpers.is_taxi_terminal_and_goal_state(state)
+        if not state_is_terminal:
+            # if there is a slip, prevent a navigation action from occurring
+            stuck = False
+            if self.slip_prob > random.random():
                 stuck = True
 
-        # decrement fuel if it exists
-        if state.track_fuel():
-            state.decrement_fuel()
+            # if you're at a traffic cell, determine whether you're stuck or not with the corresponding traffic probability
+            at_traffic, prob_traffic = taxi_helpers.at_traffic(self, state.get_agent_x(), state.get_agent_y())
 
-        if action == "up" and state.get_agent_y() < self.height and not stuck:
-            next_state = self.move_agent(state, dy=1)
-        elif action == "down" and state.get_agent_y() > 1 and not stuck:
-            next_state = self.move_agent(state, dy=-1)
-        elif action == "right" and state.get_agent_x() < self.width and not stuck:
-            next_state = self.move_agent(state, dx=1)
-        elif action == "left" and state.get_agent_x() > 1 and not stuck:
-            next_state = self.move_agent(state, dx=-1)
-        elif action == "dropoff":
-            next_state = self.agent_dropoff(state)
-        elif action == "pickup":
-            next_state = self.agent_pickup(state)
-        elif action == "refuel":
-            next_state = self.agent_refuel(state)
-        elif action == "exit":
-            next_state = copy.deepcopy(self.exit_state)
+            if at_traffic:
+                if prob_traffic > random.random():
+                    stuck = True
+
+            # decrement fuel if it exists
+            if state.track_fuel():
+                state.decrement_fuel()
+
+            if action == "up" and state.get_agent_y() < self.height and not stuck:
+                next_state = self.move_agent(state, dy=1)
+            elif action == "down" and state.get_agent_y() > 1 and not stuck:
+                next_state = self.move_agent(state, dy=-1)
+            elif action == "right" and state.get_agent_x() < self.width and not stuck:
+                next_state = self.move_agent(state, dx=1)
+            elif action == "left" and state.get_agent_x() > 1 and not stuck:
+                next_state = self.move_agent(state, dx=-1)
+            elif action == "dropoff":
+                next_state = self.agent_dropoff(state)
+            elif action == "pickup":
+                next_state = self.agent_pickup(state)
+            elif action == "refuel":
+                next_state = self.agent_refuel(state)
+            elif action == "exit":
+                next_state = copy.deepcopy(self.exit_state)
+            else:
+                next_state = state
+
+            # Make terminal.
+            next_state_is_terminal, next_state_is_goal = taxi_helpers.is_taxi_terminal_and_goal_state(next_state)
+            if next_state_is_terminal:
+                next_state.set_terminal(True)
+            if next_state_is_goal:
+                next_state.set_goal(True)
+
+            # All OOMDP states must be updated.
+            next_state.update()
         else:
             next_state = state
-
-        # Make terminal.
-        is_terminal, is_goal = taxi_helpers.is_taxi_terminal_and_goal_state(next_state)
-        if is_terminal:
-            next_state.set_terminal(True)
-        if is_goal:
-            next_state.set_goal(True)
-
-        # All OOMDP states must be updated.
-        next_state.update()
-
         return next_state
 
     def __str__(self):
