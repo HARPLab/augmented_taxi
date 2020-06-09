@@ -4,6 +4,7 @@ from simple_rl.agents import FixedPolicyAgent
 import numpy as np
 from scipy.optimize import linprog
 import itertools
+from pypoman import compute_polytope_vertices, intersect_line_polygon
 
 def normalize_constraints(constraints):
     '''
@@ -84,6 +85,62 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
 
     return nonredundant_constraints
 
+def _compute_lengths(lines):
+    lengths = np.zeros(len(lines))
+    n = 0
+    for line in lines:
+        lengths[n] = np.linalg.norm(line[1] - line[0])
+        n += 1
+
+    return lengths
+
+def calculate_BEC_length(constraints, weights, step_cost_flag):
+    '''
+    :param constraints (list of constraints, corresponding to the A of the form Ax >= 0): constraints that comprise the
+        BEC region
+    :param weights (numpy array): Ground truth reward weights used by agent to derive its optimal policy
+    :param step_cost_flag (bool): Indicates that the last weight element is a known step cost
+    :return: total_intersection_length: total length of the intersection between the BEC region and the L1 constraints
+    '''
+    if step_cost_flag:
+        # convert the half space representation of a convex polygon (Ax < b) into the corresponding polytope vertices
+        n_boundary_constraints = 4
+        A = np.zeros((len(constraints) + n_boundary_constraints, len(constraints[0][0]) - 1))
+        b = np.zeros(len(constraints) + n_boundary_constraints)
+
+        for j in range(len(constraints)):
+            A[j, :] = np.array([-constraints[j][0][0], -constraints[j][0][1]])
+            b[j] = constraints[j][0][2] * weights[0, -1]
+
+        # add the L1 constraints
+        A[len(constraints), :] = np.array([1, 0])
+        b[len(constraints)] = 1
+        A[len(constraints) + 1, :] = np.array([-1, 0])
+        b[len(constraints) + 1] = 1
+        A[len(constraints) + 2, :] = np.array([0, 1])
+        b[len(constraints) + 2] = 1
+        A[len(constraints) + 3, :] = np.array([0, -1])
+        b[len(constraints) + 3] = 1
+
+        # compute the vertices of the convex polygon formed by the BEC constraints (BEC polygon)
+        vertices = compute_polytope_vertices(A, b)
+
+        # intersect the L1 constraints with the BEC polygon
+        L1_intersections = []
+        # L1 constraints in 2D
+        L1_constraints = [[[-1 + abs(weights[0, -1]), 0], [0, 1 - abs(weights[0, -1])]], [[0, 1 - abs(weights[0, -1])], [1 - abs(weights[0, -1]), 0]],
+                          [[1 - abs(weights[0, -1]), 0], [0, -1 + abs(weights[0, -1])]], [[0, -1 + abs(weights[0, -1])], [-1 + abs(weights[0, -1]), 0]]]
+
+        for constraint in L1_constraints:
+            intersection = intersect_line_polygon(constraint, vertices, False)
+            if len(intersection) > 0:
+                L1_intersections.append(intersection)
+
+        intersection_lengths = _compute_lengths(L1_intersections)
+        total_intersection_length = np.sum(intersection_lengths)
+    else:
+        raise Exception("Not yet implemented.")
+    return total_intersection_length
 
 def visualize_constraints(constraints, weights, step_cost_flag):
     '''

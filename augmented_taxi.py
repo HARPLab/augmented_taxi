@@ -112,7 +112,7 @@ if __name__ == "__main__":
     # assume the L1 norm of the weights is equal 1. WLOG
     weights_lb = np.array([-1., -1., -0.03076923])
     weights_ub = np.array([1., 1., -0.03076923])
-    weights = np.array([[0.86153846, -0.10769231, -0.03076923]])
+    weights = np.array([[0.875, -0.09375, -0.03125]])
 
     gamma_a = 1.
     step_cost_flag = True   # indicates that the last weight element is a known step cost. code currently assumes a 2D
@@ -161,7 +161,8 @@ if __name__ == "__main__":
     # bayesian_IRL_summary, wt_candidates, history_priors = obtain_BIRL_summary(data_loc_BIRL, eval_fn, n_env, weights, weights_lb, weights_ub, n_wt_partitions, iter_idx, step_cost_flag, visualize_history_priors=False, visualize_summary=True)
 
     # c) obtain a BEC summary of the agent's policy
-    constraints, BEC_summary = obtain_BEC_summary(data_loc, n_env, weights, step_cost_flag, BEC_summary_type, BEC_depth=BEC_depth, visualize_constraints=True, visualize_summary=True)
+    constraints, BEC_summary = obtain_BEC_summary(data_loc, n_env, weights, step_cost_flag, BEC_summary_type, BEC_depth=BEC_depth, visualize_constraints=True, visualize_summary=False)
+    BEC_length = BEC.calculate_BEC_length(constraints, weights, step_cost_flag)
 
     # d) obtain test environments
     # obtain_test_environments(data_loc, weights, n_env, n_samples, sample_radius, n_desired_test_env, step_cost_flag)
