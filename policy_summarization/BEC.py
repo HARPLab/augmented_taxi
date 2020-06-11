@@ -4,7 +4,8 @@ from simple_rl.agents import FixedPolicyAgent
 import numpy as np
 from scipy.optimize import linprog
 import itertools
-from pypoman import compute_polytope_vertices, intersect_line_polygon
+from pypoman import compute_polytope_vertices
+from policy_summarization import computational_geometry as cg
 
 def normalize_constraints(constraints):
     '''
@@ -85,15 +86,6 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
 
     return nonredundant_constraints
 
-def _compute_lengths(lines):
-    lengths = np.zeros(len(lines))
-    n = 0
-    for line in lines:
-        lengths[n] = np.linalg.norm(line[1] - line[0])
-        n += 1
-
-    return lengths
-
 def calculate_BEC_length(constraints, weights, step_cost_flag):
     '''
     :param constraints (list of constraints, corresponding to the A of the form Ax >= 0): constraints that comprise the
@@ -122,21 +114,18 @@ def calculate_BEC_length(constraints, weights, step_cost_flag):
         A[len(constraints) + 3, :] = np.array([0, -1])
         b[len(constraints) + 3] = 1
 
-        # compute the vertices of the convex polygon formed by the BEC constraints (BEC polygon)
+        # compute the vertices of the convex polygon formed by the BEC constraints (BEC polygon), in clockwise order
         vertices = compute_polytope_vertices(A, b)
 
-        # intersect the L1 constraints with the BEC polygon
-        L1_intersections = []
         # L1 constraints in 2D
         L1_constraints = [[[-1 + abs(weights[0, -1]), 0], [0, 1 - abs(weights[0, -1])]], [[0, 1 - abs(weights[0, -1])], [1 - abs(weights[0, -1]), 0]],
                           [[1 - abs(weights[0, -1]), 0], [0, -1 + abs(weights[0, -1])]], [[0, -1 + abs(weights[0, -1])], [-1 + abs(weights[0, -1]), 0]]]
 
-        for constraint in L1_constraints:
-            intersection = intersect_line_polygon(constraint, vertices, False)
-            if len(intersection) > 0:
-                L1_intersections.append(intersection)
+        # intersect the L1 constraints with the BEC polygon
+        L1_intersections = cg.cyrus_beck_2D(np.array(vertices), L1_constraints)
 
-        intersection_lengths = _compute_lengths(L1_intersections)
+        # compute the total length of all intersections
+        intersection_lengths = cg.compute_lengths(L1_intersections)
         total_intersection_length = np.sum(intersection_lengths)
     else:
         raise Exception("Not yet implemented.")
