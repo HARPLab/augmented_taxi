@@ -136,6 +136,20 @@ def compute_lengths(lines):
 
     return lengths
 
+def is_polygon_clockwise(vertices):
+    # assume that these are the vertices of a convex polygon in with clockwise or counter-clockwise order
+    edge_1 = [vertices[1][0] - vertices[0][0], vertices[1][1] - vertices[0][1]]
+    edge_2 = [vertices[2][0] - vertices[1][0], vertices[2][1] - vertices[1][1]]
+
+    sign = np.cross(edge_1, edge_2)
+
+    if sign > 0:
+        # counter-clockwise
+        return False
+    else:
+        # clockwise
+        return True
+
 if __name__ == "__main__":
     # polygon to clip the line by
     polygon = np.array([[1, 1], [3, 3], [3, 1]])

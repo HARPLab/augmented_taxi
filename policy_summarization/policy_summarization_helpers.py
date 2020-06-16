@@ -4,11 +4,14 @@ import itertools
 import shutil
 import random
 from termcolor import colored
+import copy
 
 # Other imports
 from simple_rl.tasks import AugmentedTaxiOOMDP
 from simple_rl.planning import ValueIteration
+from simple_rl.agents import FixedPolicyAgent
 from simple_rl.utils import mdp_helpers
+from policy_summarization import BEC
 
 def sample_wt_candidates(data_loc, weights, step_cost_flag, n_samples, sample_radius):
     '''
@@ -176,12 +179,12 @@ def obtain_env_policies(data_loc, n_env, wt_candidates, agent_a, walls_a, traffi
             for wt_candidate in wt_candidates:
                 mdp_candidate = AugmentedTaxiOOMDP(width=width_a, height=height_a, agent=agent_a, walls=walls_a,
                                                passengers=passengers_a, tolls=tolls_a, traffic=traffic_a,
-                                               fuel_stations=fuel_station_a, gamma=gamma_a, weights=wt_candidate)
+                                               fuel_stations=fuel_station_a, gamma=gamma_a, weights=wt_candidate, env_code=env_code)
                 # parameters tailored to the 4x3 Augmented Taxi Domain
                 vi_candidate = ValueIteration(mdp_candidate, sample_rate=1, max_iterations=50)
                 iterations, value_of_init_state = vi_candidate.run_vi()
                 trajectory = mdp_helpers.rollout_policy(mdp_candidate, vi_candidate)
-                wt_vi_traj_env.append((wt_candidate, vi_candidate, trajectory))
+                wt_vi_traj_env.append([wt_candidate, vi_candidate, trajectory])
 
                 wt_counter += 1
                 print('wt_counter: {}, iterations: {}, init_val: {}, wt_candidate: {}'.format(wt_counter, iterations,
@@ -208,79 +211,109 @@ def obtain_env_policies(data_loc, n_env, wt_candidates, agent_a, walls_a, traffi
 
     return wt_vi_traj_candidates
 
-def obtain_test_environments(data_loc, weights, wt_candidates, n_env, n_desired_test_env, agent_a, walls_a, traffic_a, fuel_station_a, gamma_a, width_a, height_a, visualize=False):
+def _in_summary(mdp, summary, BEC_summary_type, initial_state=None):
     '''
-    Summary: Select the environments with the most disagreement between the optimal polices of the ground truth weight
-    and the test weights as the test environments
+    Summary: Check if this MDP (and trajectory, if summary type is policy BEC) is already in the BEC summary. If so,
+    do not consider it as a potential test environment.
     '''
-    # obtain optimal policies for each of the test candidate weights and the ground truth candidate weight. It's assumed
-    # that the environments appear in the same order for both the test and ground truth weights.
-    test_wt_vi_traj_candidates = obtain_env_policies(data_loc, n_env, wt_candidates, agent_a, walls_a, traffic_a, fuel_station_a, gamma_a, width_a, height_a, save_type='test')
+    if BEC_summary_type == 'demo':
+        # for demo BEC, you only have to check if the same MDP has already been included in the summary since there is only one
+        # initial state and one optimal demo per MDP
+        for summary_idx in range(len(summary)):
+            if mdp.env_code == summary[summary_idx][0].env_code:
+                return True
+        return False
+    else:
+        # for policy BEC, you have to check both the MDP and the initial state
+        for summary_idx in range(len(summary)):
+            if (mdp.env_code == summary[summary_idx][0].env_code) and (summary[summary_idx][1][0] == initial_state):
+                return True
+        return False
 
-    gt_wt_vi_traj_candidates = obtain_env_policies(data_loc, n_env, np.expand_dims(weights, axis=0), agent_a,
-                                                           walls_a, traffic_a, fuel_station_a, gamma_a, width_a,
-                                                           height_a, 'ground_truth')
+def obtain_test_environments(wt_vi_traj_candidates, weights, n_desired_test_env, difficulty, step_cost_flag, BEC_depth, summary=None, BEC_summary_type=None):
+    '''
+    Summary: Correlate the difficulty of a test environment with the generalized area of the BEC region obtain by the
+    corresponding optimal demonstration. Return the desired number and difficulty of test environments (to be given
+    to the human to test his understanding of the agent's policy).
+    '''
+    env_idxs = []
+    BEC_lengths = []
+    BEC_constraints = []
 
-    discrepancy = np.zeros(n_env)
+    if BEC_summary_type == 'demo':
+        # a) only consider the optimal trajectories from the start states
+        # check if this demonstration was already displayed during training
+        for j, wt_vi_traj_candidate in enumerate(wt_vi_traj_candidates):
+            print(colored('Considering environment {}'.format(j), 'red'))
+            if not _in_summary(wt_vi_traj_candidate[0][1].mdp, summary, BEC_summary_type):
+                constraints = BEC.extract_constraints([wt_vi_traj_candidate], weights, step_cost_flag,
+                                                      BEC_depth=BEC_depth,
+                                                      trajectories=[wt_vi_traj_candidate[0][2]])
+                BEC_length = BEC.calculate_BEC_length(constraints, weights, step_cost_flag)
+                BEC_lengths.append(BEC_length)
+                env_idxs.append(j)
+                BEC_constraints.append(constraints)
 
-    # compare the difference in reward between optimal demonstrations of the candidate weights to the optimal
-    # demonstration of the ground truth weight in each environment
-    for env_idx in range(n_env):
-        gt_weight = gt_wt_vi_traj_candidates[env_idx][0][0]
-        gt_mdp = gt_wt_vi_traj_candidates[env_idx][0][1].mdp
-        gt_trajectory= gt_wt_vi_traj_candidates[env_idx][0][2]
-        test_wt_vi_traj_candidates_tuples = test_wt_vi_traj_candidates[env_idx]
+        # sorted from smallest to largest BEC lengths (i.e. most to least challenging)
+        tie_breaker = [i for i in range(len(BEC_lengths))]
+        sorted_zipped = sorted(zip(BEC_lengths, tie_breaker, env_idxs, BEC_constraints))
+        BEC_lengths_sorted, _, env_idxs_sorted, BEC_constraints_sorted = list(zip(*sorted_zipped))
+        wt_vi_traj_candidates_sorted = [wt_vi_traj_candidates[k] for k in env_idxs_sorted]
 
-        reward_diff = 0
+        if difficulty == 'hard':
+            test_wt_vi_traj_tuples = wt_vi_traj_candidates_sorted[:n_desired_test_env]
+            test_BEC_lengths = list(BEC_lengths_sorted[:n_desired_test_env])
+            test_BEC_constraints = list(BEC_constraints_sorted[:n_desired_test_env])
+        else:
+            test_wt_vi_traj_tuples = wt_vi_traj_candidates_sorted[-n_desired_test_env:]
+            test_BEC_lengths = list(BEC_lengths_sorted[-n_desired_test_env:])
+            test_BEC_constraints = list(BEC_constraints_sorted[-n_desired_test_env:])
+    else:
+        traj_opts = []
+        for j, wt_vi_traj_candidate in enumerate(wt_vi_traj_candidates):
+            print(colored('Considering environment {}'.format(j), 'red'))
 
-        for test_wt_vi_traj_candidates_tuple in test_wt_vi_traj_candidates_tuples:
-            wt_candidate = test_wt_vi_traj_candidates_tuple[0]
-            vi_candidate = test_wt_vi_traj_candidates_tuple[1]
-            trajectory_candidate = test_wt_vi_traj_candidates_tuple[2]
+            # b) consider all possible trajectories by the optimal policy
+            mdp = wt_vi_traj_candidate[0][1].mdp
+            agent = FixedPolicyAgent(wt_vi_traj_candidate[0][1].policy)
+            # test_states = list(mdp.states)
+            # for state in test_states[0:2]:
+            for state in mdp.states:
+                if not _in_summary(mdp, summary, BEC_summary_type, initial_state=state):
+                    traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state)
+                    constraints = BEC.extract_constraints([wt_vi_traj_candidate], weights, step_cost_flag, trajectories=[traj_opt])
 
-            # note that this is different from the reward comparison in BIRL (see bayesian_IRL.py). Euclidean distance
-            # between the trajectories could also be used instead
-            reward_diff += abs(
-                (wt_candidate.dot(vi_candidate.mdp.accumulate_reward_features(trajectory_candidate, discount=True).T) \
-                 - gt_weight.dot(gt_mdp.accumulate_reward_features(gt_trajectory, discount=True).T))[0][0])
+                    BEC_length = BEC.calculate_BEC_length(constraints, weights, step_cost_flag)
+                    BEC_lengths.append(BEC_length)
+                    env_idxs.append(j)
+                    BEC_constraints.append(constraints)
+                    traj_opts.append(traj_opt)
 
-        discrepancy[env_idx] = reward_diff
+        # sorted from smallest to largest BEC lengths (i.e. most to least challenging)
+        tie_breaker = [i for i in range(len(BEC_lengths))]
+        sorted_zipped = sorted(zip(BEC_lengths, tie_breaker, env_idxs, BEC_constraints, traj_opts))
+        BEC_lengths_sorted, _, env_idxs_sorted, BEC_constraints_sorted, traj_opts_sorted = list(zip(*sorted_zipped))
 
-    print(discrepancy)
-    # sort from greatest discrepancy to least discrepancy, taking the first n_desired_test_env as the test environments
-    test_idxs = (-discrepancy).argsort()[:n_desired_test_env]
-    print(test_idxs)
-    print(discrepancy[test_idxs])
+        # must update the wt_vi_traj_candidate with the right initial state and trajectory
+        if difficulty == 'hard':
+            test_wt_vi_traj_tuples = [copy.deepcopy(wt_vi_traj_candidates[k]) for k in
+                                      env_idxs_sorted[:n_desired_test_env]]
 
-    # visualize each test environment, and the optimal trajectories
-    if visualize:
-        test_env_count = 1
-        for test_idx in test_idxs:
-            print(colored('Visualizing test environment {}'.format(test_env_count), 'red'))
+            for k, traj_opt_sorted in enumerate(traj_opts_sorted[:n_desired_test_env]):
+                test_wt_vi_traj_tuples[k][0][1].mdp.set_init_state(traj_opt_sorted[0][0])
+                test_wt_vi_traj_tuples[k][0][2] = traj_opt_sorted
 
-            # visualize the ground truth weight trajectory
-            print(colored('Ground truth weight: {}'.format(gt_wt_vi_traj_candidates[test_idx][0][0]), 'blue'))
-            gt_trajectory = gt_wt_vi_traj_candidates[test_idx][0][2]
-            gt_wt_vi_traj_candidates[test_idx][0][1].mdp.visualize_trajectory(gt_trajectory)
+            test_BEC_lengths = list(BEC_lengths_sorted[:n_desired_test_env])
+            test_BEC_constraints = list(BEC_constraints_sorted[:n_desired_test_env])
+        else:
+            test_wt_vi_traj_tuples = [copy.deepcopy(wt_vi_traj_candidates[k]) for k in
+                                      env_idxs_sorted[-n_desired_test_env:]]
 
-            # visualize the candidate weight trajectories
-            test_wt_vi_traj_candidates_tuples = test_wt_vi_traj_candidates[test_idx]
-            test_wt_count = 1
-            for test_wt_vi_traj_candidates_tuple in test_wt_vi_traj_candidates_tuples:
-                wt_candidate = test_wt_vi_traj_candidates_tuple[0]
-                vi_candidate = test_wt_vi_traj_candidates_tuple[1]
-                trajectory_candidate = test_wt_vi_traj_candidates_tuple[2]
+            for k, traj_opt_sorted in enumerate(traj_opts_sorted[-n_desired_test_env:]):
+                test_wt_vi_traj_tuples[k][0][1].mdp.set_init_state(traj_opt_sorted[0][0])
+                test_wt_vi_traj_tuples[k][0][2] = traj_opt_sorted
 
-                print(colored('#{} candidate weight: {}'.format(test_wt_count, wt_candidate), 'blue'))
-                vi_candidate.mdp.visualize_trajectory(trajectory_candidate)
+            test_BEC_lengths = list(BEC_lengths_sorted[-n_desired_test_env:])
+            test_BEC_constraints = list(BEC_constraints_sorted[-n_desired_test_env:])
 
-                test_wt_count += 1
-            test_env_count += 1
-
-    # return a list of [gt_wt_vi_traj_candidates, test_wt_vi_traj_candidates] that correspond to the selected test
-    # environments
-    test_wt_vi_traj_tuples = []
-    for test_idx in test_idxs:
-        test_wt_vi_traj_tuples.append([gt_wt_vi_traj_candidates[test_idx], test_wt_vi_traj_candidates[test_idx]])
-
-    return test_wt_vi_traj_tuples
+    return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints

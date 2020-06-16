@@ -31,7 +31,8 @@ class AugmentedTaxiOOMDP(OOMDP):
     ATTRIBUTES = ["x", "y", "has_passenger", "in_taxi", "dest_x", "dest_y"]
     CLASSES = ["agent", "wall", "passenger", "toll", "traffic", "fuel_station"]
 
-    def __init__(self, width, height, agent, walls, passengers, tolls, traffic, fuel_stations, slip_prob=0, gamma=0.99, step_cost=0, weights=None):
+    def __init__(self, width, height, agent, walls, passengers, tolls, traffic, fuel_stations, slip_prob=0, gamma=0.99, step_cost=0, weights=None, env_code=None):
+        self.env_code = env_code
         self.height = height
         self.width = width
         if weights is not None:

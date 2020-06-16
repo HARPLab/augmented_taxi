@@ -4,6 +4,7 @@
 import sys
 import dill as pickle
 import numpy as np
+from termcolor import colored
 
 # Other imports.
 sys.path.append("simple_rl")
@@ -15,7 +16,6 @@ from policy_summarization import policy_summarization_helpers as ps_helpers
 from policy_summarization import BEC
 
 def generate_agent(data_loc, agent_a, walls_a, traffic_a, fuel_station_a, passengers_a, tolls_a, gamma_a, width_a, height_a, weights, visualize=False):
-
     try:
         with open('models/' + data_loc + '/vi_agent.pickle', 'rb') as f:
             mdp_agent, vi_agent = pickle.load(f)
@@ -90,12 +90,39 @@ def obtain_BEC_summary(data_loc, n_env, weights, step_cost_flag, summary_type, B
 
     return constraints, BEC_summary
 
-def obtain_test_environments(data_loc, weights, n_env, n_samples, sample_radius, n_desired_test_env, step_cost_flag):
-    # obtain test weight candidates
-    wt_candidates = ps_helpers.sample_wt_candidates(data_loc, weights, step_cost_flag, n_samples, sample_radius)
+def obtain_test_environments(data_loc, weights, n_env, n_desired_test_env, difficulty, step_cost_flag, BEC_depth, summary=None, BEC_summary_type=None, visualize_test_env=False):
+    '''
+    Summary: Correlate the difficulty of a test environment with the generalized area of the BEC region obtain by the
+    corresponding optimal demonstration. Return the desired number and difficulty of test environments (to be given
+    to the human to test his understanding of the agent's policy).
+    '''
+    # use generalized area of the BEC region to select test environments
+    try:
+        with open('models/' + data_loc + '/test_environments.pickle', 'rb') as f:
+            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = pickle.load(f)
 
-    # use test weight candidates to select test environments
-    test_wt_vi_traj_tuples = ps_helpers.obtain_test_environments(data_loc, weights, wt_candidates, n_env, n_desired_test_env, agent_a, walls_a, traffic_a, fuel_station_a, gamma_a, width_a, height_a, visualize=True)
+    except:
+        wt_vi_traj_candidates = ps_helpers.obtain_env_policies(data_loc, n_env, np.expand_dims(weights, axis=0), agent_a,
+                                                               walls_a, traffic_a, fuel_station_a, gamma_a, width_a,
+                                                               height_a, 'ground_truth')
+
+        test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = ps_helpers.obtain_test_environments(wt_vi_traj_candidates, weights, n_desired_test_env, difficulty, step_cost_flag, BEC_depth, summary, BEC_summary_type)
+
+        with open('models/' + data_loc + '/test_environments.pickle', 'wb') as f:
+            pickle.dump((test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints), f)
+
+    if visualize_test_env:
+        for j, test_wt_vi_traj_tuple in enumerate(test_wt_vi_traj_tuples):
+            print(colored('Visualizing test environment {} with BEC length of {}'.format(j, test_BEC_lengths[j]),
+                          'red'))
+
+            vi_candidate = test_wt_vi_traj_tuple[0][1]
+            trajectory_candidate = test_wt_vi_traj_tuple[0][2]
+            vi_candidate.mdp.visualize_trajectory(trajectory_candidate)
+
+            BEC.visualize_constraints(test_BEC_constraints[j], weights, step_cost_flag)
+
+    return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_lengths
 
 if __name__ == "__main__":
     # Augmented Taxi details (note that I'm allowing functions below to directly access these taxi variables w/o passing them in)
@@ -153,6 +180,8 @@ if __name__ == "__main__":
                                 # starting state or from all possible states from the full policy
     BEC_depth = 1               # number of suboptimal actions to take before following the optimal policy to obtain the
                                 # suboptimal trajectory (and the corresponding suboptimal expected feature counts)
+                                # for computational feasibility, only considering depths > 1 for demo summary type
+    BEC_test_difficulty = 'hard'
 
     # a) generate an agent if you want to explore the Augmented Taxi MDP
     # generate_agent('base', agent_a, walls_a, traffic_a, fuel_station_a, passengers_a, tolls_a, gamma_a, width_a, height_a, weights, visualize=True)
@@ -161,8 +190,8 @@ if __name__ == "__main__":
     # bayesian_IRL_summary, wt_candidates, history_priors = obtain_BIRL_summary(data_loc_BIRL, eval_fn, n_env, weights, weights_lb, weights_ub, n_wt_partitions, iter_idx, step_cost_flag, visualize_history_priors=False, visualize_summary=True)
 
     # c) obtain a BEC summary of the agent's policy
-    constraints, BEC_summary = obtain_BEC_summary(data_loc, n_env, weights, step_cost_flag, BEC_summary_type, BEC_depth=BEC_depth, visualize_constraints=True, visualize_summary=False)
+    constraints, BEC_summary = obtain_BEC_summary(data_loc, n_env, weights, step_cost_flag, BEC_summary_type, BEC_depth=BEC_depth, visualize_constraints=False, visualize_summary=False)
     BEC_length = BEC.calculate_BEC_length(constraints, weights, step_cost_flag)
 
     # d) obtain test environments
-    # obtain_test_environments(data_loc, weights, n_env, n_samples, sample_radius, n_desired_test_env, step_cost_flag)
+    obtain_test_environments(data_loc, weights, n_env, n_desired_test_env, 'hard', step_cost_flag, BEC_depth, summary=BEC_summary, BEC_summary_type=BEC_summary_type, visualize_test_env=False)

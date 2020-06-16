@@ -4,7 +4,7 @@ from simple_rl.agents import FixedPolicyAgent
 import numpy as np
 from scipy.optimize import linprog
 import itertools
-from pypoman import compute_polytope_vertices
+from pypoman import compute_polygon_hull
 from policy_summarization import computational_geometry as cg
 
 def normalize_constraints(constraints):
@@ -114,8 +114,10 @@ def calculate_BEC_length(constraints, weights, step_cost_flag):
         A[len(constraints) + 3, :] = np.array([0, -1])
         b[len(constraints) + 3] = 1
 
-        # compute the vertices of the convex polygon formed by the BEC constraints (BEC polygon), in clockwise order
-        vertices = compute_polytope_vertices(A, b)
+        # compute the vertices of the convex polygon formed by the BEC constraints (BEC polygon), in counterclockwise order
+        vertices = compute_polygon_hull(A, b)
+        # clockwise order
+        vertices.reverse()
 
         # L1 constraints in 2D
         L1_constraints = [[[-1 + abs(weights[0, -1]), 0], [0, 1 - abs(weights[0, -1])]], [[0, 1 - abs(weights[0, -1])], [1 - abs(weights[0, -1]), 0]],
@@ -343,8 +345,7 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints, weights, step_cost_fl
                 mdp = wt_vi_traj_candidates[env_idx][0][1].mdp
                 agent = FixedPolicyAgent(wt_vi_traj_candidates[env_idx][0][1].policy)
                 for state in mdp.states:
-                    action_opt = agent.act(state, 0)
-                    traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state, action_seq=[action_opt])
+                    traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state)
                     new_constraints = extract_constraints([wt_vi_traj_candidates[env_idx]], weights, step_cost_flag, trajectories=[traj_opt])
                     count = count_new_covers(new_constraints, BEC_constraints, covered_BEC_constraints)
 
