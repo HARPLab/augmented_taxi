@@ -8,6 +8,7 @@ from termcolor import colored
 
 # Other imports.
 sys.path.append("simple_rl")
+import params
 from simple_rl.agents import FixedPolicyAgent
 from simple_rl.tasks import AugmentedTaxiOOMDP
 from simple_rl.planning import ValueIteration
@@ -15,14 +16,14 @@ from policy_summarization import bayesian_IRL
 from policy_summarization import policy_summarization_helpers as ps_helpers
 from policy_summarization import BEC
 
-def generate_agent(data_loc, agent_a, walls_a, traffic_a, fuel_station_a, passengers_a, tolls_a, gamma_a, width_a, height_a, weights, visualize=False):
+def generate_agent(data_loc, aug_taxi, weights, visualize=False):
     try:
         with open('models/' + data_loc + '/vi_agent.pickle', 'rb') as f:
             mdp_agent, vi_agent = pickle.load(f)
     except:
-        mdp_agent = AugmentedTaxiOOMDP(width=width_a, height=height_a, agent=agent_a, walls=walls_a,
-                                       passengers=passengers_a, tolls=tolls_a, traffic=traffic_a,
-                                       fuel_stations=fuel_station_a, gamma=gamma_a, weights=weights)
+        mdp_agent = AugmentedTaxiOOMDP(width=aug_taxi['width'], height=aug_taxi['height'], agent=aug_taxi['agent'], walls=aug_taxi['walls'],
+                                       passengers=aug_taxi['passengers'], tolls=aug_taxi['tolls'], traffic=aug_taxi['traffic'],
+                                       fuel_stations=aug_taxi['fuel_station'], gamma=aug_taxi['gamma'], weights=weights)
         vi_agent = ValueIteration(mdp_agent, sample_rate=1)
         vi_agent.run_vi()
 
@@ -33,19 +34,25 @@ def generate_agent(data_loc, agent_a, walls_a, traffic_a, fuel_station_a, passen
     if visualize:
         fixed_agent = FixedPolicyAgent(vi_agent.policy)
         mdp_agent.visualize_agent(fixed_agent)
-        # mdp.reset()  # reset the current state to the initial state
-        # mdp_agent.visualize_interaction()
+        mdp_agent.reset()  # reset the current state to the initial state
+        mdp_agent.visualize_interaction()
 
-def obtain_BIRL_summary(data_loc, eval_fn, n_env, weights, weights_lb, weights_ub, n_wt_partitions, iter_idx, step_cost_flag, visualize_history_priors=False, visualize_summary=False):
+def obtain_BIRL_summary(data_loc, aug_taxi, BIRL_params, n_env, weights, step_cost_flag, visualize_history_priors=False, visualize_summary=False):
     try:
-        with open('models/' + data_loc + '/BIRL_summary_{}.pickle'.format(eval_fn), 'rb') as f:
+        with open('models/' + data_loc + '/BIRL_summary_{}.pickle'.format(BIRL_params['eval_fn']), 'rb') as f:
             bayesian_IRL_summary, wt_candidates, history_priors = pickle.load(f)
     except:
-        wt_candidates = ps_helpers.discretize_wt_candidates(data_loc, weights, weights_lb, weights_ub, step_cost_flag, n_wt_partitions=n_wt_partitions, iter_idx=iter_idx)
-        wt_vi_traj_candidates = ps_helpers.obtain_env_policies(data_loc, n_env, wt_candidates, agent_a, walls_a, traffic_a, fuel_station_a, gamma_a, width_a, height_a, 'BIRL')
-        bayesian_IRL_summary, wt_candidates, history_priors = bayesian_IRL.obtain_summary(n_demonstrations, weights, wt_candidates, wt_vi_traj_candidates, eval_fn)
+        wt_candidates = ps_helpers.discretize_wt_candidates(data_loc, weights['val'], weights['lb'], weights['ub'],
+                                                            step_cost_flag,
+                                                            n_wt_partitions=BIRL_params['n_wt_partitions'],
+                                                            iter_idx=BIRL_params['iter_idx'])
+        wt_vi_traj_candidates = ps_helpers.obtain_env_policies(data_loc, n_env, wt_candidates, aug_taxi, 'BIRL')
 
-        with open('models/' + data_loc + '/BIRL_summary_{}.pickle'.format(eval_fn), 'wb') as f:
+        bayesian_IRL_summary, wt_candidates, history_priors = bayesian_IRL.obtain_summary(
+            BIRL_params['n_demonstrations'], weights['val'], wt_candidates, wt_vi_traj_candidates,
+            BIRL_params['eval_fn'])
+
+        with open('models/' + data_loc + '/BIRL_summary_{}.pickle'.format(BIRL_params['eval_fn']), 'wb') as f:
             pickle.dump((bayesian_IRL_summary, wt_candidates, history_priors), f)
 
     if visualize_history_priors or visualize_summary:
@@ -53,7 +60,7 @@ def obtain_BIRL_summary(data_loc, eval_fn, n_env, weights, weights_lb, weights_u
 
     return bayesian_IRL_summary, wt_candidates, history_priors
 
-def obtain_BEC_summary(data_loc, n_env, weights, step_cost_flag, summary_type, BEC_depth=1, visualize_constraints=False, visualize_summary=False):
+def obtain_BEC_summary(data_loc, aug_taxi, n_env, weights, step_cost_flag, summary_type, BEC_depth=1, visualize_constraints=False, visualize_summary=False):
     try:
         with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
             BEC_summary = pickle.load(f)
@@ -61,7 +68,8 @@ def obtain_BEC_summary(data_loc, n_env, weights, step_cost_flag, summary_type, B
         with open('models/' + data_loc + '/BEC_constraints.pickle', 'rb') as f:
             constraints = pickle.load(f)
     except:
-        wt_vi_traj_candidates = ps_helpers.obtain_env_policies(data_loc, n_env, np.expand_dims(weights, axis=0), agent_a, walls_a, traffic_a, fuel_station_a, gamma_a, width_a, height_a, 'ground_truth')
+        wt_vi_traj_candidates = ps_helpers.obtain_env_policies(data_loc, n_env, np.expand_dims(weights, axis=0),
+                                                               aug_taxi, 'ground_truth')
         try:
             with open('models/' + data_loc + '/BEC_constraints.pickle', 'rb') as f:
                 constraints = pickle.load(f)
@@ -90,7 +98,7 @@ def obtain_BEC_summary(data_loc, n_env, weights, step_cost_flag, summary_type, B
 
     return constraints, BEC_summary
 
-def obtain_test_environments(data_loc, weights, n_env, n_desired_test_env, difficulty, step_cost_flag, BEC_depth, summary=None, BEC_summary_type=None, visualize_test_env=False):
+def obtain_test_environments(data_loc, aug_taxi, weights, n_env, BEC_params, step_cost_flag, summary=None, visualize_test_env=False):
     '''
     Summary: Correlate the difficulty of a test environment with the generalized area of the BEC region obtain by the
     corresponding optimal demonstration. Return the desired number and difficulty of test environments (to be given
@@ -102,11 +110,10 @@ def obtain_test_environments(data_loc, weights, n_env, n_desired_test_env, diffi
             test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = pickle.load(f)
 
     except:
-        wt_vi_traj_candidates = ps_helpers.obtain_env_policies(data_loc, n_env, np.expand_dims(weights, axis=0), agent_a,
-                                                               walls_a, traffic_a, fuel_station_a, gamma_a, width_a,
-                                                               height_a, 'ground_truth')
+        wt_vi_traj_candidates = ps_helpers.obtain_env_policies(data_loc, n_env, np.expand_dims(weights, axis=0), aug_taxi, 'ground_truth')
 
-        test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = ps_helpers.obtain_test_environments(wt_vi_traj_candidates, weights, n_desired_test_env, difficulty, step_cost_flag, BEC_depth, summary, BEC_summary_type)
+        test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = \
+            ps_helpers.obtain_test_environments(wt_vi_traj_candidates, weights, BEC_params['n_desired_test_env'], BEC_params['test_difficulty'], step_cost_flag, BEC_params['depth'], summary, BEC_params['summary_type'])
 
         with open('models/' + data_loc + '/test_environments.pickle', 'wb') as f:
             pickle.dump((test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints), f)
@@ -122,76 +129,26 @@ def obtain_test_environments(data_loc, weights, n_env, n_desired_test_env, diffi
             trajectory_candidate = test_wt_vi_traj_tuple[0][2]
             vi_candidate.mdp.visualize_trajectory(trajectory_candidate)
 
-    return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_lengths
+    return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints
 
 if __name__ == "__main__":
-    # Augmented Taxi details (note that I'm allowing functions below to directly access these taxi variables w/o passing them in)
-    agent_a = {"x": 4, "y": 1, "has_passenger": 0}
-    walls_a = [{"x": 1, "y": 3, "fee": 1}, {"x": 1, "y": 2, "fee": 1}]
-    passengers_a = [{"x": 4, "y": 1, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
-    tolls_a = [{"x": 3, "y": 1, "fee": 1}]
-    traffic_a = [] # probability that you're stuck
-    fuel_station_a = []
-    width_a = 4
-    height_a = 3
-
-    # reward weight parameters (on the goal with the passenger, on a toll, step cost).
-    # assume the L1 norm of the weights is equal 1. WLOG
-    weights_lb = np.array([-1., -1., -0.03076923])
-    weights_ub = np.array([1., 1., -0.03076923])
-    weights = np.array([[0.875, -0.09375, -0.03125]])
-
-    gamma_a = 1.
-    step_cost_flag = True   # indicates that the last weight element is a known step cost. code currently assumes a 2D
-                            # weight vector if step_cost_flag = False, and a 3D weight vector if step_cost_flag = True
-
-    # test environment selection parameters
-    n_desired_test_env = 10      # number of desired test environments
-    sample_radius = 0.75         # radius around the ground truth weight from which you will uniformly sample from
-                                 # to obtain test weight candidates
-    n_samples = 5                # number of test weight candidates to sample
-
-    # Joint BIRL and BEC parameters
-    n_env = 512                  # number of environments to consider
-                                 # tip: select so that np.log(n_env) / np.log(2) yields an int for predictable behavior
-                                 # see ps_helpers.obtain_env_policies()
-    # BIRL parameters
-    n_wt = 1                    # total number of weight candidates (including the ground truth)
-                                 # tip: select n_wt to such that n_wt_partitions is an int to ensure that the exact
-                                 # number of desired weight candidates is actually incorporated. see ps_helpers.discretize_wt_candidates()
-                                 # also note that n_wt = n_wt_partitions ** (# of weights you're discretizing over) + 1
-
-    iter_idx = None              # weight dimension to discretize over. If None, discretize uniformly over all dimensions
-    eval_fn = 'approx_MP'        # desired likelihood function for computing the posterior probability of weight candidates
-    n_demonstrations = 10        # total number of demonstrations sought, in order of decreasing effectiveness
-
-    if iter_idx == None:
-        data_loc_BIRL = str(n_env) + '_env/' + str(n_wt) + '_wt_' + 'uniform'
-        if step_cost_flag:
-            n_wt_partitions = int((n_wt - 1) ** (1.0 / (weights.shape[1] - 1)))
-        else:
-            n_wt_partitions = int((n_wt - 1) ** (1.0 / weights.shape[1]))
-    else:
-        data_loc_BIRL = str(n_env) + '_env/' + str(n_wt) + '_wt_' + 'iter_idx_' + str(iter_idx)
-        n_wt_partitions = n_wt - 1
-    data_loc = str(n_env) + '_env'
-
-    BEC_summary_type = 'policy' # demo or policy: whether constratints are extraced from just the optimal demo from the
-                                # starting state or from all possible states from the full policy
-    BEC_depth = 1               # number of suboptimal actions to take before following the optimal policy to obtain the
-                                # suboptimal trajectory (and the corresponding suboptimal expected feature counts)
-                                # for computational feasibility, only considering depths > 1 for demo summary type
-    BEC_test_difficulty = 'hard'
-
     # a) generate an agent if you want to explore the Augmented Taxi MDP
-    # generate_agent('base', agent_a, walls_a, traffic_a, fuel_station_a, passengers_a, tolls_a, gamma_a, width_a, height_a, weights, visualize=True)
+    # generate_agent(params.data_loc['base'], params.aug_taxi, params.weights['val'], visualize=True)
 
     # b) obtain a Bayesian IRL summary of the agent's policy
-    # bayesian_IRL_summary, wt_candidates, history_priors = obtain_BIRL_summary(data_loc_BIRL, eval_fn, n_env, weights, weights_lb, weights_ub, n_wt_partitions, iter_idx, step_cost_flag, visualize_history_priors=False, visualize_summary=True)
+    # bayesian_IRL_summary, wt_candidates, history_priors = obtain_BIRL_summary(params.data_loc['BIRL'], params.aug_taxi,
+    #                                                                           params.BIRL, params.n_env, params.weights,
+    #                                                                           params.step_cost_flag,
+    #                                                                           visualize_history_priors=True,
+    #                                                                           visualize_summary=True)
 
     # c) obtain a BEC summary of the agent's policy
-    constraints, BEC_summary = obtain_BEC_summary(data_loc, n_env, weights, step_cost_flag, BEC_summary_type, BEC_depth=BEC_depth, visualize_constraints=False, visualize_summary=False)
-    BEC_length = BEC.calculate_BEC_length(constraints, weights, step_cost_flag)
+    constraints, BEC_summary = obtain_BEC_summary(params.data_loc['BEC'], params.aug_taxi, params.n_env,
+                                                  params.weights['val'], params.step_cost_flag,
+                                                  params.BEC['summary_type'], BEC_depth=params.BEC['depth'],
+                                                  visualize_constraints=True, visualize_summary=True)
+    BEC_length = BEC.calculate_BEC_length(constraints, params.weights['val'], params.step_cost_flag)
 
     # d) obtain test environments
-    obtain_test_environments(data_loc, weights, n_env, n_desired_test_env, BEC_test_difficulty, step_cost_flag, BEC_depth, summary=BEC_summary, BEC_summary_type=BEC_summary_type, visualize_test_env=False)
+    obtain_test_environments(params.data_loc['BEC'], params.aug_taxi, params.weights['val'], params.n_env, params.BEC,
+                             params.step_cost_flag, summary=BEC_summary, visualize_test_env=True)

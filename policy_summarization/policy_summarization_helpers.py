@@ -137,7 +137,31 @@ def generate_mdp_obj(mdp_code):
     # (only includes environment info) will always need to be manually defined
     return requested_passenger, requested_tolls, mdp_code[1:]
 
-def obtain_env_policies(data_loc, n_env, wt_candidates, agent_a, walls_a, traffic_a, fuel_station_a, gamma_a, width_a, height_a, save_type):
+# hard-coded in order to evaluate hand-designed environments
+def hand_generate_mdp_obj(mdp_code):
+
+    # a) for resolving weight of toll
+    if mdp_code == [0, 0]:
+        requested_passenger = [{"x": 4, "y": 1, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
+        requested_tolls = [{"x": 3, "y": 1, "fee": 1}, {"x": 3, "y": 2, "fee": 1}]  # upperbound
+    elif mdp_code == [0, 1]:
+        requested_passenger = [{"x": 4, "y": 1, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
+        requested_tolls = [{"x": 3, "y": 1, "fee": 1}]                              # lowerbound
+    # b) for resolving weight of dropping off passenger
+    elif mdp_code == [1, 0]:
+        requested_passenger = [{"x": 2, "y": 3, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
+        requested_tolls = [{"x": 2, "y": 3, "fee": 1}, {"x": 3, "y": 3, "fee": 1}, {"x": 4, "y": 3, "fee": 1},
+                   {"x": 2, "y": 2, "fee": 1}, {"x": 3, "y": 2, "fee": 1}, {"x": 2, "y": 1, "fee": 1},
+                   {"x": 3, "y": 1, "fee": 1}]                              # lowerbound
+    else:
+        requested_passenger = [{"x": 2, "y": 3, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
+        requested_tolls = [{"x": 2, "y": 3, "fee": 1}, {"x": 3, "y": 3, "fee": 1}, {"x": 4, "y": 3, "fee": 1},
+                   {"x": 2, "y": 2, "fee": 1}, {"x": 3, "y": 2, "fee": 1}, {"x": 4, "y": 2, "fee": 1},
+                   {"x": 2, "y": 1, "fee": 1}, {"x": 3, "y": 1, "fee": 1}]  # upperbound
+
+    return requested_passenger, requested_tolls, mdp_code
+
+def obtain_env_policies(data_loc, n_env, wt_candidates, aug_taxi, save_type):
     '''
     Summary: come up with an optimal policy for each of the candidates
     '''
@@ -175,14 +199,20 @@ def obtain_env_policies(data_loc, n_env, wt_candidates, agent_a, walls_a, traffi
     if n_processed_envs < len(mdp_codes):
         for env_idx in range(n_processed_envs, len(mdp_codes)):
             mdp_code = mdp_codes[env_idx]
-            passengers_a, tolls_a, env_code = generate_mdp_obj(mdp_code)
+            # note that this is specially accommodates the four hand-designed environments
+            if len(mdp_codes) == 4:
+                passengers, tolls, env_code = hand_generate_mdp_obj(mdp_code)
+            else:
+                passengers, tolls, env_code = generate_mdp_obj(mdp_code)
             wt_counter = 0
             # a per-environment tuple of corresponding reward weight, optimal policy, and optimal trajectory
             wt_vi_traj_env = []
             for wt_candidate in wt_candidates:
-                mdp_candidate = AugmentedTaxiOOMDP(width=width_a, height=height_a, agent=agent_a, walls=walls_a,
-                                               passengers=passengers_a, tolls=tolls_a, traffic=traffic_a,
-                                               fuel_stations=fuel_station_a, gamma=gamma_a, weights=wt_candidate, env_code=env_code)
+                mdp_candidate = AugmentedTaxiOOMDP(width=aug_taxi['width'], height=aug_taxi['height'], agent=aug_taxi['agent'],
+                                   walls=aug_taxi['walls'], passengers=passengers, tolls=tolls,
+                                   traffic=aug_taxi['traffic'], fuel_stations=aug_taxi['fuel_station'],
+                                                   gamma=aug_taxi['gamma'], weights=wt_candidate, env_code=env_code)
+
                 # parameters tailored to the 4x3 Augmented Taxi Domain
                 vi_candidate = ValueIteration(mdp_candidate, sample_rate=1, max_iterations=50)
                 iterations, value_of_init_state = vi_candidate.run_vi()

@@ -395,7 +395,7 @@ def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=N
                         _draw_lower_right_text('       ', screen)
 
                 agent_shape = draw_state(screen, mdp, cur_state, agent_shape=agent_shape)
-                print("A: " + str(action))
+                # print("A: " + str(action))
 
                 # Update state text.
                 _draw_lower_left_text(cur_state, screen)
