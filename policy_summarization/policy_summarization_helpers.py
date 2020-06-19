@@ -107,14 +107,15 @@ def discretize_wt_candidates(data_loc, weights, weights_lb, weights_ub, step_cos
 
     return wt_uniform_sampling
 
-def generate_env(env_code):
+def generate_mdp_obj(mdp_code):
     '''
-    :param env_code: Vector representation of an augmented taxi environment (list of binary values)
-    :return: Corresponding passenger and toll objects
+    :param mdp_code: Vector representation of an augmented taxi environment (list of binary values)
+    :return: Corresponding passenger and toll objects and code that specifically only concerns the environment (and not
+    the initial state) of the MDP
     '''
 
     # first entry currently dictates where the passenger begins
-    if env_code[0] == 0:
+    if mdp_code[0] == 0:
         requested_passenger = [{"x": 4, "y": 1, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
     else:
         requested_passenger = [{"x": 2, "y": 3, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
@@ -127,12 +128,14 @@ def generate_env(env_code):
     requested_tolls = []
 
     offset = 1
-    for x in range(offset, len(env_code)):
-        entry = env_code[x]
+    for x in range(offset, len(mdp_code)):
+        entry = mdp_code[x]
         if entry:
             requested_tolls.append(available_tolls[x - offset])
 
-    return requested_passenger, requested_tolls
+    # note that what's considered mdp_code (potentially includes both initial state and environment info) and env_code
+    # (only includes environment info) will always need to be manually defined
+    return requested_passenger, requested_tolls, mdp_code[1:]
 
 def obtain_env_policies(data_loc, n_env, wt_candidates, agent_a, walls_a, traffic_a, fuel_station_a, gamma_a, width_a, height_a, save_type):
     '''
@@ -140,7 +143,7 @@ def obtain_env_policies(data_loc, n_env, wt_candidates, agent_a, walls_a, traffi
     '''
 
     # generate codes that govern passenger's initial position and status of the eight tolls in the 4x3 environment
-    env_codes = list(map(list, itertools.product([0, 1], repeat=int(np.log(n_env) / np.log(2)))))
+    mdp_codes = list(map(list, itertools.product([0, 1], repeat=int(np.log(n_env) / np.log(2)))))
 
     save_mark = 750
     if save_type == 'ground_truth':
@@ -157,9 +160,9 @@ def obtain_env_policies(data_loc, n_env, wt_candidates, agent_a, walls_a, traffi
         with open(filename, 'rb') as f:
             wt_vi_traj_candidates = pickle.load(f)
 
-        if len(wt_vi_traj_candidates) == len(env_codes) and len(wt_vi_traj_candidates[-1]) == len(wt_candidates):
+        if len(wt_vi_traj_candidates) == len(mdp_codes) and len(wt_vi_traj_candidates[-1]) == len(wt_candidates):
             # all environments and weights have been processed
-            n_processed_envs = len(env_codes)
+            n_processed_envs = len(mdp_codes)
         else:
             # a portion of the environments and weights have been processed
             n_processed_envs = len(wt_vi_traj_candidates)
@@ -169,10 +172,10 @@ def obtain_env_policies(data_loc, n_env, wt_candidates, agent_a, walls_a, traffi
 
     # enumeration of all possible optimal policies from possible environments x weight candidates
     # if there are environments and weights yet to be processed
-    if n_processed_envs < len(env_codes):
-        for env_idx in range(n_processed_envs, len(env_codes)):
-            env_code = env_codes[env_idx]
-            passengers_a, tolls_a = generate_env(env_code)
+    if n_processed_envs < len(mdp_codes):
+        for env_idx in range(n_processed_envs, len(mdp_codes)):
+            mdp_code = mdp_codes[env_idx]
+            passengers_a, tolls_a, env_code = generate_mdp_obj(mdp_code)
             wt_counter = 0
             # a per-environment tuple of corresponding reward weight, optimal policy, and optimal trajectory
             wt_vi_traj_env = []
@@ -211,24 +214,15 @@ def obtain_env_policies(data_loc, n_env, wt_candidates, agent_a, walls_a, traffi
 
     return wt_vi_traj_candidates
 
-def _in_summary(mdp, summary, BEC_summary_type, initial_state=None):
+def _in_summary(mdp, summary, initial_state):
     '''
     Summary: Check if this MDP (and trajectory, if summary type is policy BEC) is already in the BEC summary. If so,
     do not consider it as a potential test environment.
     '''
-    if BEC_summary_type == 'demo':
-        # for demo BEC, you only have to check if the same MDP has already been included in the summary since there is only one
-        # initial state and one optimal demo per MDP
-        for summary_idx in range(len(summary)):
-            if mdp.env_code == summary[summary_idx][0].env_code:
-                return True
-        return False
-    else:
-        # for policy BEC, you have to check both the MDP and the initial state
-        for summary_idx in range(len(summary)):
-            if (mdp.env_code == summary[summary_idx][0].env_code) and (summary[summary_idx][1][0] == initial_state):
-                return True
-        return False
+    for summary_idx in range(len(summary)):
+        if (mdp.env_code == summary[summary_idx][0].env_code) and (summary[summary_idx][1][0][0] == initial_state):
+            return True
+    return False
 
 def obtain_test_environments(wt_vi_traj_candidates, weights, n_desired_test_env, difficulty, step_cost_flag, BEC_depth, summary=None, BEC_summary_type=None):
     '''
@@ -245,7 +239,7 @@ def obtain_test_environments(wt_vi_traj_candidates, weights, n_desired_test_env,
         # check if this demonstration was already displayed during training
         for j, wt_vi_traj_candidate in enumerate(wt_vi_traj_candidates):
             print(colored('Considering environment {}'.format(j), 'red'))
-            if not _in_summary(wt_vi_traj_candidate[0][1].mdp, summary, BEC_summary_type):
+            if not _in_summary(wt_vi_traj_candidate[0][1].mdp, summary, wt_vi_traj_candidate[0][1].mdp.init_state):
                 constraints = BEC.extract_constraints([wt_vi_traj_candidate], weights, step_cost_flag,
                                                       BEC_depth=BEC_depth,
                                                       trajectories=[wt_vi_traj_candidate[0][2]])
@@ -269,25 +263,32 @@ def obtain_test_environments(wt_vi_traj_candidates, weights, n_desired_test_env,
             test_BEC_lengths = list(BEC_lengths_sorted[-n_desired_test_env:])
             test_BEC_constraints = list(BEC_constraints_sorted[-n_desired_test_env:])
     else:
+        # b) consider all possible trajectories by the optimal policy in the environments contained within wt_vi_traj_candidates
         traj_opts = []
+        processed_envs = []
         for j, wt_vi_traj_candidate in enumerate(wt_vi_traj_candidates):
             print(colored('Considering environment {}'.format(j), 'red'))
 
-            # b) consider all possible trajectories by the optimal policy
             mdp = wt_vi_traj_candidate[0][1].mdp
-            agent = FixedPolicyAgent(wt_vi_traj_candidate[0][1].policy)
-            # test_states = list(mdp.states)
-            # for state in test_states[0:2]:
-            for state in mdp.states:
-                if not _in_summary(mdp, summary, BEC_summary_type, initial_state=state):
-                    traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state)
-                    constraints = BEC.extract_constraints([wt_vi_traj_candidate], weights, step_cost_flag, trajectories=[traj_opt])
 
-                    BEC_length = BEC.calculate_BEC_length(constraints, weights, step_cost_flag)
-                    BEC_lengths.append(BEC_length)
-                    env_idxs.append(j)
-                    BEC_constraints.append(constraints)
-                    traj_opts.append(traj_opt)
+            # wt_vi_traj_candidates can contain MDPs with the same environment but different initial states.
+            # by considering all reachable states of two identical MDPs with different initial states, you will obtain
+            # duplicate test environments unless you
+            if mdp.env_code not in processed_envs:
+                agent = FixedPolicyAgent(wt_vi_traj_candidate[0][1].policy)
+
+                for state in mdp.states:
+                    if not _in_summary(mdp, summary, state):
+                        traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state)
+                        constraints = BEC.extract_constraints([wt_vi_traj_candidate], weights, step_cost_flag, trajectories=[traj_opt])
+
+                        BEC_length = BEC.calculate_BEC_length(constraints, weights, step_cost_flag)
+                        BEC_lengths.append(BEC_length)
+                        env_idxs.append(j)
+                        BEC_constraints.append(constraints)
+                        traj_opts.append(traj_opt)
+
+                processed_envs.append(mdp.env_code)
 
         # sorted from smallest to largest BEC lengths (i.e. most to least challenging)
         tie_breaker = [i for i in range(len(BEC_lengths))]

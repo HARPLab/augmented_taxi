@@ -34,7 +34,7 @@ def generate_agent(data_loc, agent_a, walls_a, traffic_a, fuel_station_a, passen
         fixed_agent = FixedPolicyAgent(vi_agent.policy)
         mdp_agent.visualize_agent(fixed_agent)
         # mdp.reset()  # reset the current state to the initial state
-        # mdp.visualize_interaction()
+        # mdp_agent.visualize_interaction()
 
 def obtain_BIRL_summary(data_loc, eval_fn, n_env, weights, weights_lb, weights_ub, n_wt_partitions, iter_idx, step_cost_flag, visualize_history_priors=False, visualize_summary=False):
     try:
@@ -116,11 +116,11 @@ def obtain_test_environments(data_loc, weights, n_env, n_desired_test_env, diffi
             print(colored('Visualizing test environment {} with BEC length of {}'.format(j, test_BEC_lengths[j]),
                           'red'))
 
+            BEC.visualize_constraints(test_BEC_constraints[j], weights, step_cost_flag)
+
             vi_candidate = test_wt_vi_traj_tuple[0][1]
             trajectory_candidate = test_wt_vi_traj_tuple[0][2]
             vi_candidate.mdp.visualize_trajectory(trajectory_candidate)
-
-            BEC.visualize_constraints(test_BEC_constraints[j], weights, step_cost_flag)
 
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_lengths
 
@@ -146,7 +146,7 @@ if __name__ == "__main__":
                             # weight vector if step_cost_flag = False, and a 3D weight vector if step_cost_flag = True
 
     # test environment selection parameters
-    n_desired_test_env = 5       # number of desired test environments
+    n_desired_test_env = 10      # number of desired test environments
     sample_radius = 0.75         # radius around the ground truth weight from which you will uniformly sample from
                                  # to obtain test weight candidates
     n_samples = 5                # number of test weight candidates to sample
@@ -194,4 +194,4 @@ if __name__ == "__main__":
     BEC_length = BEC.calculate_BEC_length(constraints, weights, step_cost_flag)
 
     # d) obtain test environments
-    obtain_test_environments(data_loc, weights, n_env, n_desired_test_env, 'hard', step_cost_flag, BEC_depth, summary=BEC_summary, BEC_summary_type=BEC_summary_type, visualize_test_env=False)
+    obtain_test_environments(data_loc, weights, n_env, n_desired_test_env, BEC_test_difficulty, step_cost_flag, BEC_depth, summary=BEC_summary, BEC_summary_type=BEC_summary_type, visualize_test_env=False)

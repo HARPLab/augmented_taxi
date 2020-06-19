@@ -357,7 +357,7 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints, weights, step_cost_fl
                         best_mdp = mdp
                         print('New max count: {}'.format(max_count))
 
-        summary.append((best_mdp, best_traj, constraints_added))
+        summary.append([best_mdp, best_traj, constraints_added])
         update_covered_constraints(constraints_added, BEC_constraints, covered_BEC_constraints)
         total_covered += max_count
         print("{}/{} BEC constraints covered".format(total_covered, n_BEC_constraints))
