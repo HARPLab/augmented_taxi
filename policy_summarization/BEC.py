@@ -325,7 +325,7 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints, weights, step_cost_fl
     total_covered = 0
     while total_covered < n_BEC_constraints:
         max_count = float("-inf")
-
+        min_complexity = float("inf")
         for env_idx in range(len(wt_vi_traj_candidates)):
             print("Extracting constraints from environment {}".format(env_idx))
 
@@ -336,10 +336,17 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints, weights, step_cost_fl
                 if count > max_count:
                     max_count = count
                     constraints_added = new_constraints
-                    # I don't think a shallow copy is required since this won't be getting changed
+                    min_complexity = wt_vi_traj_candidates[env_idx][0][1].mdp.measure_env_complexity()
                     best_traj = wt_vi_traj_candidates[env_idx][0][2]
                     best_mdp = wt_vi_traj_candidates[env_idx][0][1].mdp
                     print('New max count: {}'.format(max_count))
+                # swap out the old demo for a simpler demo for the same constraints
+                elif count == max_count and wt_vi_traj_candidates[env_idx][0][1].mdp.measure_env_complexity() < min_complexity:
+                    constraints_added = new_constraints
+                    min_complexity = wt_vi_traj_candidates[env_idx][0][1].mdp.measure_env_complexity()
+                    best_traj = wt_vi_traj_candidates[env_idx][0][2]
+                    best_mdp = wt_vi_traj_candidates[env_idx][0][1].mdp
+                    print('Swapped out constraints')
             else:
                 # b) consider all possible trajectories by the optimal policy
                 mdp = wt_vi_traj_candidates[env_idx][0][1].mdp
@@ -352,10 +359,17 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints, weights, step_cost_fl
                     if count > max_count:
                         max_count = count
                         constraints_added = new_constraints
-                        # I don't think a shallow copy is required since this won't be getting changed
+                        min_complexity = mdp.measure_env_complexity()
                         best_traj = traj_opt
                         best_mdp = mdp
                         print('New max count: {}'.format(max_count))
+                    # swap out the old demo for a simpler demo for the same constraints
+                    elif count == max_count and mdp.measure_env_complexity() < min_complexity:
+                        constraints_added = new_constraints
+                        min_complexity = mdp.measure_env_complexity()
+                        best_traj = traj_opt
+                        best_mdp = mdp
+                        print('Swapped out constraints')
 
         summary.append([best_mdp, best_traj, constraints_added])
         update_covered_constraints(constraints_added, BEC_constraints, covered_BEC_constraints)

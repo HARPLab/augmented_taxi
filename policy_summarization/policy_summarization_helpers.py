@@ -261,6 +261,7 @@ def obtain_test_environments(wt_vi_traj_candidates, weights, n_desired_test_env,
     to the human to test his understanding of the agent's policy).
     '''
     env_idxs = []
+    env_complexities = []
     BEC_lengths = []
     BEC_constraints = []
 
@@ -276,22 +277,29 @@ def obtain_test_environments(wt_vi_traj_candidates, weights, n_desired_test_env,
                 BEC_length = BEC.calculate_BEC_length(constraints, weights, step_cost_flag)
                 BEC_lengths.append(BEC_length)
                 env_idxs.append(j)
+                env_complexities.append(wt_vi_traj_candidate[0][1].mdp.measure_env_complexity())
                 BEC_constraints.append(constraints)
 
         # sorted from smallest to largest BEC lengths (i.e. most to least challenging)
         tie_breaker = [i for i in range(len(BEC_lengths))]
-        sorted_zipped = sorted(zip(BEC_lengths, tie_breaker, env_idxs, BEC_constraints))
-        BEC_lengths_sorted, _, env_idxs_sorted, BEC_constraints_sorted = list(zip(*sorted_zipped))
-        wt_vi_traj_candidates_sorted = [wt_vi_traj_candidates[k] for k in env_idxs_sorted]
+        sorted_zipped = sorted(zip(BEC_lengths, env_complexities, tie_breaker, env_idxs, BEC_constraints))
+        BEC_lengths_sorted, env_complexities_sorted, _, env_idxs_sorted, BEC_constraints_sorted = list(zip(*sorted_zipped))
+        env_idxs_sorted = np.array(env_idxs_sorted)
+
+        # again sorted in order from smallest to largest, only selecting unique BEC lengths (as demos with the same
+        # BEC lengths are often quite similar)
+        BEC_lengths_unique, unique_idxs = np.unique(BEC_lengths_sorted, return_index=True)
 
         if difficulty == 'hard':
-            test_wt_vi_traj_tuples = wt_vi_traj_candidates_sorted[:n_desired_test_env]
-            test_BEC_lengths = list(BEC_lengths_sorted[:n_desired_test_env])
-            test_BEC_constraints = list(BEC_constraints_sorted[:n_desired_test_env])
+            test_wt_vi_traj_tuples = [wt_vi_traj_candidates[k] for k in
+                                            env_idxs_sorted[unique_idxs[:n_desired_test_env]]]
+            test_BEC_lengths = [BEC_lengths_sorted[k] for k in unique_idxs[:n_desired_test_env]]
+            test_BEC_constraints = [BEC_constraints_sorted[k] for k in unique_idxs[:n_desired_test_env]]
         else:
-            test_wt_vi_traj_tuples = wt_vi_traj_candidates_sorted[-n_desired_test_env:]
-            test_BEC_lengths = list(BEC_lengths_sorted[-n_desired_test_env:])
-            test_BEC_constraints = list(BEC_constraints_sorted[-n_desired_test_env:])
+            test_wt_vi_traj_tuples = [wt_vi_traj_candidates[k] for k in
+                                            env_idxs_sorted[unique_idxs[-n_desired_test_env:]]]
+            test_BEC_lengths = [BEC_lengths_sorted[k] for k in unique_idxs[-n_desired_test_env:]]
+            test_BEC_constraints = [BEC_constraints_sorted[k] for k in unique_idxs[-n_desired_test_env:]]
     else:
         # b) consider all possible trajectories by the optimal policy in the environments contained within wt_vi_traj_candidates
         traj_opts = []
@@ -315,6 +323,7 @@ def obtain_test_environments(wt_vi_traj_candidates, weights, n_desired_test_env,
                         BEC_length = BEC.calculate_BEC_length(constraints, weights, step_cost_flag)
                         BEC_lengths.append(BEC_length)
                         env_idxs.append(j)
+                        env_complexities.append(mdp.measure_env_complexity())
                         BEC_constraints.append(constraints)
                         traj_opts.append(traj_opt)
 
@@ -322,29 +331,39 @@ def obtain_test_environments(wt_vi_traj_candidates, weights, n_desired_test_env,
 
         # sorted from smallest to largest BEC lengths (i.e. most to least challenging)
         tie_breaker = [i for i in range(len(BEC_lengths))]
-        sorted_zipped = sorted(zip(BEC_lengths, tie_breaker, env_idxs, BEC_constraints, traj_opts))
-        BEC_lengths_sorted, _, env_idxs_sorted, BEC_constraints_sorted, traj_opts_sorted = list(zip(*sorted_zipped))
+        sorted_zipped = sorted(zip(BEC_lengths, env_complexities, tie_breaker, env_idxs, BEC_constraints, traj_opts))
+        BEC_lengths_sorted, env_complexities_sorted, _, env_idxs_sorted, BEC_constraints_sorted, traj_opts_sorted = list(zip(*sorted_zipped))
+        env_idxs_sorted = np.array(env_idxs_sorted)
+
+        # again sorted in order from smallest to largest, only selecting unique BEC lengths (as demos with the same
+        # BEC lengths are often quite similar)
+        BEC_lengths_unique, unique_idxs = np.unique(BEC_lengths_sorted, return_index=True)
 
         # must update the wt_vi_traj_candidate with the right initial state and trajectory
         if difficulty == 'hard':
             test_wt_vi_traj_tuples = [copy.deepcopy(wt_vi_traj_candidates[k]) for k in
-                                      env_idxs_sorted[:n_desired_test_env]]
+                                      env_idxs_sorted[unique_idxs[:n_desired_test_env]]]
 
-            for k, traj_opt_sorted in enumerate(traj_opts_sorted[:n_desired_test_env]):
-                test_wt_vi_traj_tuples[k][0][1].mdp.set_init_state(traj_opt_sorted[0][0])
-                test_wt_vi_traj_tuples[k][0][2] = traj_opt_sorted
+            test_traj_opts = [traj_opts_sorted[k] for k in unique_idxs[:n_desired_test_env]]
 
-            test_BEC_lengths = list(BEC_lengths_sorted[:n_desired_test_env])
-            test_BEC_constraints = list(BEC_constraints_sorted[:n_desired_test_env])
+            for k, test_traj_opt in enumerate(test_traj_opts):
+                test_wt_vi_traj_tuples[k][0][1].mdp.set_init_state(test_traj_opt[0][0])
+                test_wt_vi_traj_tuples[k][0][2] = test_traj_opt
+
+            test_BEC_lengths = [BEC_lengths_sorted[k] for k in unique_idxs[:n_desired_test_env]]
+            test_BEC_constraints = [BEC_constraints_sorted[k] for k in unique_idxs[:n_desired_test_env]]
         else:
             test_wt_vi_traj_tuples = [copy.deepcopy(wt_vi_traj_candidates[k]) for k in
-                                      env_idxs_sorted[-n_desired_test_env:]]
+                                      env_idxs_sorted[unique_idxs[-n_desired_test_env:]]]
 
-            for k, traj_opt_sorted in enumerate(traj_opts_sorted[-n_desired_test_env:]):
-                test_wt_vi_traj_tuples[k][0][1].mdp.set_init_state(traj_opt_sorted[0][0])
-                test_wt_vi_traj_tuples[k][0][2] = traj_opt_sorted
+            test_traj_opts = [traj_opts_sorted[k] for k in unique_idxs[-n_desired_test_env:]]
 
-            test_BEC_lengths = list(BEC_lengths_sorted[-n_desired_test_env:])
-            test_BEC_constraints = list(BEC_constraints_sorted[-n_desired_test_env:])
+            for k, test_traj_opt in enumerate(test_traj_opts):
+                test_wt_vi_traj_tuples[k][0][1].mdp.set_init_state(test_traj_opt[0][0])
+                test_wt_vi_traj_tuples[k][0][2] = test_traj_opt
+
+            test_BEC_lengths = [BEC_lengths_sorted[k] for k in unique_idxs[-n_desired_test_env:]]
+            test_BEC_constraints = [BEC_constraints_sorted[k] for k in unique_idxs[-n_desired_test_env:]]
+
 
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints

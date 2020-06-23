@@ -408,6 +408,10 @@ class AugmentedTaxiOOMDP(OOMDP):
 
         return next_state
 
+    def measure_env_complexity(self):
+        # currently only measuring the number of tolls in the environment
+        return len(self.tolls)
+
 def _error_check(state, action):
     '''
     Args:
