@@ -8,13 +8,14 @@ from simple_rl.utils import mdp_helpers
 
 # For research integration with UMass Lowell
 
-if __name__ == "__main__":
+
+def get_trajectories():
     # obtain BEC summary
     print("Visualizing demonstrations comprising BEC summary")
     constraints, BEC_summary = augmented_taxi.obtain_BEC_summary(params.data_loc['BEC'], params.aug_taxi, params.n_env,
                                                   params.weights['val'], params.step_cost_flag,
                                                   params.BEC['summary_type'], BEC_depth=params.BEC['depth'],
-                                                  visualize_constraints=True, visualize_summary=True)
+                                                  visualize_constraints=False, visualize_summary=False)
 
     # obtain test environment
     print("Visualizing agent's optimal demonstration in test environment")
@@ -31,6 +32,7 @@ if __name__ == "__main__":
     iterations, value_of_init_state = vi_human.run_vi()
     human_trajectory = mdp_helpers.rollout_policy(mdp_human, vi_human)
 
-    print("Visualizing simulated human demonstration in test environment")
-    mdp_human.visualize_trajectory(human_trajectory)
+    # print("Visualizing simulated human demonstration in test environment")
+    # mdp_human.visualize_trajectory(human_trajectory)
 
+    return agent_trajectory, human_trajectory

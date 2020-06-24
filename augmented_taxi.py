@@ -146,7 +146,7 @@ if __name__ == "__main__":
     constraints, BEC_summary = obtain_BEC_summary(params.data_loc['BEC'], params.aug_taxi, params.n_env,
                                                   params.weights['val'], params.step_cost_flag,
                                                   params.BEC['summary_type'], BEC_depth=params.BEC['depth'],
-                                                  visualize_constraints=True, visualize_summary=True)
+                                                  visualize_constraints=False, visualize_summary=True)
     BEC_length = BEC.calculate_BEC_length(constraints, params.weights['val'], params.step_cost_flag)
 
     # d) obtain test environments
