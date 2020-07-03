@@ -79,10 +79,10 @@ def obtain_BEC_summary(data_loc, aug_taxi, n_env, weights, step_cost_flag, summa
                 opt_trajs = []
                 for wt_vi_traj_candidate in wt_vi_traj_candidates:
                     opt_trajs.append(wt_vi_traj_candidate[0][2])
-                constraints = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_depth=BEC_depth, trajectories=opt_trajs)
+                constraints = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_depth=BEC_depth, trajectories=opt_trajs, print_flag=True)
             else:
                 # b) use full policy to extract constraints
-                constraints = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag)
+                constraints = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, print_flag=True)
             with open('models/' + data_loc + '/BEC_constraints.pickle', 'wb') as f:
                 pickle.dump(constraints, f)
 

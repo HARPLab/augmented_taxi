@@ -207,7 +207,7 @@ def visualize_constraints(constraints, weights, step_cost_flag):
     plt.ylabel(r'$\theta_1$')
     plt.show()
 
-def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_depth=1, trajectories=None):
+def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_depth=1, trajectories=None, print_flag=False):
     '''
     :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
     :param weights (numpy array): Ground truth reward weights used by agent to derive its optimal policy
@@ -223,7 +223,8 @@ def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_dept
     counter = 0
 
     for wt_vi_traj_candidate in wt_vi_traj_candidates:
-        # print("Extracting constraints from environment {}".format(counter))
+        if print_flag:
+            print("Extracting constraints from environment {}".format(counter))
         mdp = wt_vi_traj_candidate[0][1].mdp
 
         if trajectories is not None:
@@ -276,35 +277,26 @@ def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_dept
 
     return min_subset_constraints
 
-def count_new_covers(new_constraints, BEC_constraints, covered_BEC_constraints):
+def record_covers(constraints, BEC_constraints, BEC_constraint_bookkeeping):
     '''
-    :param new_constraints: New constraints imposed by the recent demo and/or policy (list of constraints)
-    :param BEC_constraints: Minimum set of constraints defining the BEC of a set of demos / policy (list of constraints)
-    :param covered_BEC_constraints: Bookmarking of BEC_constraints that are already accounted for (boolean list)
-    :return: count: number of new BEC constraints that can be accounted for
+    :param constraints (list): New constraints imposed by the recent demo
+    :param BEC_constraints (list): Minimum set of constraints defining the BEC of a set of demos / policy
+    :param BEC_constraint_bookkeeping (list): Keeps track of which demo conveys which of the BEC constraints
+
+    Summary: Keep track of which demo conveys which of the BEC constraints
     '''
-    count = 0
+    covers = []
+    for BEC_constraint_idx in range(len(BEC_constraints)):
+        contains_BEC_constraint = False
+        for constraint in constraints:
+            if equal_constraints(constraint, BEC_constraints[BEC_constraint_idx]):
+                contains_BEC_constraint = True
+        if contains_BEC_constraint:
+            covers.append(1)
+        else:
+            covers.append(0)
 
-    for new_constraint in new_constraints:
-        for BEC_constraint_idx in range(len(BEC_constraints)):
-            if equal_constraints(new_constraint, BEC_constraints[BEC_constraint_idx]) and not covered_BEC_constraints[BEC_constraint_idx]:
-                count += 1
-
-    return count
-
-def update_covered_constraints(constraints_added, BEC_constraints, covered_BEC_constraints):
-    '''
-    :param constraints_added: New constraints imposed by the recent demo and/or policy (list of constraints)
-    :param BEC_constraints: Minimum set of constraints defining the BEC of a set of demos / policy (list of constraints)
-    :param covered_BEC_constraints: Bookmarking of BEC_constraints that are already accounted for (boolean list)
-
-    Summary: Update the bookmarking with the newly added constraints
-    '''
-    for constraint_added in constraints_added:
-        for BEC_constraint_idx in range(len(BEC_constraints)):
-            if equal_constraints(constraint_added, BEC_constraints[BEC_constraint_idx]) and not covered_BEC_constraints[BEC_constraint_idx]:
-                covered_BEC_constraints[BEC_constraint_idx] = True
-
+    BEC_constraint_bookkeeping.append(covers)
 
 def obtain_summary(wt_vi_traj_candidates, BEC_constraints, weights, step_cost_flag, summary_type, BEC_depth):
     '''
@@ -319,61 +311,69 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints, weights, step_cost_fl
     An implementation of 'Machine Teaching for Inverse Reinforcement Learning: Algorithms and Applications' (Brown et al. AAAI 2019).
     '''
     n_BEC_constraints = len(BEC_constraints)
-    covered_BEC_constraints = np.zeros(n_BEC_constraints, dtype=bool)
     summary = []
 
     total_covered = 0
-    while total_covered < n_BEC_constraints:
-        max_count = float("-inf")
-        min_complexity = float("inf")
-        for env_idx in range(len(wt_vi_traj_candidates)):
-            print("Extracting constraints from environment {}".format(env_idx))
+    BEC_constraint_bookkeeping = []
 
-            if summary_type == 'demo':
-                # a) only consider the optimal trajectories from the start states
-                new_constraints = extract_constraints([wt_vi_traj_candidates[env_idx]], weights, step_cost_flag, BEC_depth=BEC_depth, trajectories=[wt_vi_traj_candidates[env_idx][0][2]])
-                count = count_new_covers(new_constraints, BEC_constraints, covered_BEC_constraints)
-                if count > max_count:
-                    max_count = count
-                    constraints_added = new_constraints
-                    min_complexity = wt_vi_traj_candidates[env_idx][0][1].mdp.measure_env_complexity()
-                    best_traj = wt_vi_traj_candidates[env_idx][0][2]
-                    best_mdp = wt_vi_traj_candidates[env_idx][0][1].mdp
-                    print('New max count: {}'.format(max_count))
-                # swap out the old demo for a simpler demo for the same constraints
-                elif count == max_count and wt_vi_traj_candidates[env_idx][0][1].mdp.measure_env_complexity() < min_complexity:
-                    constraints_added = new_constraints
-                    min_complexity = wt_vi_traj_candidates[env_idx][0][1].mdp.measure_env_complexity()
-                    best_traj = wt_vi_traj_candidates[env_idx][0][2]
-                    best_mdp = wt_vi_traj_candidates[env_idx][0][1].mdp
-                    print('Swapped out constraints')
-            else:
-                # b) consider all possible trajectories by the optimal policy
-                mdp = wt_vi_traj_candidates[env_idx][0][1].mdp
-                agent = FixedPolicyAgent(wt_vi_traj_candidates[env_idx][0][1].policy)
-                for state in mdp.states:
-                    traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state)
-                    new_constraints = extract_constraints([wt_vi_traj_candidates[env_idx]], weights, step_cost_flag, trajectories=[traj_opt])
-                    count = count_new_covers(new_constraints, BEC_constraints, covered_BEC_constraints)
+    env_bookkeeping = []
+    constraints_record = []
+    traj_record = []
 
-                    if count > max_count:
-                        max_count = count
-                        constraints_added = new_constraints
-                        min_complexity = mdp.measure_env_complexity()
-                        best_traj = traj_opt
-                        best_mdp = mdp
-                        print('New max count: {}'.format(max_count))
-                    # swap out the old demo for a simpler demo for the same constraints
-                    elif count == max_count and mdp.measure_env_complexity() < min_complexity:
-                        constraints_added = new_constraints
-                        min_complexity = mdp.measure_env_complexity()
-                        best_traj = traj_opt
-                        best_mdp = mdp
-                        print('Swapped out constraints')
+    for env_idx in range(len(wt_vi_traj_candidates)):
+        print("Extracting constraints from environment {}".format(env_idx))
+
+        # accumulate all possible constraints that could be conveyed through various demonstrations
+        if summary_type == 'demo':
+            # a) only consider the optimal trajectories from the start states
+            constraints = extract_constraints([wt_vi_traj_candidates[env_idx]], weights, step_cost_flag, BEC_depth=BEC_depth, trajectories=[wt_vi_traj_candidates[env_idx][0][2]])
+            constraints_record.append(constraints)
+            record_covers(constraints, BEC_constraints, BEC_constraint_bookkeeping)
+            env_bookkeeping.append(env_idx)
+        else:
+            # b) consider all possible trajectories by the optimal policy
+            mdp = wt_vi_traj_candidates[env_idx][0][1].mdp
+            agent = FixedPolicyAgent(wt_vi_traj_candidates[env_idx][0][1].policy)
+            for state in mdp.states:
+                traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state)
+                constraints = extract_constraints([wt_vi_traj_candidates[env_idx]], weights, step_cost_flag, trajectories=[traj_opt])
+                constraints_record.append(constraints)
+                record_covers(constraints, BEC_constraints, BEC_constraint_bookkeeping)
+                env_bookkeeping.append(env_idx)
+                traj_record.append(traj_opt)
+
+    BEC_constraint_bookkeeping = np.array(BEC_constraint_bookkeeping)
+    # where there remain BEC constraints to cover, select the least complex demonstration that covers the most number of BEC constraints
+    while BEC_constraint_bookkeeping.shape[1] > 0:
+        total_counts = np.sum(BEC_constraint_bookkeeping, axis=1)
+        max_idxs = np.argwhere(total_counts == np.max(total_counts)).flatten().tolist()
+
+        # find the least complex environment
+        complexities = np.zeros(len(max_idxs))
+        for max_idx in range(len(max_idxs)):
+            complexities[max_idx] = wt_vi_traj_candidates[env_bookkeeping[max_idxs[max_idx]]][0][1].mdp.measure_env_complexity()
+        best_idx = max_idxs[np.argmin(complexities)]
+        best_env_idx = env_bookkeeping[max_idxs[np.argmin(complexities)]]
+
+        if summary_type == 'demo':
+            best_traj = wt_vi_traj_candidates[best_env_idx][0][2]
+        else:
+            best_traj = traj_record[best_idx]
+            del traj_record[best_idx]
+        best_mdp = wt_vi_traj_candidates[best_env_idx][0][1].mdp
+        constraints_added = constraints_record[best_idx]
 
         summary.append([best_mdp, best_traj, constraints_added])
-        update_covered_constraints(constraints_added, BEC_constraints, covered_BEC_constraints)
-        total_covered += max_count
+
+        # remove the columns associated with the BEC constraints accounted for, the row associated with the demo
+        # that's been selected to go into the BEC summary
+        BEC_constraint_bookkeeping = np.delete(BEC_constraint_bookkeeping, np.argwhere(BEC_constraint_bookkeeping[best_idx, :] == 1).flatten(), axis=1)
+        BEC_constraint_bookkeeping = np.delete(BEC_constraint_bookkeeping, best_idx, axis=0)
+        # delete the corresponding constraints and environmental index as well
+        del constraints_record[best_idx]
+        env_bookkeeping = np.delete(env_bookkeeping, best_idx, axis=0)
+
+        total_covered += np.max(total_counts)
         print("{}/{} BEC constraints covered".format(total_covered, n_BEC_constraints))
 
     return summary
