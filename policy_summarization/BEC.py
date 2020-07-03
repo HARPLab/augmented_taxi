@@ -207,64 +207,10 @@ def visualize_constraints(constraints, weights, step_cost_flag):
     plt.ylabel(r'$\theta_1$')
     plt.show()
 
-def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_depth=1, trajectories=None, print_flag=False):
+def clean_up_constraints(constraints, weights, step_cost_flag):
     '''
-    :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
-    :param weights (numpy array): Ground truth reward weights used by agent to derive its optimal policy
-    :param step_cost_flag (bool): Indicates that the last weight element is a known step cost
-    :param BEC_depth (int): number of suboptimal actions to take before following the optimal policy to obtain the
-                            suboptimal trajectory (and the corresponding suboptimal expected feature counts)
-    :return: min_subset_constraints: List of constraints
-
-    Summary: Obtain the constraints that comprise the BEC region of a set of demonstrations
+    Summary: Normalize constraints, remove duplicates, and remove redundant constraints
     '''
-    # go through each environment and corresponding optimal trajectory, and extract the behavior equivalence class (BEC) constraints
-    constraints = []
-    counter = 0
-
-    for wt_vi_traj_candidate in wt_vi_traj_candidates:
-        if print_flag:
-            print("Extracting constraints from environment {}".format(counter))
-        mdp = wt_vi_traj_candidate[0][1].mdp
-
-        if trajectories is not None:
-            # a) demonstration-driven BEC
-            # BEC constraints are obtained by ensuring that the optimal actions accumulate at least as much reward as
-            # all other possible actions along a trajectory
-            action_seq_list = list(itertools.product(mdp.actions, repeat=BEC_depth))
-
-            traj = trajectories[counter]
-            for sas_idx in range(len(traj)):
-                # reward features of optimal action
-                mu_sa = mdp.accumulate_reward_features(traj[sas_idx:], discount=True)
-
-                sas = traj[sas_idx]
-                cur_state = sas[0]
-
-                # currently assumes that all actions are executable from all states
-                for action_seq in action_seq_list:
-                    traj_hyp = mdp_helpers.rollout_policy(mdp, FixedPolicyAgent(wt_vi_traj_candidate[0][1].policy), cur_state, action_seq)
-                    mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
-
-                    constraints.append(mu_sa - mu_sb)
-        else:
-            # b) policy-driven BEC
-            agent = FixedPolicyAgent(wt_vi_traj_candidate[0][1].policy)
-
-            for state in mdp.states:
-                action_opt = agent.act(state, 0)
-                traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state, action_seq=[action_opt])
-                mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
-
-                # currently assumes that all actions are executable from all states
-                for action in mdp.actions:
-                    if action_opt != action:
-                        traj_hyp = mdp_helpers.rollout_policy(mdp, agent, cur_state=state, action_seq=[action])
-                        mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
-
-                        constraints.append(mu_sa - mu_sb)
-        counter += 1
-
     normalized_constraints = normalize_constraints(constraints)
     if len(normalized_constraints) > 0:
         nonduplicate_constraints = remove_duplicate_constraints(normalized_constraints)
@@ -277,28 +223,88 @@ def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_dept
 
     return min_subset_constraints
 
-def record_covers(constraints, BEC_constraints, BEC_constraint_bookkeeping):
+def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_depth=1, trajectories=None, print_flag=False):
     '''
-    :param constraints (list): New constraints imposed by the recent demo
-    :param BEC_constraints (list): Minimum set of constraints defining the BEC of a set of demos / policy
-    :param BEC_constraint_bookkeeping (list): Keeps track of which demo conveys which of the BEC constraints
+    :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
+    :param weights (numpy array): Ground truth reward weights used by agent to derive its optimal policy
+    :param step_cost_flag (bool): Indicates that the last weight element is a known step cost
+    :param BEC_depth (int): number of suboptimal actions to take before following the optimal policy to obtain the
+                            suboptimal trajectory (and the corresponding suboptimal expected feature counts)
+    :return: min_subset_constraints: List of constraints
 
-    Summary: Keep track of which demo conveys which of the BEC constraints
+    Summary: Obtain the constraints that comprise the BEC region of a set of demonstrations
     '''
-    covers = []
-    for BEC_constraint_idx in range(len(BEC_constraints)):
-        contains_BEC_constraint = False
-        for constraint in constraints:
-            if equal_constraints(constraint, BEC_constraints[BEC_constraint_idx]):
-                contains_BEC_constraint = True
-        if contains_BEC_constraint:
-            covers.append(1)
+    min_subset_constraints_record = []
+    env_record = []
+    constraints_record = []
+    traj_record = []
+
+    # go through each environment and corresponding optimal trajectory, and extract the behavior equivalence class (BEC) constraints
+    for env_idx, wt_vi_traj_candidate in enumerate(wt_vi_traj_candidates):
+        if print_flag:
+            print("Extracting constraints from environment {}".format(env_idx))
+        mdp = wt_vi_traj_candidate[0][1].mdp
+
+        if trajectories is not None:
+            constraints = []
+            # a) demonstration-driven BEC
+            # BEC constraints are obtained by ensuring that the optimal actions accumulate at least as much reward as
+            # all other possible actions along a trajectory
+            action_seq_list = list(itertools.product(mdp.actions, repeat=BEC_depth))
+
+            traj_opt = trajectories[env_idx]
+            for sas_idx in range(len(traj_opt)):
+                # reward features of optimal action
+                mu_sa = mdp.accumulate_reward_features(traj_opt[sas_idx:], discount=True)
+
+                sas = traj_opt[sas_idx]
+                cur_state = sas[0]
+
+                # currently assumes that all actions are executable from all states
+                for action_seq in action_seq_list:
+                    traj_hyp = mdp_helpers.rollout_policy(mdp, FixedPolicyAgent(wt_vi_traj_candidate[0][1].policy), cur_state, action_seq)
+                    mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
+
+                    constraints.append(mu_sa - mu_sb)
+                    constraints_record.append(mu_sa - mu_sb)
+
+            # store the BEC constraints for each environment, along with the associated demo and environment number
+            min_subset_constraints = clean_up_constraints(constraints, weights, step_cost_flag)
+            min_subset_constraints_record.append(min_subset_constraints)
+            traj_record.append(traj_opt)
+            env_record.append(env_idx)
         else:
-            covers.append(0)
+            # b) policy-driven BEC
+            agent = FixedPolicyAgent(wt_vi_traj_candidate[0][1].policy)
 
-    BEC_constraint_bookkeeping.append(covers)
+            for state in mdp.states:
+                constraints = []
 
-def obtain_summary(wt_vi_traj_candidates, BEC_constraints, weights, step_cost_flag, summary_type, BEC_depth):
+                action_opt = agent.act(state, 0)
+                traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state, action_seq=[action_opt])
+                mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
+
+                # currently assumes that all actions are executable from all states
+                for action in mdp.actions:
+                    if action_opt != action:
+                        traj_hyp = mdp_helpers.rollout_policy(mdp, agent, cur_state=state, action_seq=[action])
+                        mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
+
+                        constraints.append(mu_sa - mu_sb)
+                        constraints_record.append(mu_sa - mu_sb)
+
+                min_subset_constraints = clean_up_constraints(constraints, weights, step_cost_flag)
+                # store the BEC constraints for each environment, along with the associated demo and environment number
+                min_subset_constraints_record.append(min_subset_constraints)
+                traj_record.append(traj_opt)
+                env_record.append(env_idx)
+
+    # BEC constraints after considering all environments and demos
+    BEC_constraints = clean_up_constraints(constraints_record, weights, step_cost_flag)
+
+    return BEC_constraints, min_subset_constraints_record, env_record, traj_record
+
+def obtain_summary(wt_vi_traj_candidates, BEC_constraints, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, summary_type, BEC_depth):
     '''
     :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
     :param BEC_constraints: Minimum set of constraints defining the BEC of a set of demos / policy (list of constraints)
@@ -316,31 +322,20 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints, weights, step_cost_fl
     total_covered = 0
     BEC_constraint_bookkeeping = []
 
-    env_bookkeeping = []
-    constraints_record = []
-    traj_record = []
+    # keep track of which demo conveys which of the BEC constraints
+    for constraints in min_subset_constraints_record:
+        covers = []
+        for BEC_constraint_idx in range(len(BEC_constraints)):
+            contains_BEC_constraint = False
+            for constraint in constraints:
+                if equal_constraints(constraint, BEC_constraints[BEC_constraint_idx]):
+                    contains_BEC_constraint = True
+            if contains_BEC_constraint:
+                covers.append(1)
+            else:
+                covers.append(0)
 
-    for env_idx in range(len(wt_vi_traj_candidates)):
-        print("Extracting constraints from environment {}".format(env_idx))
-
-        # accumulate all possible constraints that could be conveyed through various demonstrations
-        if summary_type == 'demo':
-            # a) only consider the optimal trajectories from the start states
-            constraints = extract_constraints([wt_vi_traj_candidates[env_idx]], weights, step_cost_flag, BEC_depth=BEC_depth, trajectories=[wt_vi_traj_candidates[env_idx][0][2]])
-            constraints_record.append(constraints)
-            record_covers(constraints, BEC_constraints, BEC_constraint_bookkeeping)
-            env_bookkeeping.append(env_idx)
-        else:
-            # b) consider all possible trajectories by the optimal policy
-            mdp = wt_vi_traj_candidates[env_idx][0][1].mdp
-            agent = FixedPolicyAgent(wt_vi_traj_candidates[env_idx][0][1].policy)
-            for state in mdp.states:
-                traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state)
-                constraints = extract_constraints([wt_vi_traj_candidates[env_idx]], weights, step_cost_flag, trajectories=[traj_opt])
-                constraints_record.append(constraints)
-                record_covers(constraints, BEC_constraints, BEC_constraint_bookkeeping)
-                env_bookkeeping.append(env_idx)
-                traj_record.append(traj_opt)
+        BEC_constraint_bookkeeping.append(covers)
 
     BEC_constraint_bookkeeping = np.array(BEC_constraint_bookkeeping)
     # where there remain BEC constraints to cover, select the least complex demonstration that covers the most number of BEC constraints
@@ -351,18 +346,15 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints, weights, step_cost_fl
         # find the least complex environment
         complexities = np.zeros(len(max_idxs))
         for max_idx in range(len(max_idxs)):
-            complexities[max_idx] = wt_vi_traj_candidates[env_bookkeeping[max_idxs[max_idx]]][0][1].mdp.measure_env_complexity()
+            complexities[max_idx] = wt_vi_traj_candidates[env_record[max_idxs[max_idx]]][0][1].mdp.measure_env_complexity()
         best_idx = max_idxs[np.argmin(complexities)]
-        best_env_idx = env_bookkeeping[max_idxs[np.argmin(complexities)]]
+        best_env_idx = env_record[max_idxs[np.argmin(complexities)]]
 
-        if summary_type == 'demo':
-            best_traj = wt_vi_traj_candidates[best_env_idx][0][2]
-        else:
-            best_traj = traj_record[best_idx]
-            del traj_record[best_idx]
+        # record information associated with the best selected summary demo
+        best_traj = traj_record[best_idx]
+        del traj_record[best_idx]
         best_mdp = wt_vi_traj_candidates[best_env_idx][0][1].mdp
-        constraints_added = constraints_record[best_idx]
-
+        constraints_added = min_subset_constraints_record[best_idx]
         summary.append([best_mdp, best_traj, constraints_added])
 
         # remove the columns associated with the BEC constraints accounted for, the row associated with the demo
@@ -370,8 +362,8 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints, weights, step_cost_fl
         BEC_constraint_bookkeeping = np.delete(BEC_constraint_bookkeeping, np.argwhere(BEC_constraint_bookkeeping[best_idx, :] == 1).flatten(), axis=1)
         BEC_constraint_bookkeeping = np.delete(BEC_constraint_bookkeeping, best_idx, axis=0)
         # delete the corresponding constraints and environmental index as well
-        del constraints_record[best_idx]
-        env_bookkeeping = np.delete(env_bookkeeping, best_idx, axis=0)
+        del min_subset_constraints_record[best_idx]
+        env_record = np.delete(env_record, best_idx, axis=0)
 
         total_covered += np.max(total_counts)
         print("{}/{} BEC constraints covered".format(total_covered, n_BEC_constraints))
