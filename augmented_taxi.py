@@ -112,8 +112,24 @@ def obtain_test_environments(data_loc, aug_taxi, weights, n_env, BEC_params, ste
     except:
         wt_vi_traj_candidates = ps_helpers.obtain_env_policies(data_loc, n_env, np.expand_dims(weights, axis=0), aug_taxi, 'ground_truth')
 
+        try:
+            with open('models/' + data_loc + '/BEC_constraints.pickle', 'rb') as f:
+                BEC_constraints, min_subset_constraints_record, env_record, traj_record = pickle.load(f)
+        except:
+            if params.BEC['summary_type'] == 'demo':
+                # a) use optimal trajectories from starting states to extract constraints
+                opt_trajs = []
+                for wt_vi_traj_candidate in wt_vi_traj_candidates:
+                    opt_trajs.append(wt_vi_traj_candidate[0][2])
+                BEC_constraints, min_subset_constraints_record, env_record, traj_record = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_depth=BEC_params['depth'], trajectories=opt_trajs, print_flag=True)
+            else:
+                # b) use full policy to extract constraints
+                BEC_constraints, min_subset_constraints_record, env_record, traj_record = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, print_flag=True)
+            with open('models/' + data_loc + '/BEC_constraints.pickle', 'wb') as f:
+                pickle.dump((BEC_constraints, min_subset_constraints_record, env_record, traj_record), f)
+
         test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = \
-            ps_helpers.obtain_test_environments(wt_vi_traj_candidates, weights, BEC_params['n_desired_test_env'], BEC_params['test_difficulty'], step_cost_flag, BEC_params['depth'], summary, BEC_params['summary_type'])
+            ps_helpers.obtain_test_environments(wt_vi_traj_candidates, min_subset_constraints_record, env_record, traj_record, weights, BEC_params['n_desired_test_env'], BEC_params['test_difficulty'], step_cost_flag, summary, BEC_params['summary_type'])
 
         with open('models/' + data_loc + '/test_environments.pickle', 'wb') as f:
             pickle.dump((test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints), f)

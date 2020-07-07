@@ -238,6 +238,7 @@ def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_dept
     env_record = []
     constraints_record = []
     traj_record = []
+    processed_envs = []
 
     # go through each environment and corresponding optimal trajectory, and extract the behavior equivalence class (BEC) constraints
     for env_idx, wt_vi_traj_candidate in enumerate(wt_vi_traj_candidates):
@@ -275,29 +276,40 @@ def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_dept
             env_record.append(env_idx)
         else:
             # b) policy-driven BEC
-            agent = FixedPolicyAgent(wt_vi_traj_candidate[0][1].policy)
+            # wt_vi_traj_candidates can contain MDPs with the same environment but different initial states (to
+            # accommodate demo BEC). by considering all reachable states of two identical MDPs with different initial
+            # states, you will obtain duplicate test environments so only go through each MDP once for policy BEC.
+            if mdp.env_code not in processed_envs:
+                agent = FixedPolicyAgent(wt_vi_traj_candidate[0][1].policy)
 
-            for state in mdp.states:
-                constraints = []
+                for state in mdp.states:
+                    constraints = []
 
-                action_opt = agent.act(state, 0)
-                traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state, action_seq=[action_opt])
-                mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
+                    traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state)
 
-                # currently assumes that all actions are executable from all states
-                for action in mdp.actions:
-                    if action_opt != action:
-                        traj_hyp = mdp_helpers.rollout_policy(mdp, agent, cur_state=state, action_seq=[action])
-                        mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
+                    for sas_idx in range(len(traj_opt)):
+                        mu_sa = mdp.accumulate_reward_features(traj_opt[sas_idx:], discount=True)
 
-                        constraints.append(mu_sa - mu_sb)
-                        constraints_record.append(mu_sa - mu_sb)
+                        sas = traj_opt[sas_idx]
+                        cur_state = sas[0]
 
-                min_subset_constraints = clean_up_constraints(constraints, weights, step_cost_flag)
-                # store the BEC constraints for each environment, along with the associated demo and environment number
-                min_subset_constraints_record.append(min_subset_constraints)
-                traj_record.append(traj_opt)
-                env_record.append(env_idx)
+                        # currently assumes that all actions are executable from all states. only considering
+                        # action depth of 1 currently
+                        for action in mdp.actions:
+                            if action != sas[1]:
+                                traj_hyp = mdp_helpers.rollout_policy(mdp, agent, cur_state=cur_state, action_seq=[action])
+                                mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
+
+                                constraints.append(mu_sa - mu_sb)
+                                constraints_record.append(mu_sa - mu_sb)
+
+                        min_subset_constraints = clean_up_constraints(constraints, weights, step_cost_flag)
+                        # store the BEC constraints for each environment, along with the associated demo and environment number
+                        min_subset_constraints_record.append(min_subset_constraints)
+                        traj_record.append(traj_opt)
+                        env_record.append(env_idx)
+
+                processed_envs.append(mdp.env_code)
 
     # BEC constraints after considering all environments and demos
     BEC_constraints = clean_up_constraints(constraints_record, weights, step_cost_flag)
