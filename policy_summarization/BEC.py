@@ -54,6 +54,7 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
     # these lists are effectively one level deep so a shallow copy should suffice. copy over the original constraints
     # and remove redundant constraints one by one
     nonredundant_constraints = constraints.copy()
+    redundundant_constraints = []
 
     for query_constraint in constraints:
         # create a set of constraints the excludes the current constraint in question (query_constraint)
@@ -81,12 +82,13 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
                     if not equal_constraints(query_constraint, nonredundant_constraint):
                         copy_array.append(nonredundant_constraint)
                 nonredundant_constraints = copy_array
+                redundundant_constraints.append(query_constraint)
         else:
             break
 
-    return nonredundant_constraints
+    return nonredundant_constraints, redundundant_constraints
 
-def calculate_BEC_length(constraints, weights, step_cost_flag):
+def calculate_BEC_length(constraints_collection, weights, step_cost_flag):
     '''
     :param constraints (list of constraints, corresponding to the A of the form Ax >= 0): constraints that comprise the
         BEC region
@@ -94,46 +96,50 @@ def calculate_BEC_length(constraints, weights, step_cost_flag):
     :param step_cost_flag (bool): Indicates that the last weight element is a known step cost
     :return: total_intersection_length: total length of the intersection between the BEC region and the L1 constraints
     '''
-    if step_cost_flag:
-        # convert the half space representation of a convex polygon (Ax < b) into the corresponding polytope vertices
-        n_boundary_constraints = 4
-        A = np.zeros((len(constraints) + n_boundary_constraints, len(constraints[0][0]) - 1))
-        b = np.zeros(len(constraints) + n_boundary_constraints)
+    total_intersection_lengths = []
+    for constraints in constraints_collection:
+        if step_cost_flag:
+            # convert the half space representation of a convex polygon (Ax < b) into the corresponding polytope vertices
+            n_boundary_constraints = 4
+            A = np.zeros((len(constraints) + n_boundary_constraints, len(constraints[0][0]) - 1))
+            b = np.zeros(len(constraints) + n_boundary_constraints)
 
-        for j in range(len(constraints)):
-            A[j, :] = np.array([-constraints[j][0][0], -constraints[j][0][1]])
-            b[j] = constraints[j][0][2] * weights[0, -1]
+            for j in range(len(constraints)):
+                A[j, :] = np.array([-constraints[j][0][0], -constraints[j][0][1]])
+                b[j] = constraints[j][0][2] * weights[0, -1]
 
-        # add the L1 constraints
-        A[len(constraints), :] = np.array([1, 0])
-        b[len(constraints)] = 1
-        A[len(constraints) + 1, :] = np.array([-1, 0])
-        b[len(constraints) + 1] = 1
-        A[len(constraints) + 2, :] = np.array([0, 1])
-        b[len(constraints) + 2] = 1
-        A[len(constraints) + 3, :] = np.array([0, -1])
-        b[len(constraints) + 3] = 1
+            # add the L1 constraints
+            A[len(constraints), :] = np.array([1, 0])
+            b[len(constraints)] = 1
+            A[len(constraints) + 1, :] = np.array([-1, 0])
+            b[len(constraints) + 1] = 1
+            A[len(constraints) + 2, :] = np.array([0, 1])
+            b[len(constraints) + 2] = 1
+            A[len(constraints) + 3, :] = np.array([0, -1])
+            b[len(constraints) + 3] = 1
 
-        # compute the vertices of the convex polygon formed by the BEC constraints (BEC polygon), in counterclockwise order
-        vertices = compute_polygon_hull(A, b)
-        # clockwise order
-        vertices.reverse()
+            # compute the vertices of the convex polygon formed by the BEC constraints (BEC polygon), in counterclockwise order
+            vertices = compute_polygon_hull(A, b)
+            # clockwise order
+            vertices.reverse()
 
-        # L1 constraints in 2D
-        L1_constraints = [[[-1 + abs(weights[0, -1]), 0], [0, 1 - abs(weights[0, -1])]], [[0, 1 - abs(weights[0, -1])], [1 - abs(weights[0, -1]), 0]],
-                          [[1 - abs(weights[0, -1]), 0], [0, -1 + abs(weights[0, -1])]], [[0, -1 + abs(weights[0, -1])], [-1 + abs(weights[0, -1]), 0]]]
+            # L1 constraints in 2D
+            L1_constraints = [[[-1 + abs(weights[0, -1]), 0], [0, 1 - abs(weights[0, -1])]], [[0, 1 - abs(weights[0, -1])], [1 - abs(weights[0, -1]), 0]],
+                              [[1 - abs(weights[0, -1]), 0], [0, -1 + abs(weights[0, -1])]], [[0, -1 + abs(weights[0, -1])], [-1 + abs(weights[0, -1]), 0]]]
 
-        # intersect the L1 constraints with the BEC polygon
-        L1_intersections = cg.cyrus_beck_2D(np.array(vertices), L1_constraints)
+            # intersect the L1 constraints with the BEC polygon
+            L1_intersections = cg.cyrus_beck_2D(np.array(vertices), L1_constraints)
 
-        # compute the total length of all intersections
-        intersection_lengths = cg.compute_lengths(L1_intersections)
-        total_intersection_length = np.sum(intersection_lengths)
-    else:
-        raise Exception("Not yet implemented.")
-    return total_intersection_length
+            # compute the total length of all intersections
+            intersection_lengths = cg.compute_lengths(L1_intersections)
+            total_intersection_length = np.sum(intersection_lengths)
+        else:
+            raise Exception("Not yet implemented.")
+        total_intersection_lengths.append(total_intersection_length)
 
-def visualize_constraints(constraints, weights, step_cost_flag):
+    return total_intersection_lengths
+
+def visualize_constraints(constraints_collection, weights, step_cost_flag):
     '''
     Summary: Visualize the constraints
     '''
@@ -142,70 +148,72 @@ def visualize_constraints(constraints, weights, step_cost_flag):
 
     plt.xlim(-1, 1)
     plt.ylim(-1, 1)
-    wt_shading = 1. / len(constraints)
 
-    if step_cost_flag:
-        # if the final weight is the step cost, it is assumed that there are three weights, which must be accounted for
-        # differently to plot the BEC region for the first two weights
-        for constraint in constraints:
-            if constraint[0, 1] == 0.:
-                # completely vertical line going through zero
-                pt = (-weights[0, -1] * constraint[0, 2]) / constraint[0, 0]
-                plt.plot([pt, pt], [-1, 1])
+    for constraints in constraints_collection:
+        wt_shading = 1. / len(constraints)
 
-                # use (1, 0) as a test point to decide which half space to color
-                if 1 >= pt:
-                    # color the right side of the line
-                    plt.axvspan(pt, 1, alpha=wt_shading, color='blue')
+        if step_cost_flag:
+            # if the final weight is the step cost, it is assumed that there are three weights, which must be accounted for
+            # differently to plot the BEC region for the first two weights
+            for constraint in constraints:
+                if constraint[0, 1] == 0.:
+                    # completely vertical line going through zero
+                    pt = (-weights[0, -1] * constraint[0, 2]) / constraint[0, 0]
+                    plt.plot([pt, pt], [-1, 1])
+
+                    # use (1, 0) as a test point to decide which half space to color
+                    if 1 >= pt:
+                        # color the right side of the line
+                        plt.axvspan(pt, 1, alpha=wt_shading, color='blue')
+                    else:
+                        # color the left side of the line
+                        plt.axvspan(-1, pt, alpha=wt_shading, color='blue')
                 else:
-                    # color the left side of the line
-                    plt.axvspan(-1, pt, alpha=wt_shading, color='blue')
-            else:
-                pt_1 = (constraint[0, 0] - (weights[0, -1] * constraint[0, 2])) / constraint[0, 1]
-                pt_2 = (-constraint[0, 0] - (weights[0, -1] * constraint[0, 2])) / constraint[0, 1]
-                plt.plot([-1, 1], [pt_1, pt_2])
+                    pt_1 = (constraint[0, 0] - (weights[0, -1] * constraint[0, 2])) / constraint[0, 1]
+                    pt_2 = (-constraint[0, 0] - (weights[0, -1] * constraint[0, 2])) / constraint[0, 1]
+                    plt.plot([-1, 1], [pt_1, pt_2])
 
-                # use (0, 1) as a test point to decide which half space to color
-                if constraint[0, 1] + (weights[0, -1] * constraint[0, 2]) >= 0:
-                    plt.fill_between([-1, 1], [pt_1, pt_2], [1, 1], alpha=wt_shading, color='blue')
+                    # use (0, 1) as a test point to decide which half space to color
+                    if constraint[0, 1] + (weights[0, -1] * constraint[0, 2]) >= 0:
+                        plt.fill_between([-1, 1], [pt_1, pt_2], [1, 1], alpha=wt_shading, color='blue')
+                    else:
+                        plt.fill_between([-1, 1], [pt_1, pt_2], [-1, -1], alpha=wt_shading, color='blue')
+
+            # visualize the L1 norm == 1 constraints
+            plt.plot([-1 + abs(weights[0, -1]), 0], [0, 1 - abs(weights[0, -1])], color='grey')
+            plt.plot([0, 1 - abs(weights[0, -1])], [1 - abs(weights[0, -1]), 0], color='grey')
+            plt.plot([1 - abs(weights[0, -1]), 0], [0, -1 + abs(weights[0, -1])], color='grey')
+            plt.plot([0, -1 + abs(weights[0, -1])], [-1 + abs(weights[0, -1]), 0], color='grey')
+        else:
+            for constraint in constraints:
+                if constraint[0, 0] == 1.:
+                    # completely vertical line going through zero
+                    plt.plot([constraint[0, 1] / constraint[0, 0], -constraint[0, 1] / constraint[0, 0]], [-1, 1])
+
+                    # use (1, 0) as a test point to decide which half space to color
+                    if constraint[0, 0] >= 0:
+                        # color the right side of the line
+                        plt.axvspan(0, 1, alpha=wt_shading, color='blue')
+                    else:
+                        # color the left side of the line
+                        plt.axvspan(-1, 0, alpha=wt_shading, color='blue')
                 else:
-                    plt.fill_between([-1, 1], [pt_1, pt_2], [-1, -1], alpha=wt_shading, color='blue')
+                    pt_1 = constraint[0, 0] / constraint[0, 1]
+                    pt_2 = -constraint[0, 0] / constraint[0, 1]
+                    plt.plot([-1, 1], [pt_1, pt_2])
 
-        # visualize the L1 norm == 1 constraints
-        plt.plot([-1 + abs(weights[0, -1]), 0], [0, 1 - abs(weights[0, -1])], color='grey')
-        plt.plot([0, 1 - abs(weights[0, -1])], [1 - abs(weights[0, -1]), 0], color='grey')
-        plt.plot([1 - abs(weights[0, -1]), 0], [0, -1 + abs(weights[0, -1])], color='grey')
-        plt.plot([0, -1 + abs(weights[0, -1])], [-1 + abs(weights[0, -1]), 0], color='grey')
-    else:
-        for constraint in constraints:
-            if constraint[0, 0] == 1.:
-                # completely vertical line going through zero
-                plt.plot([constraint[0, 1] / constraint[0, 0], -constraint[0, 1] / constraint[0, 0]], [-1, 1])
+                    # use (0, 1) as a test point to decide which half space to color
+                    if constraint[0, 1] >= 0:
+                        plt.fill_between([-1, 1], [pt_1, pt_2], [1, 1], alpha=wt_shading, color='blue')
+                    else:
+                        plt.fill_between([-1, 1], [pt_1, pt_2], [-1, -1], alpha=wt_shading, color='blue')
 
-                # use (1, 0) as a test point to decide which half space to color
-                if constraint[0, 0] >= 0:
-                    # color the right side of the line
-                    plt.axvspan(0, 1, alpha=wt_shading, color='blue')
-                else:
-                    # color the left side of the line
-                    plt.axvspan(-1, 0, alpha=wt_shading, color='blue')
-            else:
-                pt_1 = constraint[0, 0] / constraint[0, 1]
-                pt_2 = -constraint[0, 0] / constraint[0, 1]
-                plt.plot([-1, 1], [pt_1, pt_2])
-
-                # use (0, 1) as a test point to decide which half space to color
-                if constraint[0, 1] >= 0:
-                    plt.fill_between([-1, 1], [pt_1, pt_2], [1, 1], alpha=wt_shading, color='blue')
-                else:
-                    plt.fill_between([-1, 1], [pt_1, pt_2], [-1, -1], alpha=wt_shading, color='blue')
-
-    wt_marker_size = 200
-    # plot ground truth weight
-    plt.scatter(weights[0, 0], weights[0, 1], s=wt_marker_size, color='red')
-    plt.xlabel(r'$\theta_0$')
-    plt.ylabel(r'$\theta_1$')
-    plt.show()
+        wt_marker_size = 200
+        # plot ground truth weight
+        plt.scatter(weights[0, 0], weights[0, 1], s=wt_marker_size, color='red')
+        plt.xlabel(r'$\theta_0$')
+        plt.ylabel(r'$\theta_1$')
+        plt.show()
 
 def clean_up_constraints(constraints, weights, step_cost_flag):
     '''
@@ -215,7 +223,7 @@ def clean_up_constraints(constraints, weights, step_cost_flag):
     if len(normalized_constraints) > 0:
         nonduplicate_constraints = remove_duplicate_constraints(normalized_constraints)
         if len(nonduplicate_constraints) > 1:
-            min_subset_constraints = remove_redundant_constraints(nonduplicate_constraints, weights, step_cost_flag)
+            min_subset_constraints, _ = remove_redundant_constraints(nonduplicate_constraints, weights, step_cost_flag)
         else:
             min_subset_constraints = nonduplicate_constraints
     else:
@@ -223,7 +231,7 @@ def clean_up_constraints(constraints, weights, step_cost_flag):
 
     return min_subset_constraints
 
-def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_depth=1, trajectories=None, print_flag=False):
+def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, min_BEC_set, BEC_depth=1, trajectories=None, print_flag=False):
     '''
     :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
     :param weights (numpy array): Ground truth reward weights used by agent to derive its optimal policy
@@ -267,11 +275,11 @@ def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_dept
                     mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
 
                     constraints.append(mu_sa - mu_sb)
-                    constraints_record.append(mu_sa - mu_sb)
 
             # store the BEC constraints for each environment, along with the associated demo and environment number
             min_subset_constraints = clean_up_constraints(constraints, weights, step_cost_flag)
             min_subset_constraints_record.append(min_subset_constraints)
+            constraints_record.extend(min_subset_constraints)
             traj_record.append(traj_opt)
             env_record.append(env_idx)
         else:
@@ -301,22 +309,42 @@ def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_dept
                                 mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
 
                                 constraints.append(mu_sa - mu_sb)
-                                constraints_record.append(mu_sa - mu_sb)
 
-                        min_subset_constraints = clean_up_constraints(constraints, weights, step_cost_flag)
-                        # store the BEC constraints for each environment, along with the associated demo and environment number
-                        min_subset_constraints_record.append(min_subset_constraints)
-                        traj_record.append(traj_opt)
-                        env_record.append(env_idx)
+                    min_subset_constraints = clean_up_constraints(constraints, weights, step_cost_flag)
+                    # store the BEC constraints for each environment, along with the associated demo and environment number
+                    min_subset_constraints_record.append(min_subset_constraints)
+                    constraints_record.extend(min_subset_constraints)
+                    traj_record.append(traj_opt)
+                    env_record.append(env_idx)
 
                 processed_envs.append(mdp.env_code)
 
-    # BEC constraints after considering all environments and demos
-    BEC_constraints = clean_up_constraints(constraints_record, weights, step_cost_flag)
+    BEC_constraints_collection = []
 
-    return BEC_constraints, min_subset_constraints_record, env_record, traj_record
+    if min_BEC_set:
+        # only return the set of minimum BEC constraints
+        BEC_constraints = clean_up_constraints(constraints_record, weights, step_cost_flag)
+        BEC_constraints_collection.append(BEC_constraints)
+    else:
+        redundant_constraints = constraints_record
+        redundant_constraints = normalize_constraints(redundant_constraints)
+        if len(redundant_constraints) > 0:
+            redundant_constraints = remove_duplicate_constraints(redundant_constraints)
+            if len(redundant_constraints) > 1:
+                BEC_constraints, redundant_constraints = remove_redundant_constraints(redundant_constraints, weights,
+                                                                         step_cost_flag)
+                BEC_constraints_collection.append(BEC_constraints)
+            else:
+                redundant_constraints = redundant_constraints
 
-def obtain_summary(wt_vi_traj_candidates, BEC_constraints, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, summary_type, BEC_depth):
+        while len(redundant_constraints) > 0:
+            BEC_constraints, redundant_constraints = remove_redundant_constraints(redundant_constraints, weights,
+                                                                                  step_cost_flag)
+            BEC_constraints_collection.append(BEC_constraints)
+
+    return BEC_constraints_collection, min_subset_constraints_record, env_record, traj_record
+
+def obtain_summary(wt_vi_traj_candidates, BEC_constraints_collection, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, summary_type, BEC_depth, single_constraint_flag=False):
     '''
     :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
     :param BEC_constraints: Minimum set of constraints defining the BEC of a set of demos / policy (list of constraints)
@@ -328,69 +356,88 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints, min_subset_constraint
     Summary: Obtain a minimal set of a demonstrations that recovers the behavioral equivalence class (BEC) of a set of demos / policy.
     An implementation of 'Machine Teaching for Inverse Reinforcement Learning: Algorithms and Applications' (Brown et al. AAAI 2019).
     '''
-    n_BEC_constraints = len(BEC_constraints)
-    summary = []
+    summaries = []
+    for set_idx, BEC_constraints in enumerate (BEC_constraints_collection):
+        n_BEC_constraints = len(BEC_constraints)
+        summary = []
 
-    total_covered = 0
-    BEC_constraint_bookkeeping = []
+        total_covered = 0
+        BEC_constraint_bookkeeping = []
 
-    # keep track of which demo conveys which of the BEC constraints
-    for constraints in min_subset_constraints_record:
-        covers = []
-        for BEC_constraint_idx in range(len(BEC_constraints)):
-            contains_BEC_constraint = False
-            for constraint in constraints:
-                if equal_constraints(constraint, BEC_constraints[BEC_constraint_idx]):
-                    contains_BEC_constraint = True
-            if contains_BEC_constraint:
-                covers.append(1)
+        # keep track of which demo conveys which of the BEC constraints
+        for constraints in min_subset_constraints_record:
+            covers = []
+            for BEC_constraint_idx in range(len(BEC_constraints)):
+                contains_BEC_constraint = False
+                for constraint in constraints:
+                    if equal_constraints(constraint, BEC_constraints[BEC_constraint_idx]):
+                        contains_BEC_constraint = True
+                if contains_BEC_constraint:
+                    covers.append(1)
+                else:
+                    covers.append(0)
+
+            BEC_constraint_bookkeeping.append(covers)
+
+        BEC_constraint_bookkeeping = np.array(BEC_constraint_bookkeeping)
+        # where there remain BEC constraints to cover, select the least complex demonstration that covers the most number of BEC constraints
+        while BEC_constraint_bookkeeping.shape[1] > 0:
+            if single_constraint_flag:
+                # a) select the simplest environments that cover the BEC constraints one at a time
+                contender_idxs = np.argwhere(np.sum(BEC_constraint_bookkeeping, axis=1) >= 1).flatten().tolist()
             else:
-                covers.append(0)
+                # b) select environments that mostly efficiently cover the BEC constraints
+                total_counts = np.sum(BEC_constraint_bookkeeping, axis=1)
+                contender_idxs = np.argwhere(total_counts == np.max(total_counts)).flatten().tolist()
 
-        BEC_constraint_bookkeeping.append(covers)
+            # find the least complex environment
+            complexities = np.zeros(len(contender_idxs))
+            for max_idx in range(len(contender_idxs)):
+                complexities[max_idx] = wt_vi_traj_candidates[env_record[contender_idxs[max_idx]]][0][1].mdp.measure_env_complexity()
+            best_idx = contender_idxs[np.argmin(complexities)]
+            best_env_idx = env_record[contender_idxs[np.argmin(complexities)]]
 
-    BEC_constraint_bookkeeping = np.array(BEC_constraint_bookkeeping)
-    # where there remain BEC constraints to cover, select the least complex demonstration that covers the most number of BEC constraints
-    while BEC_constraint_bookkeeping.shape[1] > 0:
-        total_counts = np.sum(BEC_constraint_bookkeeping, axis=1)
-        max_idxs = np.argwhere(total_counts == np.max(total_counts)).flatten().tolist()
+            # record information associated with the best selected summary demo
+            best_traj = traj_record[best_idx]
+            del traj_record[best_idx]
+            best_mdp = wt_vi_traj_candidates[best_env_idx][0][1].mdp
+            constraints_added = min_subset_constraints_record[best_idx]
+            summary.append([best_mdp, best_traj, constraints_added])
 
-        # find the least complex environment
-        complexities = np.zeros(len(max_idxs))
-        for max_idx in range(len(max_idxs)):
-            complexities[max_idx] = wt_vi_traj_candidates[env_record[max_idxs[max_idx]]][0][1].mdp.measure_env_complexity()
-        best_idx = max_idxs[np.argmin(complexities)]
-        best_env_idx = env_record[max_idxs[np.argmin(complexities)]]
+            # remove the columns associated with the BEC constraints accounted for, the row associated with the demo
+            # that's been selected to go into the BEC summary
+            if single_constraint_flag:
+                BEC_constraint_bookkeeping = np.delete(BEC_constraint_bookkeeping, np.argwhere(
+                    BEC_constraint_bookkeeping[best_idx, :] == 1).flatten()[0], axis=1)
+                total_covered += 1
+            else:
+                BEC_constraint_bookkeeping = np.delete(BEC_constraint_bookkeeping, np.argwhere(
+                    BEC_constraint_bookkeeping[best_idx, :] == 1).flatten(), axis=1)
+                total_covered += np.max(total_counts)
+            BEC_constraint_bookkeeping = np.delete(BEC_constraint_bookkeeping, best_idx, axis=0)
+            # delete the corresponding constraints and environmental index as well
+            del min_subset_constraints_record[best_idx]
+            env_record = np.delete(env_record, best_idx, axis=0)
 
-        # record information associated with the best selected summary demo
-        best_traj = traj_record[best_idx]
-        del traj_record[best_idx]
-        best_mdp = wt_vi_traj_candidates[best_env_idx][0][1].mdp
-        constraints_added = min_subset_constraints_record[best_idx]
-        summary.append([best_mdp, best_traj, constraints_added])
+            print("{}/{} BEC constraints covered".format(total_covered, n_BEC_constraints))
+            print("Extracted summary {} out of {}".format(set_idx + 1, len(BEC_constraints_collection)))
 
-        # remove the columns associated with the BEC constraints accounted for, the row associated with the demo
-        # that's been selected to go into the BEC summary
-        BEC_constraint_bookkeeping = np.delete(BEC_constraint_bookkeeping, np.argwhere(BEC_constraint_bookkeeping[best_idx, :] == 1).flatten(), axis=1)
-        BEC_constraint_bookkeeping = np.delete(BEC_constraint_bookkeeping, best_idx, axis=0)
-        # delete the corresponding constraints and environmental index as well
-        del min_subset_constraints_record[best_idx]
-        env_record = np.delete(env_record, best_idx, axis=0)
+        summaries.append(summary)
 
-        total_covered += np.max(total_counts)
-        print("{}/{} BEC constraints covered".format(total_covered, n_BEC_constraints))
+    return summaries
 
-    return summary
-
-def visualize_summary(BEC_summary, weights, step_cost_flag):
+def visualize_summary(BEC_summaries_collection, weights, step_cost_flag):
     '''
     :param BEC_summary: Nested list of [mdp, trajectory]
 
     Summary: visualize the BEC demonstrations
     '''
-    for mdp_traj_constraint in BEC_summary:
-        # visualize demonstration
-        mdp_traj_constraint[0].visualize_trajectory(mdp_traj_constraint[1])
-        # visualize constraints enforced by demonstration above
-        # print(mdp_traj_constraint[2])
-        # visualize_constraints(mdp_traj_constraint[2], weights, step_cost_flag)
+    for collection_idx, BEC_summaries in enumerate(BEC_summaries_collection):
+        print("Showing summary {} out of {}".format(collection_idx + 1, len(BEC_summaries_collection)))
+        for summary_idx, BEC_summary in enumerate(BEC_summaries):
+            print("Showing demo {} out of {}".format(summary_idx + 1, len(BEC_summaries)))
+            # visualize demonstration
+            BEC_summary[0].visualize_trajectory(BEC_summary[1])
+            # visualize constraints enforced by demonstration above
+            # print(mdp_traj_constraint[2])
+            # visualize_constraints(mdp_traj_constraint[2], weights, step_cost_flag)
