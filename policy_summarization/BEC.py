@@ -47,9 +47,10 @@ def equal_constraints(c1, c2):
     else:
         return False
 
-def remove_redundant_constraints(constraints, weights, step_cost_flag):
+def remove_redundant_constraints_lp(constraints, weights, step_cost_flag):
     '''
-    Summary: Remove redundant constraint that do not change the underlying BEC region
+    Summary: Remove redundant constraint that do not change the underlying BEC region (without consideration for
+    whether how it intersects the L1 constraints)
     '''
     # these lists are effectively one level deep so a shallow copy should suffice. copy over the original constraints
     # and remove redundant constraints one by one
@@ -88,6 +89,38 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
 
     return nonredundant_constraints, redundundant_constraints
 
+def remove_redundant_constraints(constraints, weights, step_cost_flag):
+    '''
+    Summary: Remove redundant constraint that do not change the underlying intersection between the BEC region and the
+    L1 constraints
+    '''
+
+    BEC_length_all_constraints, nonredundant_constraint_idxs = calculate_BEC_length([constraints], weights, step_cost_flag)
+    nonredundant_constraints = [constraints[x] for x in nonredundant_constraint_idxs[0]]
+
+    redundant_constraints = []
+
+    for query_idx, query_constraint in enumerate(constraints):
+        if query_idx not in nonredundant_constraint_idxs[0]:
+            redundant_constraints.append(query_constraint)
+        else:
+            # see if this is truly non-redundant or crosses an L1 constraint exactly where another constraint does
+            constraints_other = []
+            for constraint_idx, constraint in enumerate(nonredundant_constraints):
+                if not equal_constraints(query_constraint, constraint):
+                    constraints_other.append(constraint)
+            if len(constraints_other) > 0:
+                BEC_length, _ = calculate_BEC_length([constraints_other], weights, step_cost_flag)
+
+                # simply remove the first redundant constraint. can also remove the redundant constraint that's
+                # 1) conveyed by the fewest environments, 2) conveyed by a higher minimum complexity environment,
+                # 3) doesn't work as well with visual similarity of other nonredundant constraints
+                if np.isclose(BEC_length[0], BEC_length_all_constraints[0]):
+                    nonredundant_constraints = constraints_other
+                    redundant_constraints.append(query_constraint)
+
+    return nonredundant_constraints, redundant_constraints
+
 def calculate_BEC_length(constraints_collection, weights, step_cost_flag):
     '''
     :param constraints (list of constraints, corresponding to the A of the form Ax >= 0): constraints that comprise the
@@ -97,6 +130,8 @@ def calculate_BEC_length(constraints_collection, weights, step_cost_flag):
     :return: total_intersection_length: total length of the intersection between the BEC region and the L1 constraints
     '''
     total_intersection_lengths = []
+    polygon_hull_constraint_idxs = []
+
     for constraints in constraints_collection:
         if step_cost_flag:
             # convert the half space representation of a convex polygon (Ax < b) into the corresponding polytope vertices
@@ -108,7 +143,7 @@ def calculate_BEC_length(constraints_collection, weights, step_cost_flag):
                 A[j, :] = np.array([-constraints[j][0][0], -constraints[j][0][1]])
                 b[j] = constraints[j][0][2] * weights[0, -1]
 
-            # add the L1 constraints
+            # add the L1 boundary constraints
             A[len(constraints), :] = np.array([1, 0])
             b[len(constraints)] = 1
             A[len(constraints) + 1, :] = np.array([-1, 0])
@@ -119,7 +154,13 @@ def calculate_BEC_length(constraints_collection, weights, step_cost_flag):
             b[len(constraints) + 3] = 1
 
             # compute the vertices of the convex polygon formed by the BEC constraints (BEC polygon), in counterclockwise order
-            vertices = compute_polygon_hull(A, b)
+            vertices, simplices = compute_polygon_hull(A, b)
+            # clean up the indices of the constraints that gave rise to the polygon hull
+            polygon_hull_constraints = np.unique(simplices)
+            # don't consider the L1 boundary constraints
+            polygon_hull_constraints = polygon_hull_constraints[polygon_hull_constraints < len(constraints)]
+            polygon_hull_constraint_idxs.append(polygon_hull_constraints.astype(np.int64))
+
             # clockwise order
             vertices.reverse()
 
@@ -137,17 +178,17 @@ def calculate_BEC_length(constraints_collection, weights, step_cost_flag):
             raise Exception("Not yet implemented.")
         total_intersection_lengths.append(total_intersection_length)
 
-    return total_intersection_lengths
+    return total_intersection_lengths, polygon_hull_constraint_idxs
 
-def visualize_constraints(constraints_collection, weights, step_cost_flag):
+def visualize_constraints(constraints_collection, weights, step_cost_flag, plot_lim=[(-1, 1), (-1, 1)]):
     '''
     Summary: Visualize the constraints
     '''
     # This visualization function is currently specialized to handle plotting problems with two unknown weights or two
     # unknown and one known weight. For higher dimensional constraints, this visualization function must be updated.
 
-    plt.xlim(-1, 1)
-    plt.ylim(-1, 1)
+    plt.xlim(plot_lim[0][0], plot_lim[0][1])
+    plt.ylim(plot_lim[1][0], plot_lim[1][1])
 
     for constraints in constraints_collection:
         wt_shading = 1. / len(constraints)
@@ -231,7 +272,7 @@ def clean_up_constraints(constraints, weights, step_cost_flag):
 
     return min_subset_constraints
 
-def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, min_BEC_set, BEC_depth=1, trajectories=None, print_flag=False):
+def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, min_BEC_set_only, BEC_depth=1, trajectories=None, print_flag=False):
     '''
     :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
     :param weights (numpy array): Ground truth reward weights used by agent to derive its optimal policy
@@ -321,26 +362,30 @@ def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, min_BEC_
 
     BEC_constraints_collection = []
 
-    if min_BEC_set:
+    if min_BEC_set_only:
         # only return the set of minimum BEC constraints
         BEC_constraints = clean_up_constraints(constraints_record, weights, step_cost_flag)
         BEC_constraints_collection.append(BEC_constraints)
     else:
         redundant_constraints = constraints_record
         redundant_constraints = normalize_constraints(redundant_constraints)
-        if len(redundant_constraints) > 0:
+        if len(redundant_constraints) > 1:
             redundant_constraints = remove_duplicate_constraints(redundant_constraints)
-            if len(redundant_constraints) > 1:
-                BEC_constraints, redundant_constraints = remove_redundant_constraints(redundant_constraints, weights,
-                                                                         step_cost_flag)
-                BEC_constraints_collection.append(BEC_constraints)
-            else:
-                redundant_constraints = redundant_constraints
 
-        while len(redundant_constraints) > 0:
-            BEC_constraints, redundant_constraints = remove_redundant_constraints(redundant_constraints, weights,
-                                                                                  step_cost_flag)
-            BEC_constraints_collection.append(BEC_constraints)
+            n_redundant_constraints = len(redundant_constraints)
+
+            while len(redundant_constraints) > 1:
+                BEC_constraints, redundant_constraints = remove_redundant_constraints(redundant_constraints,
+                                                                                          weights,
+                                                                                          step_cost_flag)
+                BEC_constraints_collection.append(BEC_constraints)
+
+                print("{}/{} redundant constraints left to process".format(len(redundant_constraints),
+                                                                           n_redundant_constraints))
+
+            BEC_constraints_collection.append(redundant_constraints)
+
+        print("All redundant constraints processed!")
 
     return BEC_constraints_collection, min_subset_constraints_record, env_record, traj_record
 

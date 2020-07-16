@@ -45,7 +45,7 @@ BEC = {
 
     'test_difficulty': 'hard',
 
-    'min_BEC_set': False
+    'min_BEC_set_only': False
 }
 
 # BIRL parameters
