@@ -272,7 +272,7 @@ def clean_up_constraints(constraints, weights, step_cost_flag):
 
     return min_subset_constraints
 
-def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, min_BEC_set_only, BEC_depth=1, trajectories=None, print_flag=False):
+def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_depth=1, trajectories=None, print_flag=False):
     '''
     :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
     :param weights (numpy array): Ground truth reward weights used by agent to derive its optimal policy
@@ -281,7 +281,7 @@ def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, min_BEC_
                             suboptimal trajectory (and the corresponding suboptimal expected feature counts)
     :return: min_subset_constraints: List of constraints
 
-    Summary: Obtain the constraints that comprise the BEC region of a set of demonstrations
+    Summary: Obtain the minimum BEC constraints for each environment
     '''
     min_subset_constraints_record = []
     env_record = []
@@ -360,6 +360,14 @@ def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, min_BEC_
 
                 processed_envs.append(mdp.env_code)
 
+    return min_subset_constraints_record, env_record, traj_record
+
+def extract_BEC_constraints(min_subset_constraints_record, weights, step_cost_flag, min_BEC_set_only):
+    '''
+    Summary: Obtain the minimum BEC constraints across all environments
+    '''
+    constraints_record = [item for sublist in min_subset_constraints_record for item in sublist]
+
     BEC_constraints_collection = []
 
     if min_BEC_set_only:
@@ -387,7 +395,7 @@ def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, min_BEC_
 
         print("All redundant constraints processed!")
 
-    return BEC_constraints_collection, min_subset_constraints_record, env_record, traj_record
+    return BEC_constraints_collection
 
 def obtain_summary(wt_vi_traj_candidates, BEC_constraints_collection, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, summary_type, BEC_depth, single_constraint_flag=False):
     '''
