@@ -6,6 +6,8 @@ from scipy.optimize import linprog
 import itertools
 from pypoman import compute_polygon_hull
 from policy_summarization import computational_geometry as cg
+from itertools import chain, combinations
+import random
 
 def normalize_constraints(constraints):
     '''
@@ -251,7 +253,7 @@ def visualize_constraints(constraints_collection, weights, step_cost_flag, plot_
 
         wt_marker_size = 200
         # plot ground truth weight
-        plt.scatter(weights[0, 0], weights[0, 1], s=wt_marker_size, color='red')
+        plt.scatter(weights[0, 0], weights[0, 1], s=wt_marker_size, color='red', zorder=2)
         plt.xlabel(r'$\theta_0$')
         plt.ylabel(r'$\theta_1$')
         plt.show()
@@ -397,7 +399,7 @@ def extract_BEC_constraints(min_subset_constraints_record, weights, step_cost_fl
 
     return BEC_constraints_collection
 
-def obtain_summary(wt_vi_traj_candidates, BEC_constraints_collection, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, summary_type, BEC_depth, single_constraint_flag=False):
+def obtain_summary(wt_vi_traj_candidates, BEC_constraints_collection, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_desired_summaries=3, downsample_threshold=50):
     '''
     :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
     :param BEC_constraints: Minimum set of constraints defining the BEC of a set of demos / policy (list of constraints)
@@ -406,10 +408,11 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints_collection, min_subset
 
     :return: summary: Nested list of [mdp, trajectory]
 
-    Summary: Obtain a minimal set of a demonstrations that recovers the behavioral equivalence class (BEC) of a set of demos / policy.
-    An implementation of 'Machine Teaching for Inverse Reinforcement Learning: Algorithms and Applications' (Brown et al. AAAI 2019).
+    Summary: Obtain a set of efficient demonstrations that recovers the behavioral equivalence class (BEC) of a set of demos / policy.
+    An modified implementation of 'Machine Teaching for Inverse Reinforcement Learning: Algorithms and Applications' (Brown et al. AAAI 2019).
     '''
     summaries = []
+    summary_efficiencies = []
     for set_idx, BEC_constraints in enumerate (BEC_constraints_collection):
         n_BEC_constraints = len(BEC_constraints)
         summary = []
@@ -432,50 +435,88 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints_collection, min_subset
 
             BEC_constraint_bookkeeping.append(covers)
 
-        BEC_constraint_bookkeeping = np.array(BEC_constraint_bookkeeping)
-        # where there remain BEC constraints to cover, select the least complex demonstration that covers the most number of BEC constraints
-        while BEC_constraint_bookkeeping.shape[1] > 0:
-            if single_constraint_flag:
-                # a) select the simplest environments that cover the BEC constraints one at a time
-                contender_idxs = np.argwhere(np.sum(BEC_constraint_bookkeeping, axis=1) >= 1).flatten().tolist()
-            else:
-                # b) select environments that mostly efficiently cover the BEC constraints
-                total_counts = np.sum(BEC_constraint_bookkeeping, axis=1)
-                contender_idxs = np.argwhere(total_counts == np.max(total_counts)).flatten().tolist()
+        # there are either no more demos to consider or none of the demos that are left are able to address the BEC constraints
+        if len(min_subset_constraints_record) == 0 or len(BEC_constraint_bookkeeping) == 0:
+            break
 
-            # find the least complex environment
-            complexities = np.zeros(len(contender_idxs))
-            for max_idx in range(len(contender_idxs)):
-                complexities[max_idx] = wt_vi_traj_candidates[env_record[contender_idxs[max_idx]]][0][1].mdp.measure_env_complexity()
-            best_idx = contender_idxs[np.argmin(complexities)]
-            best_env_idx = env_record[contender_idxs[np.argmin(complexities)]]
+        BEC_constraint_bookkeeping = np.array(BEC_constraint_bookkeeping)
+
+        sets = []
+        for constraint_idx in range(BEC_constraint_bookkeeping.shape[1]):
+            sets.append(np.argwhere(BEC_constraint_bookkeeping[:, constraint_idx] == 1).flatten().tolist())
+
+        # downsample for computational feasibility
+        for j, set in enumerate(sets):
+            print(len(set))
+            if len(set) > downsample_threshold:
+                sets[j] = random.sample(set, downsample_threshold)
+
+        filtered_combo = []
+        for combination in itertools.product(*sets):
+            filtered_combo.append(np.unique(combination))
+
+        # consider the visual similarity between environments, and the complexity and BEC length of individual demonstrations
+        # when constructing the set of summaries
+        visual_dissimilarities = np.zeros(len(filtered_combo))
+        complexities = np.zeros(len(filtered_combo))
+        BEC_lengths = np.zeros(len(filtered_combo))
+        for j, combo in enumerate(filtered_combo):
+            visual_dissimilarity = 0
+            if len(combo) >= 2:
+                pairs = list(itertools.combinations(combo, 2))
+                for pair in pairs:
+                    visual_dissimilarity += wt_vi_traj_candidates[
+                        env_record[pair[0]]][0][1].mdp.measure_visual_dissimilarity(traj_record[pair[0]][0][0], wt_vi_traj_candidates[
+                        env_record[pair[1]]][0][1].mdp, traj_record[pair[1]][0][0])
+
+                visual_dissimilarities[j] = visual_dissimilarity / len(pairs)
+            else:
+                visual_dissimilarities[j] = 0
+
+            complexity = 0
+            BEC_length = 0
+            for env in combo:
+                complexity += wt_vi_traj_candidates[env_record[env]][0][1].mdp.measure_env_complexity()
+
+                BEC_length += calculate_BEC_length([min_subset_constraints_record[env]], weights, step_cost_flag)[0][0]
+
+            complexities[j] = complexity / len(combo)
+            # large BEC length correlates to simplicity
+            BEC_lengths[j] = -BEC_length / len(combo)
+
+        tie_breaker = np.arange(len(filtered_combo))
+        sorted_zipped = sorted(zip(visual_dissimilarities, BEC_lengths, complexities, tie_breaker, filtered_combo))
+        visual_dissimilarities_sorted, BEC_lengths_sorted, complexities_sorted, _, filtered_combo_sorted = list(zip(*sorted_zipped))
+        best_idxs = filtered_combo_sorted[0]
+
+        for best_idx in best_idxs:
+            best_env_idx = env_record[best_idx]
 
             # record information associated with the best selected summary demo
             best_traj = traj_record[best_idx]
-            del traj_record[best_idx]
             best_mdp = wt_vi_traj_candidates[best_env_idx][0][1].mdp
             constraints_added = min_subset_constraints_record[best_idx]
+
+            # store the desired metric for determining the final shortlist of summaries
+            total_BEC_length = calculate_BEC_length([constraints_added], weights, step_cost_flag)[0][0]
+            # want this value to be as small as possible
+            summary_efficiencies.append(total_BEC_length + BEC_lengths_sorted[0])
             summary.append([best_mdp, best_traj, constraints_added])
 
-            # remove the columns associated with the BEC constraints accounted for, the row associated with the demo
-            # that's been selected to go into the BEC summary
-            if single_constraint_flag:
-                BEC_constraint_bookkeeping = np.delete(BEC_constraint_bookkeeping, np.argwhere(
-                    BEC_constraint_bookkeeping[best_idx, :] == 1).flatten()[0], axis=1)
-                total_covered += 1
-            else:
-                BEC_constraint_bookkeeping = np.delete(BEC_constraint_bookkeeping, np.argwhere(
-                    BEC_constraint_bookkeeping[best_idx, :] == 1).flatten(), axis=1)
-                total_covered += np.max(total_counts)
-            BEC_constraint_bookkeeping = np.delete(BEC_constraint_bookkeeping, best_idx, axis=0)
-            # delete the corresponding constraints and environmental index as well
+        for best_idx in sorted(best_idxs, reverse=True):
             del min_subset_constraints_record[best_idx]
-            env_record = np.delete(env_record, best_idx, axis=0)
+            del traj_record[best_idx]
+            del env_record[best_idx]
 
-            print("{}/{} BEC constraints covered".format(total_covered, n_BEC_constraints))
-            print("Extracted summary {} out of {}".format(set_idx + 1, len(BEC_constraints_collection)))
+        print("Extracted summary {} out of {}".format(set_idx + 1, len(BEC_constraints_collection)))
 
         summaries.append(summary)
+
+    # determine which summaries to actually provide.
+    tie_breaker = np.arange(len(summary_efficiencies))
+    sorted_zipped = sorted(zip(summary_efficiencies, tie_breaker, summaries))
+    summary_efficiencies_sorted, _, summaries_sorted = list(zip(*sorted_zipped))
+    summaries = summaries_sorted[0:n_desired_summaries]
 
     return summaries
 

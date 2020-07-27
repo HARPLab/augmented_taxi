@@ -244,17 +244,18 @@ def obtain_env_policies(data_loc, n_env, wt_candidates, aug_taxi, save_type):
 
     return wt_vi_traj_candidates
 
-def _in_summary(mdp, summary, initial_state):
+def _in_summary(mdp, summary_collection, initial_state):
     '''
     Summary: Check if this MDP (and trajectory, if summary type is policy BEC) is already in the BEC summary. If so,
     do not consider it as a potential test environment.
     '''
-    if summary is None:
+    if summary_collection is None:
         return False
 
-    for summary_idx in range(len(summary)):
-        if (mdp.env_code == summary[summary_idx][0].env_code) and (summary[summary_idx][1][0][0] == initial_state):
-            return True
+    for summary in summary_collection:
+        for summary_idx in range(len(summary)):
+            if (mdp.env_code == summary[summary_idx][0].env_code) and (summary[summary_idx][1][0][0] == initial_state):
+                return True
     return False
 
 def obtain_test_environments(wt_vi_traj_candidates, min_subset_constraints_record, env_record, traj_record, weights, n_desired_test_env, difficulty, step_cost_flag, summary=None, BEC_summary_type=None):
@@ -273,7 +274,7 @@ def obtain_test_environments(wt_vi_traj_candidates, min_subset_constraints_recor
     # BEC lengths
     for j, constraints in enumerate(min_subset_constraints_record):
         if not _in_summary(wt_vi_traj_candidates[env_record[j]][0][1].mdp, summary, traj_record[j][0][0]):
-            BEC_length = BEC.calculate_BEC_length(constraints, weights, step_cost_flag)
+            BEC_length = BEC.calculate_BEC_length([constraints], weights, step_cost_flag)[0][0]
             BEC_lengths.append(BEC_length)
             env_complexities.append(wt_vi_traj_candidates[env_record[j]][0][1].mdp.measure_env_complexity())
             env_idxs.append(env_record[j])
