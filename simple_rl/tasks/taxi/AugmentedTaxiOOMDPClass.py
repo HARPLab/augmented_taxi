@@ -110,7 +110,7 @@ class AugmentedTaxiOOMDP(OOMDP):
         # reward = 0
         #
         # if len(self.tolls) != 0:
-        #     [moved_into_toll, toll_fee] = taxi_helpers._moved_into_toll(self, next_state)
+        #     [moved_into_toll, toll_fee] = taxi_helpers._moved_into_toll(self, state, next_state)
         #     if moved_into_toll:
         #         reward -= toll_fee
         #
@@ -154,7 +154,7 @@ class AugmentedTaxiOOMDP(OOMDP):
             step_cost_flag = 0
 
         if len(self.tolls) != 0:
-            [moved_into_toll, toll_fee] = taxi_helpers._moved_into_toll(self, next_state)
+            [moved_into_toll, toll_fee] = taxi_helpers._moved_into_toll(self, state, next_state)
             if moved_into_toll and not next_state == self.exit_state:
                 toll_flag = 1
 

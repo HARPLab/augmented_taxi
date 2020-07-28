@@ -174,15 +174,12 @@ if __name__ == "__main__":
     #                                                                           params.step_cost_flag,
     #                                                                           visualize_history_priors=True,
     #                                                                           visualize_summary=True)
-
     # c) obtain a BEC summary of the agent's policy
     constraints, BEC_summary = obtain_BEC_summary(params.data_loc['BEC'], params.aug_taxi, params.n_env,
                                                   params.weights['val'], params.step_cost_flag,
                                                   params.BEC['summary_type'], params.BEC['n_desired_summaries'], min_BEC_set_only=params.BEC['min_BEC_set_only'], BEC_depth=params.BEC['depth'],
                                                   visualize_constraints=True, visualize_summary=True)
-    BEC_length, _ = BEC.calculate_BEC_length(constraints, params.weights['val'], params.step_cost_flag)
-    print(BEC_length)
 
-    # # d) obtain test environments
-    # obtain_test_environments(params.data_loc['BEC'], params.aug_taxi, params.weights['val'], params.n_env, params.BEC,
-    #                          params.step_cost_flag, summary=BEC_summary, visualize_test_env=True)
+    # d) obtain test environments
+    obtain_test_environments(params.data_loc['BEC'], params.aug_taxi, params.weights['val'], params.n_env, params.BEC,
+                             params.step_cost_flag, summary=BEC_summary, visualize_test_env=True)

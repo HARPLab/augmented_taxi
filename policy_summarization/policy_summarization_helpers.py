@@ -289,7 +289,7 @@ def obtain_test_environments(wt_vi_traj_candidates, min_subset_constraints_recor
 
     # again sorted in order from smallest to largest, only selecting unique BEC lengths (as demos with the same
     # BEC lengths are often quite similar). could also factor in visual complexity here as well
-    BEC_lengths_unique, unique_idxs = np.unique(BEC_lengths_sorted, return_index=True)
+    BEC_lengths_unique, unique_idxs = np.unique(np.array(BEC_lengths_sorted).round(decimals=5), return_index=True)
 
     if BEC_summary_type == 'demo':
         if difficulty == 'hard':
