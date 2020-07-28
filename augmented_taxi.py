@@ -62,8 +62,8 @@ def obtain_BIRL_summary(data_loc, aug_taxi, BIRL_params, n_env, weights, step_co
 
 def obtain_BEC_summary(data_loc, aug_taxi, n_env, weights, step_cost_flag, summary_type, n_desired_summaries, min_BEC_set_only=False, BEC_depth=1, visualize_constraints=False, visualize_summary=False):
     try:
-        with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
-            BEC_summary = pickle.load(f)
+        with open('models/' + data_loc + '/BEC_summary_shortlist.pickle', 'rb') as f:
+            BEC_summary_shortlist = pickle.load(f)
 
         with open('models/' + data_loc + '/BEC_constraints.pickle', 'rb') as f:
             BEC_constraints = pickle.load(f)
@@ -95,17 +95,25 @@ def obtain_BEC_summary(data_loc, aug_taxi, n_env, weights, step_cost_flag, summa
             with open('models/' + data_loc + '/BEC_constraints.pickle', 'wb') as f:
                 pickle.dump(BEC_constraints, f)
 
-        BEC_summary = BEC.obtain_summary(wt_vi_traj_candidates, BEC_constraints, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_desired_summaries=n_desired_summaries)
-        with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
-            pickle.dump(BEC_summary, f)
+        try:
+            with open('models/' + data_loc + '/BEC_summary_full.pickle', 'rb') as f:
+                BEC_summary_full, summaries_total_BEC_lengths, summaries_avg_BEC_lengths, summaries_visual_complexities = pickle.load(f)
+        except:
+            BEC_summary_full, summaries_total_BEC_lengths, summaries_avg_BEC_lengths, summaries_visual_complexities = BEC.obtain_summary_full(wt_vi_traj_candidates, BEC_constraints, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag)
+            with open('models/' + data_loc + '/BEC_summary_full.pickle', 'wb') as f:
+                pickle.dump((BEC_summary_full, summaries_total_BEC_lengths, summaries_avg_BEC_lengths, summaries_visual_complexities), f)
+
+        BEC_summary_shortlist = BEC.obtain_summary_shortlist(BEC_summary_full, summaries_total_BEC_lengths, summaries_avg_BEC_lengths, summaries_visual_complexities, n_desired_summaries=n_desired_summaries)
+        with open('models/' + data_loc + '/BEC_summary_shortlist.pickle', 'wb') as f:
+            pickle.dump(BEC_summary_shortlist, f)
 
     if visualize_constraints:
         BEC.visualize_constraints(BEC_constraints, weights, step_cost_flag)
 
     if visualize_summary:
-        BEC.visualize_summary(BEC_summary, weights, step_cost_flag)
+        BEC.visualize_summary(BEC_summary_shortlist, weights, step_cost_flag)
 
-    return BEC_constraints, BEC_summary
+    return BEC_constraints, BEC_summary_shortlist
 
 def obtain_test_environments(data_loc, aug_taxi, weights, n_env, BEC_params, step_cost_flag, summary=None, visualize_test_env=False):
     '''

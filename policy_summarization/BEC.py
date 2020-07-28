@@ -399,7 +399,7 @@ def extract_BEC_constraints(min_subset_constraints_record, weights, step_cost_fl
 
     return BEC_constraints_collection
 
-def obtain_summary(wt_vi_traj_candidates, BEC_constraints_collection, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_desired_summaries=3, downsample_threshold=50):
+def obtain_summary_full(wt_vi_traj_candidates, BEC_constraints_collection, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, downsample_threshold=50):
     '''
     :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
     :param BEC_constraints: Minimum set of constraints defining the BEC of a set of demos / policy (list of constraints)
@@ -412,12 +412,13 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints_collection, min_subset
     An modified implementation of 'Machine Teaching for Inverse Reinforcement Learning: Algorithms and Applications' (Brown et al. AAAI 2019).
     '''
     summaries = []
-    summary_efficiencies = []
-    for set_idx, BEC_constraints in enumerate (BEC_constraints_collection):
-        n_BEC_constraints = len(BEC_constraints)
+    summaries_total_BEC_lengths = []   # BEC lengths of the minimum constraints of all constituent demos of a summary
+    summaries_visual_complexities = []
+    summaries_avg_BEC_lengths = []
+
+    for set_idx, BEC_constraints in enumerate(BEC_constraints_collection):
         summary = []
 
-        total_covered = 0
         BEC_constraint_bookkeeping = []
 
         # keep track of which demo conveys which of the BEC constraints
@@ -435,22 +436,24 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints_collection, min_subset
 
             BEC_constraint_bookkeeping.append(covers)
 
-        # there are either no more demos to consider or none of the demos that are left are able to address the BEC constraints
-        if len(min_subset_constraints_record) == 0 or len(BEC_constraint_bookkeeping) == 0:
-            break
-
         BEC_constraint_bookkeeping = np.array(BEC_constraint_bookkeeping)
 
+        # there are either no more demos to consider or none of the demos that are left are able to address the BEC constraints
+        if len(min_subset_constraints_record) == 0 or np.sum(BEC_constraint_bookkeeping) == 0:
+            break
+
+        # extract sets of demos+environments pairs that can cover each BEC constraint
         sets = []
         for constraint_idx in range(BEC_constraint_bookkeeping.shape[1]):
             sets.append(np.argwhere(BEC_constraint_bookkeeping[:, constraint_idx] == 1).flatten().tolist())
 
-        # downsample for computational feasibility
+        # downsample some sets with too many members for computational feasibility
         for j, set in enumerate(sets):
             print(len(set))
             if len(set) > downsample_threshold:
                 sets[j] = random.sample(set, downsample_threshold)
 
+        # find all combination of demos+environments pairs that cover all BEC constraints
         filtered_combo = []
         for combination in itertools.product(*sets):
             filtered_combo.append(np.unique(combination))
@@ -459,7 +462,7 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints_collection, min_subset
         # when constructing the set of summaries
         visual_dissimilarities = np.zeros(len(filtered_combo))
         complexities = np.zeros(len(filtered_combo))
-        BEC_lengths = np.zeros(len(filtered_combo))
+        BEC_lengths = np.zeros(len(filtered_combo)) # an average of BEC lengths of constituent demos of a summary
         for j, combo in enumerate(filtered_combo):
             visual_dissimilarity = 0
             if len(combo) >= 2:
@@ -496,12 +499,12 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints_collection, min_subset
             best_traj = traj_record[best_idx]
             best_mdp = wt_vi_traj_candidates[best_env_idx][0][1].mdp
             constraints_added = min_subset_constraints_record[best_idx]
-
-            # store the desired metric for determining the final shortlist of summaries
-            total_BEC_length = calculate_BEC_length([constraints_added], weights, step_cost_flag)[0][0]
-            # want this value to be as small as possible
-            summary_efficiencies.append(total_BEC_length + BEC_lengths_sorted[0])
             summary.append([best_mdp, best_traj, constraints_added])
+
+        # metrics to be used to determine the shortlist of summaries later
+        summaries_total_BEC_lengths.append(calculate_BEC_length([BEC_constraints], weights, step_cost_flag)[0][0])
+        summaries_avg_BEC_lengths.append(BEC_lengths_sorted[0])
+        summaries_visual_complexities.append(visual_dissimilarities_sorted[0])
 
         for best_idx in sorted(best_idxs, reverse=True):
             del min_subset_constraints_record[best_idx]
@@ -512,9 +515,20 @@ def obtain_summary(wt_vi_traj_candidates, BEC_constraints_collection, min_subset
 
         summaries.append(summary)
 
-    # determine which summaries to actually provide.
+    return summaries, summaries_total_BEC_lengths, summaries_avg_BEC_lengths, summaries_visual_complexities
+
+def obtain_summary_shortlist(BEC_summary_full, summaries_total_BEC_lengths, summaries_avg_BEC_lengths, summaries_visual_complexities, n_desired_summaries=3):
+    '''
+    Summary: Return the desired number of most efficient summaries from the pool of potential summaries.
+    '''
+    summary_efficiencies = []
+    for summary_idx in range(len(BEC_summary_full)):
+        # metric for judging the efficiency of a summary (information conveyed vs difficult of understanding)
+        # currently want this value to be as low as possible
+        summary_efficiencies.append(summaries_total_BEC_lengths[summary_idx] + summaries_avg_BEC_lengths[summary_idx])
+
     tie_breaker = np.arange(len(summary_efficiencies))
-    sorted_zipped = sorted(zip(summary_efficiencies, tie_breaker, summaries))
+    sorted_zipped = sorted(zip(summary_efficiencies, tie_breaker, BEC_summary_full))
     summary_efficiencies_sorted, _, summaries_sorted = list(zip(*sorted_zipped))
     summaries = summaries_sorted[0:n_desired_summaries]
 
