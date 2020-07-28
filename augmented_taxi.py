@@ -158,8 +158,8 @@ def obtain_test_environments(data_loc, aug_taxi, weights, n_env, BEC_params, ste
 
             BEC.visualize_constraints([test_BEC_constraints[j]], weights, step_cost_flag)
 
-            vi_candidate = test_wt_vi_traj_tuple[0][1]
-            trajectory_candidate = test_wt_vi_traj_tuple[0][2]
+            vi_candidate = test_wt_vi_traj_tuple[1]
+            trajectory_candidate = test_wt_vi_traj_tuple[2]
             vi_candidate.mdp.visualize_trajectory(trajectory_candidate)
 
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints

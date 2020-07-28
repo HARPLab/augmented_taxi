@@ -293,38 +293,38 @@ def obtain_test_environments(wt_vi_traj_candidates, min_subset_constraints_recor
 
     if BEC_summary_type == 'demo':
         if difficulty == 'hard':
-            test_wt_vi_traj_tuples = [wt_vi_traj_candidates[k] for k in
+            test_wt_vi_traj_tuples = [wt_vi_traj_candidates[k][0] for k in
                                             env_record_sorted[unique_idxs[:n_desired_test_env]]]
             test_BEC_lengths = [BEC_lengths_sorted[k] for k in unique_idxs[:n_desired_test_env]]
             test_BEC_constraints = [BEC_constraints_sorted[k] for k in unique_idxs[:n_desired_test_env]]
         else:
-            test_wt_vi_traj_tuples = [wt_vi_traj_candidates[k] for k in
+            test_wt_vi_traj_tuples = [wt_vi_traj_candidates[k][0] for k in
                                             env_record_sorted[unique_idxs[-n_desired_test_env:]]]
             test_BEC_lengths = [BEC_lengths_sorted[k] for k in unique_idxs[-n_desired_test_env:]]
             test_BEC_constraints = [BEC_constraints_sorted[k] for k in unique_idxs[-n_desired_test_env:]]
     else:
         # must update the wt_vi_traj_candidate with the right initial state and trajectory
         if difficulty == 'hard':
-            test_wt_vi_traj_tuples = [copy.deepcopy(wt_vi_traj_candidates[k]) for k in
+            test_wt_vi_traj_tuples = [copy.deepcopy(wt_vi_traj_candidates[k][0]) for k in
                                       env_record_sorted[unique_idxs[:n_desired_test_env]]]
 
             test_traj_opts = [traj_opts_sorted[k] for k in unique_idxs[:n_desired_test_env]]
 
             for k, test_traj_opt in enumerate(test_traj_opts):
-                test_wt_vi_traj_tuples[k][0][1].mdp.set_init_state(test_traj_opt[0][0])
-                test_wt_vi_traj_tuples[k][0][2] = test_traj_opt
+                test_wt_vi_traj_tuples[k][1].mdp.set_init_state(test_traj_opt[0][0])
+                test_wt_vi_traj_tuples[k][2] = test_traj_opt
 
             test_BEC_lengths = [BEC_lengths_sorted[k] for k in unique_idxs[:n_desired_test_env]]
             test_BEC_constraints = [BEC_constraints_sorted[k] for k in unique_idxs[:n_desired_test_env]]
         else:
-            test_wt_vi_traj_tuples = [copy.deepcopy(wt_vi_traj_candidates[k]) for k in
+            test_wt_vi_traj_tuples = [copy.deepcopy(wt_vi_traj_candidates[k][0]) for k in
                                       env_record_sorted[unique_idxs[-n_desired_test_env:]]]
 
             test_traj_opts = [traj_opts_sorted[k] for k in unique_idxs[-n_desired_test_env:]]
 
             for k, test_traj_opt in enumerate(test_traj_opts):
-                test_wt_vi_traj_tuples[k][0][1].mdp.set_init_state(test_traj_opt[0][0])
-                test_wt_vi_traj_tuples[k][0][2] = test_traj_opt
+                test_wt_vi_traj_tuples[k][1].mdp.set_init_state(test_traj_opt[0][0])
+                test_wt_vi_traj_tuples[k][2] = test_traj_opt
 
             test_BEC_lengths = [BEC_lengths_sorted[k] for k in unique_idxs[-n_desired_test_env:]]
             test_BEC_constraints = [BEC_constraints_sorted[k] for k in unique_idxs[-n_desired_test_env:]]

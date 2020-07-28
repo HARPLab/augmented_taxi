@@ -269,7 +269,8 @@ class AugmentedTaxiOOMDP(OOMDP):
     def visualize_interaction(self, width_scr_scale=180, height_scr_scale=180):
         from simple_rl.utils.mdp_visualizer import visualize_interaction
         from .taxi_visualizer import _draw_state
-        visualize_interaction(self, _draw_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
+        trajectory = visualize_interaction(self, _draw_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
+        return trajectory
 
     # Visualize the value of each of the grid cells. --> Color corresponds to higher value.
     # (Currently not very helpful - see first comment in taxi_visualizer.py)
