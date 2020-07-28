@@ -60,43 +60,60 @@ def obtain_BIRL_summary(data_loc, aug_taxi, BIRL_params, n_env, weights, step_co
 
     return bayesian_IRL_summary, wt_candidates, history_priors
 
-def obtain_BEC_summary(data_loc, aug_taxi, n_env, weights, step_cost_flag, summary_type, BEC_depth=1, visualize_constraints=False, visualize_summary=False):
+def obtain_BEC_summary(data_loc, aug_taxi, n_env, weights, step_cost_flag, summary_type, n_desired_summaries, min_BEC_set_only=False, BEC_depth=1, visualize_constraints=False, visualize_summary=False):
     try:
-        with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
-            BEC_summary = pickle.load(f)
+        with open('models/' + data_loc + '/BEC_summary_shortlist.pickle', 'rb') as f:
+            BEC_summary_shortlist = pickle.load(f)
 
         with open('models/' + data_loc + '/BEC_constraints.pickle', 'rb') as f:
-            constraints = pickle.load(f)
+            BEC_constraints = pickle.load(f)
     except:
         wt_vi_traj_candidates = ps_helpers.obtain_env_policies(data_loc, n_env, np.expand_dims(weights, axis=0),
                                                                aug_taxi, 'ground_truth')
         try:
-            with open('models/' + data_loc + '/BEC_constraints.pickle', 'rb') as f:
-                constraints = pickle.load(f)
+            with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
+                min_subset_constraints_record, env_record, traj_record = pickle.load(f)
         except:
             if summary_type == 'demo':
                 # a) use optimal trajectories from starting states to extract constraints
                 opt_trajs = []
                 for wt_vi_traj_candidate in wt_vi_traj_candidates:
                     opt_trajs.append(wt_vi_traj_candidate[0][2])
-                constraints = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_depth=BEC_depth, trajectories=opt_trajs)
+                min_subset_constraints_record, env_record, traj_record = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_depth=BEC_depth, trajectories=opt_trajs, print_flag=True)
             else:
                 # b) use full policy to extract constraints
-                constraints = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag)
-            with open('models/' + data_loc + '/BEC_constraints.pickle', 'wb') as f:
-                pickle.dump(constraints, f)
+                min_subset_constraints_record, env_record, traj_record = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, print_flag=True)
+            with open('models/' + data_loc + '/base_constraints.pickle', 'wb') as f:
+                pickle.dump((min_subset_constraints_record, env_record, traj_record), f)
 
-        BEC_summary = BEC.obtain_summary(wt_vi_traj_candidates, constraints, weights, step_cost_flag, summary_type, BEC_depth)
-        with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
-            pickle.dump(BEC_summary, f)
+        try:
+            with open('models/' + data_loc + '/BEC_constraints.pickle', 'rb') as f:
+                BEC_constraints = pickle.load(f)
+        except:
+            BEC_constraints = BEC.extract_BEC_constraints(min_subset_constraints_record, weights, step_cost_flag, min_BEC_set_only)
+
+            with open('models/' + data_loc + '/BEC_constraints.pickle', 'wb') as f:
+                pickle.dump(BEC_constraints, f)
+
+        try:
+            with open('models/' + data_loc + '/BEC_summary_full.pickle', 'rb') as f:
+                BEC_summary_full, summaries_total_BEC_lengths, summaries_avg_BEC_lengths, summaries_visual_complexities = pickle.load(f)
+        except:
+            BEC_summary_full, summaries_total_BEC_lengths, summaries_avg_BEC_lengths, summaries_visual_complexities = BEC.obtain_summary_full(wt_vi_traj_candidates, BEC_constraints, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag)
+            with open('models/' + data_loc + '/BEC_summary_full.pickle', 'wb') as f:
+                pickle.dump((BEC_summary_full, summaries_total_BEC_lengths, summaries_avg_BEC_lengths, summaries_visual_complexities), f)
+
+        BEC_summary_shortlist = BEC.obtain_summary_shortlist(BEC_summary_full, summaries_total_BEC_lengths, summaries_avg_BEC_lengths, summaries_visual_complexities, n_desired_summaries=n_desired_summaries)
+        with open('models/' + data_loc + '/BEC_summary_shortlist.pickle', 'wb') as f:
+            pickle.dump(BEC_summary_shortlist, f)
 
     if visualize_constraints:
-        BEC.visualize_constraints(constraints, weights, step_cost_flag)
+        BEC.visualize_constraints(BEC_constraints, weights, step_cost_flag)
 
     if visualize_summary:
-        BEC.visualize_summary(BEC_summary, weights, step_cost_flag)
+        BEC.visualize_summary(BEC_summary_shortlist, weights, step_cost_flag)
 
-    return constraints, BEC_summary
+    return BEC_constraints, BEC_summary_shortlist
 
 def obtain_test_environments(data_loc, aug_taxi, weights, n_env, BEC_params, step_cost_flag, summary=None, visualize_test_env=False):
     '''
@@ -112,8 +129,24 @@ def obtain_test_environments(data_loc, aug_taxi, weights, n_env, BEC_params, ste
     except:
         wt_vi_traj_candidates = ps_helpers.obtain_env_policies(data_loc, n_env, np.expand_dims(weights, axis=0), aug_taxi, 'ground_truth')
 
+        try:
+            with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
+                min_subset_constraints_record, env_record, traj_record = pickle.load(f)
+        except:
+            if params.BEC['summary_type'] == 'demo':
+                # a) use optimal trajectories from starting states to extract constraints
+                opt_trajs = []
+                for wt_vi_traj_candidate in wt_vi_traj_candidates:
+                    opt_trajs.append(wt_vi_traj_candidate[0][2])
+                min_subset_constraints_record, env_record, traj_record = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_depth=BEC_params['depth'], trajectories=opt_trajs, print_flag=True)
+            else:
+                # b) use full policy to extract constraints
+                min_subset_constraints_record, env_record, traj_record = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, print_flag=True)
+            with open('models/' + data_loc + '/base_constraints.pickle', 'wb') as f:
+                pickle.dump((min_subset_constraints_record, env_record, traj_record), f)
+
         test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = \
-            ps_helpers.obtain_test_environments(wt_vi_traj_candidates, weights, BEC_params['n_desired_test_env'], BEC_params['test_difficulty'], step_cost_flag, BEC_params['depth'], summary, BEC_params['summary_type'])
+            ps_helpers.obtain_test_environments(wt_vi_traj_candidates, min_subset_constraints_record, env_record, traj_record, weights, BEC_params['n_desired_test_env'], BEC_params['test_difficulty'], step_cost_flag, summary, BEC_params['summary_type'])
 
         with open('models/' + data_loc + '/test_environments.pickle', 'wb') as f:
             pickle.dump((test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints), f)
@@ -123,7 +156,7 @@ def obtain_test_environments(data_loc, aug_taxi, weights, n_env, BEC_params, ste
             print(colored('Visualizing test environment {} with BEC length of {}'.format(j, test_BEC_lengths[j]),
                           'red'))
 
-            BEC.visualize_constraints(test_BEC_constraints[j], weights, step_cost_flag)
+            BEC.visualize_constraints([test_BEC_constraints[j]], weights, step_cost_flag)
 
             vi_candidate = test_wt_vi_traj_tuple[0][1]
             trajectory_candidate = test_wt_vi_traj_tuple[0][2]
@@ -141,13 +174,11 @@ if __name__ == "__main__":
     #                                                                           params.step_cost_flag,
     #                                                                           visualize_history_priors=True,
     #                                                                           visualize_summary=True)
-
     # c) obtain a BEC summary of the agent's policy
     constraints, BEC_summary = obtain_BEC_summary(params.data_loc['BEC'], params.aug_taxi, params.n_env,
                                                   params.weights['val'], params.step_cost_flag,
-                                                  params.BEC['summary_type'], BEC_depth=params.BEC['depth'],
-                                                  visualize_constraints=False, visualize_summary=True)
-    BEC_length = BEC.calculate_BEC_length(constraints, params.weights['val'], params.step_cost_flag)
+                                                  params.BEC['summary_type'], params.BEC['n_desired_summaries'], min_BEC_set_only=params.BEC['min_BEC_set_only'], BEC_depth=params.BEC['depth'],
+                                                  visualize_constraints=True, visualize_summary=True)
 
     # d) obtain test environments
     obtain_test_environments(params.data_loc['BEC'], params.aug_taxi, params.weights['val'], params.n_env, params.BEC,

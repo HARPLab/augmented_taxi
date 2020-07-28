@@ -110,7 +110,7 @@ class AugmentedTaxiOOMDP(OOMDP):
         # reward = 0
         #
         # if len(self.tolls) != 0:
-        #     [moved_into_toll, toll_fee] = taxi_helpers._moved_into_toll(self, next_state)
+        #     [moved_into_toll, toll_fee] = taxi_helpers._moved_into_toll(self, state, next_state)
         #     if moved_into_toll:
         #         reward -= toll_fee
         #
@@ -154,7 +154,7 @@ class AugmentedTaxiOOMDP(OOMDP):
             step_cost_flag = 0
 
         if len(self.tolls) != 0:
-            [moved_into_toll, toll_fee] = taxi_helpers._moved_into_toll(self, next_state)
+            [moved_into_toll, toll_fee] = taxi_helpers._moved_into_toll(self, state, next_state)
             if moved_into_toll and not next_state == self.exit_state:
                 toll_flag = 1
 
@@ -407,6 +407,23 @@ class AugmentedTaxiOOMDP(OOMDP):
             agent["fuel"] = max_fuel_capacity
 
         return next_state
+
+    def measure_env_complexity(self):
+        # currently only measuring the number of tolls in the environment
+        return len(self.tolls)
+
+    def measure_visual_dissimilarity(self, start_state, other_mdp, other_start_state):
+        # measure the visual similarity between two MDPs through their start states and their tolls effectively
+        dissimilarity = 0
+
+        # start states
+        dissimilarity += np.sum(np.abs(np.array([int(x) for x in str(hash(start_state))]) - np.array(
+            [int(x) for x in str(hash(other_start_state))])))
+
+        # tolls
+        dissimilarity += np.sum(np.abs(np.array(self.env_code) - np.array(other_mdp.env_code)))
+
+        return dissimilarity
 
 def _error_check(state, action):
     '''

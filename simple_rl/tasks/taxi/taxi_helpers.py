@@ -86,10 +86,12 @@ def _move_pass_in_taxi(state, dx=0, dy=0):
             passenger_attr_dict_ls[i]["x"] += dx
             passenger_attr_dict_ls[i]["y"] += dy
 
-def _moved_into_toll(mdp, next_state):
+def _moved_into_toll(mdp, state, next_state):
     for toll in mdp.tolls:
-        # if the state's agent x, y is on x, y of the toll
-        if toll.attributes['x'] == next_state.get_agent_x() and toll.attributes['y'] == next_state.get_agent_y():
+        # if current state's agent x, y doesn't coincide with any x, y of the tolls
+        if toll.attributes['x'] != state.get_agent_x() or toll.attributes['y'] != state.get_agent_y():
+            # and if the next state's agent x, y moves into of the x, y of the toll
+            if toll.attributes['x'] == next_state.get_agent_x() and toll.attributes['y'] == next_state.get_agent_y():
                 return True, toll.attributes['fee']
     return False, 0
 

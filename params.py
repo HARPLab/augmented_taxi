@@ -17,7 +17,7 @@ aug_taxi = {
 weights = {
     'lb': np.array([-1., -1., -0.03125]),
     'ub': np.array([1., 1., -0.03125]),
-    'val': np.array([[0.875, -0.09375, -0.03125]])
+    'val': np.array([[0.86962556, -0.09931639, -0.03105805]])
 }
 
 weights_human = {
@@ -31,7 +31,7 @@ step_cost_flag = True    # indicates that the last weight element is a known ste
                          # weight vector if step_cost_flag = False, and a 3D weight vector if step_cost_flag = True
 
 # Joint BIRL and BEC parameters
-n_env = 4                           # number of environments to consider
+n_env = 512                           # number of environments to consider
                                       # tip: select so that np.log(n_env) / np.log(2) yields an int for predictable
                                       # behavior see ps_helpers.obtain_env_policies()
 
@@ -41,9 +41,13 @@ BEC = {
                                       # starting state or from all possible states from the full policy
     'depth': 1,                       # number of suboptimal actions to take before following the optimal policy to obtain the
                                       # suboptimal trajectory (and the corresponding suboptimal expected feature counts)
-    'n_desired_test_env': 1,         # number of desired test environments
+    'n_desired_test_env': 512,         # number of desired test environments
 
-    'test_difficulty': 'hard'
+    'n_desired_summaries': 3,
+
+    'test_difficulty': 'hard',
+
+    'min_BEC_set_only': False
 }
 
 # BIRL parameters
@@ -76,4 +80,3 @@ data_loc = {
     'BEC': str(n_env) + '_env',
     'BIRL': data_loc_BIRL
 }
-
