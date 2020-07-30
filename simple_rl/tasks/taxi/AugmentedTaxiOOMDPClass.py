@@ -414,12 +414,14 @@ class AugmentedTaxiOOMDP(OOMDP):
         return len(self.tolls)
 
     def measure_visual_dissimilarity(self, start_state, other_mdp, other_start_state):
+        start_state_weight = 2
+
         # measure the visual similarity between two MDPs through their start states and their tolls effectively
         dissimilarity = 0
 
         # start states
         dissimilarity += np.sum(np.abs(np.array([int(x) for x in str(hash(start_state))]) - np.array(
-            [int(x) for x in str(hash(other_start_state))])))
+            [int(x) for x in str(hash(other_start_state))]))) * start_state_weight
 
         # tolls
         dissimilarity += np.sum(np.abs(np.array(self.env_code) - np.array(other_mdp.env_code)))

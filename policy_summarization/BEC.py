@@ -399,7 +399,7 @@ def extract_BEC_constraints(min_subset_constraints_record, weights, step_cost_fl
 
     return BEC_constraints_collection
 
-def obtain_summary_full(wt_vi_traj_candidates, BEC_constraints_collection, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, downsample_threshold=50):
+def obtain_summary_full(wt_vi_traj_candidates, BEC_constraints_collection, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, downsample_threshold=30):
     '''
     :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
     :param BEC_constraints: Minimum set of constraints defining the BEC of a set of demos / policy (list of constraints)
@@ -412,9 +412,6 @@ def obtain_summary_full(wt_vi_traj_candidates, BEC_constraints_collection, min_s
     An modified implementation of 'Machine Teaching for Inverse Reinforcement Learning: Algorithms and Applications' (Brown et al. AAAI 2019).
     '''
     summaries = []
-    summaries_total_BEC_lengths = []   # BEC lengths of the minimum constraints of all constituent demos of a summary
-    summaries_visual_complexities = []
-    summaries_avg_BEC_lengths = []
 
     for set_idx, BEC_constraints in enumerate(BEC_constraints_collection):
         summary = []
@@ -501,11 +498,6 @@ def obtain_summary_full(wt_vi_traj_candidates, BEC_constraints_collection, min_s
             constraints_added = min_subset_constraints_record[best_idx]
             summary.append([best_mdp, best_traj, constraints_added])
 
-        # metrics to be used to determine the shortlist of summaries later
-        summaries_total_BEC_lengths.append(calculate_BEC_length([BEC_constraints], weights, step_cost_flag)[0][0])
-        summaries_avg_BEC_lengths.append(BEC_lengths_sorted[0])
-        summaries_visual_complexities.append(visual_dissimilarities_sorted[0])
-
         for best_idx in sorted(best_idxs, reverse=True):
             del min_subset_constraints_record[best_idx]
             del traj_record[best_idx]
@@ -515,22 +507,45 @@ def obtain_summary_full(wt_vi_traj_candidates, BEC_constraints_collection, min_s
 
         summaries.append(summary)
 
-    return summaries, summaries_total_BEC_lengths, summaries_avg_BEC_lengths, summaries_visual_complexities
+    return summaries
 
-def obtain_summary_shortlist(BEC_summary_full, summaries_total_BEC_lengths, summaries_avg_BEC_lengths, summaries_visual_complexities, n_desired_summaries=3):
+def obtain_summary_shortlist(BEC_summary_full, weights, step_cost_flag, n_desired_summaries=3):
     '''
     Summary: Return the desired number of most efficient summaries from the pool of potential summaries.
     '''
-    summary_efficiencies = []
-    for summary_idx in range(len(BEC_summary_full)):
-        # metric for judging the efficiency of a summary (information conveyed vs difficult of understanding)
-        # currently want this value to be as low as possible
-        summary_efficiencies.append(summaries_total_BEC_lengths[summary_idx] + summaries_avg_BEC_lengths[summary_idx])
+    # can only have as many unique demos as already in BEC_summary_full
+    n_shortlist_summaries = min(n_desired_summaries, len(BEC_summary_full))
 
-    tie_breaker = np.arange(len(summary_efficiencies))
-    sorted_zipped = sorted(zip(summary_efficiencies, tie_breaker, BEC_summary_full))
-    summary_efficiencies_sorted, _, summaries_sorted = list(zip(*sorted_zipped))
-    summaries = summaries_sorted[0:n_desired_summaries]
+    shortlist_idxs = np.floor(np.arange(0, n_shortlist_summaries) * 1 / n_shortlist_summaries * len(BEC_summary_full)).astype(int)
+    summaries = [BEC_summary_full[i] for i in shortlist_idxs]
+
+    # order from the easiest to the hardest
+    summaries.reverse()
+
+    # filter out any demos in subsequent summaries that are redundant
+    conveyed_constraints = []
+    for summary in summaries:
+        delete_idxs = []
+        for demo_idx, demo in enumerate(summary):
+            demo_constraints = demo[2]
+            # if no constraints have been conveyed yet, simply add the constraints
+            if len(conveyed_constraints) == 0:
+                conveyed_constraints.extend(demo_constraints)
+            else:
+                old_length = calculate_BEC_length([conveyed_constraints], weights, step_cost_flag)[0][0]
+                peek_conveyed_constraints = conveyed_constraints.copy()
+                peek_conveyed_constraints.extend(demo_constraints)
+                new_length = calculate_BEC_length([peek_conveyed_constraints], weights, step_cost_flag)[0][0]
+
+                # if it adds new information, add this demo
+                if new_length < old_length:
+                    conveyed_constraints.extend(demo_constraints)
+                # else, mark this redundant demo for deletion
+                else:
+                    delete_idxs.append(demo_idx)
+
+        for delete_idx in sorted(delete_idxs, reverse=True):
+            del summary[delete_idx]
 
     return summaries
 
@@ -548,4 +563,4 @@ def visualize_summary(BEC_summaries_collection, weights, step_cost_flag):
             BEC_summary[0].visualize_trajectory(BEC_summary[1])
             # visualize constraints enforced by demonstration above
             # print(mdp_traj_constraint[2])
-            # visualize_constraints(mdp_traj_constraint[2], weights, step_cost_flag)
+            # visualize_constraints([BEC_summary[2]], weights, step_cost_flag)

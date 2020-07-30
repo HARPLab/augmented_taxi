@@ -97,13 +97,13 @@ def obtain_BEC_summary(data_loc, aug_taxi, n_env, weights, step_cost_flag, summa
 
         try:
             with open('models/' + data_loc + '/BEC_summary_full.pickle', 'rb') as f:
-                BEC_summary_full, summaries_total_BEC_lengths, summaries_avg_BEC_lengths, summaries_visual_complexities = pickle.load(f)
+                BEC_summary_full = pickle.load(f)
         except:
-            BEC_summary_full, summaries_total_BEC_lengths, summaries_avg_BEC_lengths, summaries_visual_complexities = BEC.obtain_summary_full(wt_vi_traj_candidates, BEC_constraints, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag)
+            BEC_summary_full = BEC.obtain_summary_full(wt_vi_traj_candidates, BEC_constraints, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag)
             with open('models/' + data_loc + '/BEC_summary_full.pickle', 'wb') as f:
-                pickle.dump((BEC_summary_full, summaries_total_BEC_lengths, summaries_avg_BEC_lengths, summaries_visual_complexities), f)
+                pickle.dump(BEC_summary_full, f)
 
-        BEC_summary_shortlist = BEC.obtain_summary_shortlist(BEC_summary_full, summaries_total_BEC_lengths, summaries_avg_BEC_lengths, summaries_visual_complexities, n_desired_summaries=n_desired_summaries)
+        BEC_summary_shortlist = BEC.obtain_summary_shortlist(BEC_summary_full, weights, step_cost_flag, n_desired_summaries=n_desired_summaries)
         with open('models/' + data_loc + '/BEC_summary_shortlist.pickle', 'wb') as f:
             pickle.dump(BEC_summary_shortlist, f)
 
