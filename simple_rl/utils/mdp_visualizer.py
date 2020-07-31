@@ -507,7 +507,7 @@ def visualize_interaction(mdp, draw_state, cur_state=None, scr_width=720, scr_he
 
     actions = mdp.get_actions()
 
-    keys = [K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, K_9, K_0]
+    keys = [K_UP, K_DOWN, K_LEFT, K_RIGHT, K_p, K_d, K_7, K_8, K_9, K_0]
     keys = keys[:len(actions)]
 
     trajectory = []
