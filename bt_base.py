@@ -6,7 +6,7 @@ sys.path.append("simple_rl")
 
 # For research integration with UMass Lowell
 
-def get_trajectories():
+def get_trajectories(human_action_callback, on_done):
     # obtain BEC summaries
     print("Visualizing demonstrations comprising BEC summary")
     constraints, BEC_summary = augmented_taxi.obtain_BEC_summary(params.data_loc['BEC'], params.aug_taxi, params.n_env,
@@ -24,8 +24,11 @@ def get_trajectories():
 
     # for each test environment
     for test_wt_vi_traj_tuple in test_wt_vi_traj_tuples:
+        def on_done_():
+            on_done(test_wt_vi_traj_tuple[2])
+
         # obtain human's prediction of the agent's trajectory
-        human_trajectory = test_wt_vi_traj_tuple[1].mdp.visualize_interaction()
+        human_trajectory = test_wt_vi_traj_tuple[1].mdp.visualize_interaction(human_action_callback, on_done_)
         human_trajectories.append(human_trajectory)
 
         # store the agent's actual trajectory
