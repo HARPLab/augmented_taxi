@@ -41,9 +41,9 @@ BEC = {
                                       # starting state or from all possible states from the full policy
     'depth': 1,                       # number of suboptimal actions to take before following the optimal policy to obtain the
                                       # suboptimal trajectory (and the corresponding suboptimal expected feature counts)
-    'n_desired_test_env': 3,         # number of desired test environments
+    'n_test_demos': 1,                # number of desired test environments
 
-    'n_desired_summaries': 1,
+    'n_train_demos': 4,
 
     'test_difficulty': 'hard',
 
