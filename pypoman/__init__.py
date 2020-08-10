@@ -25,7 +25,7 @@ from .intersection import intersect_line_cylinder
 from .intersection import intersect_line_polygon
 from .intersection import intersect_polygons
 from .lp import solve_lp
-from .polygon import compute_polygon_hull
+from .polygon import compute_polygon_hull, indicate_violating_constraints
 from .polygon import plot_polygon
 from .projection import project_polytope
 from .projection import project_polytope_bretl
@@ -33,6 +33,7 @@ from .projection import project_polytope_bretl
 __all__ = [
     'compute_cone_face_matrix',
     'compute_polygon_hull',
+    'indicate_violating_constraints',
     'compute_polytope_halfspaces',
     'compute_polytope_vertices',
     'intersect_line_cylinder',

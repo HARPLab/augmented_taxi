@@ -11,7 +11,7 @@ from simple_rl.tasks import AugmentedTaxiOOMDP
 from simple_rl.planning import ValueIteration
 from simple_rl.agents import FixedPolicyAgent
 from simple_rl.utils import mdp_helpers
-from policy_summarization import BEC
+from policy_summarization import BEC_helpers
 
 def sample_wt_candidates(data_loc, weights, step_cost_flag, n_samples, sample_radius):
     '''
@@ -114,11 +114,7 @@ def generate_mdp_obj(mdp_code):
     the initial state) of the MDP
     '''
 
-    # first entry currently dictates where the passenger begins
-    if mdp_code[0] == 0:
-        requested_passenger = [{"x": 4, "y": 1, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
-    else:
-        requested_passenger = [{"x": 2, "y": 3, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
+    requested_passenger = [{"x": 4, "y": 1, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
 
     # the last eight entries currently dictate the presence of tolls
     available_tolls = [{"x": 2, "y": 3, "fee": 1}, {"x": 3, "y": 3, "fee": 1}, {"x": 4, "y": 3, "fee": 1},
@@ -127,7 +123,8 @@ def generate_mdp_obj(mdp_code):
 
     requested_tolls = []
 
-    offset = 1
+    # offset can facilitate additional MDP information present in the code before toll information
+    offset = 0
     for x in range(offset, len(mdp_code)):
         entry = mdp_code[x]
         if entry:
@@ -135,7 +132,7 @@ def generate_mdp_obj(mdp_code):
 
     # note that what's considered mdp_code (potentially includes both initial state and environment info) and env_code
     # (only includes environment info) will always need to be manually defined
-    return requested_passenger, requested_tolls, mdp_code[1:]
+    return requested_passenger, requested_tolls, mdp_code
 
 # hard-coded in order to evaluate hand-designed environments
 def hand_generate_mdp_obj(mdp_code):
@@ -273,7 +270,7 @@ def obtain_test_environments(wt_vi_traj_candidates, min_subset_constraints_recor
     # BEC lengths
     for j, constraints in enumerate(min_subset_constraints_record):
         if not _in_summary(wt_vi_traj_candidates[env_record[j]][0][1].mdp, summary, traj_record[j][0][0]):
-            BEC_length = BEC.calculate_BEC_length([constraints], weights, step_cost_flag)[0][0]
+            BEC_length = BEC_helpers.calculate_BEC_length([constraints], weights, step_cost_flag)[0][0]
             BEC_lengths.append(BEC_length)
             env_complexities.append(wt_vi_traj_candidates[env_record[j]][0][1].mdp.measure_env_complexity())
             env_idxs.append(env_record[j])

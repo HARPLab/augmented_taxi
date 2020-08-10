@@ -12,12 +12,18 @@ aug_taxi = {
     'gamma': 1
 }
 
+# w = np.array([[26, -5, -1]])
+# w = np.array([[26, -4, -1]])
+w = np.array([[26, -3, -1]])
+# w = np.array([[26, -2, -1]])
+# w = np.array([[26, -1, -1]])
+
 # reward weight parameters (on the goal with the passenger, on a toll, step cost).
 # assume the L1 norm of the weights is equal 1. WLOG
 weights = {
     'lb': np.array([-1., -1., -0.03125]),
     'ub': np.array([1., 1., -0.03125]),
-    'val': np.array([[0.86962556, -0.09931639, -0.03105805]])
+    'val': w / np.linalg.norm(w[0, :], ord=1)
 }
 
 weights_human = {
@@ -31,7 +37,7 @@ step_cost_flag = True    # indicates that the last weight element is a known ste
                          # weight vector if step_cost_flag = False, and a 3D weight vector if step_cost_flag = True
 
 # Joint BIRL and BEC parameters
-n_env = 512                           # number of environments to consider
+n_env = 256                           # number of environments to consider
                                       # tip: select so that np.log(n_env) / np.log(2) yields an int for predictable
                                       # behavior see ps_helpers.obtain_env_policies()
 
@@ -51,7 +57,7 @@ BEC = {
 }
 
 # BIRL parameters
-n_wt = 5                              # total number of weight candidates (including the ground truth)
+n_wt = 1                              # total number of weight candidates (including the ground truth)
                                       # tip: select n_wt to such that n_wt_partitions is an int to ensure that the exact
                                       # number of desired weight candidates is actually incorporated. see ps_helpers.discretize_wt_candidates()
                                       # also note that n_wt = n_wt_partitions ** (# of weights you're discretizing over) + 1

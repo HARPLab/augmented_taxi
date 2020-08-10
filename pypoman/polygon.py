@@ -128,6 +128,15 @@ def compute_polygon_hull(B, c):
         vertices = [v + x for v in vertices]
     return vertices, simplices
 
+def indicate_violating_constraints(B, c):
+    '''
+    Indicate which constraint is preventing a proper polygon from being formed by the collection of halfspaces
+    '''
+    if not all(c > 0):
+        x = compute_chebyshev_center(B, c)
+        c = c - dot(B, x)
+    if not all(c > 0):
+        return (c <= 0).nonzero()
 
 def plot_polygon(points, alpha=.4, color='g', linestyle='solid', fill=True,
                  linewidth=None):
