@@ -109,7 +109,7 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
     '''
 
     try:
-        BEC_length_all_constraints, nonredundant_constraint_idxs = calculate_BEC_length([constraints], weights,
+        BEC_length_all_constraints, nonredundant_constraint_idxs = calculate_BEC_length(constraints, weights,
                                                                                         step_cost_flag)
     except:
         # a subset of these constraints aren't numerically stable (e.g. you can have a constraint that's ever so slightly
@@ -120,15 +120,15 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
         for violating_idx in sorted(violating_idxs[0], reverse=True):
             del constraints[violating_idx]
 
-        BEC_length_all_constraints, nonredundant_constraint_idxs = calculate_BEC_length([constraints], weights,
+        BEC_length_all_constraints, nonredundant_constraint_idxs = calculate_BEC_length(constraints, weights,
                                                                                         step_cost_flag)
 
-    nonredundant_constraints = [constraints[x] for x in nonredundant_constraint_idxs[0]]
+    nonredundant_constraints = [constraints[x] for x in nonredundant_constraint_idxs]
 
     redundant_constraints = []
 
     for query_idx, query_constraint in enumerate(constraints):
-        if query_idx not in nonredundant_constraint_idxs[0]:
+        if query_idx not in nonredundant_constraint_idxs:
             redundant_constraints.append(query_constraint)
         else:
             # see if this is truly non-redundant or crosses an L1 constraint exactly where another constraint does
@@ -137,12 +137,12 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
                 if not equal_constraints(query_constraint, constraint):
                     constraints_other.append(constraint)
             if len(constraints_other) > 0:
-                BEC_length, _ = calculate_BEC_length([constraints_other], weights, step_cost_flag)
+                BEC_length = calculate_BEC_length(constraints_other, weights, step_cost_flag)[0]
 
                 # simply remove the first redundant constraint. can also remove the redundant constraint that's
                 # 1) conveyed by the fewest environments, 2) conveyed by a higher minimum complexity environment,
                 # 3) doesn't work as well with visual similarity of other nonredundant constraints
-                if np.isclose(BEC_length[0], BEC_length_all_constraints[0]):
+                if np.isclose(BEC_length, BEC_length_all_constraints):
                     nonredundant_constraints = constraints_other
                     redundant_constraints.append(query_constraint)
 
@@ -176,7 +176,7 @@ def constraints_to_halfspace_matrix(constraints, weights, step_cost_flag):
 
     return A, b
 
-def calculate_BEC_length(constraints_collection, weights, step_cost_flag):
+def calculate_BEC_length(constraints, weights, step_cost_flag):
     '''
     :param constraints (list of constraints, corresponding to the A of the form Ax >= 0): constraints that comprise the
         BEC region
@@ -184,37 +184,31 @@ def calculate_BEC_length(constraints_collection, weights, step_cost_flag):
     :param step_cost_flag (bool): Indicates that the last weight element is a known step cost
     :return: total_intersection_length: total length of the intersection between the BEC region and the L1 constraints
     '''
-    total_intersection_lengths = []
-    polygon_hull_constraint_idxs = []
+    A, b = constraints_to_halfspace_matrix(constraints, weights, step_cost_flag)
 
-    for constraints in constraints_collection:
-        A, b = constraints_to_halfspace_matrix(constraints, weights, step_cost_flag)
+    # compute the vertices of the convex polygon formed by the BEC constraints (BEC polygon), in counterclockwise order
+    vertices, simplices = compute_polygon_hull(A, b)
+    # clean up the indices of the constraints that gave rise to the polygon hull
+    polygon_hull_constraints = np.unique(simplices)
+    # don't consider the L1 boundary constraints
+    polygon_hull_constraints = polygon_hull_constraints[polygon_hull_constraints < len(constraints)]
+    polygon_hull_constraint_idxs = polygon_hull_constraints.astype(np.int64)
 
-        # compute the vertices of the convex polygon formed by the BEC constraints (BEC polygon), in counterclockwise order
-        vertices, simplices = compute_polygon_hull(A, b)
-        # clean up the indices of the constraints that gave rise to the polygon hull
-        polygon_hull_constraints = np.unique(simplices)
-        # don't consider the L1 boundary constraints
-        polygon_hull_constraints = polygon_hull_constraints[polygon_hull_constraints < len(constraints)]
-        polygon_hull_constraint_idxs.append(polygon_hull_constraints.astype(np.int64))
+    # clockwise order
+    vertices.reverse()
 
-        # clockwise order
-        vertices.reverse()
+    # L1 constraints in 2D
+    L1_constraints = [[[-1 + abs(weights[0, -1]), 0], [0, 1 - abs(weights[0, -1])]], [[0, 1 - abs(weights[0, -1])], [1 - abs(weights[0, -1]), 0]],
+                      [[1 - abs(weights[0, -1]), 0], [0, -1 + abs(weights[0, -1])]], [[0, -1 + abs(weights[0, -1])], [-1 + abs(weights[0, -1]), 0]]]
 
-        # L1 constraints in 2D
-        L1_constraints = [[[-1 + abs(weights[0, -1]), 0], [0, 1 - abs(weights[0, -1])]], [[0, 1 - abs(weights[0, -1])], [1 - abs(weights[0, -1]), 0]],
-                          [[1 - abs(weights[0, -1]), 0], [0, -1 + abs(weights[0, -1])]], [[0, -1 + abs(weights[0, -1])], [-1 + abs(weights[0, -1]), 0]]]
+    # intersect the L1 constraints with the BEC polygon
+    L1_intersections = cg.cyrus_beck_2D(np.array(vertices), L1_constraints)
 
-        # intersect the L1 constraints with the BEC polygon
-        L1_intersections = cg.cyrus_beck_2D(np.array(vertices), L1_constraints)
+    # compute the total length of all intersections
+    intersection_lengths = cg.compute_lengths(L1_intersections)
+    total_intersection_length = np.sum(intersection_lengths)
 
-        # compute the total length of all intersections
-        intersection_lengths = cg.compute_lengths(L1_intersections)
-        total_intersection_length = np.sum(intersection_lengths)
-
-        total_intersection_lengths.append(total_intersection_length)
-
-    return total_intersection_lengths, polygon_hull_constraint_idxs
+    return total_intersection_length, polygon_hull_constraint_idxs
 
 
 def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_record):

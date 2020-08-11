@@ -126,7 +126,7 @@ def is_taxi_terminal_and_goal_state(state):
         state (OOMDPState)
 
     Returns:
-        (bool): True iff all passengers at at their destinations, not in the taxi.
+        (bool): True iff all passengers are at their destinations, not in the taxi.
     '''
     all_passengers_at_destination = True
 

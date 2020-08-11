@@ -43,9 +43,9 @@ class AugmentedTaxiOOMDP(OOMDP):
 
         # objects that belong in the state (changing)
         agent_obj = OOMDPObject(attributes=agent, name="agent")
-        agent_exit = {"x": 0, "y": 0, "has_passenger": 0}  # grid world indices start at (1, 1) so (0, 0) is unreserved
+        agent_exit = {"x": 100, "y": 100, "has_passenger": 0}  # grid world indices start at (1, 1) so (0, 0) is unreserved
         pass_objs = self._make_oomdp_objs_from_list_of_dict(passengers, "passenger")
-        pass_objs_exit = self._make_oomdp_objs_from_list_of_dict([], "passenger")
+        pass_objs_exit = self._make_oomdp_objs_from_list_of_dict(passengers, "passenger")
 
         # objects that belong to the MDP (static)
         wall_objs = self._make_oomdp_objs_from_list_of_dict(walls, "wall")
@@ -61,6 +61,7 @@ class AugmentedTaxiOOMDP(OOMDP):
         init_state = self._create_state(agent_obj, pass_objs)
         self.exit_state = self._create_state(OOMDPObject(attributes=agent_exit, name="agent_exit"), pass_objs_exit)
         self.exit_state.set_terminal(True)
+        self.exit_state.set_goal(False)
         if init_state.track_fuel():
             OOMDP.__init__(self, AugmentedTaxiOOMDP.AUGMENTED_ACTIONS, self._taxi_transition_func, self._taxi_reward_func,
                            init_state=init_state, gamma=gamma, step_cost=step_cost)

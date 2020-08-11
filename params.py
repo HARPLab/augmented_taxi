@@ -51,9 +51,7 @@ BEC = {
 
     'n_train_demos': 4,
 
-    'test_difficulty': 'hard',
-
-    'min_BEC_set_only': False
+    'test_difficulty': 'hard'
 }
 
 # BIRL parameters

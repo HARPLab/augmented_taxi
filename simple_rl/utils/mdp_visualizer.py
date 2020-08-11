@@ -404,6 +404,19 @@ def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=N
 
         pygame.display.flip()
 
+    if cur_state.is_terminal():
+        if cur_state.is_goal():
+            # Done! Agent found goal.
+            goal_text = "Dropped off the passenger!"
+        else:
+            # Done! Agent failed.
+            goal_text = "Decided not to pick up the passenger!"
+        goal_text_rendered = title_font.render(goal_text, True, (206, 147, 66))
+        goal_text_point = scr_width / 2.0 - (len(goal_text)*7), 18*scr_height / 20.0
+        screen.blit(goal_text_rendered, goal_text_point)
+
+    pygame.display.flip()
+
     print("Press ESC to quit")
     while True:
         # Check for key presses.
