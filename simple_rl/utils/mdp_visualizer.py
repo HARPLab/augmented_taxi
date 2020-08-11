@@ -496,10 +496,11 @@ def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_h
                 pygame.display.quit()
                 return
 
-def visualize_interaction(mdp, draw_state, cur_state=None, scr_width=720, scr_height=720):
+def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=None, done_callback=None, keys_map=None, scr_width=720, scr_height=720):
     '''
     Args:
         mdp (MDP)
+        interaction_callback (lambda: string)
         draw_state (lambda: State --> pygame.Rect)
         cur_state (State)
         scr_width (int)
@@ -520,8 +521,14 @@ def visualize_interaction(mdp, draw_state, cur_state=None, scr_width=720, scr_he
 
     actions = mdp.get_actions()
 
-    keys = [K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, K_9, K_0]
-    keys = keys[:len(actions)]
+    if keys_map is None:
+        keys = [K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, K_9, K_0]
+        keys = keys[:len(actions)]
+    else:
+        keys = []
+        for key in keys_map:
+            keys.append(eval(key))
+        keys = keys[:len(actions)]
 
     trajectory = []
 
@@ -541,6 +548,7 @@ def visualize_interaction(mdp, draw_state, cur_state=None, scr_width=720, scr_he
                 cumulative_reward += reward * gamma ** step
                 agent_shape = draw_state(screen, mdp, cur_state, agent_shape=agent_shape)
                 trajectory.append((prev_state, action, cur_state))
+                interaction_callback(action)
 
                 # Update state text.
                 _draw_lower_left_text(cur_state, screen)
@@ -557,6 +565,7 @@ def visualize_interaction(mdp, draw_state, cur_state=None, scr_width=720, scr_he
             goal_text_point = scr_width / 2.0 - (len(goal_text)*7), 18*scr_height / 20.0
             screen.blit(goal_text_rendered, goal_text_point)
             done = True
+            done_callback()
             print(cumulative_reward)
         pygame.display.flip()
 

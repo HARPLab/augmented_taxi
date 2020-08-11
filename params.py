@@ -12,6 +12,9 @@ aug_taxi = {
     'gamma': 1
 }
 
+# Based on Pygame's key constants
+keys_map = ['K_UP', 'K_DOWN', 'K_LEFT', 'K_RIGHT', 'K_p', 'K_d', 'K_7', 'K_8', 'K_9', 'K_0']
+
 # w = np.array([[26, -5, -1]])
 # w = np.array([[26, -4, -1]])
 w = np.array([[26, -3, -1]])

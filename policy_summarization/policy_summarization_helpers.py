@@ -270,7 +270,7 @@ def obtain_test_environments(wt_vi_traj_candidates, min_subset_constraints_recor
     # BEC lengths
     for j, constraints in enumerate(min_subset_constraints_record):
         if not _in_summary(wt_vi_traj_candidates[env_record[j]][0][1].mdp, summary, traj_record[j][0][0]):
-            BEC_length = BEC_helpers.calculate_BEC_length([constraints], weights, step_cost_flag)[0][0]
+            BEC_length = BEC_helpers.calculate_BEC_length(constraints, weights, step_cost_flag)[0]
             BEC_lengths.append(BEC_length)
             env_complexities.append(wt_vi_traj_candidates[env_record[j]][0][1].mdp.measure_env_complexity())
             env_idxs.append(env_record[j])
