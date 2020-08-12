@@ -117,7 +117,7 @@ def extract_BEC_constraints(min_subset_constraints_record, weights, step_cost_fl
     return min_BEC_constraints, unique_BEC_lengths, unique_BEC_bins
 
 
-def obtain_summary(wt_vi_traj_candidates, min_BEC_constraints, unique_BEC_lengths, unique_BEC_bins, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=4, downsample_threshold=300):
+def obtain_summary(wt_vi_traj_candidates, min_BEC_constraints, unique_BEC_lengths, unique_BEC_bins, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=4, downsample_threshold=float("inf")):
     '''
     :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
     :param BEC_constraints: Minimum set of constraints defining the BEC of a set of demos / policy (list of constraints)
@@ -279,15 +279,15 @@ def obtain_summary(wt_vi_traj_candidates, min_BEC_constraints, unique_BEC_length
     summary.extend(min_BEC_summary)
     return summary
 
-def visualize_constraints(constraints, weights, step_cost_flag, plot_lim=[(-1, 1), (-1, 1)]):
+def visualize_constraints(constraints, weights, step_cost_flag, plot_lim=[(-1, 1), (-1, 1)], scale=1.0, fig_name=None):
     '''
     Summary: Visualize the constraints
     '''
     # This visualization function is currently specialized to handle plotting problems with two unknown weights or two
     # unknown and one known weight. For higher dimensional constraints, this visualization function must be updated.
 
-    plt.xlim(plot_lim[0][0], plot_lim[0][1])
-    plt.ylim(plot_lim[1][0], plot_lim[1][1])
+    plt.xlim(plot_lim[0][0] * scale, plot_lim[0][1] * scale)
+    plt.ylim(plot_lim[1][0] * scale, plot_lim[1][1] * scale)
 
     wt_shading = 1. / len(constraints)
 
@@ -298,60 +298,63 @@ def visualize_constraints(constraints, weights, step_cost_flag, plot_lim=[(-1, 1
             if constraint[0, 1] == 0.:
                 # completely vertical line going through zero
                 pt = (-weights[0, -1] * constraint[0, 2]) / constraint[0, 0]
-                plt.plot([pt, pt], [-1, 1])
+                plt.plot(np.array([pt, pt]) * scale, np.array([-1, 1]) * scale)
 
                 # use (1, 0) as a test point to decide which half space to color
                 if 1 >= pt:
                     # color the right side of the line
-                    plt.axvspan(pt, 1, alpha=wt_shading, color='blue')
+                    plt.axvspan(pt * scale, 1 * scale, alpha=wt_shading, color='blue')
                 else:
                     # color the left side of the line
-                    plt.axvspan(-1, pt, alpha=wt_shading, color='blue')
+                    plt.axvspan(-1 * scale, pt * scale, alpha=wt_shading, color='blue')
             else:
                 pt_1 = (constraint[0, 0] - (weights[0, -1] * constraint[0, 2])) / constraint[0, 1]
                 pt_2 = (-constraint[0, 0] - (weights[0, -1] * constraint[0, 2])) / constraint[0, 1]
-                plt.plot([-1, 1], [pt_1, pt_2])
+                plt.plot(np.array([-1, 1]) * scale, np.array([pt_1, pt_2]) * scale)
 
                 # use (0, 1) as a test point to decide which half space to color
                 if constraint[0, 1] + (weights[0, -1] * constraint[0, 2]) >= 0:
-                    plt.fill_between([-1, 1], [pt_1, pt_2], [1, 1], alpha=wt_shading, color='blue')
+                    plt.fill_between(np.array([-1, 1]) * scale, np.array([pt_1, pt_2]) * scale, np.array([1, 1]) * scale, alpha=wt_shading, color='blue')
                 else:
-                    plt.fill_between([-1, 1], [pt_1, pt_2], [-1, -1], alpha=wt_shading, color='blue')
+                    plt.fill_between(np.array([-1, 1]) * scale, np.array([pt_1, pt_2]) * scale, np.array([-1, -1]) * scale, alpha=wt_shading, color='blue')
 
         # visualize the L1 norm == 1 constraints
-        plt.plot([-1 + abs(weights[0, -1]), 0], [0, 1 - abs(weights[0, -1])], color='grey')
-        plt.plot([0, 1 - abs(weights[0, -1])], [1 - abs(weights[0, -1]), 0], color='grey')
-        plt.plot([1 - abs(weights[0, -1]), 0], [0, -1 + abs(weights[0, -1])], color='grey')
-        plt.plot([0, -1 + abs(weights[0, -1])], [-1 + abs(weights[0, -1]), 0], color='grey')
+        # plt.plot(np.array([-1 + abs(weights[0, -1]), 0]) * scale, np.array([0, 1 - abs(weights[0, -1])]) * scale, color='grey')
+        # plt.plot(np.array([0, 1 - abs(weights[0, -1])]) * scale, np.array([1 - abs(weights[0, -1]), 0]) * scale, color='grey')
+        # plt.plot(np.array([1 - abs(weights[0, -1]), 0]) * scale, np.array([0, -1 + abs(weights[0, -1])]) * scale, color='grey')
+        # plt.plot(np.array([0, -1 + abs(weights[0, -1])]) * scale, np.array([-1 + abs(weights[0, -1]), 0] )* scale, color='grey')
     else:
         for constraint in constraints:
             if constraint[0, 0] == 1.:
                 # completely vertical line going through zero
-                plt.plot([constraint[0, 1] / constraint[0, 0], -constraint[0, 1] / constraint[0, 0]], [-1, 1])
+                plt.plot(np.array([constraint[0, 1] / constraint[0, 0], -constraint[0, 1] / constraint[0, 0]]) * scale, np.array([-1, 1]) * scale)
 
                 # use (1, 0) as a test point to decide which half space to color
                 if constraint[0, 0] >= 0:
                     # color the right side of the line
-                    plt.axvspan(0, 1, alpha=wt_shading, color='blue')
+                    plt.axvspan(0 * scale, 1 * scale, alpha=wt_shading, color='blue')
                 else:
                     # color the left side of the line
-                    plt.axvspan(-1, 0, alpha=wt_shading, color='blue')
+                    plt.axvspan(-1 * scale, 0 * scale, alpha=wt_shading, color='blue')
             else:
                 pt_1 = constraint[0, 0] / constraint[0, 1]
                 pt_2 = -constraint[0, 0] / constraint[0, 1]
-                plt.plot([-1, 1], [pt_1, pt_2])
+                plt.plot(np.array([-1, 1]) * scale, np.array([pt_1, pt_2]) * scale)
 
                 # use (0, 1) as a test point to decide which half space to color
                 if constraint[0, 1] >= 0:
-                    plt.fill_between([-1, 1], [pt_1, pt_2], [1, 1], alpha=wt_shading, color='blue')
+                    plt.fill_between(np.array([-1, 1]) * scale, np.array([pt_1, pt_2]) * scale, np.array([1, 1]) * scale, alpha=wt_shading, color='blue')
                 else:
-                    plt.fill_between([-1, 1], [pt_1, pt_2], [-1, -1], alpha=wt_shading, color='blue')
+                    plt.fill_between(np.array([-1, 1]) * scale, np.array([pt_1, pt_2]) * scale, np.array([-1, -1]) * scale, alpha=wt_shading, color='blue')
 
     wt_marker_size = 200
     # plot ground truth weight
-    plt.scatter(weights[0, 0], weights[0, 1], s=wt_marker_size, color='red', zorder=2)
+    plt.scatter(weights[0, 0] * scale, weights[0, 1] * scale, s=wt_marker_size, color='red', zorder=2)
     plt.xlabel(r'$\theta_0$')
     plt.ylabel(r'$\theta_1$')
+    plt.tight_layout()
+    if fig_name is not None:
+        plt.savefig(fig_name, dpi=200, transparent=True)
     plt.show()
 
 
@@ -370,7 +373,7 @@ def visualize_summary(BEC_summaries_collection, weights, step_cost_flag):
         # print(mdp_traj_constraint[2])
 
         # visualize the min BEC constraints of this particular demonstration
-        # visualize_constraints(BEC_summary[2], weights, step_cost_flag)
+        # visualize_constraints(BEC_summary[2], weights, step_cost_flag, fig_name=str(summary_idx) + '.png')
 
         # visualize the min BEC constraints extracted from all demonstrations shown thus far
         # min_BEC_constraints_running.extend(BEC_summary[2])

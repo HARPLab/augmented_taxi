@@ -241,6 +241,13 @@ class AugmentedTaxiOOMDP(OOMDP):
                 next_state = self.agent_refuel(state)
             elif action == "exit":
                 next_state = copy.deepcopy(self.exit_state)
+
+                # ensure that the passenger is in the same place when the agent exits
+                passenger_attr_dict_ls = state.get_objects_of_class("passenger")
+                passenger_attr_dict_ls_exit = next_state.get_objects_of_class("passenger")
+                for i, passenger in enumerate(passenger_attr_dict_ls):
+                        passenger_attr_dict_ls_exit[i]["x"] = passenger_attr_dict_ls[i]["x"]
+                        passenger_attr_dict_ls_exit[i]["y"] = passenger_attr_dict_ls[i]["y"]
             else:
                 next_state = state
 
