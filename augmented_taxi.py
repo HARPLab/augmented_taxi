@@ -60,7 +60,7 @@ def obtain_BIRL_summary(data_loc, aug_taxi, BIRL_params, n_env, weights, step_co
 
     return bayesian_IRL_summary, wt_candidates, history_priors
 
-def obtain_BEC_summary(data_loc, aug_taxi, n_env, weights, step_cost_flag, summary_type, n_train_demos, BEC_depth=1, visualize_summary=False):
+def obtain_BEC_summary(data_loc, aug_taxi, n_env, weights, step_cost_flag, summary_type, summary_variant, n_train_demos, BEC_depth=1, visualize_summary=False):
     try:
         with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
             BEC_summary = pickle.load(f)
@@ -96,7 +96,7 @@ def obtain_BEC_summary(data_loc, aug_taxi, n_env, weights, step_cost_flag, summa
             with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
                 BEC_summary = pickle.load(f)
         except:
-            BEC_summary = BEC.obtain_summary(wt_vi_traj_candidates, min_BEC_constraints, unique_BEC_lengths, unique_BEC_bins, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=n_train_demos)
+            BEC_summary = BEC.obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, unique_BEC_lengths, unique_BEC_bins, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=n_train_demos)
             with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
                 pickle.dump(BEC_summary, f)
 
@@ -165,9 +165,8 @@ if __name__ == "__main__":
     # c) obtain a BEC summary of the agent's policy
     BEC_summary = obtain_BEC_summary(params.data_loc['BEC'], params.aug_taxi, params.n_env,
                                                   params.weights['val'], params.step_cost_flag,
-                                                  params.BEC['summary_type'], params.BEC['n_train_demos'], BEC_depth=params.BEC['depth'],
+                                                  params.BEC['summary_type'], params.BEC['summary_variant'], params.BEC['n_train_demos'], BEC_depth=params.BEC['depth'],
                                                   visualize_summary=True)
-
     # d) obtain test environments
     obtain_test_environments(params.data_loc['BEC'], params.aug_taxi, params.weights['val'], params.n_env, params.BEC,
                              params.step_cost_flag, summary=BEC_summary, visualize_test_env=True)

@@ -40,29 +40,36 @@ step_cost_flag = True    # indicates that the last weight element is a known ste
                          # weight vector if step_cost_flag = False, and a 3D weight vector if step_cost_flag = True
 
 # Joint BIRL and BEC parameters
-n_env = 256                           # number of environments to consider
-                                      # tip: select so that np.log(n_env) / np.log(2) yields an int for predictable
-                                      # behavior see ps_helpers.obtain_env_policies()
+n_env = 256                                   # number of environments to consider
+                                              # tip: select so that np.log(n_env) / np.log(2) yields an int for predictable
+                                              # behavior see ps_helpers.obtain_env_policies()
 
 # BEC parameters
 BEC = {
-    'summary_type': 'policy',           # demo or policy: whether constratints are extraced from just the optimal demo from the
-                                      # starting state or from all possible states from the full policy
-    'depth': 1,                       # number of suboptimal actions to take before following the optimal policy to obtain the
-                                      # suboptimal trajectory (and the corresponding suboptimal expected feature counts)
-    'n_test_demos': 1,                # number of desired test environments
+    'summary_type': 'policy',                 # demo or policy: whether constratints are extraced from just the optimal demo from the
+                                              # starting state or from all possible states from the full policy
 
-    'n_train_demos': 4,
+    'summary_variant': ['forward', 'easy'],   # ['low' or 'medium' or 'highest']: demonstrations based on expected information
+                                              # transfer to a perfect IRL agent, ['forward' or 'backward', 'easy' or 'hard']:
+                                              # demonstrations that utilize scaffolding and ease metrics (visual similarity,
+                                              # visual simplicity, etc) respectively
 
-    'test_difficulty': 'hard'
+    'n_train_demos': 2,                       # number of desired training demonstrations
+
+    'n_test_demos': 5,                        # number of desired test demonstration
+
+    'depth': 1,                               # number of suboptimal actions to take before following the optimal policy to obtain the
+                                              # suboptimal trajectory (and the corresponding suboptimal expected feature counts)
+
+    'test_difficulty': 'hard'                 # expected ease for human to correctly predict the agent's actions in this test environment
 }
 
 # BIRL parameters
-n_wt = 1                              # total number of weight candidates (including the ground truth)
-                                      # tip: select n_wt to such that n_wt_partitions is an int to ensure that the exact
-                                      # number of desired weight candidates is actually incorporated. see ps_helpers.discretize_wt_candidates()
-                                      # also note that n_wt = n_wt_partitions ** (# of weights you're discretizing over) + 1
-iter_idx = None                       # weight dimension to discretize over. If None, discretize uniformly over all dimensions
+n_wt = 1                                      # total number of weight candidates (including the ground truth)
+                                              # tip: select n_wt to such that n_wt_partitions is an int to ensure that the exact
+                                              # number of desired weight candidates is actually incorporated. see ps_helpers.discretize_wt_candidates()
+                                              # also note that n_wt = n_wt_partitions ** (# of weights you're discretizing over) + 1
+iter_idx = None                               # weight dimension to discretize over. If None, discretize uniformly over all dimensions
 
 if iter_idx == None:
     data_loc_BIRL = str(n_env) + '_env/' + str(n_wt) + '_wt_' + 'uniform'
