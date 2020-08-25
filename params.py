@@ -1,25 +1,46 @@
 import numpy as np
 
-aug_taxi = {
-    'agent': {'x': 4, 'y': 1, 'has_passenger': 0},
-    'walls': [{'x': 1, 'y': 3, 'fee': 1}, {'x': 1, 'y': 2, 'fee': 1}],
-    'passengers': [{'x': 4, 'y': 1, 'dest_x': 1, 'dest_y': 1, 'in_taxi': 0}],
-    'tolls': [{'x': 3, 'y': 1, 'fee': 1}],
-    'traffic': [],  # probability that you're stuck
-    'fuel_station': [],
-    'width': 4,
-    'height': 3,
-    'gamma': 1
-}
+mdp_class = 'augmented_taxi'
+# mdp_class = 'two_goal'
+
+if mdp_class == 'augmented_taxi':
+    w = np.array([[26, -3, -1]])
+
+    mdp_parameters = {
+        'agent': {'x': 4, 'y': 1, 'has_passenger': 0},
+        'walls': [{'x': 1, 'y': 3}, {'x': 1, 'y': 2}],
+        'passengers': [{'x': 4, 'y': 1, 'dest_x': 1, 'dest_y': 1, 'in_taxi': 0}],
+        'tolls': [{'x': 3, 'y': 1, 'fee': 1}],
+        'traffic': [],  # probability that you're stuck
+        'fuel_station': [],
+        'width': 4,
+        'height': 3,
+        'gamma': 1,
+        'env_code': [],
+        'weights': w / np.linalg.norm(w[0, :], ord=1),
+        'weights_lb': w,
+        'weights_ub': w
+    }
+elif mdp_class == 'two_goal':
+    w = np.array([[7.25, 10.5, -1]])
+
+    mdp_parameters = {
+        'agent': {'x': 3, 'y': 5},
+        'goals': [{'x': 1, 'y': 1}, {'x': 5, 'y': 2}],
+        'walls': [],
+        'width': 5,
+        'height': 5,
+        'gamma': 1,
+        'env_code': [],
+        'weights': w / np.linalg.norm(w[0, :], ord=1),
+        'weights_lb': w,
+        'weights_ub': w
+    }
+else:
+    raise Exception("Unknown MDP class.")
 
 # Based on Pygame's key constants
 keys_map = ['K_UP', 'K_DOWN', 'K_LEFT', 'K_RIGHT', 'K_p', 'K_d', 'K_7', 'K_8', 'K_9', 'K_0']
-
-# w = np.array([[26, -5, -1]])
-# w = np.array([[26, -4, -1]])
-w = np.array([[26, -3, -1]])
-# w = np.array([[26, -2, -1]])
-# w = np.array([[26, -1, -1]])
 
 # reward weight parameters (on the goal with the passenger, on a toll, step cost).
 # assume the L1 norm of the weights is equal 1. WLOG
@@ -40,7 +61,7 @@ step_cost_flag = True    # indicates that the last weight element is a known ste
                          # weight vector if step_cost_flag = False, and a 3D weight vector if step_cost_flag = True
 
 # Joint BIRL and BEC parameters
-n_env = 256                                   # number of environments to consider
+n_env = 64                                   # number of environments to consider
                                               # tip: select so that np.log(n_env) / np.log(2) yields an int for predictable
                                               # behavior see ps_helpers.obtain_env_policies()
 
@@ -54,7 +75,7 @@ BEC = {
                                               # demonstrations that utilize scaffolding and ease metrics (visual similarity,
                                               # visual simplicity, etc) respectively
 
-    'n_train_demos': 2,                       # number of desired training demonstrations
+    'n_train_demos': 4,                       # number of desired training demonstrations
 
     'n_test_demos': 5,                        # number of desired test demonstration
 
@@ -91,6 +112,6 @@ BIRL = {
 
 data_loc = {
     'base': 'base',
-    'BEC': str(n_env) + '_env',
+    'BEC': mdp_class,
     'BIRL': data_loc_BIRL
 }

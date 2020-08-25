@@ -12,6 +12,7 @@ from simple_rl.planning import ValueIteration
 from simple_rl.agents import FixedPolicyAgent
 from simple_rl.utils import mdp_helpers
 from policy_summarization import BEC_helpers
+from simple_rl.utils import make_mdp
 
 def sample_wt_candidates(data_loc, weights, step_cost_flag, n_samples, sample_radius):
     '''
@@ -84,19 +85,19 @@ def discretize_wt_candidates(data_loc, weights, weights_lb, weights_ub, step_cos
             # if the last element of the reward weight vector is the step cost,
             if step_cost_flag:
                 mesh = np.array(np.meshgrid(
-                    *[np.linspace(weights_lb[x], weights_ub[x], n_wt_partitions) for x in np.arange(len(weights[0]) - 1)]))
+                    *[np.linspace(weights_lb[0][x], weights_ub[0][x], n_wt_partitions) for x in np.arange(len(weights[0]) - 1)]))
                 wt_uniform_sampling = np.hstack([mesh[x].reshape(-1, 1) for x in np.arange(len(weights[0]) - 1)])
                 wt_uniform_sampling = np.hstack((wt_uniform_sampling, weights[0, -1] * np.ones((wt_uniform_sampling.shape[0], 1))))
             else:
                 mesh = np.array(np.meshgrid(
-                    *[np.linspace(weights_lb[x], weights_ub[x], n_wt_partitions) for x in np.arange(len(weights[0]))]))
+                    *[np.linspace(weights_lb[0][x], weights_ub[0][x], n_wt_partitions) for x in np.arange(len(weights[0]))]))
                 wt_uniform_sampling = np.hstack([mesh[x].reshape(-1, 1) for x in np.arange(len(weights[0]))])
             wt_uniform_sampling = np.vstack((wt_uniform_sampling, weights))
             wt_uniform_sampling = wt_uniform_sampling.reshape(wt_uniform_sampling.shape[0], 1,
                                                               wt_uniform_sampling.shape[1])  # for future dot products
         # uniformly discretize only over the desired reward weight dimension
         else:
-            discretized_weights = np.linspace(weights_lb[iter_idx], weights_ub[iter_idx], n_wt_partitions)
+            discretized_weights = np.linspace(weights_lb[0][iter_idx], weights_ub[0][iter_idx], n_wt_partitions)
             wt_uniform_sampling = np.tile(weights, (len(discretized_weights), 1))
             wt_uniform_sampling[:, iter_idx] = discretized_weights
             wt_uniform_sampling = np.vstack((wt_uniform_sampling, weights))
@@ -107,64 +108,20 @@ def discretize_wt_candidates(data_loc, weights, weights_lb, weights_ub, step_cos
 
     return wt_uniform_sampling
 
-def generate_mdp_obj(mdp_code):
-    '''
-    :param mdp_code: Vector representation of an augmented taxi environment (list of binary values)
-    :return: Corresponding passenger and toll objects and code that specifically only concerns the environment (and not
-    the initial state) of the MDP
-    '''
-
-    requested_passenger = [{"x": 4, "y": 1, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
-
-    # the last eight entries currently dictate the presence of tolls
-    available_tolls = [{"x": 2, "y": 3, "fee": 1}, {"x": 3, "y": 3, "fee": 1}, {"x": 4, "y": 3, "fee": 1},
-               {"x": 2, "y": 2, "fee": 1}, {"x": 3, "y": 2, "fee": 1}, {"x": 4, "y": 2, "fee": 1},
-               {"x": 2, "y": 1, "fee": 1}, {"x": 3, "y": 1, "fee": 1}]
-
-    requested_tolls = []
-
-    # offset can facilitate additional MDP information present in the code before toll information
-    offset = 0
-    for x in range(offset, len(mdp_code)):
-        entry = mdp_code[x]
-        if entry:
-            requested_tolls.append(available_tolls[x - offset])
-
-    # note that what's considered mdp_code (potentially includes both initial state and environment info) and env_code
-    # (only includes environment info) will always need to be manually defined
-    return requested_passenger, requested_tolls, mdp_code
-
-# hard-coded in order to evaluate hand-designed environments
-def hand_generate_mdp_obj(mdp_code):
-
-    # a) for resolving weight of toll
-    if mdp_code == [0, 0]:
-        requested_passenger = [{"x": 4, "y": 1, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
-        requested_tolls = [{"x": 3, "y": 1, "fee": 1}, {"x": 3, "y": 2, "fee": 1}]  # upperbound
-    elif mdp_code == [0, 1]:
-        requested_passenger = [{"x": 4, "y": 1, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
-        requested_tolls = [{"x": 3, "y": 1, "fee": 1}]                              # lowerbound
-    # b) for resolving weight of dropping off passenger
-    elif mdp_code == [1, 0]:
-        requested_passenger = [{"x": 2, "y": 3, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
-        requested_tolls = [{"x": 2, "y": 3, "fee": 1}, {"x": 3, "y": 3, "fee": 1}, {"x": 4, "y": 3, "fee": 1},
-                   {"x": 2, "y": 2, "fee": 1}, {"x": 3, "y": 2, "fee": 1}, {"x": 2, "y": 1, "fee": 1},
-                   {"x": 3, "y": 1, "fee": 1}]                              # lowerbound
-    else:
-        requested_passenger = [{"x": 2, "y": 3, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
-        requested_tolls = [{"x": 2, "y": 3, "fee": 1}, {"x": 3, "y": 3, "fee": 1}, {"x": 4, "y": 3, "fee": 1},
-                   {"x": 2, "y": 2, "fee": 1}, {"x": 3, "y": 2, "fee": 1}, {"x": 4, "y": 2, "fee": 1},
-                   {"x": 2, "y": 1, "fee": 1}, {"x": 3, "y": 1, "fee": 1}]  # upperbound
-
-    return requested_passenger, requested_tolls, mdp_code
-
-def obtain_env_policies(data_loc, n_env, wt_candidates, aug_taxi, save_type):
+def obtain_env_policies(mdp_class, data_loc, n_env, wt_candidates, mdp_parameters, save_type):
     '''
     Summary: come up with an optimal policy for each of the candidates
     '''
 
-    # generate codes that govern passenger's initial position and status of the eight tolls in the 4x3 environment
-    mdp_codes = list(map(list, itertools.product([0, 1], repeat=int(np.log(n_env) / np.log(2)))))
+    if mdp_class == 'augmented_taxi':
+        # generate codes that govern the binary status of the eight tolls
+        mdp_codes = list(map(list, itertools.product([0, 1], repeat=int(np.log(n_env) / np.log(2)))))
+    elif mdp_class == 'two_goal':
+        # generate codes that govern the binary status of the walls
+        # todo: I feel like each environment should actually have its own folder (rather than being associated with a number of environments)
+        mdp_codes = list(map(list, itertools.product([0, 1], repeat=int(np.log(n_env) / np.log(2)))))
+    else:
+        raise Exception("Unknown MDP class.")
 
     save_mark = 750
     if save_type == 'ground_truth':
@@ -196,19 +153,40 @@ def obtain_env_policies(data_loc, n_env, wt_candidates, aug_taxi, save_type):
     if n_processed_envs < len(mdp_codes):
         for env_idx in range(n_processed_envs, len(mdp_codes)):
             mdp_code = mdp_codes[env_idx]
-            # note that this is specially accommodates the four hand-designed environments
-            if len(mdp_codes) == 4:
-                passengers, tolls, env_code = hand_generate_mdp_obj(mdp_code)
+
+            if mdp_class == 'augmented_taxi':
+                # note that this is specially accommodates the four hand-designed environments
+                if len(mdp_codes) == 4:
+                    passengers, tolls, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
+                else:
+                    passengers, tolls, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code)
+
+                mdp_parameters['passengers'] = passengers
+                mdp_parameters['tolls'] = tolls
+                mdp_parameters['env_code'] = env_code
+            elif mdp_class == 'two_goal':
+                # note that this is specially accommodates the four hand-designed environments
+                if len(mdp_codes) == 4:
+                        walls, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
+                else:
+                    walls, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code)
+
+                mdp_parameters['walls'] = walls
+                mdp_parameters['env_code'] = env_code
             else:
-                passengers, tolls, env_code = generate_mdp_obj(mdp_code)
-            wt_counter = 0
+                raise Exception("Unknown MDP class.")
+
             # a per-environment tuple of corresponding reward weight, optimal policy, and optimal trajectory
             wt_vi_traj_env = []
+            wt_counter = 0
             for wt_candidate in wt_candidates:
-                mdp_candidate = AugmentedTaxiOOMDP(width=aug_taxi['width'], height=aug_taxi['height'], agent=aug_taxi['agent'],
-                                   walls=aug_taxi['walls'], passengers=passengers, tolls=tolls,
-                                   traffic=aug_taxi['traffic'], fuel_stations=aug_taxi['fuel_station'],
-                                                   gamma=aug_taxi['gamma'], weights=wt_candidate, env_code=env_code)
+                mdp_parameters['weights'] = wt_candidate
+                if mdp_class == 'augmented_taxi':
+                    mdp_candidate = make_mdp.make_custom_mdp('augmented_taxi', mdp_parameters)
+                elif mdp_class == 'two_goal':
+                    mdp_candidate = make_mdp.make_custom_mdp('two_goal', mdp_parameters)
+                else:
+                    raise Exception("Unknown MDP class.")
 
                 # parameters tailored to the 4x3 Augmented Taxi Domain
                 vi_candidate = ValueIteration(mdp_candidate, sample_rate=1, max_iterations=50)
@@ -254,20 +232,23 @@ def _in_summary(mdp, summary, initial_state):
             return True
     return False
 
-def select_test_demos(lowerbound, upperbound, n_desired_test_env, wt_vi_traj_candidates, unique_idxs, env_record_sorted, traj_opts_sorted, BEC_lengths_sorted, BEC_constraints_sorted, type='random'):
+def select_test_demos(lowerbound, upperbound, n_desired_test_env, wt_vi_traj_candidates, unique_BEC_bins, env_record_sorted, traj_opts_sorted, BEC_lengths_sorted, BEC_constraints_sorted, type='random'):
     if type == 'random':
         # a) random selection of test demonstrations
+        test_demo_idxs = []
         test_unique_idxs = []
-        while len(test_unique_idxs) < n_desired_test_env:
+        while len(test_demo_idxs) < n_desired_test_env:
             test_unique_idx = random.randint(lowerbound, upperbound)
-            if test_unique_idx not in test_unique_idxs:
-                test_unique_idxs.append(test_unique_idx)
-
+            # try and find a unique BEC length unless you've already exhausted all of your options
+            if test_unique_idx not in test_unique_idxs or (len(test_unique_idxs) >= (upperbound - lowerbound + 1)):
+                covering_demo_idxs = [i for i, x in enumerate(unique_BEC_bins) if x == test_unique_idx]
+                covering_demo_idx = random.choice(covering_demo_idxs)
+                if covering_demo_idx not in test_demo_idxs:
+                    test_demo_idxs.append(covering_demo_idx)
+                    test_unique_idxs.append(test_unique_idx)
     else:
-        # b) equally spaced selection of test demonstrations
+        # b) equally spaced selection of test demonstrations (outdated)
         test_unique_idxs = np.linspace(upperbound, lowerbound, n_desired_test_env + 1, endpoint=False)[1:].astype(int)
-
-    test_demo_idxs = [unique_idxs[j] for j in test_unique_idxs]
 
     test_wt_vi_traj_tuples = [copy.deepcopy(wt_vi_traj_candidates[k][0]) for k in
                               env_record_sorted[test_demo_idxs]]
@@ -314,7 +295,7 @@ def obtain_test_environments(wt_vi_traj_candidates, min_subset_constraints_recor
 
     # again sorted in order from smallest to largest, only selecting unique BEC lengths (as demos with the same
     # BEC lengths are often quite similar). could also factor in visual complexity here as well
-    unique_BEC_lengths, unique_idxs = np.unique(np.array(BEC_lengths_sorted).round(decimals=5), return_index=True)
+    unique_BEC_lengths, unique_BEC_bins = np.unique(np.array(BEC_lengths_sorted).round(decimals=5), return_inverse=True)
 
     if BEC_summary_type == 'demo':
         # demo test environment generation is outdated
@@ -331,10 +312,10 @@ def obtain_test_environments(wt_vi_traj_candidates, min_subset_constraints_recor
     else:
         # must update the wt_vi_traj_candidate with the right initial state and trajectory
         if difficulty == 'hard':
-            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(0, np.floor(1 * (len(unique_idxs) - 1) / 3), n_desired_test_env, wt_vi_traj_candidates, unique_idxs, env_record_sorted, traj_opts_sorted, BEC_lengths_sorted, BEC_constraints_sorted)
+            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(0, np.floor(1 * (len(unique_BEC_lengths) - 1) / 3), n_desired_test_env, wt_vi_traj_candidates, unique_BEC_bins, env_record_sorted, traj_opts_sorted, BEC_lengths_sorted, BEC_constraints_sorted)
         elif difficulty == 'medium':
-            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(np.floor(1 * (len(unique_idxs) - 1) / 3), np.floor(2 * (len(unique_idxs) - 1) / 3), n_desired_test_env, wt_vi_traj_candidates, unique_idxs, env_record_sorted, traj_opts_sorted, BEC_lengths_sorted, BEC_constraints_sorted)
+            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(np.floor(1 * (len(unique_BEC_lengths) - 1) / 3), np.floor(2 * (len(unique_BEC_lengths) - 1) / 3), n_desired_test_env, wt_vi_traj_candidates, unique_BEC_bins, env_record_sorted, traj_opts_sorted, BEC_lengths_sorted, BEC_constraints_sorted)
         else:
-            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(np.floor(2 * (len(unique_idxs) - 1) / 3), len(unique_idxs) - 1, n_desired_test_env, wt_vi_traj_candidates, unique_idxs, env_record_sorted, traj_opts_sorted, BEC_lengths_sorted, BEC_constraints_sorted)
+            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(np.floor(2 * (len(unique_BEC_lengths) - 1) / 3), len(unique_BEC_lengths) - 1, n_desired_test_env, wt_vi_traj_candidates, unique_BEC_bins, env_record_sorted, traj_opts_sorted, BEC_lengths_sorted, BEC_constraints_sorted)
 
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints
