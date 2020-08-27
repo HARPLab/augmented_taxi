@@ -1,11 +1,11 @@
-''' Helper functions for executing actions in the Taxi Problem '''
+''' Helper functions for executing actions in the Two Goal Problem '''
 
 # Other imports.
 
 def is_wall(mdp, x, y):
     '''
     Args:
-        state (TaxiState)
+        state (TwoGoalState)
         x (int) [agent's x]
         y (int) [agent's y]
 
@@ -20,7 +20,7 @@ def is_wall(mdp, x, y):
 def _is_wall_in_the_way(mdp, state, dx=0, dy=0):
     '''
     Args:
-        state (TaxiState)
+        state (TwoGoalState)
         dx (int) [optional]
         dy (int) [optional]
 
