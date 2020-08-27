@@ -195,13 +195,13 @@ class CookieCrumbOOMDP(OOMDP):
     def visualize_agent(self, agent, width_scr_scale=180, height_scr_scale=180):
         from simple_rl.utils.mdp_visualizer import visualize_agent
         from .cookie_crumb_visualizer import _draw_state
-        visualize_agent(self, agent, _draw_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
+        visualize_agent(self, agent, _draw_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='cookie_crumb')
 
     # Press <1>, <2>, <3>, and so on to execute action 1, action 2, etc.
     def visualize_interaction(self, interaction_callback=None, done_callback=None, keys_map=None, width_scr_scale=180, height_scr_scale=180):
         from simple_rl.utils.mdp_visualizer import visualize_interaction
         from .cookie_crumb_visualizer import _draw_state
-        trajectory = visualize_interaction(self, _draw_state, interaction_callback=interaction_callback, done_callback=done_callback, keys_map=keys_map, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
+        trajectory = visualize_interaction(self, _draw_state, interaction_callback=interaction_callback, done_callback=done_callback, keys_map=keys_map, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='cookie_crumb')
         return trajectory
 
     # Visualize the value of each of the grid cells. --> Color corresponds to higher value.
@@ -238,7 +238,7 @@ class CookieCrumbOOMDP(OOMDP):
         from simple_rl.utils.mdp_visualizer import visualize_trajectory
         from .cookie_crumb_visualizer import _draw_state
 
-        visualize_trajectory(self, trajectory, _draw_state, marked_state_importances=marked_state_importances, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
+        visualize_trajectory(self, trajectory, _draw_state, marked_state_importances=marked_state_importances, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='cookie_crumb')
 
     # ----------------------------
     # -- Action Implementations --

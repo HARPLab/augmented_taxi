@@ -106,6 +106,36 @@ def _draw_lower_left_text(state, screen, score=-1):
     state_text = title_font.render(formatted_state_text, True, (46, 49, 49))
     screen.blit(state_text, state_text_point)
 
+def _draw_terminal_text(mdp_class, cur_state, scr_width, scr_height, title_font):
+    if mdp_class == 'augmented_taxi':
+        if cur_state.is_goal():
+            goal_text = "Dropped off the passenger!"
+        else:
+            goal_text = "Decided not to drop off the passenger!"
+    elif mdp_class == 'two_goal':
+        if cur_state.is_goal():
+            goal_text = "Arrived at a goal!"
+        else:
+            goal_text = "Decided to not go to either goal!"
+    elif mdp_class == 'cookie_crumb':
+        if cur_state.is_goal():
+            goal_text = "Arrived at the goal!"
+        else:
+            goal_text = "Decided to not go to the goal!"
+    else:
+        if cur_state.is_goal():
+            # Done! Agent found goal.
+            goal_text = "Success!"
+        else:
+            # Done! Agent failed.
+            goal_text = "Fail!"
+
+    goal_text_rendered = title_font.render(goal_text, True, (206, 147, 66))
+    goal_text_point = scr_width / 2.0 - (len(goal_text) * 7), 18 * scr_height / 20.0
+
+    return goal_text_rendered, goal_text_point
+
+
 def visualize_state(mdp, draw_state, cur_state=None, scr_width=720, scr_height=720):
     '''
     Args:
@@ -348,7 +378,7 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
                 pygame.display.quit()
                 return
 
-def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=None, cur_state=None, scr_width=720, scr_height=720):
+def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=None, cur_state=None, scr_width=720, scr_height=720, mdp_class=None):
     '''
     Args:
         mdp (MDP)
@@ -405,14 +435,7 @@ def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=N
         pygame.display.flip()
 
     if cur_state.is_terminal():
-        if cur_state.is_goal():
-            # Done! Agent found goal.
-            goal_text = "Dropped off the passenger!"
-        else:
-            # Done! Agent failed.
-            goal_text = "Decided not to pick up the passenger!"
-        goal_text_rendered = title_font.render(goal_text, True, (206, 147, 66))
-        goal_text_point = scr_width / 2.0 - (len(goal_text)*7), 18*scr_height / 20.0
+        goal_text_rendered, goal_text_point = _draw_terminal_text(mdp_class, cur_state, scr_width, scr_height, title_font)
         screen.blit(goal_text_rendered, goal_text_point)
 
     pygame.display.flip()
@@ -427,7 +450,7 @@ def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=N
                 return
 
 
-def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_height=720):
+def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_height=720, mdp_class=None):
     '''
     Args:
         mdp (MDP)
@@ -473,14 +496,7 @@ def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_h
                 step += 1
 
         if cur_state.is_terminal():
-            if cur_state.is_goal():
-                # Done! Agent found goal.
-                goal_text = "Success!"
-            else:
-                # Done! Agent failed.
-                goal_text = "Fail!"
-            goal_text_rendered = title_font.render(goal_text, True, (206, 147, 66))
-            goal_text_point = scr_width / 2.0 - (len(goal_text)*7), 18*scr_height / 20.0
+            goal_text_rendered, goal_text_point = _draw_terminal_text(mdp_class, cur_state, scr_width, scr_height, title_font)
             screen.blit(goal_text_rendered, goal_text_point)
             done = True
             print('Cumulative reward: {}'.format(cumulative_reward))
@@ -496,7 +512,7 @@ def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_h
                 pygame.display.quit()
                 return
 
-def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=None, done_callback=None, keys_map=None, scr_width=720, scr_height=720):
+def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=None, done_callback=None, keys_map=None, scr_width=720, scr_height=720, mdp_class=None):
     '''
     Args:
         mdp (MDP)
@@ -556,14 +572,7 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
 
                 step += 1
         if cur_state.is_terminal():
-            if cur_state.is_goal():
-                # Done! Agent found goal.
-                goal_text = "Success!"
-            else:
-                # Done! Agent failed.
-                goal_text = "Fail!"
-            goal_text_rendered = title_font.render(goal_text, True, (246, 207, 106))
-            goal_text_point = scr_width / 2.0 - (len(goal_text)*7), 18*scr_height / 20.0
+            goal_text_rendered, goal_text_point = _draw_terminal_text(mdp_class, cur_state, scr_width, scr_height, title_font)
             screen.blit(goal_text_rendered, goal_text_point)
             done = True
             if done_callback is not None:

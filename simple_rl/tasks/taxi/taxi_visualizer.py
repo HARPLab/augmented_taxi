@@ -147,21 +147,25 @@ def _draw_state(screen,
         dest_col = (int(max(color_ls[-i-1][0]-30, 0)), int(max(color_ls[-i-1][1]-30, 0)), int(max(color_ls[-i-1][2]-30, 0)))
         pygame.draw.rect(screen, dest_col, top_left_point + (cell_width / 6, cell_height / 6), 0)
 
-    # Draw the passengers.
-    for i, p in enumerate(objects["passenger"]):
-        # Passenger
-        pass_x, pass_y = p["x"], p["y"]
-        taxi_size = int(min(cell_width, cell_height) / 8.5) if p["in_taxi"] else int(min(cell_width, cell_height) / 5.0)
-        top_left_point = int(width_buffer + cell_width*(pass_x - 1) + taxi_size + 38) , int(height_buffer + cell_height*(taxi_oomdp.height - pass_y) + taxi_size + 35)
-        dest_col = (max(color_ls[-i-1][0]-30, 0), max(color_ls[-i-1][1]-30, 0), max(color_ls[-i-1][2]-30, 0))
-        pygame.draw.circle(screen, dest_col, top_left_point, taxi_size)
-
     # Draw new agent.
     top_left_point = width_buffer + cell_width * (agent_x - 1), height_buffer + cell_height * (
                 taxi_oomdp.height - agent_y)
     agent_center = int(top_left_point[0] + cell_width / 2.0), int(top_left_point[1] + cell_height / 2.0)
     agent_shape = _draw_agent(agent_center, screen, base_size=min(cell_width, cell_height) / 2.5 - 4)
 
+    # Draw the passengers.
+    for i, p in enumerate(objects["passenger"]):
+        # Passenger
+        pass_x, pass_y = p["x"], p["y"]
+        taxi_size = int(min(cell_width, cell_height) / 9.0) if p["in_taxi"] else int(min(cell_width, cell_height) / 5.0)
+        if p["in_taxi"]:
+            top_left_point = int(width_buffer + cell_width * (pass_x - 1) + taxi_size + 58), int(
+                height_buffer + cell_height * (taxi_oomdp.height - pass_y) + taxi_size + 16)
+        else:
+            top_left_point = int(width_buffer + cell_width * (pass_x - 1) + taxi_size + 47), int(
+                height_buffer + cell_height * (taxi_oomdp.height - pass_y) + taxi_size + 38)
+        dest_col = (max(color_ls[-i-1][0]-30, 0), max(color_ls[-i-1][1]-30, 0), max(color_ls[-i-1][2]-30, 0))
+        pygame.draw.circle(screen, dest_col, top_left_point, taxi_size)
 
     if draw_statics:
         # For each row:

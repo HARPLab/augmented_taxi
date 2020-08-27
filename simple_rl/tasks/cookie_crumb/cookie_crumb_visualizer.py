@@ -9,6 +9,7 @@ except ImportError:
     print("Warning: pygame not installed (needed for visuals).")
 
 # Other imports.
+import math
 from simple_rl.utils.chart_utils import color_ls
 from simple_rl.planning import ValueIteration
 from simple_rl.utils import mdp_visualizer as mdpv
@@ -88,16 +89,23 @@ def _draw_state(screen,
     for i, c in enumerate(objects["crumb"]):
         # Dest.
         x, y = c["x"], c["y"]
-        top_left_point = int(width_buffer + cell_width*(x - 1) + 25), int(height_buffer + cell_height*(cookie_crumb_oomdp.height - y) + 25)
-        dest_col = (int(max(color_ls[-i-1][0]-30, 0)), int(max(color_ls[-i-1][1]-30, 0)), int(max(color_ls[-i-1][2]-30, 0)))
-        pygame.draw.rect(screen, dest_col, top_left_point + (cell_width / 6, cell_height / 6), 0)
+        top_left_point = int(width_buffer + cell_width*(x - 1) + 70), int(height_buffer + cell_height*(cookie_crumb_oomdp.height - y) + 65)
+        dest_col = (int(max(color_ls[0][0]-30, 0)), int(max(color_ls[0][1]-30, 0)), int(max(color_ls[0][2]-30, 0)))
+
+        n, r = 6, cell_width / 8
+        x, y = top_left_point[0], top_left_point[1]
+        color = dest_col
+        pygame.draw.polygon(screen, color, [
+            (x + r * math.cos(2 * math.pi * i / n), y + r * math.sin(2 * math.pi * i / n))
+            for i in range(n)
+        ])
 
     # Draw the two goals
     for i, g in enumerate(cookie_crumb_oomdp.goals):
         dest_x, dest_y = g["x"], g["y"]
-        top_left_point = int(width_buffer + cell_width*(dest_x - 1) + 25), int(height_buffer + cell_height*(cookie_crumb_oomdp.height - dest_y) + 25)
-        dest_col = (int(max(color_ls[-i-1][0]-30, 0)), int(max(color_ls[-i-1][1]-30, 0)), int(max(color_ls[-i-1][2]-30, 0)))
-        pygame.draw.rect(screen, dest_col, top_left_point + (cell_width / 6, cell_height / 6), 0)
+        top_left_point = int(width_buffer + cell_width*(dest_x - 1) + 37), int(height_buffer + cell_height*(cookie_crumb_oomdp.height - dest_y) + 34)
+        dest_col = (int(max(color_ls[i+4][0]-30, 0)), int(max(color_ls[i+4][1]-30, 0)), int(max(color_ls[i+4][2]-30, 0)))
+        pygame.draw.rect(screen, dest_col, top_left_point + (cell_width / 2, cell_height / 2))
 
     # Draw new agent.
     top_left_point = width_buffer + cell_width * (agent_x - 1), height_buffer + cell_height * (
