@@ -23,14 +23,14 @@ from simple_rl.tasks.two_goal import two_goal_helpers
 
 
 class TwoGoalOOMDP(OOMDP):
-    ''' Class for a Taxi OO-MDP '''
+    ''' Class for a Two Goal OO-MDP '''
 
     # Static constants.
     ACTIONS = ["up", "down", "left", "right", "exit"]
     ATTRIBUTES = ["x", "y", "dest_x", "dest_y"]
     CLASSES = ["agent", "wall", "goal"]
 
-    def __init__(self, width, height, agent, walls, goals, slip_prob=0, gamma=0.99, step_cost=0, weights=None, env_code=None):
+    def __init__(self, width, height, agent, walls, goals, slip_prob=0, gamma=0.99, step_cost=0, weights=None, env_code=None, sample_rate=5):
         self.env_code = env_code
         self.height = height
         self.width = width
@@ -58,8 +58,8 @@ class TwoGoalOOMDP(OOMDP):
         self.exit_state = self._create_state(OOMDPObject(attributes=agent_exit, name="agent_exit"))
         self.exit_state.set_terminal(True)
         self.exit_state.set_goal(False)
-        OOMDP.__init__(self, TwoGoalOOMDP.ACTIONS, self._taxi_transition_func, self._taxi_reward_func,
-                       init_state=init_state, gamma=gamma, step_cost=step_cost)
+        OOMDP.__init__(self, TwoGoalOOMDP.ACTIONS, self._two_goal_transition_func, self._two_goal_reward_func,
+                       init_state=init_state, gamma=gamma, step_cost=step_cost, sample_rate=sample_rate)
 
     def _create_state(self, agent_oo_obj):
         '''
@@ -83,7 +83,7 @@ class TwoGoalOOMDP(OOMDP):
 
         return TwoGoalState(objects)
 
-    def _taxi_reward_func(self, state, action, next_state=None):
+    def _two_goal_reward_func(self, state, action, next_state=None):
         '''
         Args:
             state (OOMDP State)
@@ -144,7 +144,7 @@ class TwoGoalOOMDP(OOMDP):
         return reward_features
 
 
-    def _taxi_transition_func(self, state, action):
+    def _two_goal_transition_func(self, state, action):
         '''
         Args:
             state (State)
@@ -189,7 +189,7 @@ class TwoGoalOOMDP(OOMDP):
         return next_state
 
     def __str__(self):
-        return "taxi_h-" + str(self.height) + "_w-" + str(self.width)
+        return "two_goal_h-" + str(self.height) + "_w-" + str(self.width)
 
     # Visualize the agent's policy. --> Press <spacebar> to advance the agent.
     def visualize_agent(self, agent, width_scr_scale=180, height_scr_scale=180):
@@ -205,14 +205,12 @@ class TwoGoalOOMDP(OOMDP):
         return trajectory
 
     # Visualize the value of each of the grid cells. --> Color corresponds to higher value.
-    # (Currently not very helpful - see first comment in taxi_visualizer.py)
     def visualize_value(self, agent=None, width_scr_scale=180, height_scr_scale=180):
         from simple_rl.utils.mdp_visualizer import visualize_value
         from .two_goal_visualizer import _draw_state
         visualize_value(self, _draw_state, agent, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
 
     # Visualize the optimal action for each of the grid cells
-    # (Currently not very helpful - see first comment in taxi_visualizer.py)
     def visualize_policy(self, policy, width_scr_scale=180, height_scr_scale=180):
         from simple_rl.utils.mdp_visualizer import visualize_policy
         from .two_goal_visualizer import _draw_state
@@ -305,8 +303,7 @@ def _error_check(state, action):
 
 def main():
     agent = {"x":1, "y":1, "has_passenger":0}
-    passengers = [{"x":8, "y":4, "dest_x":2, "dest_y":2, "in_taxi":0}]
-    two_goal_world = TwoGoalOOMDP(10, 10, agent=agent, walls=[], passengers=passengers)
+    two_goal_world = TwoGoalOOMDP(10, 10, agent=agent, walls=[])
 
 if __name__ == "__main__":
     main()

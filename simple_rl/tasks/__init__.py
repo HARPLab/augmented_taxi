@@ -26,6 +26,8 @@ from simple_rl.tasks.taxi.AugmentedTaxiOOMDPClass import AugmentedTaxiOOMDP
 from simple_rl.tasks.taxi.AugmentedTaxiStateClass import AugmentedTaxiState
 from simple_rl.tasks.two_goal.TwoGoalOOMDPClass import TwoGoalOOMDP
 from simple_rl.tasks.two_goal.TwoGoalStateClass import TwoGoalState
+from simple_rl.tasks.cookie_crumb.CookieCrumbOOMDPClass import CookieCrumbOOMDP
+from simple_rl.tasks.cookie_crumb.CookieCrumbStateClass import CookieCrumbState
 from simple_rl.tasks.trench.TrenchOOMDPClass import TrenchOOMDP
 from simple_rl.tasks.rock_paper_scissors.RockPaperScissorsMDPClass import RockPaperScissorsMDP
 try:

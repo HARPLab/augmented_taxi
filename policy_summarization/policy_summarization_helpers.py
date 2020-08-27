@@ -7,9 +7,7 @@ from termcolor import colored
 import copy
 
 # Other imports
-from simple_rl.tasks import AugmentedTaxiOOMDP
 from simple_rl.planning import ValueIteration
-from simple_rl.agents import FixedPolicyAgent
 from simple_rl.utils import mdp_helpers
 from policy_summarization import BEC_helpers
 from simple_rl.utils import make_mdp
@@ -108,20 +106,23 @@ def discretize_wt_candidates(data_loc, weights, weights_lb, weights_ub, step_cos
 
     return wt_uniform_sampling
 
-def obtain_env_policies(mdp_class, data_loc, n_env, wt_candidates, mdp_parameters, save_type):
+def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, save_type, hardcode_envs=False):
     '''
     Summary: come up with an optimal policy for each of the candidates
     '''
-
-    if mdp_class == 'augmented_taxi':
-        # generate codes that govern the binary status of the eight tolls
-        mdp_codes = list(map(list, itertools.product([0, 1], repeat=int(np.log(n_env) / np.log(2)))))
-    elif mdp_class == 'two_goal':
-        # generate codes that govern the binary status of the walls
-        # todo: I feel like each environment should actually have its own folder (rather than being associated with a number of environments)
-        mdp_codes = list(map(list, itertools.product([0, 1], repeat=int(np.log(n_env) / np.log(2)))))
+    if hardcode_envs:
+        # each of the domains has four possible hard-coded environments
+        mdp_codes = list(map(list, itertools.product([0, 1], repeat=2)))
     else:
-        raise Exception("Unknown MDP class.")
+        # generate codes that govern the binary status of available tolls, walls, or crumbs
+        if mdp_class == 'augmented_taxi':
+            mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_tolls']))))
+        elif mdp_class == 'two_goal':
+            mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_walls']))))
+        elif mdp_class == 'cookie_crumb':
+            mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_crumbs']))))
+        else:
+            raise Exception("Unknown MDP class.")
 
     save_mark = 750
     if save_type == 'ground_truth':
@@ -156,22 +157,26 @@ def obtain_env_policies(mdp_class, data_loc, n_env, wt_candidates, mdp_parameter
 
             if mdp_class == 'augmented_taxi':
                 # note that this is specially accommodates the four hand-designed environments
-                if len(mdp_codes) == 4:
+                if hardcode_envs:
                     passengers, tolls, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
                 else:
-                    passengers, tolls, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code)
-
+                    passengers, tolls, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code, mdp_parameters)
                 mdp_parameters['passengers'] = passengers
                 mdp_parameters['tolls'] = tolls
                 mdp_parameters['env_code'] = env_code
             elif mdp_class == 'two_goal':
-                # note that this is specially accommodates the four hand-designed environments
-                if len(mdp_codes) == 4:
+                if hardcode_envs:
                         walls, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
                 else:
-                    walls, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code)
-
+                    walls, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code, mdp_parameters)
                 mdp_parameters['walls'] = walls
+                mdp_parameters['env_code'] = env_code
+            elif mdp_class == 'cookie_crumb':
+                if hardcode_envs:
+                        crumbs, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
+                else:
+                    crumbs, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code, mdp_parameters)
+                mdp_parameters['crumbs'] = crumbs
                 mdp_parameters['env_code'] = env_code
             else:
                 raise Exception("Unknown MDP class.")
@@ -185,6 +190,8 @@ def obtain_env_policies(mdp_class, data_loc, n_env, wt_candidates, mdp_parameter
                     mdp_candidate = make_mdp.make_custom_mdp('augmented_taxi', mdp_parameters)
                 elif mdp_class == 'two_goal':
                     mdp_candidate = make_mdp.make_custom_mdp('two_goal', mdp_parameters)
+                elif mdp_class == 'cookie_crumb':
+                    mdp_candidate = make_mdp.make_custom_mdp('cookie_crumb', mdp_parameters)
                 else:
                     raise Exception("Unknown MDP class.")
 

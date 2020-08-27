@@ -31,7 +31,7 @@ class AugmentedTaxiOOMDP(OOMDP):
     ATTRIBUTES = ["x", "y", "has_passenger", "in_taxi", "dest_x", "dest_y"]
     CLASSES = ["agent", "wall", "passenger", "toll", "traffic", "fuel_station"]
 
-    def __init__(self, width, height, agent, walls, passengers, tolls, traffic, fuel_stations, slip_prob=0, gamma=0.99, step_cost=0, weights=None, env_code=None):
+    def __init__(self, width, height, agent, walls, passengers, tolls, traffic, fuel_stations, slip_prob=0, gamma=0.99, step_cost=0, weights=None, env_code=None, sample_rate=5):
         self.env_code = env_code
         self.height = height
         self.width = width
@@ -64,10 +64,10 @@ class AugmentedTaxiOOMDP(OOMDP):
         self.exit_state.set_goal(False)
         if init_state.track_fuel():
             OOMDP.__init__(self, AugmentedTaxiOOMDP.AUGMENTED_ACTIONS, self._taxi_transition_func, self._taxi_reward_func,
-                           init_state=init_state, gamma=gamma, step_cost=step_cost)
+                           init_state=init_state, gamma=gamma, step_cost=step_cost, sample_rate=sample_rate)
         else:
             OOMDP.__init__(self, AugmentedTaxiOOMDP.BASE_ACTIONS, self._taxi_transition_func, self._taxi_reward_func,
-                           init_state=init_state, gamma=gamma, step_cost=step_cost)
+                           init_state=init_state, gamma=gamma, step_cost=step_cost, sample_rate=sample_rate)
 
     def _create_state(self, agent_oo_obj, passengers):
         '''

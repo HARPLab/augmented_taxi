@@ -548,7 +548,8 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
                 cumulative_reward += reward * gamma ** step
                 agent_shape = draw_state(screen, mdp, cur_state, agent_shape=agent_shape)
                 trajectory.append((prev_state, action, cur_state))
-                interaction_callback(action)
+                if interaction_callback is not None:
+                    interaction_callback(action)
 
                 # Update state text.
                 _draw_lower_left_text(cur_state, screen)
@@ -565,7 +566,8 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
             goal_text_point = scr_width / 2.0 - (len(goal_text)*7), 18*scr_height / 20.0
             screen.blit(goal_text_rendered, goal_text_point)
             done = True
-            done_callback()
+            if done_callback is not None:
+                done_callback()
             print(cumulative_reward)
         pygame.display.flip()
 

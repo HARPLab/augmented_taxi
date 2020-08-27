@@ -10,7 +10,6 @@ from termcolor import colored
 sys.path.append("simple_rl")
 import params
 from simple_rl.agents import FixedPolicyAgent
-from simple_rl.tasks import AugmentedTaxiOOMDP
 from simple_rl.planning import ValueIteration
 from simple_rl.utils import make_mdp
 from policy_summarization import bayesian_IRL
@@ -36,7 +35,7 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
         mdp_agent.reset()  # reset the current state to the initial state
         mdp_agent.visualize_interaction()
 
-def obtain_BIRL_summary(mdp_class, data_loc, mdp_parameters, BIRL_params, n_env, step_cost_flag, visualize_history_priors=False, visualize_summary=False):
+def obtain_BIRL_summary(mdp_class, data_loc, mdp_parameters, BIRL_params, step_cost_flag, visualize_history_priors=False, visualize_summary=False):
     try:
         with open('models/' + data_loc + '/BIRL_summary_{}.pickle'.format(BIRL_params['eval_fn']), 'rb') as f:
             bayesian_IRL_summary, wt_candidates, history_priors = pickle.load(f)
@@ -45,7 +44,7 @@ def obtain_BIRL_summary(mdp_class, data_loc, mdp_parameters, BIRL_params, n_env,
                                                             step_cost_flag,
                                                             n_wt_partitions=BIRL_params['n_wt_partitions'],
                                                             iter_idx=BIRL_params['iter_idx'])
-        wt_vi_traj_candidates = ps_helpers.obtain_env_policies(mdp_class, data_loc, n_env, wt_candidates, mdp_parameters, 'BIRL')
+        wt_vi_traj_candidates = ps_helpers.obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, 'BIRL')
 
         bayesian_IRL_summary, wt_candidates, history_priors = bayesian_IRL.obtain_summary(
             BIRL_params['n_demonstrations'], mdp_parameters['weights'], wt_candidates, wt_vi_traj_candidates,
@@ -59,12 +58,12 @@ def obtain_BIRL_summary(mdp_class, data_loc, mdp_parameters, BIRL_params, n_env,
 
     return bayesian_IRL_summary, wt_candidates, history_priors
 
-def obtain_BEC_summary(mdp_class, data_loc, mdp_parameters, n_env, weights, step_cost_flag, summary_type, summary_variant, n_train_demos, BEC_depth=1, visualize_summary=False):
+def obtain_BEC_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_type, summary_variant, n_train_demos, BEC_depth=1, visualize_summary=False):
     try:
         with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
             BEC_summary = pickle.load(f)
     except:
-        wt_vi_traj_candidates = ps_helpers.obtain_env_policies(mdp_class, data_loc, n_env, np.expand_dims(weights, axis=0),
+        wt_vi_traj_candidates = ps_helpers.obtain_env_policies(mdp_class, data_loc, np.expand_dims(weights, axis=0),
                                                                mdp_parameters, 'ground_truth')
         try:
             with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
@@ -104,7 +103,7 @@ def obtain_BEC_summary(mdp_class, data_loc, mdp_parameters, n_env, weights, step
 
     return BEC_summary
 
-def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, n_env, BEC_params, step_cost_flag, summary=None, visualize_test_env=False):
+def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_params, step_cost_flag, summary=None, visualize_test_env=False):
     '''
     Summary: Correlate the difficulty of a test environment with the generalized area of the BEC region obtain by the
     corresponding optimal demonstration. Return the desired number and difficulty of test environments (to be given
@@ -116,7 +115,7 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, n_env
             test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = pickle.load(f)
 
     except:
-        wt_vi_traj_candidates = ps_helpers.obtain_env_policies(mdp_class, data_loc, n_env, np.expand_dims(weights, axis=0), mdp_parameters, 'ground_truth')
+        wt_vi_traj_candidates = ps_helpers.obtain_env_policies(mdp_class, data_loc, np.expand_dims(weights, axis=0), mdp_parameters, 'ground_truth')
 
         try:
             with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
@@ -157,15 +156,12 @@ if __name__ == "__main__":
 
     # b) obtain a Bayesian IRL summary of the agent's policy
     # bayesian_IRL_summary, wt_candidates, history_priors = obtain_BIRL_summary(params.mdp_class, params.data_loc['BIRL'], params.mdp_parameters,
-    #                                                                           params.BIRL, params.n_env,
-    #                                                                           params.step_cost_flag,
-    #                                                                           visualize_history_priors=False,
-    #                                                                           visualize_summary=True)
+    #                                                                           params.BIRL, params.step_cost_flag,
+    #                                                                           visualize_history_priors=False, visualize_summary=True)
     # c) obtain a BEC summary of the agent's policy
-    BEC_summary = obtain_BEC_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.n_env,
-                                                  params.weights['val'], params.step_cost_flag,
-                                                  params.BEC['summary_type'], params.BEC['summary_variant'], params.BEC['n_train_demos'], BEC_depth=params.BEC['depth'],
-                                                  visualize_summary=True)
+    BEC_summary = obtain_BEC_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
+                                                  params.step_cost_flag, params.BEC['summary_type'], params.BEC['summary_variant'],
+                                                  params.BEC['n_train_demos'], BEC_depth=params.BEC['depth'], visualize_summary=True)
     # d) obtain test environments
-    obtain_test_environments(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.n_env, params.BEC,
+    obtain_test_environments(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,
                              params.step_cost_flag, summary=BEC_summary, visualize_test_env=True)

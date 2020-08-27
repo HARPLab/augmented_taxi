@@ -38,7 +38,7 @@ class TaxiOOMDP(OOMDP):
         pass_objs = self._make_oomdp_objs_from_list_of_dict(passengers, "passenger")
 
         init_state = self._create_state(agent_obj, wall_objs, pass_objs)
-        OOMDP.__init__(self, TaxiOOMDP.ACTIONS, self._taxi_transition_func, self._taxi_reward_func, init_state=init_state, gamma=gamma)
+        OOMDP.__init__(self, TaxiOOMDP.ACTIONS, self._taxi_transition_func, self._taxi_reward_func, init_state=init_state, gamma=gamma, sample_rate=1)
         self.slip_prob = slip_prob
 
     def _create_state(self, agent_oo_obj, walls, passengers):

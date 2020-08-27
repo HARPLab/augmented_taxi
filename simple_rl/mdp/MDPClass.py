@@ -12,7 +12,7 @@ else:
 class MDP(object):
     ''' Abstract class for a Markov Decision Process. '''
 
-    def __init__(self, actions, transition_func, reward_func, init_state, gamma=0.99, step_cost=0):
+    def __init__(self, actions, transition_func, reward_func, init_state, gamma=0.99, step_cost=0, sample_rate=5):
         self.actions = actions
         self.transition_func = transition_func
         self.reward_func = reward_func
@@ -22,7 +22,7 @@ class MDP(object):
         self.step_cost = step_cost
         self.states = set([])
         self.reachability_done = False
-        self.sample_rate = 5
+        self.sample_rate = sample_rate
 
     # ---------------
     # -- Accessors --

@@ -1,7 +1,8 @@
 import numpy as np
 
-mdp_class = 'augmented_taxi'
+# mdp_class = 'augmented_taxi'
 # mdp_class = 'two_goal'
+mdp_class = 'cookie_crumb'
 
 if mdp_class == 'augmented_taxi':
     w = np.array([[26, -3, -1]])
@@ -11,6 +12,9 @@ if mdp_class == 'augmented_taxi':
         'walls': [{'x': 1, 'y': 3}, {'x': 1, 'y': 2}],
         'passengers': [{'x': 4, 'y': 1, 'dest_x': 1, 'dest_y': 1, 'in_taxi': 0}],
         'tolls': [{'x': 3, 'y': 1, 'fee': 1}],
+        'available_tolls': [{"x": 2, "y": 3, "fee": 1}, {"x": 3, "y": 3, "fee": 1}, {"x": 4, "y": 3, "fee": 1},
+                   {"x": 2, "y": 2, "fee": 1}, {"x": 3, "y": 2, "fee": 1}, {"x": 4, "y": 2, "fee": 1},
+                   {"x": 2, "y": 1, "fee": 1}, {"x": 3, "y": 1, "fee": 1}],
         'traffic': [],  # probability that you're stuck
         'fuel_station': [],
         'width': 4,
@@ -28,8 +32,27 @@ elif mdp_class == 'two_goal':
         'agent': {'x': 3, 'y': 5},
         'goals': [{'x': 1, 'y': 1}, {'x': 5, 'y': 2}],
         'walls': [],
+        'available_walls': [{'x': 1, 'y': 4}, {'x': 2, 'y': 4}, {'x': 3, 'y': 4}, {'x': 3, 'y': 2}, {'x': 4, 'y': 2},
+                            {'x': 5, 'y': 3}],
         'width': 5,
         'height': 5,
+        'gamma': 1,
+        'env_code': [],
+        'weights': w / np.linalg.norm(w[0, :], ord=1),
+        'weights_lb': w,
+        'weights_ub': w
+    }
+elif mdp_class == 'cookie_crumb':
+    w = np.array([[25, 1.7, -1]])
+
+    mdp_parameters = {
+        'agent': {'x': 4, 'y': 1},
+        'goals': [{'x': 4, 'y': 4}],
+        'walls': [],
+        'crumbs': [],
+        'available_crumbs': [{'x': 1, 'y': 2}, {'x': 1, 'y': 3}, {'x': 1, 'y': 4}, {'x': 2, 'y': 2}, {'x': 2, 'y': 3}, {'x': 2, 'y': 4}],
+        'width': 4,
+        'height': 4,
         'gamma': 1,
         'env_code': [],
         'weights': w / np.linalg.norm(w[0, :], ord=1),
