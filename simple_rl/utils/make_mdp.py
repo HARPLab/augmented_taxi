@@ -7,7 +7,7 @@ Utility for making MDP instances
 # Python imports.
 
 # Other imports.
-from simple_rl.tasks import AugmentedTaxiOOMDP, TwoGoalOOMDP, CookieCrumbOOMDP
+from simple_rl.tasks import AugmentedTaxiOOMDP, TwoGoalOOMDP, SkateboardOOMDP, CookieCrumbOOMDP
 
 def make_custom_mdp(mdp_class, mdp_parameters):
     if mdp_class == 'augmented_taxi':
@@ -18,6 +18,10 @@ def make_custom_mdp(mdp_class, mdp_parameters):
     elif mdp_class == 'two_goal':
         mdp_candidate = TwoGoalOOMDP(width=mdp_parameters['width'], height=mdp_parameters['height'], agent=mdp_parameters['agent'],
                                            walls=mdp_parameters['walls'], goals=mdp_parameters['goals'], gamma=mdp_parameters['gamma'],
+                                           weights=mdp_parameters['weights'], env_code=mdp_parameters['env_code'], sample_rate=1)
+    elif mdp_class == 'skateboard':
+        mdp_candidate = SkateboardOOMDP(width=mdp_parameters['width'], height=mdp_parameters['height'], agent=mdp_parameters['agent'],
+                                           walls=mdp_parameters['walls'], goal=mdp_parameters['goal'], skateboard=mdp_parameters['skateboard'], gamma=mdp_parameters['gamma'],
                                            weights=mdp_parameters['weights'], env_code=mdp_parameters['env_code'], sample_rate=1)
     elif mdp_class == 'cookie_crumb':
         mdp_candidate = CookieCrumbOOMDP(width=mdp_parameters['width'], height=mdp_parameters['height'], agent=mdp_parameters['agent'],
@@ -60,6 +64,19 @@ def make_mdp_obj(mdp_class, mdp_code, mdp_parameters):
             entry = mdp_code[x]
             if entry:
                 requested_walls.append(available_walls[x])
+
+        return requested_walls, mdp_code
+    elif mdp_class == 'skateboard':
+        available_walls = mdp_parameters['available_walls']
+        requested_walls = []
+
+        for x in range(0, len(mdp_code)):
+            entry = mdp_code[x]
+            if entry:
+                requested_walls.append(available_walls[x])
+
+        # these are permanent walls
+        requested_walls.extend([{'x': 5, 'y': 4}, {'x': 5, 'y': 3}, {'x': 5, 'y': 2}, {'x': 6, 'y': 3}, {'x': 6, 'y': 2}])
 
         return requested_walls, mdp_code
     elif mdp_class == 'cookie_crumb':
@@ -108,6 +125,20 @@ def hardcode_mdp_obj(mdp_class, mdp_code):
             walls = [{'x': 1, 'y': 4}, {'x': 2, 'y': 4}, {'x': 3, 'y': 4}, {'x': 3, 'y': 2}, {'x': 5, 'y': 3}]
         else:
             walls = [{'x': 1, 'y': 4}, {'x': 2, 'y': 4}, {'x': 3, 'y': 4}, {'x': 4, 'y': 2}, {'x': 5, 'y': 3}]
+
+        return walls, mdp_code
+    elif mdp_class == 'skateboard':
+        if mdp_code == [0, 0]:
+            walls = [{'x': 3, 'y': 4}, {'x': 3, 'y': 3}, {'x': 3, 'y': 2}]
+        elif mdp_code == [0, 1]:
+            walls = [{'x': 3, 'y': 4}, {'x': 3 , 'y': 3}]
+        elif mdp_code == [1, 0]:
+            walls = [{'x': 3, 'y': 4}]
+        else:
+            walls = []
+
+        # these are permanent walls
+        walls.extend([{'x': 4, 'y': 4}, {'x': 4, 'y': 3}, {'x': 4, 'y': 2}, {'x': 5, 'y': 3}, {'x': 5, 'y': 2}])
 
         return walls, mdp_code
     elif mdp_class == 'cookie_crumb':

@@ -119,6 +119,8 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, save
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_tolls']))))
         elif mdp_class == 'two_goal':
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_walls']))))
+        elif mdp_class == 'skateboard':
+            mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_walls']))))
         elif mdp_class == 'cookie_crumb':
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_crumbs']))))
         else:
@@ -171,6 +173,13 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, save
                     walls, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code, mdp_parameters)
                 mdp_parameters['walls'] = walls
                 mdp_parameters['env_code'] = env_code
+            elif mdp_class == 'skateboard':
+                if hardcode_envs:
+                        walls, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
+                else:
+                    walls, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code, mdp_parameters)
+                mdp_parameters['walls'] = walls
+                mdp_parameters['env_code'] = env_code
             elif mdp_class == 'cookie_crumb':
                 if hardcode_envs:
                         crumbs, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
@@ -190,6 +199,8 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, save
                     mdp_candidate = make_mdp.make_custom_mdp('augmented_taxi', mdp_parameters)
                 elif mdp_class == 'two_goal':
                     mdp_candidate = make_mdp.make_custom_mdp('two_goal', mdp_parameters)
+                elif mdp_class == 'skateboard':
+                    mdp_candidate = make_mdp.make_custom_mdp('skateboard', mdp_parameters)
                 elif mdp_class == 'cookie_crumb':
                     mdp_candidate = make_mdp.make_custom_mdp('cookie_crumb', mdp_parameters)
                 else:
@@ -306,7 +317,7 @@ def obtain_test_environments(wt_vi_traj_candidates, min_subset_constraints_recor
 
     if BEC_summary_type == 'demo':
         # demo test environment generation is outdated
-        if difficulty == 'hard':
+        if difficulty == 'high':
             test_wt_vi_traj_tuples = [wt_vi_traj_candidates[k][0] for k in
                                             env_record_sorted[unique_idxs[:n_desired_test_env]]]
             test_BEC_lengths = [BEC_lengths_sorted[k] for k in unique_idxs[:n_desired_test_env]]
@@ -318,7 +329,7 @@ def obtain_test_environments(wt_vi_traj_candidates, min_subset_constraints_recor
             test_BEC_constraints = [BEC_constraints_sorted[k] for k in unique_idxs[-n_desired_test_env:]]
     else:
         # must update the wt_vi_traj_candidate with the right initial state and trajectory
-        if difficulty == 'hard':
+        if difficulty == 'high':
             test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(0, np.floor(1 * (len(unique_BEC_lengths) - 1) / 3), n_desired_test_env, wt_vi_traj_candidates, unique_BEC_bins, env_record_sorted, traj_opts_sorted, BEC_lengths_sorted, BEC_constraints_sorted)
         elif difficulty == 'medium':
             test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(np.floor(1 * (len(unique_BEC_lengths) - 1) / 3), np.floor(2 * (len(unique_BEC_lengths) - 1) / 3), n_desired_test_env, wt_vi_traj_candidates, unique_BEC_bins, env_record_sorted, traj_opts_sorted, BEC_lengths_sorted, BEC_constraints_sorted)

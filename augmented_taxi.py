@@ -140,14 +140,7 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
             pickle.dump((test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints), f)
 
     if visualize_test_env:
-        for j, test_wt_vi_traj_tuple in enumerate(test_wt_vi_traj_tuples):
-            print(colored('Visualizing test environment {} with BEC length of {}'.format(j, test_BEC_lengths[j]),
-                          'red'))
-
-            vi_candidate = test_wt_vi_traj_tuple[1]
-            trajectory_candidate = test_wt_vi_traj_tuple[2]
-            vi_candidate.mdp.visualize_trajectory(trajectory_candidate)
-
+        BEC.visualize_test_envs(test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, weights, step_cost_flag)
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints
 
 if __name__ == "__main__":

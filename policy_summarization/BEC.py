@@ -130,6 +130,14 @@ def obtain_potential_summary_demos(lowerbound, upperbound, n_demos, padding, uni
                 if len(covering_demo_idxs) > 0:
                     current_BEC_length_idxs.append(current_BEC_length_idx)
                     covering_demos_idxs.append(covering_demo_idxs)
+
+        # sort based on BEC lengths from high to low (in order of simplest to most complex)
+        tie_breaker = np.arange(len(current_BEC_length_idxs))
+        sorted_zipped = sorted(zip(current_BEC_length_idxs, tie_breaker, covering_demos_idxs))
+        current_BEC_length_idxs_sorted, _, covering_demos_idxs_sorted = list(zip(*sorted_zipped))
+        covering_demos_idxs_sorted = list(covering_demos_idxs_sorted)
+        covering_demos_idxs_sorted.reverse()
+        covering_demos_idxs = covering_demos_idxs_sorted
     else:
         # b) equally spaced selection. go from upperbound to lower bound since upperbound has easier demos (which are ordered from hardest to easiest,
         # i.e. smallest to largest BEC length)
@@ -475,8 +483,6 @@ def visualize_constraints(constraints, weights, step_cost_flag, plot_lim=[(-1, 1
 
 def visualize_summary(BEC_summaries_collection, weights, step_cost_flag):
     '''
-    :param BEC_summary: Nested list of [mdp, trajectory]
-
     Summary: visualize the BEC demonstrations
     '''
     min_BEC_constraints_running = []
@@ -492,7 +498,18 @@ def visualize_summary(BEC_summaries_collection, weights, step_cost_flag):
         # visualize_constraints(BEC_summary[2], weights, step_cost_flag, fig_name=str(summary_idx) + '.png', scale=abs(1 / weights[0, -1]))
 
         # visualize the min BEC constraints extracted from all demonstrations shown thus far
-        # min_BEC_constraints_running.extend(BEC_summary[2])
-        # min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)[0]
-        # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag)
+        min_BEC_constraints_running.extend(BEC_summary[2])
+        min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)[0]
+        visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag)
         # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(summary_idx) + '.png', scale=abs(1 / weights[0, -1]))
+
+
+def visualize_test_envs(test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, weights, step_cost_flag):
+    for j, test_wt_vi_traj_tuple in enumerate(test_wt_vi_traj_tuples):
+        print('Visualizing test environment {} with BEC length of {}'.format(j, test_BEC_lengths[j]))
+
+        vi_candidate = test_wt_vi_traj_tuple[1]
+        trajectory_candidate = test_wt_vi_traj_tuple[2]
+        vi_candidate.mdp.visualize_trajectory(trajectory_candidate)
+
+        visualize_constraints(test_BEC_constraints[j], weights, step_cost_flag)

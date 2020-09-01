@@ -2,7 +2,8 @@ import numpy as np
 
 # mdp_class = 'augmented_taxi'
 # mdp_class = 'two_goal'
-mdp_class = 'cookie_crumb'
+mdp_class = 'skateboard'
+# mdp_class = 'cookie_crumb'
 
 if mdp_class == 'augmented_taxi':
     w = np.array([[26, -3, -1]])
@@ -36,6 +37,23 @@ elif mdp_class == 'two_goal':
                             {'x': 5, 'y': 3}],
         'width': 5,
         'height': 5,
+        'gamma': 1,
+        'env_code': [],
+        'weights': w / np.linalg.norm(w[0, :], ord=1),
+        'weights_lb': w,
+        'weights_ub': w
+    }
+elif mdp_class == 'skateboard':
+    w = np.array([[3, -0.3, -1]])
+
+    mdp_parameters = {
+        'agent': {'x': 4, 'y': 4, 'has_skateboard': 0},
+        'skateboard': [{'x': 2, 'y': 3, 'on_agent': 0}],
+        'goal': {'x': 6, 'y': 4},
+        'walls': [],
+        'available_walls': [{'x': 3, 'y': 4}, {'x': 3, 'y': 3}, {'x': 3, 'y': 2}, {'x': 2, 'y': 2}],
+        'width': 7,
+        'height': 4,
         'gamma': 1,
         'env_code': [],
         'weights': w / np.linalg.norm(w[0, :], ord=1),
@@ -100,12 +118,12 @@ BEC = {
 
     'n_train_demos': 4,                       # number of desired training demonstrations
 
-    'n_test_demos': 5,                        # number of desired test demonstration
+    'n_test_demos': 30,                        # number of desired test demonstration
 
     'depth': 1,                               # number of suboptimal actions to take before following the optimal policy to obtain the
                                               # suboptimal trajectory (and the corresponding suboptimal expected feature counts)
 
-    'test_difficulty': 'hard'                 # expected ease for human to correctly predict the agent's actions in this test environment
+    'test_difficulty': 'medium'                 # expected ease for human to correctly predict the agent's actions in this test environment (low, medium, high)
 }
 
 # BIRL parameters

@@ -117,6 +117,11 @@ def _draw_terminal_text(mdp_class, cur_state, scr_width, scr_height, title_font)
             goal_text = "Arrived at a goal!"
         else:
             goal_text = "Decided to not go to either goal!"
+    elif mdp_class == 'skateboard':
+        if cur_state.is_goal():
+            goal_text = "Arrived at the goal!"
+        else:
+            goal_text = "Decided to not go to the goal!"
     elif mdp_class == 'cookie_crumb':
         if cur_state.is_goal():
             goal_text = "Arrived at the goal!"
@@ -131,7 +136,7 @@ def _draw_terminal_text(mdp_class, cur_state, scr_width, scr_height, title_font)
             goal_text = "Fail!"
 
     goal_text_rendered = title_font.render(goal_text, True, (206, 147, 66))
-    goal_text_point = scr_width / 2.0 - (len(goal_text) * 7), 18 * scr_height / 20.0
+    goal_text_point = scr_width / 2.0 - (len(goal_text) * 8), 18 * scr_height / 20.0
 
     return goal_text_rendered, goal_text_point
 

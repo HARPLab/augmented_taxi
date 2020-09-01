@@ -121,7 +121,7 @@ def _draw_state(screen,
         for t in taxi_oomdp.traffic_cells:
             t_x, t_y = t["x"], t["y"]
             if t["prob"] != 0:
-                alpha = t["prob"] / 1.                             # divide by whatever the max fee is expected to be
+                alpha = t["prob"] / 1.                             #divide by whatever the max fee is expected to be
                 scaled_alpha = int(min(((1 / .75) * alpha + 0.15), 1) * 255)  # scale so that the alpha is at least 0.15
             else:
                 scaled_alpha = 0
