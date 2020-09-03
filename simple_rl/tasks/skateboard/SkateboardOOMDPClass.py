@@ -26,7 +26,7 @@ class SkateboardOOMDP(OOMDP):
     ''' Class for a Skateboard OO-MDP '''
 
     # Static constants.
-    ACTIONS = ["up", "down", "left", "right", "pickup", "dropoff"]
+    ACTIONS = ["up", "down", "left", "right", "pickup", "dropoff", "exit"]
     ATTRIBUTES = ["x", "y", "has_skateboard", "on_agent"]
     CLASSES = ["agent", "wall", "skateboard"]
 
@@ -41,7 +41,9 @@ class SkateboardOOMDP(OOMDP):
 
         # objects that belong in the state (changing)
         agent_obj = OOMDPObject(attributes=agent, name="agent")
+        agent_exit = {"x": 100, "y": 100}
         skateboard_objs = self._make_oomdp_objs_from_list_of_dict(skateboard, "skateboard")
+        skateboard_objs_exit = self._make_oomdp_objs_from_list_of_dict(skateboard, "skateboard")
 
         # objects that belong to the MDP (static)
         wall_objs = self._make_oomdp_objs_from_list_of_dict(walls, "wall")
@@ -50,6 +52,9 @@ class SkateboardOOMDP(OOMDP):
         self.slip_prob = slip_prob
 
         init_state = self._create_state(agent_obj, skateboard_objs)
+        self.exit_state = self._create_state(OOMDPObject(attributes=agent_exit, name="agent_exit"), skateboard_objs_exit)
+        self.exit_state.set_terminal(True)
+        self.exit_state.set_goal(False)
         OOMDP.__init__(self, SkateboardOOMDP.ACTIONS, self._skateboard_transition_func, self._skateboard_reward_func,
                        init_state=init_state, gamma=gamma, step_cost=step_cost, sample_rate=sample_rate)
 
@@ -105,6 +110,9 @@ class SkateboardOOMDP(OOMDP):
 
         agent = state.get_first_obj_of_class("agent")
 
+        if next_state == self.exit_state:
+            return np.array([[0, 0, 0]])
+
         # movement is penalized differently based on whether you have the skateboard or not
         if action == 'up' or action == 'down' or action == 'left' or action == 'right':
             if agent.get_attribute("has_skateboard") == 1:
@@ -151,7 +159,7 @@ class SkateboardOOMDP(OOMDP):
         '''
         _error_check(state, action)
 
-        state_is_terminal, state_is_goal = skateboard_helpers.is_terminal_and_goal_state(self, state)
+        state_is_terminal, state_is_goal = skateboard_helpers.is_terminal_and_goal_state(self, state, self.exit_state)
         if not state_is_terminal:
             # if there is a slip, prevent a navigation action from occurring
             stuck = False
@@ -166,6 +174,11 @@ class SkateboardOOMDP(OOMDP):
                 next_state = self.move_agent(state, dx=1)
             elif action == "left" and state.get_agent_x() > 1 and not stuck:
                 next_state = self.move_agent(state, dx=-1)
+            elif action == "exit":
+                next_state = copy.deepcopy(self.exit_state)
+
+                # ensure that uneaten cookies stay put when the agent exits
+                next_state.objects['skateboard'] = state.objects['skateboard'].copy()
             elif action == "dropoff":
                 next_state = self.agent_dropoff(state)
             elif action == "pickup":
@@ -174,7 +187,7 @@ class SkateboardOOMDP(OOMDP):
                 next_state = state
 
             # Make terminal.
-            next_state_is_terminal, next_state_is_goal = skateboard_helpers.is_terminal_and_goal_state(self, next_state)
+            next_state_is_terminal, next_state_is_goal = skateboard_helpers.is_terminal_and_goal_state(self, next_state, self.exit_state)
             if next_state_is_terminal:
                 next_state.set_terminal(True)
             if next_state_is_goal:

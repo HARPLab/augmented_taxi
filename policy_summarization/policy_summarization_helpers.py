@@ -210,7 +210,7 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, save
                 vi_candidate = ValueIteration(mdp_candidate, sample_rate=1, max_iterations=50)
                 iterations, value_of_init_state = vi_candidate.run_vi()
                 trajectory = mdp_helpers.rollout_policy(mdp_candidate, vi_candidate)
-                wt_vi_traj_env.append([wt_candidate, vi_candidate, trajectory])
+                wt_vi_traj_env.append([wt_candidate, vi_candidate, trajectory, mdp_parameters])
 
                 wt_counter += 1
                 print('wt_counter: {}, iterations: {}, init_val: {}, wt_candidate: {}'.format(wt_counter, iterations,

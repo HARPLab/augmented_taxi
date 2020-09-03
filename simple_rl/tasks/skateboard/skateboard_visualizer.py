@@ -86,18 +86,10 @@ def _draw_state(screen,
 
     # Draw the destination.
     dest_x, dest_y = skateboard_oomdp.goal["x"], skateboard_oomdp.goal["y"]
-    top_left_point = int(width_buffer + cell_width*(dest_x - 1) + 75), int(height_buffer + cell_height*(skateboard_oomdp.height - dest_y) + 65)
+    top_left_point = int(width_buffer + cell_width * (dest_x - 1) + 37), int(
+        height_buffer + cell_height * (skateboard_oomdp.height - dest_y) + 34)
     dest_col = (int(max(color_ls[-2][0]-30, 0)), int(max(color_ls[-2][1]-30, 0)), int(max(color_ls[-2][2]-30, 0)))
-    center = top_left_point + (cell_width / 2, cell_height / 2)
-    radius = 45
-    iterations = 150
-    for i in range(iterations):
-        ang = i * 3.14159 * 2 / iterations
-        dx = int(math.cos(ang) * radius)
-        dy = int(math.sin(ang) * radius)
-        x = center[0] + dx
-        y = center[1] + dy
-        pygame.draw.circle(screen, dest_col, (x, y), 5)
+    pygame.draw.rect(screen, dest_col, top_left_point + (cell_width / 2, cell_height / 2))
 
     # Draw new agent.
     top_left_point = width_buffer + cell_width * (agent_x - 1), height_buffer + cell_height * (

@@ -105,32 +105,22 @@ def _draw_state(screen,
         # Draw tolls.
         for t in taxi_oomdp.tolls:
             t_x, t_y = t["x"], t["y"]
-            if t["fee"] != 0:
-                alpha = t["fee"] / 1.                             # divide by whatever the max fee is expected to be
-                scaled_alpha = int(min(((1 / .75) * alpha + 0.15), 1) * 255)  # scale so that the alpha is at least 0.15
-            else:
-                scaled_alpha = 0
             top_left_point = width_buffer + cell_width * (t_x - 1) + 5, height_buffer + cell_height * (
                     taxi_oomdp.height - t_y) + 5
             # Clear the space and redraw with correct transparency (instead of simply adding a new layer which would
             # affect the transparency
             pygame.draw.rect(screen, (255, 255, 255), top_left_point + (cell_width - 10, cell_height - 10), 0)
-            pygame.gfxdraw.box(screen, top_left_point + (cell_width - 10, cell_height - 10), (224, 230, 67, scaled_alpha))
+            pygame.gfxdraw.box(screen, top_left_point + (cell_width - 10, cell_height - 10), (224, 230, 67))
 
         # Draw traffic cells.
         for t in taxi_oomdp.traffic_cells:
             t_x, t_y = t["x"], t["y"]
-            if t["prob"] != 0:
-                alpha = t["prob"] / 1.                             #divide by whatever the max fee is expected to be
-                scaled_alpha = int(min(((1 / .75) * alpha + 0.15), 1) * 255)  # scale so that the alpha is at least 0.15
-            else:
-                scaled_alpha = 0
             top_left_point = width_buffer + cell_width * (t_x - 1) + 5, height_buffer + cell_height * (
                     taxi_oomdp.height - t_y) + 5
             # Clear the space and redraw with correct transparency (instead of simply adding a new layer which would
             # affect the transparency
             pygame.draw.rect(screen, (255, 255, 255), top_left_point + (cell_width - 10, cell_height - 10), 0)
-            pygame.gfxdraw.box(screen, top_left_point + (cell_width - 10, cell_height - 10), (58, 28, 232, scaled_alpha))
+            pygame.gfxdraw.box(screen, top_left_point + (cell_width - 10, cell_height - 10), (58, 28, 232))
 
         # Draw fuel stations.
         for f in taxi_oomdp.fuel_stations:
@@ -143,7 +133,7 @@ def _draw_state(screen,
     for i, p in enumerate(objects["passenger"]):
         # Dest.
         dest_x, dest_y = p["dest_x"], p["dest_y"]
-        top_left_point = int(width_buffer + cell_width*(dest_x - 1) + 25), int(height_buffer + cell_height*(taxi_oomdp.height - dest_y) + 25)
+        top_left_point = int(width_buffer + cell_width*(dest_x - 1) + 27), int(height_buffer + cell_height*(taxi_oomdp.height - dest_y) + 14)
         dest_col = (int(max(color_ls[-i-1][0]-30, 0)), int(max(color_ls[-i-1][1]-30, 0)), int(max(color_ls[-i-1][2]-30, 0)))
         pygame.draw.rect(screen, dest_col, top_left_point + (cell_width / 6, cell_height / 6), 0)
 
@@ -157,12 +147,12 @@ def _draw_state(screen,
     for i, p in enumerate(objects["passenger"]):
         # Passenger
         pass_x, pass_y = p["x"], p["y"]
-        taxi_size = int(min(cell_width, cell_height) / 9.0) if p["in_taxi"] else int(min(cell_width, cell_height) / 5.0)
+        taxi_size = int(min(cell_width, cell_height) / 9.0)
         if p["in_taxi"]:
             top_left_point = int(width_buffer + cell_width * (pass_x - 1) + taxi_size + 58), int(
                 height_buffer + cell_height * (taxi_oomdp.height - pass_y) + taxi_size + 16)
         else:
-            top_left_point = int(width_buffer + cell_width * (pass_x - 1) + taxi_size + 47), int(
+            top_left_point = int(width_buffer + cell_width * (pass_x - 1) + taxi_size + 26), int(
                 height_buffer + cell_height * (taxi_oomdp.height - pass_y) + taxi_size + 38)
         dest_col = (max(color_ls[-i-1][0]-30, 0), max(color_ls[-i-1][1]-30, 0), max(color_ls[-i-1][2]-30, 0))
         pygame.draw.circle(screen, dest_col, top_left_point, taxi_size)

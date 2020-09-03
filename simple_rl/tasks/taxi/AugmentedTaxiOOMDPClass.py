@@ -43,7 +43,7 @@ class AugmentedTaxiOOMDP(OOMDP):
 
         # objects that belong in the state (changing)
         agent_obj = OOMDPObject(attributes=agent, name="agent")
-        agent_exit = {"x": 100, "y": 100, "has_passenger": 0}  # grid world indices start at (1, 1) so (0, 0) is unreserved
+        agent_exit = {"x": 100, "y": 100, "has_passenger": 0}
         pass_objs = self._make_oomdp_objs_from_list_of_dict(passengers, "passenger")
         pass_objs_exit = self._make_oomdp_objs_from_list_of_dict(passengers, "passenger")
 
@@ -107,32 +107,7 @@ class AugmentedTaxiOOMDP(OOMDP):
         '''
         _error_check(state, action)
 
-        # 1) MDP-based reward
-        # reward = 0
-        #
-        # if len(self.tolls) != 0:
-        #     [moved_into_toll, toll_fee] = taxi_helpers._moved_into_toll(self, state, next_state)
-        #     if moved_into_toll:
-        #         reward -= toll_fee
-        #
-        # # Stacked if statements for efficiency.
-        # if action == "dropoff":
-        #     # If agent is dropping off.
-        #     agent = state.get_first_obj_of_class("agent")
-        #
-        #     # Check to see if all passengers at destination.
-        #     if agent.get_attribute("has_passenger"):
-        #         for p in state.get_objects_of_class("passenger"):
-        #             if p.get_attribute("x") != p.get_attribute("dest_x") or p.get_attribute("y") != p.get_attribute("dest_y"):
-        #                 reward += 0 - self.step_cost
-        #                 return reward
-        #         reward += 1 - self.step_cost
-        #         passenger_flag = 1
-        #         return reward
-        # reward += 0 - self.step_cost
-        # return reward
-
-        # 2) feature-based reward
+        # feature-based reward
         return self.weights.dot(self.compute_reward_features(state, action, next_state).T)
 
     def compute_reward_features(self, state, action, next_state=None):
@@ -155,7 +130,7 @@ class AugmentedTaxiOOMDP(OOMDP):
             step_cost_flag = 0
 
         if len(self.tolls) != 0:
-            [moved_into_toll, toll_fee] = taxi_helpers._moved_into_toll(self, state, next_state)
+            moved_into_toll = taxi_helpers._moved_into_toll(self, state, next_state)
             if moved_into_toll and not next_state == self.exit_state:
                 toll_flag = 1
 

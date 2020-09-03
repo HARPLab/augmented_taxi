@@ -88,7 +88,7 @@ def _draw_state(screen,
     for i, g in enumerate(two_goal_oomdp.goals):
         dest_x, dest_y = g["x"], g["y"]
         top_left_point = int(width_buffer + cell_width*(dest_x - 1) + 75), int(height_buffer + cell_height*(two_goal_oomdp.height - dest_y) + 65)
-        dest_col = (int(max(color_ls[i-3][0]-30, 0)), int(max(color_ls[i-3][1]-30, 0)), int(max(color_ls[i-3][2]-30, 0)))
+        dest_col = (int(max(color_ls[i-1][0]-30, 0)), int(max(color_ls[i-1][1]-30, 0)), int(max(color_ls[i-1][2]-30, 0)))
         center = top_left_point + (cell_width / 2, cell_height / 2)
         radius = 45
         iterations = 150

@@ -1,6 +1,12 @@
-
 '''
-CookieCrumbOOMDP.py: Contains the CookieCrumbOOMDP class.
+AugmentedTaxiMDPClass.py: Contains the AugmentedTaxiMDP class.
+
+From:
+    Dietterich, Thomas G. "Hierarchical reinforcement learning with the
+    MAXQ value function decomposition." J. Artif. Intell. Res.(JAIR) 13
+    (2000): 227-303.
+
+Author: David Abel (cs.brown.edu/~dabel/)
 '''
 
 # Python imports.
@@ -20,7 +26,7 @@ class CookieCrumbOOMDP(OOMDP):
     ''' Class for a Cookie Crumb OO-MDP '''
 
     # Static constants.
-    ACTIONS = ["up", "down", "left", "right"]
+    ACTIONS = ["up", "down", "left", "right", "exit"]
     CLASSES = ["agent", "crumb"]
 
     def __init__(self, width, height, agent, walls, goals, crumbs, slip_prob=0, gamma=0.99, step_cost=0, weights=None, env_code=None, sample_rate=5):
@@ -35,7 +41,9 @@ class CookieCrumbOOMDP(OOMDP):
 
         # objects that belong in the state (changing)
         agent_obj = OOMDPObject(attributes=agent, name="agent")
+        agent_exit = {"x": 100, "y": 100}
         crumb_objs = self._make_oomdp_objs_from_list_of_dict(crumbs, "crumb")
+        crumb_objs_exit = self._make_oomdp_objs_from_list_of_dict(crumbs, "crumb")
 
         # objects that belong to the MDP (static)
         wall_objs = self._make_oomdp_objs_from_list_of_dict(walls, "wall")
@@ -46,6 +54,9 @@ class CookieCrumbOOMDP(OOMDP):
 
 
         init_state = self._create_state(agent_obj, crumb_objs)
+        self.exit_state = self._create_state(OOMDPObject(attributes=agent_exit, name="agent_exit"), crumb_objs_exit)
+        self.exit_state.set_terminal(True)
+        self.exit_state.set_goal(False)
         OOMDP.__init__(self, CookieCrumbOOMDP.ACTIONS, self._cookie_crumb_transition_func, self._cookie_crumb_reward_func,
                        init_state=init_state, gamma=gamma, step_cost=step_cost, sample_rate=sample_rate)
 
@@ -104,6 +115,9 @@ class CookieCrumbOOMDP(OOMDP):
         reward_features = []
         step_cost_flag = 1
 
+        if next_state == self.exit_state:
+            step_cost_flag = 0
+
         for g in self.goals:
             if next_state.get_agent_x() == g.get_attribute("x") and next_state.get_agent_y() == g.get_attribute("y"):
                 reward_features.append(1)
@@ -148,7 +162,7 @@ class CookieCrumbOOMDP(OOMDP):
         '''
         _error_check(state, action)
 
-        state_is_terminal, state_is_goal = cookie_crumb_helpers.is_terminal_and_goal_state(self, state)
+        state_is_terminal, state_is_goal = cookie_crumb_helpers.is_terminal_and_goal_state(self, state, self.exit_state)
         if not state_is_terminal:
             # if there is a slip, prevent a navigation action from occurring
             stuck = False
@@ -163,6 +177,11 @@ class CookieCrumbOOMDP(OOMDP):
                 next_state = self.move_agent(state, dx=1)
             elif action == "left" and state.get_agent_x() > 1 and not stuck:
                 next_state = self.move_agent(state, dx=-1)
+            elif action == "exit":
+                next_state = copy.deepcopy(self.exit_state)
+
+                # ensure that uneaten cookies stay put when the agent exits
+                next_state.objects['crumb'] = state.objects['crumb'].copy()
             else:
                 next_state = state
 
@@ -176,7 +195,7 @@ class CookieCrumbOOMDP(OOMDP):
             next_state.objects['crumb'] = crumbs
 
             # Make terminal.
-            next_state_is_terminal, next_state_is_goal = cookie_crumb_helpers.is_terminal_and_goal_state(self, next_state)
+            next_state_is_terminal, next_state_is_goal = cookie_crumb_helpers.is_terminal_and_goal_state(self, next_state, self.exit_state)
             if next_state_is_terminal:
                 next_state.set_terminal(True)
             if next_state_is_goal:

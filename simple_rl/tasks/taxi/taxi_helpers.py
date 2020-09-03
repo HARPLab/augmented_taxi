@@ -92,8 +92,8 @@ def _moved_into_toll(mdp, state, next_state):
         if toll.attributes['x'] != state.get_agent_x() or toll.attributes['y'] != state.get_agent_y():
             # and if the next state's agent x, y moves into of the x, y of the toll
             if toll.attributes['x'] == next_state.get_agent_x() and toll.attributes['y'] == next_state.get_agent_y():
-                return True, toll.attributes['fee']
-    return False, 0
+                return True
+    return False
 
 def is_taxi_terminal_state(state):
     '''

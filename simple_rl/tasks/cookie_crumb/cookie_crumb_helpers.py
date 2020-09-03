@@ -69,7 +69,7 @@ def _is_wall_in_the_way(mdp, state, dx=0, dy=0):
     return False
 
 
-def is_terminal_and_goal_state(mdp, state):
+def is_terminal_and_goal_state(mdp, state, exit_state):
     '''
     Args:
         state (OOMDPState)
@@ -81,5 +81,8 @@ def is_terminal_and_goal_state(mdp, state):
     for g in mdp.goals:
         if state.get_agent_x() == g.get_attribute("x") and state.get_agent_y() == g.get_attribute("y"):
             return True, True
+
+    if state.get_agent_x() == exit_state.get_agent_x() and state.get_agent_y() == exit_state.get_agent_y():
+        return True, False
 
     return False, False
