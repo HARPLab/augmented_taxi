@@ -138,7 +138,7 @@ def hardcode_mdp_obj(mdp_class, mdp_code):
             walls = []
 
         # these are permanent walls
-        walls.extend([{'x': 4, 'y': 4}, {'x': 4, 'y': 3}, {'x': 4, 'y': 2}, {'x': 5, 'y': 3}, {'x': 5, 'y': 2}])
+        walls.extend([{'x': 5, 'y': 4}, {'x': 5, 'y': 3}, {'x': 5, 'y': 2}, {'x': 6, 'y': 3}, {'x': 6, 'y': 2}])
 
         return walls, mdp_code
     elif mdp_class == 'cookie_crumb':

@@ -83,18 +83,18 @@ def obtain_BEC_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_f
 
         try:
             with open('models/' + data_loc + '/BEC_constraints.pickle', 'rb') as f:
-                min_BEC_constraints, unique_BEC_lengths, unique_BEC_bins = pickle.load(f)
+                min_BEC_constraints, BEC_lengths_record = pickle.load(f)
         except:
-            min_BEC_constraints, unique_BEC_lengths, unique_BEC_bins = BEC.extract_BEC_constraints(min_subset_constraints_record, weights, step_cost_flag)
+            min_BEC_constraints, BEC_lengths_record = BEC.extract_BEC_constraints(min_subset_constraints_record, weights, step_cost_flag)
 
             with open('models/' + data_loc + '/BEC_constraints.pickle', 'wb') as f:
-                pickle.dump((min_BEC_constraints, unique_BEC_lengths, unique_BEC_bins), f)
+                pickle.dump((min_BEC_constraints, BEC_lengths_record), f)
 
         try:
             with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
                 BEC_summary = pickle.load(f)
         except:
-            BEC_summary = BEC.obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, unique_BEC_lengths, unique_BEC_bins, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=n_train_demos)
+            BEC_summary = BEC.obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=n_train_demos)
             with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
                 pickle.dump(BEC_summary, f)
 

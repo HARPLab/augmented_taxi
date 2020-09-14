@@ -120,7 +120,7 @@ BEC = {
                                               # demonstrations that utilize scaffolding and ease metrics (visual similarity,
                                               # visual simplicity, etc) respectively
 
-    'n_train_demos': 4,                       # number of desired training demonstrations
+    'n_train_demos': 5,                       # number of desired training demonstrations
 
     'n_test_demos': 30,                        # number of desired test demonstration
 

@@ -5,6 +5,7 @@ import policy_summarization.BEC_helpers as BEC_helpers
 import numpy as np
 import itertools
 import random
+from sklearn.cluster import KMeans
 
 def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_depth=1, trajectories=None, print_flag=False):
     '''
@@ -70,20 +71,20 @@ def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_dept
 
                     traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state)
 
-                    for sas_idx in range(len(traj_opt)):
-                        mu_sa = mdp.accumulate_reward_features(traj_opt[sas_idx:], discount=True)
+                    mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
 
-                        sas = traj_opt[sas_idx]
-                        cur_state = sas[0]
+                    sas = traj_opt[0]
+                    cur_state = sas[0]
 
-                        # currently assumes that all actions are executable from all states. only considering
-                        # action depth of 1 currently
-                        for action in mdp.actions:
-                            if action != sas[1]:
-                                traj_hyp = mdp_helpers.rollout_policy(mdp, agent, cur_state=cur_state, action_seq=[action])
-                                mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
+                    # currently assumes that all actions are executable from all states. only considering
+                    # action depth of 1 currently
+                    for action in mdp.actions:
+                        if action != sas[1]:
+                            traj_hyp = mdp_helpers.rollout_policy(mdp, agent, cur_state=cur_state, action_seq=[action])
+                            mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
 
-                                constraints.append(mu_sa - mu_sb)
+                            constraints.append(mu_sa - mu_sb)
+
                     min_subset_constraints = BEC_helpers.clean_up_constraints(constraints, weights, step_cost_flag)
                     # store the BEC constraints for each environment, along with the associated demo and environment number
                     min_subset_constraints_record.append(min_subset_constraints)
@@ -105,60 +106,48 @@ def extract_BEC_constraints(min_subset_constraints_record, weights, step_cost_fl
     min_BEC_constraints = BEC_helpers.clean_up_constraints(constraints_record, weights, step_cost_flag)
 
     # then determine the BEC lengths of all other potential demos that could be shown
-    BEC_lengths = np.zeros(len(min_subset_constraints_record))
-    for j, min_subset_constraints in enumerate(min_subset_constraints_record):
-        BEC_lengths[j] = BEC_helpers.calculate_BEC_length(min_subset_constraints, weights, step_cost_flag)[0]
+    BEC_lengths_record = []
 
-    # sort and bin the BEC lengths of each possible environment + demonstration
-    unique_BEC_lengths, unique_BEC_bins = np.unique(np.round(BEC_lengths, 5), return_inverse=True)
-    unique_BEC_bins = list(unique_BEC_bins)
+    for j, min_subset_constraints in enumerate(min_subset_constraints_record):
+        BEC_lengths_record.append(BEC_helpers.calculate_BEC_length(min_subset_constraints, weights, step_cost_flag)[0])
 
     # ordered from most constraining to least constraining
-    return min_BEC_constraints, unique_BEC_lengths, unique_BEC_bins
+    return min_BEC_constraints, BEC_lengths_record
 
-def obtain_potential_summary_demos(lowerbound, upperbound, n_demos, padding, unique_BEC_bins, type='random'):
+def obtain_potential_summary_demos(BEC_lengths_record, n_demos, n_clusters=6, type='scaffolding'):
     covering_demos_idxs = []
 
-    if type == 'random':
-        # a) random selection of unique BEC lengths and corresponding covering demos
-        current_BEC_length_idxs = []
-        while len(current_BEC_length_idxs) < n_demos:
-            current_BEC_length_idx = random.randint(lowerbound, upperbound)
-            # try and find a unique BEC length unless you've already exhausted all of your options
-            if current_BEC_length_idx not in current_BEC_length_idxs or len(current_BEC_length_idxs) >= (upperbound - lowerbound + 1):
-                covering_demo_idxs = [i for i, x in enumerate(unique_BEC_bins) if x == current_BEC_length_idx]
-                if len(covering_demo_idxs) > 0:
-                    current_BEC_length_idxs.append(current_BEC_length_idx)
-                    covering_demos_idxs.append(covering_demo_idxs)
+    kmeans = KMeans(n_clusters=n_clusters).fit(np.array(BEC_lengths_record).reshape(-1, 1))
+    cluster_centers = kmeans.cluster_centers_
+    labels = kmeans.labels_
 
-        # sort based on BEC lengths from high to low (in order of simplest to most complex)
-        tie_breaker = np.arange(len(current_BEC_length_idxs))
-        sorted_zipped = sorted(zip(current_BEC_length_idxs, tie_breaker, covering_demos_idxs))
-        current_BEC_length_idxs_sorted, _, covering_demos_idxs_sorted = list(zip(*sorted_zipped))
-        covering_demos_idxs_sorted = list(covering_demos_idxs_sorted)
-        covering_demos_idxs_sorted.reverse()
-        covering_demos_idxs = covering_demos_idxs_sorted
-    else:
-        # b) equally spaced selection. go from upperbound to lower bound since upperbound has easier demos (which are ordered from hardest to easiest,
-        # i.e. smallest to largest BEC length)
-        current_BEC_length_idxs = np.linspace(upperbound, lowerbound, n_demos, endpoint=False)[1:].astype(int)
+    ordering = np.arange(0, n_clusters)
+    sorted_zipped = sorted(zip(cluster_centers, ordering))
+    cluster_centers_sorted, ordering_sorted = list(zip(*sorted_zipped))
 
-        for current_BEC_length_idx in current_BEC_length_idxs:
-            max_covering_demo_ct = np.float("-inf")
-            # see if any neighboring indices have a larger demo pool to select from. select the largest pool
-            for pad in padding:
-                try:
-                    covering_demo_idxs = [i for i, x in enumerate(unique_BEC_bins) if x == (current_BEC_length_idx + pad)]
-                    if len(covering_demo_idxs) > max_covering_demo_ct:
-                        best_covering_demo_idxs = covering_demo_idxs
-                        max_covering_demo_ct = len(covering_demo_idxs)
-                except:
-                    pass
-            covering_demos_idxs.append(best_covering_demo_idxs)
+    if type == 'scaffolding':
+        # 0 is the cluster with the smallest BEC lengths
+        if n_demos == 3:
+            cluster_idxs = [0, 2, 4]
+        else:
+            cluster_idxs = [2, 4]
 
-    return covering_demos_idxs
+        for j in range(n_demos):
+            # checking out partitions one at a time
+            partition_idx = ordering_sorted[cluster_idxs[j]]
 
-def obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, unique_BEC_lengths, unique_BEC_bins, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=3, downsample_threshold=float("inf"), pad_factor=0.02):
+            covering_demo_idxs = [i for i, x in enumerate(labels) if x == partition_idx]
+            # print(len(covering_demo_idxs))
+
+            covering_demo_idxs = random.sample(covering_demo_idxs, min(50, len(covering_demo_idxs)))
+            covering_demos_idxs.append(covering_demo_idxs)
+
+        # filled this from hardest to easiest demos, so flip
+        covering_demos_idxs.reverse()
+
+        return covering_demos_idxs
+
+def obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=3, downsample_threshold=float("inf"), pad_factor=0.02):
     '''
     :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
     :param BEC_constraints: Minimum set of constraints defining the BEC of a set of demos / policy (list of constraints)
@@ -172,9 +161,6 @@ def obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, 
     '''
     min_BEC_summary = []
     summary = []
-    current_BEC_length_idx = len(unique_BEC_lengths) - 1
-    scaled_pad_factor = np.floor(len(unique_BEC_lengths) * pad_factor).astype(int)
-    padding = np.linspace(-scaled_pad_factor, scaled_pad_factor, scaled_pad_factor * 2 + 1)
 
     if summary_variant[0] == 'random':
         # select a random set of training examples
@@ -306,7 +292,7 @@ def obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, 
             del min_subset_constraints_record[best_idx]
             del traj_record[best_idx]
             del env_record[best_idx]
-            del unique_BEC_bins[best_idx]
+            del BEC_lengths_record[best_idx]
 
     # fill out the rest of the vacant demo slots
     if len(min_BEC_summary) < n_train_demos:
@@ -322,7 +308,8 @@ def obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, 
             else:
                 raise Exception("Undefined summary variant.")
         else:
-            covering_demos_idxs = obtain_potential_summary_demos(0, len(unique_BEC_lengths) - 1, n_train_demos - len(min_BEC_summary), padding, unique_BEC_bins)
+            # scaffolding
+            covering_demos_idxs = obtain_potential_summary_demos(BEC_lengths_record, n_train_demos - len(min_BEC_summary), type='scaffolding')
 
         for covering_demo_idxs in covering_demos_idxs:
             visual_dissimilarities = np.zeros(len(covering_demo_idxs))
@@ -386,12 +373,6 @@ def obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, 
                         if summary_variant[0] == 'backward':
                             summary.reverse()
                     return summary
-
-            for best_idx in sorted(best_idxs, reverse=True):
-                del min_subset_constraints_record[best_idx]
-                del traj_record[best_idx]
-                del env_record[best_idx]
-                del unique_BEC_bins[best_idx]
 
     summary.extend(min_BEC_summary)
     if len(summary_variant) == 2:

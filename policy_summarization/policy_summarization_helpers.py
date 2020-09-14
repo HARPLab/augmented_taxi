@@ -5,6 +5,7 @@ import shutil
 import random
 from termcolor import colored
 import copy
+from sklearn.cluster import KMeans
 
 # Other imports
 from simple_rl.planning import ValueIteration
@@ -250,37 +251,39 @@ def _in_summary(mdp, summary, initial_state):
             return True
     return False
 
-def select_test_demos(lowerbound, upperbound, n_desired_test_env, wt_vi_traj_candidates, unique_BEC_bins, env_record_sorted, traj_opts_sorted, BEC_lengths_sorted, BEC_constraints_sorted, type='random'):
-    if type == 'random':
-        # a) random selection of test demonstrations
-        test_demo_idxs = []
-        test_unique_idxs = []
-        while len(test_demo_idxs) < n_desired_test_env:
-            test_unique_idx = random.randint(lowerbound, upperbound)
-            # try and find a unique BEC length unless you've already exhausted all of your options
-            if test_unique_idx not in test_unique_idxs or (len(test_unique_idxs) >= (upperbound - lowerbound + 1)):
-                covering_demo_idxs = [i for i, x in enumerate(unique_BEC_bins) if x == test_unique_idx]
-                covering_demo_idx = random.choice(covering_demo_idxs)
-                if covering_demo_idx not in test_demo_idxs:
-                    test_demo_idxs.append(covering_demo_idx)
-                    test_unique_idxs.append(test_unique_idx)
-    else:
-        # b) equally spaced selection of test demonstrations (outdated)
-        test_unique_idxs = np.linspace(upperbound, lowerbound, n_desired_test_env + 1, endpoint=False)[1:].astype(int)
+def select_test_demos(cluster_idx, n_desired_test_env, wt_vi_traj_candidates, env_idxs , traj_opts, BEC_lengths, BEC_constraints, n_clusters=6):
+    kmeans = KMeans(n_clusters=n_clusters).fit(np.array(BEC_lengths).reshape(-1, 1))
+    cluster_centers = kmeans.cluster_centers_
+    labels = kmeans.labels_
+
+    ordering = np.arange(0, n_clusters)
+    sorted_zipped = sorted(zip(cluster_centers, ordering))
+    cluster_centers_sorted, ordering_sorted = list(zip(*sorted_zipped))
+
+    # checking out partitions one at a time
+    partition_idx = ordering_sorted[cluster_idx]
+
+    covering_demo_idxs = [i for i, x in enumerate(labels) if x == partition_idx]
+    print(len(covering_demo_idxs))
+
+    test_demo_idxs = random.sample(covering_demo_idxs, n_desired_test_env)
+
+    selected_env_idxs = [env_idxs[k] for k in test_demo_idxs]
 
     test_wt_vi_traj_tuples = [copy.deepcopy(wt_vi_traj_candidates[k][0]) for k in
-                              env_record_sorted[test_demo_idxs]]
+                              selected_env_idxs]
 
-    test_traj_opts = [traj_opts_sorted[k] for k in test_demo_idxs]
+    test_traj_opts = [traj_opts[k] for k in test_demo_idxs]
 
     for k, test_traj_opt in enumerate(test_traj_opts):
         test_wt_vi_traj_tuples[k][1].mdp.set_init_state(test_traj_opt[0][0])
         test_wt_vi_traj_tuples[k][2] = test_traj_opt
 
-    test_BEC_lengths = [BEC_lengths_sorted[k] for k in test_demo_idxs]
-    test_BEC_constraints = [BEC_constraints_sorted[k] for k in test_demo_idxs]
+    test_BEC_lengths = [BEC_lengths[k] for k in test_demo_idxs]
+    test_BEC_constraints = [BEC_constraints[k] for k in test_demo_idxs]
 
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints
+
 
 def obtain_test_environments(wt_vi_traj_candidates, min_subset_constraints_record, env_record, traj_record, weights, n_desired_test_env, difficulty, step_cost_flag, summary=None, BEC_summary_type=None):
     '''
@@ -305,16 +308,6 @@ def obtain_test_environments(wt_vi_traj_candidates, min_subset_constraints_recor
             BEC_constraints.append(constraints)
             traj_opts.append(traj_record[j])
 
-    # sorted from smallest to largest BEC lengths (i.e. most to least challenging)
-    tie_breaker = [i for i in range(len(BEC_lengths))]
-    sorted_zipped = sorted(zip(BEC_lengths, env_complexities, tie_breaker, env_idxs, BEC_constraints, traj_opts))
-    BEC_lengths_sorted, env_complexities_sorted, _, env_record_sorted, BEC_constraints_sorted, traj_opts_sorted = list(zip(*sorted_zipped))
-    env_record_sorted = np.array(env_record_sorted)
-
-    # again sorted in order from smallest to largest, only selecting unique BEC lengths (as demos with the same
-    # BEC lengths are often quite similar). could also factor in visual complexity here as well
-    unique_BEC_lengths, unique_BEC_bins = np.unique(np.array(BEC_lengths_sorted).round(decimals=5), return_inverse=True)
-
     if BEC_summary_type == 'demo':
         # demo test environment generation is outdated
         if difficulty == 'high':
@@ -328,12 +321,18 @@ def obtain_test_environments(wt_vi_traj_candidates, min_subset_constraints_recor
             test_BEC_lengths = [BEC_lengths_sorted[k] for k in unique_idxs[-n_desired_test_env:]]
             test_BEC_constraints = [BEC_constraints_sorted[k] for k in unique_idxs[-n_desired_test_env:]]
     else:
-        # must update the wt_vi_traj_candidate with the right initial state and trajectory
         if difficulty == 'high':
-            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(0, np.floor(1 * (len(unique_BEC_lengths) - 1) / 3), n_desired_test_env, wt_vi_traj_candidates, unique_BEC_bins, env_record_sorted, traj_opts_sorted, BEC_lengths_sorted, BEC_constraints_sorted)
-        elif difficulty == 'medium':
-            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(np.floor(1 * (len(unique_BEC_lengths) - 1) / 3), np.floor(2 * (len(unique_BEC_lengths) - 1) / 3), n_desired_test_env, wt_vi_traj_candidates, unique_BEC_bins, env_record_sorted, traj_opts_sorted, BEC_lengths_sorted, BEC_constraints_sorted)
-        else:
-            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(np.floor(2 * (len(unique_BEC_lengths) - 1) / 3), len(unique_BEC_lengths) - 1, n_desired_test_env, wt_vi_traj_candidates, unique_BEC_bins, env_record_sorted, traj_opts_sorted, BEC_lengths_sorted, BEC_constraints_sorted)
+            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(0, n_desired_test_env, wt_vi_traj_candidates, env_idxs, traj_opts, BEC_lengths, BEC_constraints)
+        if difficulty == 'medium':
+            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(2, n_desired_test_env,
+                                                                                               wt_vi_traj_candidates,
+                                                                                               env_idxs, traj_opts,
+                                                                                               BEC_lengths, BEC_constraints)
+
+        if difficulty == 'low':
+            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(4, n_desired_test_env,
+                                                                                               wt_vi_traj_candidates,
+                                                                                               env_idxs, traj_opts,
+                                                                                               BEC_lengths, BEC_constraints)
 
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints
