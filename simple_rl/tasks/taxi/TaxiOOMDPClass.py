@@ -13,6 +13,7 @@ Author: David Abel (cs.brown.edu/~dabel/)
 from __future__ import print_function
 import random
 import copy
+import numpy as np
 
 # Other imports.
 from simple_rl.mdp.oomdp.OOMDPClass import OOMDP
@@ -29,13 +30,20 @@ class TaxiOOMDP(OOMDP):
     ATTRIBUTES = ["x", "y", "has_passenger", "in_taxi", "dest_x", "dest_y"]
     CLASSES = ["agent", "wall", "passenger"]
 
-    def __init__(self, width, height, agent, walls, passengers, slip_prob=0, gamma=0.99):
+    def __init__(self, width, height, agent, walls, passengers, slip_prob=0, gamma=0.99, weights=None):
         self.height = height
         self.width = width
 
         agent_obj = OOMDPObject(attributes=agent, name="agent")
         wall_objs = self._make_oomdp_objs_from_list_of_dict(walls, "wall")
         pass_objs = self._make_oomdp_objs_from_list_of_dict(passengers, "passenger")
+        self.walls = wall_objs
+
+        if weights is not None:
+            self.weights = weights
+        else:
+            # use true weighting over reward variables (on the goal with the passenger, on a toll, on a traffic cell)
+            self.weights = np.array([[10, 0, -1]])
 
         init_state = self._create_state(agent_obj, wall_objs, pass_objs)
         OOMDP.__init__(self, TaxiOOMDP.ACTIONS, self._taxi_transition_func, self._taxi_reward_func, init_state=init_state, gamma=gamma, sample_rate=1)
@@ -80,6 +88,26 @@ class TaxiOOMDP(OOMDP):
         '''
         _error_check(state, action)
 
+        # feature-based reward
+        return self.weights.dot(self.compute_reward_features(state, action, next_state).T)
+
+    def compute_reward_features(self, state, action, next_state=None):
+        '''
+        Args:
+            state (OOMDP State)
+            action (str)
+            next_state (OOMDP State)
+
+        Returns
+            array of reward features
+        '''
+        # reward features = [successfully dropped off passenger, moved off of toll]
+        passenger_flag = 0
+        step_cost_flag = 1
+
+        # if next_state == self.exit_state:
+        #     step_cost_flag = 0
+
         # Stacked if statements for efficiency.
         if action == "dropoff":
             # If agent is dropping off.
@@ -89,9 +117,28 @@ class TaxiOOMDP(OOMDP):
             if agent.get_attribute("has_passenger"):
                 for p in state.get_objects_of_class("passenger"):
                     if p.get_attribute("x") != p.get_attribute("dest_x") or p.get_attribute("y") != p.get_attribute("dest_y"):
-                        return 0 - self.step_cost
-                return 1 - self.step_cost
-        return 0 - self.step_cost
+                        return np.array([[passenger_flag, 0, step_cost_flag]])
+                passenger_flag = 1
+                return np.array([[passenger_flag, 0, step_cost_flag]])
+
+        return np.array([[passenger_flag, 0, step_cost_flag]])
+
+    def accumulate_reward_features(self, trajectory, discount=False):
+        reward_features = np.zeros(self.weights.shape)
+
+        # discount the accumulated reward features directly here as you're considering the entire trajectory and likely
+        # won't be discounting per (s, a, s') tuple
+        if discount:
+            step = 0
+            for sas in trajectory:
+                reward_features += self.gamma ** step * self.compute_reward_features(sas[0], sas[1], sas[2])
+                step += 1
+        # but still provide the option to return undiscounted accumulated reward features as well
+        else:
+            for sas in trajectory:
+                reward_features += self.compute_reward_features(sas[0], sas[1], sas[2])
+
+        return reward_features
 
     def _taxi_transition_func(self, state, action):
         '''
@@ -131,8 +178,11 @@ class TaxiOOMDP(OOMDP):
             next_state = state
 
         # Make terminal.
-        if taxi_helpers.is_taxi_terminal_state(next_state):
+        next_state_is_terminal, next_state_is_goal = taxi_helpers.is_taxi_terminal_and_goal_state(next_state)
+        if next_state_is_terminal:
             next_state.set_terminal(True)
+        if next_state_is_goal:
+            next_state.set_goal(True)
 
         # All OOMDP states must be updated.
         next_state.update()
@@ -145,17 +195,22 @@ class TaxiOOMDP(OOMDP):
     def visualize_agent(self, agent, width_scr_scale=180, height_scr_scale=180):
         from ...utils.mdp_visualizer import visualize_agent
         from .taxi_visualizer import _draw_state
-        visualize_agent(self, agent, _draw_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
+        visualize_agent(self, agent, _draw_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='taxi')
         _ = input("Press anything to quit ")
         sys.exit(1)
 
     def visualize_interaction(self):
         from simple_rl.utils.mdp_visualizer import visualize_interaction
         from .taxi_visualizer import _draw_state
-        visualize_interaction(self, _draw_state)
+        visualize_interaction(self, _draw_state, mdp_class='taxi')
         raw_input("Press anything to quit ")
         sys.exit(1)
 
+    def visualize_trajectory(self, trajectory, marked_state_importances=None, width_scr_scale=180, height_scr_scale=180):
+        from simple_rl.utils.mdp_visualizer import visualize_trajectory
+        from .taxi_visualizer import _draw_state
+
+        visualize_trajectory(self, trajectory, _draw_state, marked_state_importances=marked_state_importances, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='taxi')
 
     # ----------------------------
     # -- Action Implementations --
@@ -172,7 +227,7 @@ class TaxiOOMDP(OOMDP):
             (TaxiState)
         '''
 
-        if taxi_helpers._is_wall_in_the_way(state, dx=dx, dy=dy):
+        if taxi_helpers._is_wall_in_the_way(self, state, dx=dx, dy=dy):
             # There's a wall in the way.
             return state
 

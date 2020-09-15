@@ -7,7 +7,7 @@ Utility for making MDP instances
 # Python imports.
 
 # Other imports.
-from simple_rl.tasks import AugmentedTaxiOOMDP, TwoGoalOOMDP, SkateboardOOMDP, CookieCrumbOOMDP
+from simple_rl.tasks import AugmentedTaxiOOMDP, TwoGoalOOMDP, SkateboardOOMDP, TaxiOOMDP, CookieCrumbOOMDP
 
 def make_custom_mdp(mdp_class, mdp_parameters):
     if mdp_class == 'augmented_taxi':
@@ -23,6 +23,9 @@ def make_custom_mdp(mdp_class, mdp_parameters):
         mdp_candidate = SkateboardOOMDP(width=mdp_parameters['width'], height=mdp_parameters['height'], agent=mdp_parameters['agent'],
                                            walls=mdp_parameters['walls'], goal=mdp_parameters['goal'], skateboard=mdp_parameters['skateboard'], gamma=mdp_parameters['gamma'],
                                            weights=mdp_parameters['weights'], env_code=mdp_parameters['env_code'], sample_rate=1)
+    elif mdp_class == 'taxi':
+        mdp_candidate = TaxiOOMDP(width=mdp_parameters['width'], height=mdp_parameters['height'], agent=mdp_parameters['agent'],
+                                           walls=mdp_parameters['walls'], passengers=mdp_parameters['passengers'], gamma=mdp_parameters['gamma'], weights=mdp_parameters['weights'])
     elif mdp_class == 'cookie_crumb':
         mdp_candidate = CookieCrumbOOMDP(width=mdp_parameters['width'], height=mdp_parameters['height'], agent=mdp_parameters['agent'],
                                          walls=mdp_parameters['walls'], goals=mdp_parameters['goals'], crumbs=mdp_parameters['crumbs'], gamma=mdp_parameters['gamma'],

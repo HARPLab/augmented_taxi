@@ -109,24 +109,29 @@ def _draw_lower_left_text(state, screen, score=-1):
 def _draw_terminal_text(mdp_class, cur_state, scr_width, scr_height, title_font):
     if mdp_class == 'augmented_taxi':
         if cur_state.is_goal():
-            goal_text = "Dropped off the passenger!"
+            goal_text = "Decided to deliver the circle!"
         else:
-            goal_text = "Decided not to drop off the passenger!"
+            goal_text = "Decided to exit!"
     elif mdp_class == 'two_goal':
         if cur_state.is_goal():
-            goal_text = "Arrived at a goal!"
+            goal_text = "Decided to go to one of the rings!"
         else:
-            goal_text = "Decided to not go to either goal!"
+            goal_text = "Decided to exit!"
     elif mdp_class == 'skateboard':
         if cur_state.is_goal():
-            goal_text = "Arrived at the goal!"
+            goal_text = "Decided to go to the square!"
         else:
-            goal_text = "Decided to not go to the goal!"
+            goal_text = "Decided to exit!"
     elif mdp_class == 'cookie_crumb':
         if cur_state.is_goal():
-            goal_text = "Arrived at the goal!"
+            goal_text = "Decided to go to the square!"
         else:
-            goal_text = "Decided to not go to the goal!"
+            goal_text = "Decided to exit!"
+    elif mdp_class == 'taxi':
+        if cur_state.is_goal():
+            goal_text = "Decided to deliver the hexagon!"
+        else:
+            goal_text = "Decided to exit!"
     else:
         if cur_state.is_goal():
             # Done! Agent found goal.
@@ -135,7 +140,7 @@ def _draw_terminal_text(mdp_class, cur_state, scr_width, scr_height, title_font)
             # Done! Agent failed.
             goal_text = "Fail!"
 
-    goal_text_rendered = title_font.render(goal_text, True, (206, 147, 66))
+    goal_text_rendered = title_font.render(goal_text, True, (75, 75, 75))
     goal_text_point = scr_width / 2.0 - (len(goal_text) * 8), 18 * scr_height / 20.0
 
     return goal_text_rendered, goal_text_point

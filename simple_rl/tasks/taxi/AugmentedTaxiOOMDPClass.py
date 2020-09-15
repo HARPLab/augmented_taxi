@@ -245,28 +245,28 @@ class AugmentedTaxiOOMDP(OOMDP):
     # Visualize the agent's policy. --> Press <spacebar> to advance the agent.
     def visualize_agent(self, agent, width_scr_scale=180, height_scr_scale=180):
         from simple_rl.utils.mdp_visualizer import visualize_agent
-        from .taxi_visualizer import _draw_state
-        visualize_agent(self, agent, _draw_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='augmented_taxi')
+        from .taxi_visualizer import _draw_augmented_state
+        visualize_agent(self, agent, _draw_augmented_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='augmented_taxi')
 
     # Press <1>, <2>, <3>, and so on to execute action 1, action 2, etc.
     def visualize_interaction(self, interaction_callback=None, done_callback=None, keys_map=None, width_scr_scale=180, height_scr_scale=180):
         from simple_rl.utils.mdp_visualizer import visualize_interaction
-        from .taxi_visualizer import _draw_state
-        trajectory = visualize_interaction(self, _draw_state, interaction_callback=interaction_callback, done_callback=done_callback, keys_map=keys_map, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='augmented_taxi')
+        from .taxi_visualizer import _draw_augmented_state
+        trajectory = visualize_interaction(self, _draw_augmented_state, interaction_callback=interaction_callback, done_callback=done_callback, keys_map=keys_map, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='augmented_taxi')
         return trajectory
 
     # Visualize the value of each of the grid cells. --> Color corresponds to higher value.
     # (Currently not very helpful - see first comment in taxi_visualizer.py)
     def visualize_value(self, agent=None, width_scr_scale=180, height_scr_scale=180):
         from simple_rl.utils.mdp_visualizer import visualize_value
-        from .taxi_visualizer import _draw_state
-        visualize_value(self, _draw_state, agent, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
+        from .taxi_visualizer import _draw_augmented_state
+        visualize_value(self, _draw_augmented_state, agent, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
 
     # Visualize the optimal action for each of the grid cells
     # (Currently not very helpful - see first comment in taxi_visualizer.py)
     def visualize_policy(self, policy, width_scr_scale=180, height_scr_scale=180):
         from simple_rl.utils.mdp_visualizer import visualize_policy
-        from .taxi_visualizer import _draw_state
+        from .taxi_visualizer import _draw_augmented_state
 
         action_char_dict = {
             "up": "^",       #u"\u2191",
@@ -277,19 +277,19 @@ class AugmentedTaxiOOMDP(OOMDP):
             "dropoff": "dp",  # u"\u2192"
             "refuel": "rf",  # u"\u2192"
         }
-        visualize_policy(self, policy, _draw_state, action_char_dict, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
+        visualize_policy(self, policy, _draw_augmented_state, action_char_dict, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
 
     def visualize_state(self, cur_state, width_scr_scale=180, height_scr_scale=180):
         from simple_rl.utils.mdp_visualizer import visualize_state
-        from .taxi_visualizer import _draw_state
+        from .taxi_visualizer import _draw_augmented_state
 
-        visualize_state(self, _draw_state, cur_state=cur_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
+        visualize_state(self, _draw_augmented_state, cur_state=cur_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
 
     def visualize_trajectory(self, trajectory, marked_state_importances=None, width_scr_scale=180, height_scr_scale=180):
         from simple_rl.utils.mdp_visualizer import visualize_trajectory
-        from .taxi_visualizer import _draw_state
+        from .taxi_visualizer import _draw_augmented_state
 
-        visualize_trajectory(self, trajectory, _draw_state, marked_state_importances=marked_state_importances, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='augmented_taxi')
+        visualize_trajectory(self, trajectory, _draw_augmented_state, marked_state_importances=marked_state_importances, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='augmented_taxi')
 
     # ----------------------------
     # -- Action Implementations --

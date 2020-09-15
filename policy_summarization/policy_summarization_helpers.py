@@ -266,7 +266,7 @@ def select_test_demos(cluster_idx, n_desired_test_env, wt_vi_traj_candidates, en
     covering_demo_idxs = [i for i, x in enumerate(labels) if x == partition_idx]
     print(len(covering_demo_idxs))
 
-    test_demo_idxs = random.sample(covering_demo_idxs, n_desired_test_env)
+    test_demo_idxs = random.sample(covering_demo_idxs, min(n_desired_test_env, len(covering_demo_idxs)))
 
     selected_env_idxs = [env_idxs[k] for k in test_demo_idxs]
 

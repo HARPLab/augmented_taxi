@@ -2,7 +2,8 @@ import numpy as np
 
 # mdp_class = 'augmented_taxi'
 # mdp_class = 'two_goal'
-mdp_class = 'skateboard'
+# mdp_class = 'skateboard'
+mdp_class = 'taxi'
 # mdp_class = 'cookie_crumb'
 
 if mdp_class == 'augmented_taxi':
@@ -73,6 +74,25 @@ elif mdp_class == 'cookie_crumb':
         'walls': [],
         'crumbs': [],
         'available_crumbs': [{'x': 1, 'y': 2}, {'x': 1, 'y': 3}, {'x': 1, 'y': 4}, {'x': 2, 'y': 2}, {'x': 2, 'y': 3}, {'x': 2, 'y': 4}],
+        'width': 4,
+        'height': 4,
+        'gamma': 1,
+        'env_code': [],
+        'weights': w_normalized,
+        'weights_lb': w_normalized,
+        'weights_ub': w_normalized
+    }
+# currently only compatible with making a single MDP through make_custom_MDP of make_mdp.py, whereas others can support
+# making many MDPs by varying the available environment features (e.g. tolls, walls, crumbs)
+elif mdp_class == 'taxi':
+    # drop off reward, none, step cost
+    w = np.array([[26, 0, -1]])
+    w_normalized = w / np.linalg.norm(w[0, :], ord=1)
+
+    mdp_parameters = {
+        'agent': {'x': 4, 'y': 1, 'has_passenger': 0},
+        'walls': [{'x': 1, 'y': 3}, {'x': 2, 'y': 3}, {'x': 3, 'y': 3}],
+        'passengers': [{'x': 1, 'y': 2, 'dest_x': 1, 'dest_y': 4, 'in_taxi': 0}],
         'width': 4,
         'height': 4,
         'gamma': 1,

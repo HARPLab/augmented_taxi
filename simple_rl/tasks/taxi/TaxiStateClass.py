@@ -15,6 +15,9 @@ class TaxiState(OOMDPState):
     def get_agent_y(self):
         return self.objects["agent"][0]["y"]
 
+    def track_fuel(self):
+        return False
+
     def __hash__(self):
 
     	state_hash = str(self.get_agent_x()) + str(self.get_agent_y()) + "00"
