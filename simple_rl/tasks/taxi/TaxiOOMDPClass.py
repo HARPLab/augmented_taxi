@@ -26,30 +26,35 @@ class TaxiOOMDP(OOMDP):
     ''' Class for a Taxi OO-MDP '''
 
     # Static constants.
-    ACTIONS = ["up", "down", "left", "right", "pickup", "dropoff"]
+    ACTIONS = ["up", "down", "left", "right", "pickup", "dropoff", "exit"]
     ATTRIBUTES = ["x", "y", "has_passenger", "in_taxi", "dest_x", "dest_y"]
     CLASSES = ["agent", "wall", "passenger"]
 
     def __init__(self, width, height, agent, walls, passengers, slip_prob=0, gamma=0.99, weights=None):
         self.height = height
         self.width = width
-
-        agent_obj = OOMDPObject(attributes=agent, name="agent")
-        wall_objs = self._make_oomdp_objs_from_list_of_dict(walls, "wall")
-        pass_objs = self._make_oomdp_objs_from_list_of_dict(passengers, "passenger")
-        self.walls = wall_objs
-
         if weights is not None:
             self.weights = weights
         else:
             # use true weighting over reward variables (on the goal with the passenger, on a toll, on a traffic cell)
             self.weights = np.array([[10, 0, -1]])
 
-        init_state = self._create_state(agent_obj, wall_objs, pass_objs)
+        agent_obj = OOMDPObject(attributes=agent, name="agent")
+        agent_exit = {"x": 100, "y": 100, "has_passenger": 0}
+        wall_objs = self._make_oomdp_objs_from_list_of_dict(walls, "wall")
+        pass_objs = self._make_oomdp_objs_from_list_of_dict(passengers, "passenger")
+        pass_objs_exit = self._make_oomdp_objs_from_list_of_dict(passengers, "passenger")
+        self.walls = wall_objs
+
+        self.exit_state = self._create_state(OOMDPObject(attributes=agent_exit, name="agent_exit"), pass_objs_exit)
+        self.exit_state.set_terminal(True)
+        self.exit_state.set_goal(False)
+
+        init_state = self._create_state(agent_obj, pass_objs)
         OOMDP.__init__(self, TaxiOOMDP.ACTIONS, self._taxi_transition_func, self._taxi_reward_func, init_state=init_state, gamma=gamma, sample_rate=1)
         self.slip_prob = slip_prob
 
-    def _create_state(self, agent_oo_obj, walls, passengers):
+    def _create_state(self, agent_oo_obj, passengers):
         '''
         Args:
             agent_oo_obj (OOMDPObjects)
@@ -65,10 +70,6 @@ class TaxiOOMDP(OOMDP):
         objects = {c : [] for c in TaxiOOMDP.CLASSES}
 
         objects["agent"].append(agent_oo_obj)
-
-        # Make walls.
-        for w in walls:
-            objects["wall"].append(w)
 
         # Make passengers.
         for p in passengers:
@@ -105,8 +106,8 @@ class TaxiOOMDP(OOMDP):
         passenger_flag = 0
         step_cost_flag = 1
 
-        # if next_state == self.exit_state:
-        #     step_cost_flag = 0
+        if next_state == self.exit_state:
+            step_cost_flag = 0
 
         # Stacked if statements for efficiency.
         if action == "dropoff":
@@ -174,6 +175,15 @@ class TaxiOOMDP(OOMDP):
             next_state = self.agent_dropoff(state)
         elif action == "pickup":
             next_state = self.agent_pickup(state)
+        elif action == "exit":
+            next_state = copy.deepcopy(self.exit_state)
+
+            # ensure that the passenger is in the same place when the agent exits
+            passenger_attr_dict_ls = state.get_objects_of_class("passenger")
+            passenger_attr_dict_ls_exit = next_state.get_objects_of_class("passenger")
+            for i, passenger in enumerate(passenger_attr_dict_ls):
+                passenger_attr_dict_ls_exit[i]["x"] = passenger_attr_dict_ls[i]["x"]
+                passenger_attr_dict_ls_exit[i]["y"] = passenger_attr_dict_ls[i]["y"]
         else:
             next_state = state
 

@@ -4,6 +4,7 @@
 import sys
 import dill as pickle
 import numpy as np
+import copy
 from termcolor import colored
 
 # Other imports.
@@ -145,16 +146,16 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
 
 if __name__ == "__main__":
     # a) generate an agent if you want to explore the Augmented Taxi MDP
-    # generate_agent(params.mdp_class, params.data_loc['base'], params.mdp_parameters, visualize=True)
+    generate_agent(params.mdp_class, params.data_loc['base'], params.mdp_parameters, visualize=True)
 
     # b) obtain a Bayesian IRL summary of the agent's policy
     # bayesian_IRL_summary, wt_candidates, history_priors = obtain_BIRL_summary(params.mdp_class, params.data_loc['BIRL'], params.mdp_parameters,
     #                                                                           params.BIRL, params.step_cost_flag,
     #                                                                           visualize_history_priors=False, visualize_summary=True)
     # c) obtain a BEC summary of the agent's policy
-    BEC_summary = obtain_BEC_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
-                                                  params.step_cost_flag, params.BEC['summary_type'], params.BEC['summary_variant'],
-                                                  params.BEC['n_train_demos'], BEC_depth=params.BEC['depth'], visualize_summary=True)
+    # BEC_summary = obtain_BEC_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
+    #                                               params.step_cost_flag, params.BEC['summary_type'], params.BEC['summary_variant'],
+    #                                               params.BEC['n_train_demos'], BEC_depth=params.BEC['depth'], visualize_summary=True)
     # d) obtain test environments
-    obtain_test_environments(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,
-                             params.step_cost_flag, summary=BEC_summary, visualize_test_env=True)
+    # obtain_test_environments(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,
+    #                          params.step_cost_flag, summary=BEC_summary, visualize_test_env=True)

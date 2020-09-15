@@ -86,7 +86,7 @@ elif mdp_class == 'cookie_crumb':
 # making many MDPs by varying the available environment features (e.g. tolls, walls, crumbs)
 elif mdp_class == 'taxi':
     # drop off reward, none, step cost
-    w = np.array([[26, 0, -1]])
+    w = np.array([[15, 0, -1]])
     w_normalized = w / np.linalg.norm(w[0, :], ord=1)
 
     mdp_parameters = {
