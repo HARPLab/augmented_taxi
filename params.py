@@ -125,20 +125,15 @@ weights_human = {
 step_cost_flag = True    # indicates that the last weight element is a known step cost. code currently assumes a 2D
                          # weight vector if step_cost_flag = False, and a 3D weight vector if step_cost_flag = True
 
-# Joint BIRL and BEC parameters
-n_env = 64                                   # number of environments to consider
-                                              # tip: select so that np.log(n_env) / np.log(2) yields an int for predictable
-                                              # behavior see ps_helpers.obtain_env_policies()
 
 # BEC parameters
 BEC = {
     'summary_type': 'policy',                 # demo or policy: whether constratints are extraced from just the optimal demo from the
                                               # starting state or from all possible states from the full policy
 
-    'summary_variant': ['forward', 'easy'],   # ['low' or 'medium' or 'highest']: demonstrations based on expected information
-                                              # transfer to a perfect IRL agent, ['forward' or 'backward', 'easy' or 'hard']:
-                                              # demonstrations that utilize scaffolding and ease metrics (visual similarity,
-                                              # visual simplicity, etc) respectively
+    'summary_variant': ['medium', 'high'],   # [{'low', 'medium', 'high', 'highest', 'forward', 'backward}, {low', 'high'}]
+                                              # [{expected information transfer to a perfect IRL agent, or scaffolding},
+                                              # {ease metrics (visual similarity, visual simplicity, etc)}]
 
     'n_train_demos': 5,                       # number of desired training demonstrations
 
@@ -156,6 +151,10 @@ n_wt = 1                                      # total number of weight candidate
                                               # number of desired weight candidates is actually incorporated. see ps_helpers.discretize_wt_candidates()
                                               # also note that n_wt = n_wt_partitions ** (# of weights you're discretizing over) + 1
 iter_idx = None                               # weight dimension to discretize over. If None, discretize uniformly over all dimensions
+
+n_env = 64                                   # number of environments to consider
+                                              # tip: select so that np.log(n_env) / np.log(2) yields an int for predictable
+                                              # behavior see ps_helpers.obtain_env_policies()
 
 if iter_idx == None:
     data_loc_BIRL = str(n_env) + '_env/' + str(n_wt) + '_wt_' + 'uniform'
