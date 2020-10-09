@@ -268,14 +268,14 @@ def obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, 
                     # get demos of low visual complexity
                     complexity += wt_vi_traj_candidates[env_record[env]][0][1].mdp.measure_env_complexity()
                     # get simple demos
-                    BEC_length += \
-                    BEC_helpers.calculate_BEC_length(min_subset_constraints_record[env], weights, step_cost_flag)[0]
+                    # BEC_length += \
+                    # BEC_helpers.calculate_BEC_length(min_subset_constraints_record[env], weights, step_cost_flag)[0]
                 else:
                     # get demos of high visual complexity
                     complexity += -wt_vi_traj_candidates[env_record[env]][0][1].mdp.measure_env_complexity()
                     # get complex demos
-                    BEC_length += \
-                    -BEC_helpers.calculate_BEC_length(min_subset_constraints_record[env], weights, step_cost_flag)[0]
+                    # BEC_length += \
+                    # -BEC_helpers.calculate_BEC_length(min_subset_constraints_record[env], weights, step_cost_flag)[0]
 
             complexities[j] = complexity / len(combo)
             # large BEC length correlates to simplicity

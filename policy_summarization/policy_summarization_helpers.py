@@ -164,6 +164,7 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, save
                     passengers, tolls, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
                 else:
                     passengers, tolls, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code, mdp_parameters)
+                # todo: mdp_parameter should be copied, else you're just updating the same one over and over again
                 mdp_parameters['passengers'] = passengers
                 mdp_parameters['tolls'] = tolls
                 mdp_parameters['env_code'] = env_code
