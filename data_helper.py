@@ -234,36 +234,10 @@ def check_training_testing_overlap():
 
             print(overlap)
 
-def create_testing_dictionaries():
+def create_testing_dictionaries(test_env_dict, mapping):
     '''
     Translate the selected testing pickle files into dictionaries so that they can be uploaded and used in the web user study
     '''
-    test_env_dict = {
-        'augmented_taxi': {},
-        'two_goal': {},
-        'skateboard': {}
-    }
-
-    mapping = {
-        'augmented_taxi':
-            {
-                'low': [[0, 4], [1, 2], [3, 5]],
-                'medium': [[0, 2], [1, 4], [3, 5]],
-                'high': [[0, 1], [2, 3], [4, 5]],
-            },
-        'two_goal':
-            {
-                'low': [[0, 2], [3, 4], [1, 5]],
-                'medium': [[1, 5], [2, 3], [0, 4]],
-                'high': [[0, 3], [1, 4], [2, 5]],
-            },
-        'skateboard':
-            {
-                'low': [[0, 2], [1, 3], [4, 5]],
-                'medium': [[0, 1], [2, 3], [4, 5]],
-                'high': [[0, 1], [2, 3], [4, 5]],
-            }
-    }
 
     for data_loc in mapping.keys():
         for test_difficulty in mapping[data_loc].keys():
@@ -360,7 +334,7 @@ def create_testing_dictionaries():
 
             test_env_dict[data_loc][test_difficulty] = test_difficulty_dicts
 
-
+    # save the testing mdp information as a json
     with open('data.json', 'w') as f:
         json.dump(test_env_dict, f)
 
@@ -442,16 +416,86 @@ def print_training_summary_lengths():
     with open('training_traj_lengths.json', 'w') as f:
         json.dump(training_traj_lengths, f)
 
+def process_human_scores(test_env_dict, mapping):
+    with open('dfs.pickle', 'rb') as f:
+        df_testing, df_post_survey = pickle.load(f)
+
+    for data_loc in mapping.keys():
+        for test_difficulty in mapping[data_loc].keys():
+
+            data_loc_test = 'models/' + data_loc + '/testing/test_' + test_difficulty + '/test_environments.pickle'
+
+            with open(data_loc_test, 'rb') as f:
+                test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = pickle.load(f)
+                test_env_dict[data_loc][test_difficulty] = test_wt_vi_traj_tuples
+
+    for i in df_testing.index:
+        if df_testing.at[i, 'domain'] == 'sandbox':
+            continue
+        else:
+            domain = df_testing.at[i, 'domain']
+            moves_list = df_testing.moves[i][1:-1].replace('\', ', '').split('\'')[1:-1]
+            test_difficulty = df_testing.test_mdp[i]['test_difficulty']
+            tag = df_testing.test_mdp[i]['tag']
+
+            mdp = test_env_dict[domain][test_difficulty][tag][1].mdp
+
+            mdp.reset()
+            trajectory = []
+            cur_state = mdp.get_init_state()
+
+            for idx in range(len(moves_list)):
+                reward, next_state = mdp.execute_agent_action(moves_list[idx])
+                trajectory.append((cur_state, moves_list[idx], next_state))
+
+                # deepcopy occurs within transition function
+                cur_state = next_state
+
+            human_reward = mdp.weights.dot(mdp.accumulate_reward_features(trajectory).T)
+            scaled_human_reward = human_reward / df_testing.test_mdp[i]['opt_traj_reward']
+
+            df_testing.at[i, 'scaled_human_reward'] = scaled_human_reward[0, 0]
+
+    with open('dfs_processed.pickle', 'wb') as f:
+        pickle.dump((df_testing, df_post_survey), f)
 
 if __name__ == "__main__":
     data_loc = params.data_loc['BEC']
+    test_env_dict = {
+        'augmented_taxi': {},
+        'two_goal': {},
+        'skateboard': {}
+    }
+
+    mapping = {
+        'augmented_taxi':
+            {
+                'low': [[0, 4], [1, 2], [3, 5]],
+                'medium': [[0, 2], [1, 4], [3, 5]],
+                'high': [[0, 1], [2, 3], [4, 5]],
+            },
+        'two_goal':
+            {
+                'low': [[0, 2], [3, 4], [1, 5]],
+                'medium': [[1, 5], [2, 3], [0, 4]],
+                'high': [[0, 3], [1, 4], [2, 5]],
+            },
+        'skateboard':
+            {
+                'low': [[0, 2], [1, 3], [4, 5]],
+                'medium': [[0, 1], [2, 3], [4, 5]],
+                'high': [[0, 1], [2, 3], [4, 5]],
+            }
+    }
+
 
     # combine_summaries()
     # extract_test_demonstrations(data_loc)
     # plot_BEC_histogram(data_loc, params.weights['val'], params.step_cost_flag)
     # check_training_testing_overlap()
-    # create_testing_dictionaries()
-    print_training_summary_lengths()
+    # create_testing_dictionaries(test_env_dict, mapping)
+    # print_training_summary_lengths()
+    process_human_scores(test_env_dict, mapping)
 
     # mdp_parameters = {
     # 'agent': {'x': 4, 'y': 1, 'has_passenger': 0},

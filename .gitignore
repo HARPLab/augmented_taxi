@@ -18,3 +18,7 @@ examples/experiments_to_reproduce/*
 models/*
 scratch.py
 images/
+histograms/
+dfs.pickle
+dfs_processed.pickle
+*#
