@@ -27,9 +27,8 @@ def plot_BEC_histogram(data_loc, weights, step_cost_flag):
         with open('models/' + data_loc + '/raw_BEC_lengths.pickle', 'wb') as f:
             pickle.dump(BEC_lengths, f)
 
-    kmeans = KMeans(n_clusters=4).fit(BEC_lengths.reshape(-1, 1))
+    kmeans = KMeans(n_clusters=6).fit(BEC_lengths.reshape(-1, 1))
     cluster_centers = kmeans.cluster_centers_
-    labels = kmeans.labels_
 
     # ms = MeanShift().fit(BEC_lengths.reshape(-1, 1))
     # cluster_centers = ms.cluster_centers_
@@ -39,35 +38,33 @@ def plot_BEC_histogram(data_loc, weights, step_cost_flag):
     #     print(BEC_lengths[idx])
     # print(db.components_)
 
-    plt.hist(x=BEC_lengths, bins='auto', alpha=0.7)
-    plt.plot(cluster_centers, np.zeros(cluster_centers.shape), 'ro')
+    # figure generated for ICRA paper
+    plt.figure(figsize=(8, 3))
+    plt.hist(x=BEC_lengths, bins=200, alpha=0.7, color='tab:blue')
     plt.grid(axis='y', alpha=0.75)
-    plt.xlabel('BEC Length')
+    plt.plot(cluster_centers, np.zeros(cluster_centers.shape), 'o', color='tab:red')
+    plt.ylim(-60, plt.ylim()[1]) # to show all of BEC cluster centers
+    plt.xlabel('BEC Area')
     plt.ylabel('Frequency')
-    plt.title('Augmented Taxi | Auto Bin | Total count: ' + str(len(BEC_lengths)))
-    # plt.title('Two Goal | Auto Bin | Total count: ' + str(len(BEC_lengths)))
-    # plt.title('Skateboard | Auto Bin | Total count: ' + str(len(BEC_lengths)))
+    plt.title('Histogram of Demonstration BEC Areas')
     plt.tight_layout()
+    plt.savefig('augmented_taxi_auto.png', dpi=200, transparent=True)
 
-    plt.savefig('augmented_taxi_auto.png', dpi=200)
-    # plt.savefig('two_goal_auto.png', dpi=200)
-    # plt.savefig('skateboard_auto.png', dpi=200)
-
-    plt.clf()
-
-    plt.hist(x=BEC_lengths, bins=20, alpha=0.7)
-    plt.plot(cluster_centers, np.zeros(cluster_centers.shape), 'ro')
-    plt.grid(axis='y', alpha=0.75)
-    plt.xlabel('BEC Length')
-    plt.ylabel('Frequency')
-    plt.title('Augmented Taxi | Auto Bin | Total count: ' + str(len(BEC_lengths)))
-    # plt.title('Two Goal | Auto Bin | Total count: ' + str(len(BEC_lengths)))
-    # plt.title('Skateboard | Auto Bin | Total count: ' + str(len(BEC_lengths)))
-    plt.tight_layout()
-
-    plt.savefig('augmented_taxi_20.png', dpi=200)
-    # plt.savefig('two_goal_20.png', dpi=200)
-    # plt.savefig('skateboard_20.png', dpi=200)
+    # plt.clf()
+    #
+    # plt.hist(x=BEC_lengths, bins=20, alpha=0.7)
+    # plt.plot(cluster_centers, np.zeros(cluster_centers.shape), 'ro')
+    # plt.grid(axis='y', alpha=0.75)
+    # plt.xlabel('BEC Length')
+    # plt.ylabel('Count')
+    # plt.title('Augmented Taxi | Auto Bin | Total count: ' + str(len(BEC_lengths)))
+    # # plt.title('Two Goal | Auto Bin | Total count: ' + str(len(BEC_lengths)))
+    # # plt.title('Skateboard | Auto Bin | Total count: ' + str(len(BEC_lengths)))
+    # plt.tight_layout()
+    #
+    # plt.savefig('augmented_taxi_20.png', dpi=200)
+    # # plt.savefig('two_goal_20.png', dpi=200)
+    # # plt.savefig('skateboard_20.png', dpi=200)
 
 def extract_test_demonstrations(data_loc):
     '''
@@ -418,7 +415,7 @@ def print_training_summary_lengths():
 
 def process_human_scores(test_env_dict, mapping):
     with open('dfs.pickle', 'rb') as f:
-        df_testing, df_post_survey = pickle.load(f)
+        df_training_exp1, df_training_exp2, df_testing, df_testing_sandbox, df_training_survey_exp1, df_training_survey_exp2, df_post_survey = pickle.load(f)
 
     for data_loc in mapping.keys():
         for test_difficulty in mapping[data_loc].keys():
@@ -430,34 +427,42 @@ def process_human_scores(test_env_dict, mapping):
                 test_env_dict[data_loc][test_difficulty] = test_wt_vi_traj_tuples
 
     for i in df_testing.index:
-        if df_testing.at[i, 'domain'] == 'sandbox':
-            continue
+        domain = df_testing.at[i, 'domain']
+        moves_list = df_testing.moves[i][1:-1].replace('\', ', '').split('\'')[1:-1]
+        test_difficulty = df_testing.test_mdp[i]['test_difficulty']
+        tag = df_testing.test_mdp[i]['tag']
+
+        mdp = test_env_dict[domain][test_difficulty][tag][1].mdp
+
+        mdp.reset()
+        trajectory = []
+        cur_state = mdp.get_init_state()
+
+        for idx in range(len(moves_list)):
+            reward, next_state = mdp.execute_agent_action(moves_list[idx])
+            trajectory.append((cur_state, moves_list[idx], next_state))
+
+            # deepcopy occurs within transition function
+            cur_state = next_state
+
+        human_reward = mdp.weights.dot(mdp.accumulate_reward_features(trajectory).T)
+
+        # record binary reward
+        if human_reward == df_testing.test_mdp[i]['opt_traj_reward']:
+            df_testing.at[i, 'scaled_human_reward'] = 1
         else:
-            domain = df_testing.at[i, 'domain']
-            moves_list = df_testing.moves[i][1:-1].replace('\', ', '').split('\'')[1:-1]
-            test_difficulty = df_testing.test_mdp[i]['test_difficulty']
-            tag = df_testing.test_mdp[i]['tag']
+            df_testing.at[i, 'scaled_human_reward'] = 0
 
-            mdp = test_env_dict[domain][test_difficulty][tag][1].mdp
-
-            mdp.reset()
-            trajectory = []
-            cur_state = mdp.get_init_state()
-
-            for idx in range(len(moves_list)):
-                reward, next_state = mdp.execute_agent_action(moves_list[idx])
-                trajectory.append((cur_state, moves_list[idx], next_state))
-
-                # deepcopy occurs within transition function
-                cur_state = next_state
-
-            human_reward = mdp.weights.dot(mdp.accumulate_reward_features(trajectory).T)
-            scaled_human_reward = human_reward / df_testing.test_mdp[i]['opt_traj_reward']
-
-            df_testing.at[i, 'scaled_human_reward'] = scaled_human_reward[0, 0]
+        # record corresponding test difficulty
+        if test_difficulty == 'low':
+            df_testing.at[i, 'test_difficulty'] = 0
+        elif test_difficulty == 'medium':
+            df_testing.at[i, 'test_difficulty'] = 1
+        else:
+            df_testing.at[i, 'test_difficulty'] = 2
 
     with open('dfs_processed.pickle', 'wb') as f:
-        pickle.dump((df_testing, df_post_survey), f)
+        pickle.dump((df_training_exp1, df_training_exp2, df_testing, df_testing_sandbox, df_training_survey_exp1, df_training_survey_exp2, df_post_survey), f)
 
 if __name__ == "__main__":
     data_loc = params.data_loc['BEC']

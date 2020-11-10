@@ -1,9 +1,9 @@
 import numpy as np
 
-# mdp_class = 'augmented_taxi'
+mdp_class = 'augmented_taxi'
 # mdp_class = 'two_goal'
 # mdp_class = 'skateboard'
-mdp_class = 'taxi'
+# mdp_class = 'taxi'
 # mdp_class = 'cookie_crumb'
 
 if mdp_class == 'augmented_taxi':
@@ -152,18 +152,15 @@ n_wt = 1                                      # total number of weight candidate
                                               # also note that n_wt = n_wt_partitions ** (# of weights you're discretizing over) + 1
 iter_idx = None                               # weight dimension to discretize over. If None, discretize uniformly over all dimensions
 
-n_env = 64                                   # number of environments to consider
-                                              # tip: select so that np.log(n_env) / np.log(2) yields an int for predictable
-                                              # behavior see ps_helpers.obtain_env_policies()
 
 if iter_idx == None:
-    data_loc_BIRL = str(n_env) + '_env/' + str(n_wt) + '_wt_' + 'uniform'
+    data_loc_BIRL = str(n_wt) + '_wt_' + 'uniform'
     if step_cost_flag:
         n_wt_partitions = int((n_wt - 1) ** (1.0 / (weights['val'].shape[1] - 1)))
     else:
         n_wt_partitions = int((n_wt - 1) ** (1.0 / weights['val'].shape[1]))
 else:
-    data_loc_BIRL = str(n_env) + '_env/' + str(n_wt) + '_wt_' + 'iter_idx_' + str(iter_idx)
+    data_loc_BIRL = str(n_wt) + '_wt_' + 'iter_idx_' + str(iter_idx)
     n_wt_partitions = n_wt - 1
 
 BIRL = {
@@ -177,5 +174,5 @@ BIRL = {
 data_loc = {
     'base': 'base',
     'BEC': mdp_class,
-    'BIRL': data_loc_BIRL
+    'BIRL': mdp_class + '/' + data_loc_BIRL
 }

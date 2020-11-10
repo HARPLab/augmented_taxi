@@ -22,3 +22,4 @@ histograms/
 dfs.pickle
 dfs_processed.pickle
 *#
+*.png

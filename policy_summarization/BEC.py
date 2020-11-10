@@ -458,8 +458,8 @@ def visualize_constraints(constraints, weights, step_cost_flag, plot_lim=[(-1, 1
     wt_marker_size = 200
     # plot ground truth weight
     plt.scatter(weights[0, 0] * scale, weights[0, 1] * scale, s=wt_marker_size, color='red', zorder=2)
-    # plt.title('Space of possible reward weights')
-    plt.xlabel(r'$w_0 $')
+    # plt.title('Area of Viable Reward Weights')
+    plt.xlabel(r'$w_0$')
     plt.ylabel(r'$w_1$')
     plt.tight_layout()
     if fig_name is not None:
@@ -474,19 +474,19 @@ def visualize_summary(BEC_summaries_collection, weights, step_cost_flag):
     min_BEC_constraints_running = []
     for summary_idx, BEC_summary in enumerate(BEC_summaries_collection):
         print("Showing demo {} out of {}".format(summary_idx + 1, len(BEC_summaries_collection)))
+        # print('BEC_length: {}'.format(BEC_helpers.calculate_BEC_length(BEC_summary[2], weights, step_cost_flag)[0]))
+
         # visualize demonstration
         BEC_summary[0].visualize_trajectory(BEC_summary[1])
-        # visualize constraints enforced by demonstration above
-        # print(mdp_traj_constraint[2])
 
         # visualize the min BEC constraints of this particular demonstration
         # visualize_constraints(BEC_summary[2], weights, step_cost_flag)
         # visualize_constraints(BEC_summary[2], weights, step_cost_flag, fig_name=str(summary_idx) + '.png', scale=abs(1 / weights[0, -1]))
 
         # visualize the min BEC constraints extracted from all demonstrations shown thus far
-        min_BEC_constraints_running.extend(BEC_summary[2])
-        min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)[0]
-        visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag)
+        # min_BEC_constraints_running.extend(BEC_summary[2])
+        # min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)[0]
+        # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag)
         # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(summary_idx) + '.png', scale=abs(1 / weights[0, -1]))
 
 
@@ -497,5 +497,4 @@ def visualize_test_envs(test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_const
         vi_candidate = test_wt_vi_traj_tuple[1]
         trajectory_candidate = test_wt_vi_traj_tuple[2]
         vi_candidate.mdp.visualize_trajectory(trajectory_candidate)
-
-        visualize_constraints(test_BEC_constraints[j], weights, step_cost_flag)
+        # visualize_constraints(test_BEC_constraints[j], weights, step_cost_flag)
