@@ -68,25 +68,25 @@ def obtain_BEC_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_f
                                                                mdp_parameters, 'ground_truth')
         try:
             with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
-                min_subset_constraints_record, env_record, traj_record = pickle.load(f)
+                policy_constraints, min_subset_constraints_record, env_record, traj_record = pickle.load(f)
         except:
             if summary_type == 'demo':
                 # a) use optimal trajectories from starting states to extract constraints
                 opt_trajs = []
                 for wt_vi_traj_candidate in wt_vi_traj_candidates:
                     opt_trajs.append(wt_vi_traj_candidate[0][2])
-                min_subset_constraints_record, env_record, traj_record = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_depth=BEC_depth, trajectories=opt_trajs, print_flag=True)
+                policy_constraints, min_subset_constraints_record, env_record, traj_record = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_depth=BEC_depth, trajectories=opt_trajs, print_flag=True)
             else:
                 # b) use full policy to extract constraints
-                min_subset_constraints_record, env_record, traj_record = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, print_flag=True)
+                policy_constraints, min_subset_constraints_record, env_record, traj_record = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, print_flag=True)
             with open('models/' + data_loc + '/base_constraints.pickle', 'wb') as f:
-                pickle.dump((min_subset_constraints_record, env_record, traj_record), f)
+                pickle.dump((policy_constraints, min_subset_constraints_record, env_record, traj_record), f)
 
         try:
             with open('models/' + data_loc + '/BEC_constraints.pickle', 'rb') as f:
                 min_BEC_constraints, BEC_lengths_record = pickle.load(f)
         except:
-            min_BEC_constraints, BEC_lengths_record = BEC.extract_BEC_constraints(min_subset_constraints_record, weights, step_cost_flag)
+            min_BEC_constraints, BEC_lengths_record = BEC.extract_BEC_constraints(policy_constraints, min_subset_constraints_record, weights, step_cost_flag)
 
             with open('models/' + data_loc + '/BEC_constraints.pickle', 'wb') as f:
                 pickle.dump((min_BEC_constraints, BEC_lengths_record), f)

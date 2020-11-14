@@ -18,9 +18,10 @@ def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_dept
 
     Summary: Obtain the minimum BEC constraints for each environment
     '''
-    min_subset_constraints_record = []
+    min_subset_constraints_record = []    # minimum BEC constraints conveyed by a trajectory
     env_record = []
-    constraints_record = []
+    policy_constraints = []               # BEC constraints that define a policy (i.e. constraints arising from one action
+                                          # deviations from every possible starting state and the corresponding optimal trajectories)
     traj_record = []
     processed_envs = []
 
@@ -29,6 +30,7 @@ def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_dept
         if print_flag:
             print("Extracting constraints from environment {}".format(env_idx))
         mdp = wt_vi_traj_candidate[0][1].mdp
+        agent = FixedPolicyAgent(wt_vi_traj_candidate[0][1].policy)
 
         if trajectories is not None:
             constraints = []
@@ -47,7 +49,7 @@ def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_dept
 
                 # currently assumes that all actions are executable from all states
                 for action_seq in action_seq_list:
-                    traj_hyp = mdp_helpers.rollout_policy(mdp, FixedPolicyAgent(wt_vi_traj_candidate[0][1].policy), cur_state, action_seq)
+                    traj_hyp = mdp_helpers.rollout_policy(mdp, agent, cur_state, action_seq)
                     mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
 
                     constraints.append(mu_sa - mu_sb)
@@ -55,9 +57,11 @@ def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_dept
             # store the BEC constraints for each environment, along with the associated demo and environment number
             min_subset_constraints = BEC_helpers.clean_up_constraints(constraints, weights, step_cost_flag)
             min_subset_constraints_record.append(min_subset_constraints)
-            constraints_record.extend(min_subset_constraints)
             traj_record.append(traj_opt)
             env_record.append(env_idx)
+            # slightly abusing the term 'policy' here since I'm only considering a subset of possible trajectories (i.e.
+            # demos) that the policy can generate in these environments
+            policy_constraints.append(min_subset_constraints)
         else:
             # b) policy-driven BEC
             # wt_vi_traj_candidates can contain MDPs with the same environment but different initial states (to
@@ -71,36 +75,42 @@ def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_dept
 
                     traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state)
 
-                    mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
+                    for sas_idx in range(len(traj_opt)):
+                        # reward features of optimal action
+                        mu_sa = mdp.accumulate_reward_features(traj_opt[sas_idx:], discount=True)
 
-                    sas = traj_opt[0]
-                    cur_state = sas[0]
+                        sas = traj_opt[sas_idx]
+                        cur_state = sas[0]
 
-                    # currently assumes that all actions are executable from all states. only considering
-                    # action depth of 1 currently
-                    for action in mdp.actions:
-                        if action != sas[1]:
-                            traj_hyp = mdp_helpers.rollout_policy(mdp, agent, cur_state=cur_state, action_seq=[action])
-                            mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
+                        # currently assumes that all actions are executable from all states. only considering
+                        # action depth of 1 currently
+                        for action in mdp.actions:
+                            if action != sas[1]:
+                                traj_hyp = mdp_helpers.rollout_policy(mdp, agent, cur_state=cur_state, action_seq=[action])
+                                mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
 
-                            constraints.append(mu_sa - mu_sb)
+                                constraints.append(mu_sa - mu_sb)
 
-                    min_subset_constraints = BEC_helpers.clean_up_constraints(constraints, weights, step_cost_flag)
-                    # store the BEC constraints for each environment, along with the associated demo and environment number
-                    min_subset_constraints_record.append(min_subset_constraints)
-                    constraints_record.extend(min_subset_constraints)
+                        # if considering only suboptimal actions of the first sas, put the corresponding constraints
+                        # toward the BEC of the policy (per definition)
+                        if sas_idx == 0:
+                            policy_constraints.append(BEC_helpers.clean_up_constraints(constraints, weights, step_cost_flag))
+
+                    # also store the BEC constraints for optimal trajectory in each state, along with the associated
+                    # demo and environment number
+                    min_subset_constraints_record.append(BEC_helpers.clean_up_constraints(constraints, weights, step_cost_flag))
                     traj_record.append(traj_opt)
                     env_record.append(env_idx)
 
                 processed_envs.append(mdp.env_code)
 
-    return min_subset_constraints_record, env_record, traj_record
+    return policy_constraints, min_subset_constraints_record, env_record, traj_record
 
-def extract_BEC_constraints(min_subset_constraints_record, weights, step_cost_flag):
+def extract_BEC_constraints(policy_constraints, min_subset_constraints_record, weights, step_cost_flag):
     '''
     Summary: Obtain the minimum BEC constraints across all environments
     '''
-    constraints_record = [item for sublist in min_subset_constraints_record for item in sublist]
+    constraints_record = [item for sublist in policy_constraints for item in sublist]
 
     # first obtain the absolute min BEC constraint
     min_BEC_constraints = BEC_helpers.clean_up_constraints(constraints_record, weights, step_cost_flag)

@@ -256,7 +256,8 @@ def create_testing_dictionaries(test_env_dict, mapping):
                     optimal_traj = test_wt_vi_traj_tuple[2]
                     test_mdp_dict = test_wt_vi_traj_tuple[3]
 
-                    # postprocessing because MDP wasn't saved correctly in policy_summarization_helpers.py
+                    # postprocessing because MDP wasn't originally saved correctly in policy_summarization_helpers.py
+                    # (the problem has now been fixed and the code below should be unnecessary)
                     if data_loc == 'augmented_taxi':
                         test_mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
                         test_mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')

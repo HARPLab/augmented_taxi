@@ -131,7 +131,7 @@ BEC = {
     'summary_type': 'policy',                 # demo or policy: whether constratints are extraced from just the optimal demo from the
                                               # starting state or from all possible states from the full policy
 
-    'summary_variant': ['medium', 'high'],   # [{'low', 'medium', 'high', 'highest', 'forward', 'backward}, {low', 'high'}]
+    'summary_variant': ['forward', 'high'],   # [{'low', 'medium', 'high', 'highest', 'forward', 'backward}, {low', 'high'}]
                                               # [{expected information transfer to a perfect IRL agent, or scaffolding},
                                               # {ease metrics (visual similarity, visual simplicity, etc)}]
 
