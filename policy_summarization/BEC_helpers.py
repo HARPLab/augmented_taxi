@@ -109,7 +109,7 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
     '''
 
     try:
-        BEC_length_all_constraints, nonredundant_constraint_idxs = calculate_BEC_length(constraints, weights,
+        BEC_length_all_constraints, nonredundant_constraint_idxs, _ = calculate_BEC_length(constraints, weights,
                                                                                         step_cost_flag)
     except:
         # a subset of these constraints aren't numerically stable (e.g. you can have a constraint that's ever so slightly
@@ -120,7 +120,7 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
         for violating_idx in sorted(violating_idxs[0], reverse=True):
             del constraints[violating_idx]
 
-        BEC_length_all_constraints, nonredundant_constraint_idxs = calculate_BEC_length(constraints, weights,
+        BEC_length_all_constraints, nonredundant_constraint_idxs, _ = calculate_BEC_length(constraints, weights,
                                                                                         step_cost_flag)
 
     nonredundant_constraints = [constraints[x] for x in nonredundant_constraint_idxs]
@@ -176,7 +176,7 @@ def constraints_to_halfspace_matrix(constraints, weights, step_cost_flag):
 
     return A, b
 
-def calculate_BEC_length(constraints, weights, step_cost_flag):
+def calculate_BEC_length(constraints, weights, step_cost_flag, return_midpt=False):
     '''
     :param constraints (list of constraints, corresponding to the A of the form Ax >= 0): constraints that comprise the
         BEC region
@@ -208,7 +208,25 @@ def calculate_BEC_length(constraints, weights, step_cost_flag):
     intersection_lengths = cg.compute_lengths(L1_intersections)
     total_intersection_length = np.sum(intersection_lengths)
 
-    return total_intersection_length, polygon_hull_constraint_idxs
+    if return_midpt:
+        # estimate the human's reward weight as the mean of the current BEC area (note that this hasn't been tested for
+        # non-continguous BEC areas
+        d = total_intersection_length / 2
+        d_traveled = 0
+
+        for idx, intersection in enumerate(L1_intersections):
+            # travel fully along this constraint line
+            if d > d_traveled + intersection_lengths[idx]:
+                d_traveled += intersection_lengths[idx]
+            else:
+                t = (d - d_traveled) / intersection_lengths[idx]
+                midpt = L1_intersections[idx][0] + t * (L1_intersections[idx][1] - L1_intersections[idx][0])
+                midpt = np.append(midpt, -(1 - np.sum(abs(midpt)))) # add in the step cost, currently hardcoded
+                break
+    else:
+        midpt = None
+
+    return total_intersection_length, polygon_hull_constraint_idxs, midpt
 
 
 def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_record):

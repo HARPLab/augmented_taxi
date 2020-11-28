@@ -18,7 +18,7 @@ def plot_BEC_histogram(data_loc, weights, step_cost_flag):
             BEC_lengths = pickle.load(f)
     except:
         with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
-            min_subset_constraints_record, env_record, traj_record = pickle.load(f)
+            policy_constraints, min_subset_constraints_record, env_record, traj_record = pickle.load(f)
 
         BEC_lengths = np.zeros(len(min_subset_constraints_record))
         for j, min_subset_constraints in enumerate(min_subset_constraints_record):
@@ -497,11 +497,11 @@ if __name__ == "__main__":
 
     # combine_summaries()
     # extract_test_demonstrations(data_loc)
-    # plot_BEC_histogram(data_loc, params.weights['val'], params.step_cost_flag)
+    plot_BEC_histogram(data_loc, params.weights['val'], params.step_cost_flag)
     # check_training_testing_overlap()
     # create_testing_dictionaries(test_env_dict, mapping)
     # print_training_summary_lengths()
-    process_human_scores(test_env_dict, mapping)
+    # process_human_scores(test_env_dict, mapping)
 
     # mdp_parameters = {
     # 'agent': {'x': 4, 'y': 1, 'has_passenger': 0},

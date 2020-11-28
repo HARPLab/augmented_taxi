@@ -95,7 +95,8 @@ def obtain_BEC_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_f
             with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
                 BEC_summary = pickle.load(f)
         except:
-            BEC_summary = BEC.obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=n_train_demos)
+            # BEC_summary = BEC.obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=n_train_demos)
+            BEC_summary = BEC.obtain_summary_counterfactual(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=n_train_demos)
             with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
                 pickle.dump(BEC_summary, f)
 
