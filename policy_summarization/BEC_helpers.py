@@ -223,6 +223,7 @@ def calculate_BEC_length(constraints, weights, step_cost_flag, return_midpt=Fals
                 midpt = L1_intersections[idx][0] + t * (L1_intersections[idx][1] - L1_intersections[idx][0])
                 midpt = np.append(midpt, -(1 - np.sum(abs(midpt)))) # add in the step cost, currently hardcoded
                 break
+        midpt = midpt.reshape(1, -1)
     else:
         midpt = None
 

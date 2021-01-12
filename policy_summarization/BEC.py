@@ -8,7 +8,8 @@ import random
 import copy
 from simple_rl.planning import ValueIteration
 from sklearn.cluster import KMeans
-import pickle
+import dill as pickle
+from termcolor import colored
 
 def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_depth=1, trajectories=None, print_flag=False):
     '''
@@ -144,7 +145,7 @@ def obtain_potential_summary_demos(BEC_lengths_record, n_demos, n_clusters=6, ty
 
         for j in range(n_demos):
             covering_demo_idxs = [i for i, x in enumerate(labels) if x == partition_idx]
-            print(len(covering_demo_idxs))
+            print('# covering demos: {}'.format(len(covering_demo_idxs)))
 
             covering_demo_idxs = random.sample(covering_demo_idxs, min(sample_count, len(covering_demo_idxs)))
             covering_demos_idxs.append(covering_demo_idxs)
@@ -154,7 +155,7 @@ def obtain_potential_summary_demos(BEC_lengths_record, n_demos, n_clusters=6, ty
 
         for j in range(n_demos):
             covering_demo_idxs = [i for i, x in enumerate(labels) if x == partition_idx]
-            print(len(covering_demo_idxs))
+            print('# covering demos: {}'.format(len(covering_demo_idxs)))
 
             covering_demo_idxs = random.sample(covering_demo_idxs, min(sample_count, len(covering_demo_idxs)))
             covering_demos_idxs.append(covering_demo_idxs)
@@ -164,7 +165,7 @@ def obtain_potential_summary_demos(BEC_lengths_record, n_demos, n_clusters=6, ty
 
         for j in range(n_demos):
             covering_demo_idxs = [i for i, x in enumerate(labels) if x == partition_idx]
-            print(len(covering_demo_idxs))
+            print('# covering demos: {}'.format(len(covering_demo_idxs)))
 
             covering_demo_idxs = random.sample(covering_demo_idxs, min(sample_count, len(covering_demo_idxs)))
             covering_demos_idxs.append(covering_demo_idxs)
@@ -182,7 +183,7 @@ def obtain_potential_summary_demos(BEC_lengths_record, n_demos, n_clusters=6, ty
             partition_idx = ordering_sorted[cluster_idxs[j]]
 
             covering_demo_idxs = [i for i, x in enumerate(labels) if x == partition_idx]
-            # print(len(covering_demo_idxs))
+            print('# covering demos: {}'.format(len(covering_demo_idxs)))
 
             covering_demo_idxs = random.sample(covering_demo_idxs, min(sample_count, len(covering_demo_idxs)))
             covering_demos_idxs.append(covering_demo_idxs)
@@ -197,55 +198,90 @@ def obtain_summary_counterfactual(summary_variant, wt_vi_traj_candidates, min_BE
                        downsample_threshold=float("inf"), pad_factor=0.02):
 
     summary = []
+    feature_flag = 0
 
-    # bootstrap model of human's current understanding with a simple demo
-    n_clusters = 6
-    cluster_idxs = [4, 2, 0]
+    # # bootstrap model of human's current understanding with a simple demo
+    # a) select this simple demo on the fly
+    # n_clusters = 6
+    # cluster_idxs = [4, 2, 0]
+    #
+    # kmeans = KMeans(n_clusters=n_clusters).fit(np.array(BEC_lengths_record).reshape(-1, 1))
+    # cluster_centers = kmeans.cluster_centers_
+    # labels = kmeans.labels_
+    #
+    # ordering = np.arange(0, n_clusters)
+    # sorted_zipped = sorted(zip(cluster_centers, ordering))
+    # cluster_centers_sorted, ordering_sorted = list(zip(*sorted_zipped))
+    #
+    # partition_idx = ordering_sorted[cluster_idxs[len(summary)]]
+    # covering_demo_idxs = [i for i, x in enumerate(labels) if x == partition_idx]
+    # best_idx = random.sample(covering_demo_idxs, 1)[0]
 
-    kmeans = KMeans(n_clusters=n_clusters).fit(np.array(BEC_lengths_record).reshape(-1, 1))
-    cluster_centers = kmeans.cluster_centers_
-    labels = kmeans.labels_
+    # # b) load up a previously selected simple demo
+    # best_idx = 16460
+    #
+    # best_env_idx = env_record[best_idx]
+    # # record information associated with the best selected summary demo
+    # best_traj = traj_record[best_idx]
+    # best_mdp = wt_vi_traj_candidates[best_env_idx][0][1].mdp
+    # constraints_added = min_subset_constraints_record[best_idx]
+    # min_BEC_constraints_running = constraints_added               # this is the running model of the human
+    # summary.append([best_mdp, best_traj, constraints_added])
+    #
+    # del traj_record[best_idx]
+    # del env_record[best_idx]
+    #
+    # print('Best idx: {}'.format(best_idx))
 
-    ordering = np.arange(0, n_clusters)
-    sorted_zipped = sorted(zip(cluster_centers, ordering))
-    cluster_centers_sorted, ordering_sorted = list(zip(*sorted_zipped))
-
-    partition_idx = ordering_sorted[cluster_idxs[len(summary)]]
-    covering_demo_idxs = [i for i, x in enumerate(labels) if x == partition_idx]
-    best_idx = random.sample(covering_demo_idxs, 1)[0]
-
-    best_env_idx = env_record[best_idx]
-    # record information associated with the best selected summary demo
-    best_traj = traj_record[best_idx]
-    best_mdp = wt_vi_traj_candidates[best_env_idx][0][1].mdp
-    constraints_added = min_subset_constraints_record[best_idx]
-    min_BEC_constraints_running = constraints_added
-    summary.append([best_mdp, best_traj, constraints_added])
-
-    del traj_record[best_idx]
-    del env_record[best_idx]
+    # todo: assuming a starting human model without any inducing demonstrations. include a dummy constraint that doesn't
+    # reduce any BEC area so that the BEC area calculation doesn't break later
+    min_BEC_constraints_running = [np.array([[.01, 0, -1]])]
+    # todo: c) hardcoding the human's model for now
+    with open('models/augmented_taxi/wt_vi_traj_candidates_human.pickle', 'rb') as f:
+        wt_vi_traj_candidates_human = pickle.load(f)
 
     while len(summary) < n_train_demos:
-        visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, scale=abs(1 / weights[0, -1]), fig_name=str(len(summary)) + '.png')
-        _, _, w_human_normalized = BEC_helpers.calculate_BEC_length(min_BEC_constraints_running, weights, step_cost_flag, return_midpt=True)
+        # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, scale=abs(1 / weights[0, -1]), fig_name=str(len(summary)) + '.png')
+        # todo: c) hardcoding the human's model for now
+        w_human = np.array([[26, 0, -1]])
+        w_human_normalized = w_human / np.linalg.norm(w_human[0, :], ord=1)
+        # _, _, w_human_normalized = BEC_helpers.calculate_BEC_length(min_BEC_constraints_running, weights, step_cost_flag, return_midpt=True)
         print(w_human_normalized * abs(1 / weights[0, -1]))
 
-        hypothetical_constraints_running = []
-        info_gains = []
+        constraints_running = []
+        info_gains = np.zeros(len(traj_record))
 
         print("Length of summary: {}".format(len(summary)))
 
-        # solve for the optimal policy of the human in each of the possible environments
-        wt_vi_traj_candidates_human = copy.deepcopy(wt_vi_traj_candidates)
-        for idx, candidate in enumerate(wt_vi_traj_candidates_human):
-            print(idx)
-            mdp = candidate[0][1].mdp
-            mdp.weights = w_human_normalized
-            vi_human = ValueIteration(mdp, sample_rate=1, max_iterations=50)
-            vi_human.run_vi()
-            trajectory = mdp_helpers.rollout_policy(mdp, vi_human)
-            candidate[0][2] = trajectory
-            candidate[0][3]['weights'] = w_human_normalized
+        # for use with a) above
+        # wt_vi_traj_candidates_human = copy.deepcopy(wt_vi_traj_candidates)
+        # for idx, candidate in enumerate(wt_vi_traj_candidates_human):
+        #     print(idx)
+        #     mdp = candidate[0][1].mdp
+        #     mdp.weights = w_human_normalized
+        #     vi_human = ValueIteration(mdp, sample_rate=1, max_iterations=50)
+        #     vi_human.run_vi()
+        #     trajectory = mdp_helpers.rollout_policy(mdp, vi_human)
+        #     candidate[0][2] = trajectory
+        #     candidate[0][3]['weights'] = w_human_normalized
+
+        # # temporary hack (going along with b) above that aims to shortcircuit the repeated computation of
+        # # policies aligning with the human's model in the beginning
+        # if len(summary) == 1:
+        #     with open('models/augmented_taxi/wt_vi_traj_candidates_human.pickle', 'rb') as f:
+        #         wt_vi_traj_candidates_human = pickle.load(f)
+        # else:
+        #     # solve for the optimal policy of the human in each of the possible environments
+        #     wt_vi_traj_candidates_human = copy.deepcopy(wt_vi_traj_candidates)
+        #     for idx, candidate in enumerate(wt_vi_traj_candidates_human):
+        #         print(idx)
+        #         mdp = candidate[0][1].mdp
+        #         mdp.weights = w_human_normalized
+        #         vi_human = ValueIteration(mdp, sample_rate=1, max_iterations=50)
+        #         vi_human.run_vi()
+        #         trajectory = mdp_helpers.rollout_policy(mdp, vi_human)
+        #         candidate[0][2] = trajectory
+        #         candidate[0][3]['weights'] = w_human_normalized
 
         for idx in range(len(traj_record)):
             if idx % 1000 == 0:
@@ -256,75 +292,160 @@ def obtain_summary_counterfactual(summary_variant, wt_vi_traj_candidates, min_BE
             mdp = agent.mdp
 
             constraints = []
-            # reward features of optimal action
-            mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
             vi_human = wt_vi_traj_candidates_human[env_record[idx]][0][1]
-            traj_hyp = mdp_helpers.rollout_policy(vi_human.mdp, vi_human)
-            mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
-            constraints.append(mu_sa - mu_sb)
 
+            # # a) accumulate the reward features and generate a single constraint
+            # mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
+            # traj_hyp = mdp_helpers.rollout_policy(vi_human.mdp, vi_human)
+            # mu_sb = vi_human.mdp.accumulate_reward_features(traj_hyp, discount=True)
+            # constraints.append(mu_sa - mu_sb)
+
+            # b) contrast differing expected feature counts for each state-action pair along the agent's optimal trajectory
+            for sas_idx in range(len(traj_opt)):
+                # reward features of optimal action
+                mu_sa = mdp.accumulate_reward_features(traj_opt[sas_idx:], discount=True)
+
+                sas = traj_opt[sas_idx]
+                cur_state = sas[0]
+
+                # currently assumes that all actions are executable from all states
+                traj_hyp = mdp_helpers.rollout_policy(vi_human.mdp, vi_human, cur_state)
+                mu_sb = vi_human.mdp.accumulate_reward_features(traj_hyp, discount=True)
+
+                constraints.append(mu_sa - mu_sb)
+
+            # the hypothetical constraints that will be in the human's mind after viewing this demonstrations
             hypothetical_constraints = []
             hypothetical_constraints.extend(min_BEC_constraints_running)
-            hypothetical_constraints.extend(constraints)
+            # try conveying one feature at a time
             try:
-                hypothetical_constraints = BEC_helpers.clean_up_constraints(hypothetical_constraints, weights, step_cost_flag)
-                # visualize_constraints(hypothetical_constraints, weights, step_cost_flag, scale=abs(1 / weights[0, -1]), fig_name=str(idx) + '.png')
+                constraints = BEC_helpers.clean_up_constraints(constraints, weights, step_cost_flag)
+                if feature_flag == 0:
+                    # keep only horizontal constraints (i.e. info on only the tolls)
+                    filtered_constraints = []
+                    for constraint in constraints:
+                        if constraint[0, 0] == 0:
+                            filtered_constraints.append(constraint)
+                elif feature_flag == 1:
+                    # keep only vertical constraints (i.e. info on only the dropoff)
+                    filtered_constraints = []
+                    for constraint in constraints:
+                        if constraint[0, 1] == 0:
+                            filtered_constraints.append(constraint)
+                else:
+                    filtered_constraints = constraints
 
-                # right now I'm storing all constraints / raw BEC length rather than the differential. but
-                # because they're all starting with min_BEC_constraints_running, the raw and differential promote the same demonstration
-                info_gains.append(BEC_helpers.calculate_BEC_length(hypothetical_constraints, weights, step_cost_flag)[0])
-                hypothetical_constraints_running.append(hypothetical_constraints) # updated human model after seeing this demo
+                hypothetical_constraints.extend(filtered_constraints)
+                info_gains[idx] = BEC_helpers.calculate_BEC_length(min_BEC_constraints_running, weights, step_cost_flag)[0] - BEC_helpers.calculate_BEC_length(hypothetical_constraints, weights, step_cost_flag)[0]
+
+                constraints_running.append(constraints)
             except:
-                print("No valid constraints")
+                # print("No valid constraints")
+                pass
             # mdp.visualize_trajectory(traj_opt)
-            # mdp_human.visualize_trajectory(traj_hyp)
+            # vi_human.mdp.visualize_trajectory(traj_hyp)
 
-        kmeans = KMeans(n_clusters=n_clusters).fit(np.array(info_gains).reshape(-1, 1))
-        cluster_centers = kmeans.cluster_centers_
-        labels = kmeans.labels_
+        # no need to continue search for demonstrations if none of them will improve the human's understanding
+        if np.sum(info_gains) == 0:
+            if feature_flag == 2:
+                break
+            else:
+                feature_flag += 1
+                print(colored('Incrementing feature flag, which is now at {}'.format(feature_flag), 'red'))
 
-        ordering = np.arange(0, n_clusters)
-        sorted_zipped = sorted(zip(cluster_centers, ordering))
-        cluster_centers_sorted, ordering_sorted = list(zip(*sorted_zipped))
+        # todo: let's just try returning the smallest information gain for now (so that we can have incremental demonstrations)
+        # there often isn't enough demonstrations to generate 6 clusters, as I initially tried to do below
+        best_idx = np.argwhere(info_gains == min(i for i in info_gains if i > 0))[0][0] # info gain should be greater than 0
+        print(colored('Max infogain: {}'.format(np.max(info_gains)), 'blue'))
+        print(colored('Max Min infogain: {}'.format(min(i for i in info_gains if i > 0)), 'blue')) # smallest infogain above zero
+        print(colored('Min infogain: {}'.format(np.min(info_gains)), 'blue'))
 
-        partition_idx = ordering_sorted[cluster_idxs[len(summary)]]
-        covering_demo_idxs = [i for i, x in enumerate(labels) if x == partition_idx]
-        best_idx = random.sample(covering_demo_idxs, 1)[0]
+        # kmeans = KMeans(n_clusters=n_clusters).fit(np.array(info_gains).reshape(-1, 1))
+        # cluster_centers = kmeans.cluster_centers_
+        # labels = kmeans.labels_
+        #
+        # ordering = np.arange(0, n_clusters)
+        # sorted_zipped = sorted(zip(cluster_centers, ordering))
+        # cluster_centers_sorted, ordering_sorted = list(zip(*sorted_zipped))
+        #
+        # partition_idx = ordering_sorted[cluster_idxs[len(summary)]]
+        # covering_demo_idxs = [i for i, x in enumerate(labels) if x == partition_idx]
+        # best_idx = random.sample(covering_demo_idxs, 1)[0]
 
         best_env_idx = env_record[best_idx]
         # record information associated with the best selected summary demo
         best_traj = traj_record[best_idx]
         best_mdp = wt_vi_traj_candidates[best_env_idx][0][1].mdp
-        min_BEC_constraints_running = hypothetical_constraints_running[best_idx]
-        summary.append([best_mdp, best_traj, min_BEC_constraints_running]) # constraints now stores human's updated model rather than the BEC constraints intrinsic to this demo
+        min_BEC_constraints_running.extend(constraints_running[best_idx]) # todo: perhaps I should store the filtered constraints instead
+        summary.append([best_mdp, best_traj, constraints_running[best_idx]]) # todo: can also store the feature flag if I want to retrace the summary steps
 
         del traj_record[best_idx]
         del env_record[best_idx]
 
-        # this method doesn't currently finish, so save the summary along the way
+        # this method doesn't always finish, so save the summary along the way
         with open('models/augmented_taxi/BEC_summary.pickle', 'wb') as f:
             pickle.dump(summary, f)
 
-    # manual exploration of two sets of demonstrations that have equal BEC lengths but appear to differ in informativeness
-    # for idx in [1367, 1368, 8824, 8835]:
+    # # manual exploration of two sets of demonstrations that have equal BEC lengths but appear to differ in informativeness
+    # # for idx in [1367, 1368, 8824, 8835]:
+    # for idx in [110, 1210]:
     #     print(idx)
     #     traj_opt = traj_record[idx]
     #     agent = wt_vi_traj_candidates[env_record[idx]][0][1]
     #     mdp = agent.mdp
     #
+    #     # if desired, also visualize the BEC constraints of the agent's optimal demonstration
+    #     visualize_constraints(min_subset_constraints_record[idx], weights, step_cost_flag, scale=abs(1 / weights[0, -1]),
+    #                           fig_name=str(idx) + '_BEC_raw.png')
+    #
     #     # solve for the human's optimal trajectory
     #     mdp_human = copy.deepcopy(mdp)
     #     mdp_human.set_init_state(traj_opt[0][0])
-    #     mdp_human.weights = w_human_normalized
+    #     w_human = np.array([[26, 0, -1]])
+    #     mdp_human.weights = w_human / np.linalg.norm(w_human[0, :], ord=1)
     #     vi_human = ValueIteration(mdp_human, sample_rate=1, max_iterations=50)
     #     vi_human.run_vi()
     #
     #     constraints = []
-    #     # reward features of optimal action
-    #     mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
-    #     traj_hyp = mdp_helpers.rollout_policy(mdp_human, vi_human)
-    #     mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
-    #     constraints.append(mu_sa - mu_sb)
+    #
+    #     # # a) accumulate the reward features and generate a single constraint
+    #     # # reward features of optimal action
+    #     # mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
+    #     # traj_hyp = mdp_helpers.rollout_policy(mdp_human, vi_human)
+    #     # mu_sb = mdp_human.accumulate_reward_features(traj_hyp, discount=True)
+    #     # constraints.append(mu_sa - mu_sb)
+    #
+    #     # b) contrast differing expected feature counts for each state-action pair along the agent's optimal trajectory
+    #     for sas_idx in range(len(traj_opt)):
+    #         # reward features of optimal action
+    #         mu_sa = mdp.accumulate_reward_features(traj_opt[sas_idx:], discount=True)
+    #
+    #         sas = traj_opt[sas_idx]
+    #         cur_state = sas[0]
+    #
+    #         # currently assumes that all actions are executable from all states
+    #         traj_hyp = mdp_helpers.rollout_policy(mdp_human, vi_human, cur_state)
+    #         mu_sb = mdp_human.accumulate_reward_features(traj_hyp, discount=True)
+    #
+    #         constraints.append(mu_sa - mu_sb)
+    #
+    #         # mdp_human.visualize_trajectory(traj_hyp)
+    #
+    #     # # c) contrast differing expected feature counts for each state-action pair along the human's optimal trajectory
+    #     # cur_state = traj_opt[0][0]
+    #     # traj_human = mdp_helpers.rollout_policy(mdp_human, vi_human, cur_state)
+    #     # for sas_idx in range(len(traj_human)):
+    #     #     # reward features of optimal action
+    #     #     mu_sb = mdp.accumulate_reward_features(traj_human[sas_idx:], discount=True)
+    #     #
+    #     #     sas = traj_human[sas_idx]
+    #     #     cur_state = sas[0]
+    #     #
+    #     #     # currently assumes that all actions are executable from all states
+    #     #     traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=cur_state)
+    #     #     mu_sa = mdp_human.accumulate_reward_features(traj_opt, discount=True)
+    #     #
+    #     #     constraints.append(mu_sa - mu_sb)
     #
     #     try:
     #         constraints = BEC_helpers.clean_up_constraints(constraints, weights, step_cost_flag)
@@ -332,8 +453,11 @@ def obtain_summary_counterfactual(summary_variant, wt_vi_traj_candidates, min_BE
     #         print(BEC_helpers.calculate_BEC_length(constraints, weights, step_cost_flag)[0])
     #     except:
     #         print("No valid constraints")
+    #
+    #     print(constraints)
+    #     # if desired, visualize the agent's and human's optimal trajectories
     #     mdp.visualize_trajectory(traj_opt)
-    #     mdp_human.visualize_trajectory(traj_hyp)
+    #     # mdp_human.visualize_trajectory(traj_hyp)
 
     return summary
 
@@ -452,6 +576,8 @@ def obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, 
 
             # record information associated with the best selected summary demo
             best_traj = traj_record[best_idx]
+            # todo: I should also change the initial state of the mdp to be the first state of the trajectory for completeness
+            # (as I have already done for the test environments / demonstrations)
             best_mdp = wt_vi_traj_candidates[best_env_idx][0][1].mdp
             constraints_added = min_subset_constraints_record[best_idx]
             min_BEC_summary.append([best_mdp, best_traj, constraints_added])
@@ -647,6 +773,23 @@ def visualize_summary(BEC_summaries_collection, weights, step_cost_flag):
         # min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)[0]
         # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag)
         # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(summary_idx) + '.png', scale=abs(1 / weights[0, -1]))
+
+        # visualize what the human would've done in this environment
+        if summary_idx >= 0:
+            # solve for the human's optimal trajectory
+            mdp = BEC_summary[0]
+            traj_opt = BEC_summary[1]
+            mdp_human = copy.deepcopy(mdp)
+            mdp_human.set_init_state(traj_opt[0][0])
+            w_human = np.array([[26, 0, -1]]) # todo: hard coding, as I did for the summary generation
+            w_human_normalized = w_human / np.linalg.norm(w_human[0, :], ord=1)
+            mdp_human.weights = w_human_normalized
+            vi_human = ValueIteration(mdp_human, sample_rate=1, max_iterations=50)
+            vi_human.run_vi()
+            traj_hyp = mdp_helpers.rollout_policy(vi_human.mdp, vi_human)
+            mdp_human.visualize_trajectory(traj_hyp)
+
+        _, _, w_human_normalized = BEC_helpers.calculate_BEC_length(BEC_summary[2], weights, step_cost_flag, return_midpt=True)
 
 
 def visualize_test_envs(test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, weights, step_cost_flag):
