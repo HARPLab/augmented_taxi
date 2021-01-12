@@ -176,12 +176,16 @@ def constraints_to_halfspace_matrix(constraints, weights, step_cost_flag):
 
     return A, b
 
-def calculate_BEC_length(constraints, weights, step_cost_flag, return_midpt=False):
+def calculate_BEC_length(constraints, weights, step_cost_flag, return_midpt=False, feature=None):
     '''
     :param constraints (list of constraints, corresponding to the A of the form Ax >= 0): constraints that comprise the
         BEC region
     :param weights (numpy array): Ground truth reward weights used by agent to derive its optimal policy
     :param step_cost_flag (bool): Indicates that the last weight element is a known step cost
+    :param return_midpt (bool): Whether to return the midpoint of the valid BEC area as an estimate of the human's
+           current understanding of the reward weights
+    :param feature (int): Whether the intersection length should be computed across all feature dimensions (default)
+           or only across a specified feature dimension
     :return: total_intersection_length: total length of the intersection between the BEC region and the L1 constraints
     '''
     A, b = constraints_to_halfspace_matrix(constraints, weights, step_cost_flag)
@@ -205,7 +209,7 @@ def calculate_BEC_length(constraints, weights, step_cost_flag, return_midpt=Fals
     L1_intersections = cg.cyrus_beck_2D(np.array(vertices), L1_constraints)
 
     # compute the total length of all intersections
-    intersection_lengths = cg.compute_lengths(L1_intersections)
+    intersection_lengths = cg.compute_lengths(L1_intersections, query_dim=feature)
     total_intersection_length = np.sum(intersection_lengths)
 
     if return_midpt:

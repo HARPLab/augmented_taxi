@@ -127,11 +127,15 @@ def cyrus_beck_2D(polygon, lines):
 
     return clipped_lines
 
-def compute_lengths(lines):
+def compute_lengths(lines, query_dim=None):
     lengths = np.zeros(len(lines))
     n = 0
     for line in lines:
-        lengths[n] = np.linalg.norm(line[1] - line[0])
+        if query_dim is None:
+            lengths[n] = np.linalg.norm(line[1] - line[0])
+        else:
+            # limit the computed length to only the dimension corresponding to the desired feature
+            lengths[n] = abs(line[1][query_dim] - line[0][query_dim])
         n += 1
 
     return lengths

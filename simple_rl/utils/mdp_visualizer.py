@@ -407,6 +407,7 @@ def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=N
 
     # Setup and draw initial state.
     agent_shape = _vis_init(screen, mdp, draw_state, cur_state)
+    pygame.event.clear()
     step = 0
 
     if marked_state_importances is not None:
@@ -482,6 +483,7 @@ def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_h
     step = 0
     gamma = mdp.gamma
     agent_shape = _vis_init(screen, mdp, draw_state, cur_state, agent)
+    pygame.event.clear()
 
     done = False
     while not done:
@@ -541,6 +543,7 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
     cur_state = mdp.get_init_state() if cur_state is None else cur_state
     mdp.set_curr_state(cur_state)
     agent_shape = _vis_init(screen, mdp, draw_state, cur_state)
+    pygame.event.clear()
     cumulative_reward = 0
     gamma = mdp.gamma
     step = 0
