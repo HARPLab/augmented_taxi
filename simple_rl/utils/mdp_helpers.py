@@ -3,6 +3,46 @@ Args:
     mdp (MDP)
     agent (Agent)
     cur_state (State)
+    cur_traj (list)
+    cur_action_seq (list
+    max depth (int)
+
+Returns:
+    list of trajectories (list of list of state, action, state tuples)
+
+Summary:
+    Return all possible, equally-rewarding roll outs of the agent's policy on the designated MDP
+'''
+def rollout_policy_recursive(mdp, agent, cur_state, trajs, cur_traj=[], cur_action_seq=[], max_depth=50):
+    if cur_state.is_terminal() or len(cur_traj) >= max_depth:
+        trajs.append(cur_traj)
+        return trajs
+
+    maxq_actions = agent.get_max_q_actions(cur_state)
+    for action in maxq_actions:
+        # print('cur action seq: {}'.format(cur_action_seq))
+        # print('maxq actions: {}'.format(maxq_actions))
+        # print('action: {}'.format(action))
+
+        # mdp has a memory of its current state that needs to be adjusted accordingly
+        mdp.set_curr_state(cur_state)
+
+        # deepcopy of state occurs within transition function
+        reward, next_state = mdp.execute_agent_action(action)
+        next_traj = cur_traj.copy()
+        next_traj.append((cur_state, action, next_state))
+        next_action_seq = cur_action_seq.copy() # for debugging
+        next_action_seq.append(action)
+
+        rollout_policy_recursive(mdp, agent, next_state, trajs, cur_traj=next_traj, cur_action_seq=next_action_seq)
+
+    return trajs
+
+'''
+Args:
+    mdp (MDP)
+    agent (Agent)
+    cur_state (State)
     max depth (int)
 
 Returns:
