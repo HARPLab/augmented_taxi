@@ -10,6 +10,7 @@ from simple_rl.planning import ValueIteration
 from sklearn.cluster import KMeans
 import dill as pickle
 from termcolor import colored
+import time
 
 def extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_depth=1, trajectories=None, print_flag=False):
     '''
@@ -237,120 +238,147 @@ def obtain_summary_counterfactual(summary_variant, wt_vi_traj_candidates, min_BE
     # reduce any BEC area so that the BEC area calculation doesn't break later
     min_BEC_constraints_running = [np.array([[.01, 0, -1]])]
     # also hardcoding the human's model for now for development
-    with open('models/augmented_taxi/wt_vi_traj_candidates_human.pickle', 'rb') as f:
-        wt_vi_traj_candidates_human = pickle.load(f)
+    # with open('models/augmented_taxi/wt_vi_traj_candidates_human.pickle', 'rb') as f:
+    #     wt_vi_traj_candidates_human = pickle.load(f)
+
+    start_time = time.time()
 
     while len(summary) < n_train_demos:
-        # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, scale=abs(1 / weights[0, -1]), fig_name=str(len(summary)) + '.png')
+        visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag)
         # c) hardcoding the human's model for now
-        w_human = np.array([[26, 0, -1]])
-        w_human_normalized = w_human / np.linalg.norm(w_human[0, :], ord=1)
-        # _, _, w_human_normalized = BEC_helpers.calculate_BEC_length(min_BEC_constraints_running, weights, step_cost_flag, return_midpt=True)
-        print(w_human_normalized * abs(1 / weights[0, -1]))
+        # w_human = np.array([[26, 0, -1]])
+        # w_human_normalized = w_human / np.linalg.norm(w_human[0, :], ord=1)
+        # _, _, w_human_normalized2 = BEC_helpers.calculate_BEC_length(min_BEC_constraints_running, weights, step_cost_flag, return_midpt=True)
+        # print(w_human_normalized * abs(1 / weights[0, -1]))
 
-        constraints_running = []
-        info_gains = np.zeros(len(traj_record))
-        human_counterfactual_trajs_record = [] # save the best trajectories of the human's model (given the benefit of the doubt)
+        # d) use extreme vertices (vertices comprising the convex hull that have a extreme value in at least a single axis) as the human model
+        extreme_human_models = BEC_helpers.obtain_extreme_vertices(min_BEC_constraints_running, weights, step_cost_flag)
+
+        constraints_record = []
+        info_gains = np.zeros((len(traj_record), len(extreme_human_models)))
+        human_counterfactual_trajs_record = []  # save the best trajectories of the human's model (given the benefit of the doubt)
 
         print("Length of summary: {}".format(len(summary)))
 
-        # code to run through and recalculate the human's optimal policy (given new weights)
-        # wt_vi_traj_candidates_human = copy.deepcopy(wt_vi_traj_candidates)
-        # for idx, candidate in enumerate(wt_vi_traj_candidates_human):
-        #     print(idx)
-        #     mdp = candidate[0][1].mdp
-        #     mdp.weights = w_human_normalized
-        #     vi_human = ValueIteration(mdp, sample_rate=1, max_iterations=50)
-        #     vi_human.run_vi()
-        #     trajectory = mdp_helpers.rollout_policy(mdp, vi_human)
-        #     candidate[0][0] = w_human_normalized
-        #     candidate[0][1] = vi_human
-        #     candidate[0][2] = trajectory
-        #     candidate[0][3]['weights'] = w_human_normalized
-        # can save the human's policy and reuse if it you're fixing it (as is done currently), or if you've already
-        # decided on a starting demo (as in b), and wish to skip one iteration of solving for the human's policy)
-        # with open('models/augmented_taxi/wt_vi_traj_candidates_human.pickle', 'wb') as f:
-        #     pickle.dump(wt_vi_traj_candidates_human, f)
+        for model_idx, human_model in enumerate(extreme_human_models):
+            print(colored('Model #: {}'.format(model_idx), 'red'))
+            print(colored('Model val: {}'.format(human_model), 'red'))
 
-        for idx in range(len(traj_record)):
-            if idx % 1000 == 0:
-                print("{}/{}".format(idx, len(traj_record)))
+            w_human_normalized = human_model
 
-            traj_opt = traj_record[idx]
-            agent = wt_vi_traj_candidates[env_record[idx]][0][1]
-            mdp = agent.mdp
+            constraints_model = []
+            human_counterfactual_trajs_model = []
 
-            constraints = []
-            vi_human = wt_vi_traj_candidates_human[env_record[idx]][0][1]
+            # code to run through and recalculate the human's optimal policy (given new weights)
+            wt_vi_traj_candidates_human = copy.deepcopy(wt_vi_traj_candidates)
+            for idx, candidate in enumerate(wt_vi_traj_candidates_human):
+                print(idx)
+                mdp = candidate[0][1].mdp
+                mdp.weights = w_human_normalized
+                vi_human = ValueIteration(mdp, sample_rate=1, max_iterations=50)
+                vi_human.run_vi()
+                trajectory = mdp_helpers.rollout_policy(mdp, vi_human)
+                candidate[0][0] = w_human_normalized
+                candidate[0][1] = vi_human
+                candidate[0][2] = trajectory
+                candidate[0][3]['weights'] = w_human_normalized
+            # can save the human's policy and reuse if it you're fixing it (as is done currently), or if you've already
+            # decided on a starting demo (as in b), and wish to skip one iteration of solving for the human's policy)
+            # with open('models/augmented_taxi/wt_vi_traj_candidates_human.pickle', 'wb') as f:
+            #     pickle.dump(wt_vi_traj_candidates_human, f)
 
-            # # a) accumulate the reward features and generate a single constraint
-            # mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
-            # traj_hyp = mdp_helpers.rollout_policy(vi_human.mdp, vi_human)
-            # mu_sb = vi_human.mdp.accumulate_reward_features(traj_hyp, discount=True)
-            # constraints.append(mu_sa - mu_sb)
+            for idx in range(len(traj_record)):
+                if idx % 1000 == 0:
+                    print("{}/{}".format(idx, len(traj_record)))
 
-            # b) contrast differing expected feature counts for each state-action pair along the agent's optimal trajectory
-            best_human_trajs_record = []
-            for sas_idx in range(len(traj_opt)):
-                # reward features of optimal action
-                mu_sa = mdp.accumulate_reward_features(traj_opt[sas_idx:], discount=True)
+                traj_opt = traj_record[idx]
+                agent = wt_vi_traj_candidates[env_record[idx]][0][1]
+                mdp = agent.mdp
 
-                sas = traj_opt[sas_idx]
-                cur_state = sas[0]
+                constraints = []
+                vi_human = wt_vi_traj_candidates_human[env_record[idx]][0][1]
 
-                # obtain all optimal trajectory rollouts according to the human's model
-                human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
+                # # a) accumulate the reward features and generate a single constraint
+                # mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
+                # traj_hyp = mdp_helpers.rollout_policy(vi_human.mdp, vi_human)
+                # mu_sb = vi_human.mdp.accumulate_reward_features(traj_hyp, discount=True)
+                # constraints.append(mu_sa - mu_sb)
 
-                cur_best_reward = np.float('-inf')
-                best_reward_features = []
-                best_human_traj = []
-                # select the human's possible trajectory that has the highest true reward (i.e. give the human's policy the benefit of the doubt)
-                for traj in human_opt_trajs:
-                    mu_sb = mdp.accumulate_reward_features(traj, discount=True) # the human and agent should be working with identical mdps
-                    reward_hyp = mdp.weights.dot(mu_sb.T)
-                    if reward_hyp > cur_best_reward:
-                        cur_best_reward = reward_hyp
-                        best_reward_features = mu_sb
-                        best_human_traj = traj
+                # b) contrast differing expected feature counts for each state-action pair along the agent's optimal trajectory
+                best_human_trajs_record = []
+                for sas_idx in range(len(traj_opt)):
+                    # reward features of optimal action
+                    mu_sa = mdp.accumulate_reward_features(traj_opt[sas_idx:], discount=True)
 
-                constraints.append(mu_sa - best_reward_features)
-                best_human_trajs_record.append(best_human_traj)
+                    sas = traj_opt[sas_idx]
+                    cur_state = sas[0]
 
-            human_counterfactual_trajs_record.append(best_human_trajs_record)
+                    # obtain all optimal trajectory rollouts according to the human's model, if it has reasonable policy that converged
+                    if vi_human.stabilized:
+                        human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
+                    # simply use a single roll out (which will likely just be noise anyway)
+                    else:
+                        human_opt_traj = mdp_helpers.rollout_policy(vi_human.mdp, vi_human, cur_state)
+                        human_opt_trajs = [human_opt_traj]
 
-            # the hypothetical constraints that will be in the human's mind after viewing this demonstrations
-            hypothetical_constraints = []
-            hypothetical_constraints.extend(min_BEC_constraints_running)
-            # try conveying one feature at a time
-            try:
-                constraints = BEC_helpers.clean_up_constraints(constraints, weights, step_cost_flag)
-                if feature_flag == 0:
-                    # keep only horizontal constraints (i.e. info on only the tolls)
-                    filtered_constraints = []
-                    for constraint in constraints:
-                        if constraint[0, 0] == 0:
-                            filtered_constraints.append(constraint)
-                elif feature_flag == 1:
-                    # keep only vertical constraints (i.e. info on only the dropoff)
-                    filtered_constraints = []
-                    for constraint in constraints:
-                        if constraint[0, 1] == 0:
-                            filtered_constraints.append(constraint)
-                else:
-                    filtered_constraints = constraints
+                    cur_best_reward = np.float('-inf')
+                    best_reward_features = []
+                    best_human_traj = []
+                    # select the human's possible trajectory that has the highest true reward (i.e. give the human's policy the benefit of the doubt)
+                    for traj in human_opt_trajs:
+                        mu_sb = mdp.accumulate_reward_features(traj, discount=True) # the human and agent should be working with identical mdps
+                        reward_hyp = mdp.weights.dot(mu_sb.T)
+                        if reward_hyp > cur_best_reward:
+                            cur_best_reward = reward_hyp
+                            best_reward_features = mu_sb
+                            best_human_traj = traj
 
-                hypothetical_constraints.extend(filtered_constraints)
-                info_gains[idx] = BEC_helpers.calculate_BEC_length(min_BEC_constraints_running, weights, step_cost_flag)[0] - BEC_helpers.calculate_BEC_length(hypothetical_constraints, weights, step_cost_flag)[0]
+                    constraints.append(mu_sa - best_reward_features)
+                    best_human_trajs_record.append(best_human_traj)
 
-                constraints_running.append(constraints)
-            except:
-                # print("No valid constraints")
-                pass
-            # mdp.visualize_trajectory(traj_opt)
-            # vi_human.mdp.visualize_trajectory(traj_hyp)
+                human_counterfactual_trajs_model.append(best_human_trajs_record)
+
+                # the hypothetical constraints that will be in the human's mind after viewing this demonstrations
+                hypothetical_constraints = []
+                hypothetical_constraints.extend(min_BEC_constraints_running)
+                # try conveying one feature at a time
+                try:
+                    constraints = BEC_helpers.clean_up_constraints(constraints, weights, step_cost_flag)
+                    if feature_flag == 0:
+                        # keep only horizontal constraints (i.e. info on only the tolls)
+                        filtered_constraints = []
+                        for constraint in constraints:
+                            if constraint[0, 0] == 0:
+                                filtered_constraints.append(constraint)
+                    elif feature_flag == 1:
+                        # keep only vertical constraints (i.e. info on only the dropoff)
+                        filtered_constraints = []
+                        for constraint in constraints:
+                            if constraint[0, 1] == 0:
+                                filtered_constraints.append(constraint)
+                    else:
+                        filtered_constraints = constraints
+
+                    hypothetical_constraints.extend(filtered_constraints)
+                    info_gains[idx, model_idx] = BEC_helpers.calculate_BEC_length(min_BEC_constraints_running, weights, step_cost_flag)[0] - BEC_helpers.calculate_BEC_length(hypothetical_constraints, weights, step_cost_flag)[0]
+
+                    constraints_model.append(constraints)
+                except:
+                    # print("No valid constraints")
+                    pass
+                # mdp.visualize_trajectory(traj_opt)
+                # vi_human.mdp.visualize_trajectory(traj_hyp)
+
+            constraints_record.append(constraints_model)
+            human_counterfactual_trajs_record.append(human_counterfactual_trajs_model)
+
+        elapsed_time = time.time() - start_time
+        print(colored("Elapsed time: " + str(elapsed_time), 'green'))
 
         # no need to continue search for demonstrations if none of them will improve the human's understanding
         if np.sum(info_gains) == 0:
+            # when feature_flag == n_features - 1, you have already considered constraints that aren't solely informative
+            # regard one feature (i.e. constraints that are axis-parallel). at this point, is no more information to gain
             if feature_flag == 2:
                 break
             else:
@@ -361,10 +389,13 @@ def obtain_summary_counterfactual(summary_variant, wt_vi_traj_candidates, min_BE
 
         # todo: let's just try returning the smallest information gain for now (so that we can have incremental demonstrations)
         # there often isn't enough demonstrations to generate 6 clusters, as I initially tried to do below
-        best_idx = np.argwhere(info_gains == min(i for i in info_gains if i > 0))[0][0] # info gain should be greater than 0
+        info_gains[info_gains <= 0] = np.float('inf')
+        best_idx, select_model = np.unravel_index(np.argmin(info_gains), info_gains.shape)
         print(colored('Max infogain: {}'.format(np.max(info_gains)), 'blue'))
-        print(colored('Max Min infogain: {}'.format(min(i for i in info_gains if i > 0)), 'blue')) # smallest infogain above zero
-        print(colored('Min infogain: {}'.format(np.min(info_gains)), 'blue'))
+        print(colored('Max Min infogain: {}'.format(np.min(info_gains)), 'blue')) # smallest infogain above zero
+
+        constraints_select_model = constraints_record[select_model]
+        human_counterfactual_trajs_select_model = human_counterfactual_trajs_record[select_model]
 
         # kmeans = KMeans(n_clusters=n_clusters).fit(np.array(info_gains).reshape(-1, 1))
         # cluster_centers = kmeans.cluster_centers_
@@ -381,10 +412,10 @@ def obtain_summary_counterfactual(summary_variant, wt_vi_traj_candidates, min_BE
         best_env_idx = env_record[best_idx]
         # record information associated with the best selected summary demo
         best_traj = traj_record[best_idx]
-        best_human_trajs = human_counterfactual_trajs_record[best_idx]
+        best_human_trajs = human_counterfactual_trajs_select_model[best_idx]
         best_mdp = wt_vi_traj_candidates[best_env_idx][0][1].mdp
-        min_BEC_constraints_running.extend(constraints_running[best_idx])
-        summary.append([best_mdp, best_traj, constraints_running[best_idx], best_human_trajs])
+        min_BEC_constraints_running.extend(constraints_select_model[best_idx])
+        summary.append([best_mdp, best_traj, constraints_select_model[best_idx], best_human_trajs])
 
         del traj_record[best_idx]
         del env_record[best_idx]

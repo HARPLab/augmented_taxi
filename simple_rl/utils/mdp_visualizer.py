@@ -477,7 +477,11 @@ def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_h
     screen = pygame.display.set_mode((scr_width, scr_height))
 
     # Setup and draw initial state.
-    cur_state = mdp.get_init_state() if cur_state is None else cur_state
+    if cur_state is not None:
+        mdp.set_curr_state(cur_state)
+    else:
+        cur_state = mdp.get_init_state()
+        mdp.reset()
     reward = 0
     cumulative_reward = 0
     step = 0

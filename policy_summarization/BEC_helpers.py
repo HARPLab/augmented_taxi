@@ -109,7 +109,7 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
     '''
 
     try:
-        BEC_length_all_constraints, nonredundant_constraint_idxs, _ = calculate_BEC_length(constraints, weights,
+        BEC_length_all_constraints, nonredundant_constraint_idxs = calculate_BEC_length(constraints, weights,
                                                                                         step_cost_flag)
     except:
         # a subset of these constraints aren't numerically stable (e.g. you can have a constraint that's ever so slightly
@@ -120,7 +120,7 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
         for violating_idx in sorted(violating_idxs[0], reverse=True):
             del constraints[violating_idx]
 
-        BEC_length_all_constraints, nonredundant_constraint_idxs, _ = calculate_BEC_length(constraints, weights,
+        BEC_length_all_constraints, nonredundant_constraint_idxs = calculate_BEC_length(constraints, weights,
                                                                                         step_cost_flag)
 
     nonredundant_constraints = [constraints[x] for x in nonredundant_constraint_idxs]
@@ -176,17 +176,14 @@ def constraints_to_halfspace_matrix(constraints, weights, step_cost_flag):
 
     return A, b
 
-def calculate_BEC_length(constraints, weights, step_cost_flag, return_midpt=False, feature=None):
+def compute_L1_intersections(constraints, weights, step_cost_flag):
     '''
     :param constraints (list of constraints, corresponding to the A of the form Ax >= 0): constraints that comprise the
         BEC region
     :param weights (numpy array): Ground truth reward weights used by agent to derive its optimal policy
     :param step_cost_flag (bool): Indicates that the last weight element is a known step cost
-    :param return_midpt (bool): Whether to return the midpoint of the valid BEC area as an estimate of the human's
-           current understanding of the reward weights
-    :param feature (int): Whether the intersection length should be computed across all feature dimensions (default)
-           or only across a specified feature dimension
-    :return: total_intersection_length: total length of the intersection between the BEC region and the L1 constraints
+    :return: L1_intersections: List of L1 constraint line segments that intersect with the constraints that comprise
+        the BEC region
     '''
     A, b = constraints_to_halfspace_matrix(constraints, weights, step_cost_flag)
 
@@ -208,31 +205,96 @@ def calculate_BEC_length(constraints, weights, step_cost_flag, return_midpt=Fals
     # intersect the L1 constraints with the BEC polygon
     L1_intersections = cg.cyrus_beck_2D(np.array(vertices), L1_constraints)
 
+    return L1_intersections, polygon_hull_constraint_idxs
+
+def calculate_BEC_length(constraints, weights, step_cost_flag, feature=None):
+    '''
+    :param constraints (list of constraints, corresponding to the A of the form Ax >= 0): constraints that comprise the
+        BEC region
+    :param weights (numpy array): Ground truth reward weights used by agent to derive its optimal policy
+    :param step_cost_flag (bool): Indicates that the last weight element is a known step cost
+    :param return_midpt (bool): Whether to return the midpoint of the valid BEC area as an estimate of the human's
+           current understanding of the reward weights
+    :param feature (int): Whether the intersection length should be computed across all feature dimensions (default)
+           or only across a specified feature dimension
+    :return: total_intersection_length: total length of the intersection between the BEC region and the L1 constraints
+    '''
+    L1_intersections, polygon_hull_constraint_idxs = compute_L1_intersections(constraints, weights, step_cost_flag)
+
     # compute the total length of all intersections
     intersection_lengths = cg.compute_lengths(L1_intersections, query_dim=feature)
     total_intersection_length = np.sum(intersection_lengths)
 
-    if return_midpt:
-        # estimate the human's reward weight as the mean of the current BEC area (note that this hasn't been tested for
-        # non-continguous BEC areas
-        d = total_intersection_length / 2
-        d_traveled = 0
+    return total_intersection_length, polygon_hull_constraint_idxs
 
-        for idx, intersection in enumerate(L1_intersections):
-            # travel fully along this constraint line
-            if d > d_traveled + intersection_lengths[idx]:
-                d_traveled += intersection_lengths[idx]
-            else:
-                t = (d - d_traveled) / intersection_lengths[idx]
-                midpt = L1_intersections[idx][0] + t * (L1_intersections[idx][1] - L1_intersections[idx][0])
-                midpt = np.append(midpt, -(1 - np.sum(abs(midpt)))) # add in the step cost, currently hardcoded
-                break
-        midpt = midpt.reshape(1, -1)
-    else:
-        midpt = None
+def compute_BEC_midpt(constraints, weights, step_cost_flag):
+    '''
+    :param constraints (list of constraints, corresponding to the A of the form Ax >= 0): constraints that comprise the
+        BEC region
+    :param weights (numpy array): Ground truth reward weights used by agent to derive its optimal policy
+    :param step_cost_flag (bool): Indicates that the last weight element is a known step cost
+    :return: midpt: Midpoint of the valid BEC area
+    '''
+    L1_intersections, polygon_hull_constraint_idxs = compute_L1_intersections(constraints, weights, step_cost_flag)
 
-    return total_intersection_length, polygon_hull_constraint_idxs, midpt
+    # compute the total length of all intersections
+    intersection_lengths = cg.compute_lengths(L1_intersections)
+    total_intersection_length = np.sum(intersection_lengths)
 
+    # estimate the human's reward weight as the mean of the current BEC area (note that this hasn't been tested for
+    # non-continguous BEC areas
+    d = total_intersection_length / 2
+    d_traveled = 0
+
+    for idx, intersection in enumerate(L1_intersections):
+        # travel fully along this constraint line
+        if d > d_traveled + intersection_lengths[idx]:
+            d_traveled += intersection_lengths[idx]
+        else:
+            t = (d - d_traveled) / intersection_lengths[idx]
+            midpt = L1_intersections[idx][0] + t * (L1_intersections[idx][1] - L1_intersections[idx][0])
+            midpt = np.append(midpt, -(1 - np.sum(abs(midpt)))) # add in the step cost, currently hardcoded
+            break
+    midpt = midpt.reshape(1, -1)
+
+    return midpt
+
+def obtain_extreme_vertices(constraints, weights, step_cost_flag):
+    '''
+    :param constraints (list of constraints, corresponding to the A of the form Ax >= 0): constraints that comprise the
+        BEC region
+    :param weights (numpy array): Ground truth reward weights used by agent to derive its optimal policy
+    :param step_cost_flag (bool): Indicates that the last weight element is a known step cost
+    :return: unique_extreme_vertices: List of extreme vertices (vertices comprising the convex hull that have a
+        extreme (max or min) value in at least a single axis)
+    '''
+    L1_intersections, polygon_hull_constraint_idxs = compute_L1_intersections(constraints, weights, step_cost_flag)
+
+    # convert the list of vertices into a numpy array
+    vertices = np.concatenate(L1_intersections, axis=0)
+    unique_vertices = np.unique(vertices, axis=0)
+
+    extreme_vertices = []
+
+    # find vertices with the maximum and minimum values for each dimension
+    for dim_idx in range(unique_vertices.shape[1]):
+        extreme_vertices_idxs = np.where(unique_vertices[:, dim_idx] == unique_vertices[:, dim_idx].min())[0]
+        extreme_vertices.extend(extreme_vertices_idxs)
+
+        extreme_vertices_idxs = np.where(unique_vertices[:, dim_idx] == unique_vertices[:, dim_idx].max())[0]
+        extreme_vertices.extend(extreme_vertices_idxs)
+
+    unique_extreme_vertices_idxs = np.unique(extreme_vertices)
+
+    unique_extreme_vertices = []
+    for idx in unique_extreme_vertices_idxs:
+        unique_vertex = unique_vertices[idx, :]
+        # back out the step cost using the L1 constraint and add it if called for
+        if step_cost_flag:
+            unique_vertex = np.append(unique_vertex, 1 - np.sum(abs(unique_vertices[0, :])))
+        unique_extreme_vertices.append(unique_vertex.reshape(1, -1))
+
+    return unique_extreme_vertices
 
 def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_record):
     '''

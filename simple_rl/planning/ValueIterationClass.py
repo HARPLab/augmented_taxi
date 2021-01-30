@@ -141,6 +141,8 @@ class ValueIteration(Planner):
 
         value_of_init_state = self._compute_max_qval_action_pair(self.init_state)[0]
         self.has_planned = True
+        if iterations < self.max_iterations:
+            self.stabilized = True
 
         return iterations, value_of_init_state
 

@@ -14,6 +14,7 @@ class Planner(object):
         self.transition_func = mdp.get_transition_func()
         self.gamma = mdp.gamma
         self.has_planned = False
+        self.stabilized = False
 
     def plan(self, state):
         pass
