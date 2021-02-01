@@ -30,6 +30,12 @@ class AugmentedTaxiState(OOMDPState):
     def decrement_fuel(self):
         self.objects["agent"][0]["fuel"] -= 1
 
+    def is_an_exit_state(self, ref_exit_state):
+        if self.get_agent_x() == ref_exit_state.get_agent_x() and self.get_agent_y() == ref_exit_state.get_agent_y():
+            return True
+        else:
+            return False
+
     # selectively return attributes of the state to print out
     def abbr_str(self):
         return "Fuel: " + str(self.objects["agent"][0]["fuel"])

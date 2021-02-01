@@ -49,7 +49,7 @@ def _move_skateboard_on_agent(state, dx=0, dy=0):
             skateboard_attr_dict_ls[i]["x"] += dx
             skateboard_attr_dict_ls[i]["y"] += dy
 
-def is_terminal_and_goal_state(mdp, state, exit_state):
+def is_terminal_and_goal_state(mdp, state, ref_exit_state):
     '''
     Args:
         state (OOMDPState)
@@ -61,7 +61,7 @@ def is_terminal_and_goal_state(mdp, state, exit_state):
     if state.get_agent_x() == mdp.goal["x"] and state.get_agent_y() == mdp.goal["y"]:
         return True, True
 
-    if state.get_agent_x() == exit_state.get_agent_x() and state.get_agent_y() == exit_state.get_agent_y():
+    if state.get_agent_x() == ref_exit_state.get_agent_x() and state.get_agent_y() == ref_exit_state.get_agent_y():
         return True, False
 
     return False, False

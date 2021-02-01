@@ -52,9 +52,10 @@ class SkateboardOOMDP(OOMDP):
         self.slip_prob = slip_prob
 
         init_state = self._create_state(agent_obj, skateboard_objs)
-        self.exit_state = self._create_state(OOMDPObject(attributes=agent_exit, name="agent_exit"), skateboard_objs_exit)
-        self.exit_state.set_terminal(True)
-        self.exit_state.set_goal(False)
+        # create a reference exit state
+        self.ref_exit_state = self._create_state(OOMDPObject(attributes=agent_exit, name="agent_exit"), skateboard_objs_exit)
+        self.ref_exit_state.set_terminal(True)
+        self.ref_exit_state.set_goal(False)
         OOMDP.__init__(self, SkateboardOOMDP.ACTIONS, self._skateboard_transition_func, self._skateboard_reward_func,
                        init_state=init_state, gamma=gamma, step_cost=step_cost, sample_rate=sample_rate)
 
@@ -110,7 +111,7 @@ class SkateboardOOMDP(OOMDP):
 
         agent = state.get_first_obj_of_class("agent")
 
-        if next_state == self.exit_state:
+        if next_state.is_an_exit_state(self.ref_exit_state):
             return np.array([[0, 0, 0]])
 
         # movement is penalized differently based on whether you have the skateboard or not
@@ -159,7 +160,7 @@ class SkateboardOOMDP(OOMDP):
         '''
         _error_check(state, action)
 
-        state_is_terminal, state_is_goal = skateboard_helpers.is_terminal_and_goal_state(self, state, self.exit_state)
+        state_is_terminal, state_is_goal = skateboard_helpers.is_terminal_and_goal_state(self, state, self.ref_exit_state)
         if not state_is_terminal:
             # if there is a slip, prevent a navigation action from occurring
             stuck = False
@@ -175,9 +176,11 @@ class SkateboardOOMDP(OOMDP):
             elif action == "left" and state.get_agent_x() > 1 and not stuck:
                 next_state = self.move_agent(state, dx=-1)
             elif action == "exit":
-                next_state = copy.deepcopy(self.exit_state)
+                next_state = copy.deepcopy(self.ref_exit_state)
 
-                # ensure that uneaten cookies stay put when the agent exits
+                # ensure that the skateboard is in the same place when the agent exits (note that this is why you can't
+                # simply check whether a state == self.ref_exit_state, since the skateboard can be in different locations
+                # i.e. there are multiple possible exit states)
                 next_state.objects['skateboard'] = state.objects['skateboard'].copy()
             elif action == "dropoff":
                 next_state = self.agent_dropoff(state)
@@ -187,7 +190,7 @@ class SkateboardOOMDP(OOMDP):
                 next_state = state
 
             # Make terminal.
-            next_state_is_terminal, next_state_is_goal = skateboard_helpers.is_terminal_and_goal_state(self, next_state, self.exit_state)
+            next_state_is_terminal, next_state_is_goal = skateboard_helpers.is_terminal_and_goal_state(self, next_state, self.ref_exit_state)
             if next_state_is_terminal:
                 next_state.set_terminal(True)
             if next_state_is_goal:

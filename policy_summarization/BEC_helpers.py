@@ -291,7 +291,7 @@ def obtain_extreme_vertices(constraints, weights, step_cost_flag):
         unique_vertex = unique_vertices[idx, :]
         # back out the step cost using the L1 constraint and add it if called for
         if step_cost_flag:
-            unique_vertex = np.append(unique_vertex, 1 - np.sum(abs(unique_vertices[0, :])))
+            unique_vertex = np.append(unique_vertex, -(1 - np.sum(abs(unique_vertices[0, :])))) # negative since it's a cost
         unique_extreme_vertices.append(unique_vertex.reshape(1, -1))
 
     return unique_extreme_vertices

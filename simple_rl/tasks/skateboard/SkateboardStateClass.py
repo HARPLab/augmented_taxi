@@ -15,6 +15,13 @@ class SkateboardState(OOMDPState):
     def get_agent_y(self):
         return self.objects["agent"][0]["y"]
 
+    def is_an_exit_state(self, ref_exit_state):
+        if self.get_agent_x() == ref_exit_state.get_agent_x() and self.get_agent_y() == ref_exit_state.get_agent_y():
+            return True
+        else:
+            return False
+
+
     def __hash__(self):
 
         state_hash = str(self.get_agent_x()) + str(self.get_agent_y()) + "00"

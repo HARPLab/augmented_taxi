@@ -258,7 +258,7 @@ class ValueIteration(Planner):
         # Find best action (action w/ current max predicted Q value)
         for action in self.actions:
             q_s_a = self.get_q_value(state, action)
-            if q_s_a == max_q_val:
+            if abs(q_s_a - max_q_val) < 1e-05: # allow for slight numerical instabilities
                 best_action_list.append(action)
 
         return best_action_list

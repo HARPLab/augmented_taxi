@@ -59,9 +59,10 @@ class AugmentedTaxiOOMDP(OOMDP):
         self.slip_prob = slip_prob
 
         init_state = self._create_state(agent_obj, pass_objs)
-        self.exit_state = self._create_state(OOMDPObject(attributes=agent_exit, name="agent_exit"), pass_objs_exit)
-        self.exit_state.set_terminal(True)
-        self.exit_state.set_goal(False)
+        # create a reference exit state
+        self.ref_exit_state = self._create_state(OOMDPObject(attributes=agent_exit, name="agent_exit"), pass_objs_exit)
+        self.ref_exit_state.set_terminal(True)
+        self.ref_exit_state.set_goal(False)
         if init_state.track_fuel():
             OOMDP.__init__(self, AugmentedTaxiOOMDP.AUGMENTED_ACTIONS, self._taxi_transition_func, self._taxi_reward_func,
                            init_state=init_state, gamma=gamma, step_cost=step_cost, sample_rate=sample_rate)
@@ -126,12 +127,12 @@ class AugmentedTaxiOOMDP(OOMDP):
         # traffic_flag = 0
         step_cost_flag = 1
 
-        if next_state == self.exit_state:
+        if next_state.is_an_exit_state(self.ref_exit_state):
             step_cost_flag = 0
 
         if len(self.tolls) != 0:
             moved_into_toll = taxi_helpers._moved_into_toll(self, state, next_state)
-            if moved_into_toll and not next_state == self.exit_state:
+            if moved_into_toll and not next_state.is_an_exit_state(self.ref_exit_state):
                 toll_flag = 1
 
         # at_traffic, prob_traffic = taxi_helpers.at_traffic(self, state.get_agent_x(), state.get_agent_y())
@@ -182,7 +183,7 @@ class AugmentedTaxiOOMDP(OOMDP):
         '''
         _error_check(state, action)
 
-        state_is_terminal, state_is_goal = taxi_helpers.is_taxi_terminal_and_goal_state(state)
+        state_is_terminal, state_is_goal = taxi_helpers.is_taxi_terminal_and_goal_state(state, self.ref_exit_state)
         if not state_is_terminal:
             # if there is a slip, prevent a navigation action from occurring
             stuck = False
@@ -215,9 +216,11 @@ class AugmentedTaxiOOMDP(OOMDP):
             elif action == "refuel":
                 next_state = self.agent_refuel(state)
             elif action == "exit":
-                next_state = copy.deepcopy(self.exit_state)
+                next_state = copy.deepcopy(self.ref_exit_state)
 
-                # ensure that the passenger is in the same place when the agent exits
+                # ensure that the passenger is in the same place when the agent exits (note that this is why you can't
+                # simply check whether a state == self.ref_exit_state, since the passenger can be in different locations
+                # i.e. there are multiple possible exit states)
                 passenger_attr_dict_ls = state.get_objects_of_class("passenger")
                 passenger_attr_dict_ls_exit = next_state.get_objects_of_class("passenger")
                 for i, passenger in enumerate(passenger_attr_dict_ls):
@@ -227,7 +230,7 @@ class AugmentedTaxiOOMDP(OOMDP):
                 next_state = state
 
             # Make terminal.
-            next_state_is_terminal, next_state_is_goal = taxi_helpers.is_taxi_terminal_and_goal_state(next_state)
+            next_state_is_terminal, next_state_is_goal = taxi_helpers.is_taxi_terminal_and_goal_state(next_state, self.ref_exit_state)
             if next_state_is_terminal:
                 next_state.set_terminal(True)
             if next_state_is_goal:

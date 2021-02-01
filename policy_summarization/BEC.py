@@ -236,7 +236,7 @@ def obtain_summary_counterfactual(summary_variant, wt_vi_traj_candidates, min_BE
 
     # c) assuming a starting human model without any inducing demonstrations. include a dummy constraint that doesn't
     # reduce any BEC area so that the BEC area calculation doesn't break later
-    min_BEC_constraints_running = [np.array([[.01, 0, -1]])]
+    min_BEC_constraints_running = [np.array([[0, -1, 0]]), np.array([[1, 0, 0]])]
     # also hardcoding the human's model for now for development
     # with open('models/augmented_taxi/wt_vi_traj_candidates_human.pickle', 'rb') as f:
     #     wt_vi_traj_candidates_human = pickle.load(f)
@@ -272,7 +272,8 @@ def obtain_summary_counterfactual(summary_variant, wt_vi_traj_candidates, min_BE
             # code to run through and recalculate the human's optimal policy (given new weights)
             wt_vi_traj_candidates_human = copy.deepcopy(wt_vi_traj_candidates)
             for idx, candidate in enumerate(wt_vi_traj_candidates_human):
-                print(idx)
+                if idx % 100 == 0:
+                    print(idx)
                 mdp = candidate[0][1].mdp
                 mdp.weights = w_human_normalized
                 vi_human = ValueIteration(mdp, sample_rate=1, max_iterations=50)
@@ -415,6 +416,7 @@ def obtain_summary_counterfactual(summary_variant, wt_vi_traj_candidates, min_BE
         best_human_trajs = human_counterfactual_trajs_select_model[best_idx]
         best_mdp = wt_vi_traj_candidates[best_env_idx][0][1].mdp
         min_BEC_constraints_running.extend(constraints_select_model[best_idx])
+        min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)[0]
         summary.append([best_mdp, best_traj, constraints_select_model[best_idx], best_human_trajs])
 
         del traj_record[best_idx]
@@ -709,7 +711,7 @@ def obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, 
         summary.reverse()
     return summary
 
-def visualize_constraints(constraints, weights, step_cost_flag, plot_lim=[(-1, 1), (-1, 1)], scale=1.0, fig_name=None):
+def visualize_constraints(constraints, weights, step_cost_flag, plot_lim=[(-1, 1), (-1, 1)], scale=1.0, fig_name=None, just_save=False):
     '''
     Summary: Visualize the constraints. Use scale to determine whether to show L1 normalized weights and constraints or
     weights and constraints where the step cost is 1.
@@ -787,7 +789,8 @@ def visualize_constraints(constraints, weights, step_cost_flag, plot_lim=[(-1, 1
     plt.tight_layout()
     if fig_name is not None:
         plt.savefig(fig_name, dpi=200, transparent=True)
-    plt.show()
+    if not just_save:
+        plt.show()
 
 
 def visualize_summary(BEC_summaries_collection, weights, step_cost_flag):

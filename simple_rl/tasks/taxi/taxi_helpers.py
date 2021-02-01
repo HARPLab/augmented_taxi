@@ -120,7 +120,7 @@ def is_taxi_terminal_state(state):
                 return True
         return False
 
-def is_taxi_terminal_and_goal_state(state):
+def is_taxi_terminal_and_goal_state(state, ref_exit_state):
     '''
     Args:
         state (OOMDPState)
@@ -128,6 +128,9 @@ def is_taxi_terminal_and_goal_state(state):
     Returns:
         (bool): True iff all passengers are at their destinations, not in the taxi.
     '''
+    if state.is_an_exit_state(ref_exit_state):
+        return True, False
+
     all_passengers_at_destination = True
 
     # check if all passengers are at destination
