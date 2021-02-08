@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 mdp_class = 'augmented_taxi'
 # mdp_class = 'two_goal'
@@ -128,19 +129,13 @@ step_cost_flag = True    # indicates that the last weight element is a known ste
 
 # BEC parameters
 BEC = {
-    'summary_type': 'policy',                 # demo or policy: whether constratints are extraced from just the optimal demo from the
-                                              # starting state or from all possible states from the full policy
-
     'summary_variant': ['forward', 'high'],   # [{'low', 'medium', 'high', 'highest', 'forward', 'backward}, {low', 'high'}]
                                               # [{expected information transfer to a perfect IRL agent, or scaffolding},
                                               # {ease metrics (visual similarity, visual simplicity, etc)}]
 
-    'n_train_demos': 4,                       # number of desired training demonstrations
+    'n_train_demos': 5,                       # number of desired training demonstrations
 
     'n_test_demos': 30,                        # number of desired test demonstration
-
-    'depth': 1,                               # number of suboptimal actions to take before following the optimal policy to obtain the
-                                              # suboptimal trajectory (and the corresponding suboptimal expected feature counts)
 
     'test_difficulty': 'medium'                 # expected ease for human to correctly predict the agent's actions in this test environment (low, medium, high)
 }
@@ -176,3 +171,5 @@ data_loc = {
     'BEC': mdp_class,
     'BIRL': mdp_class + '/' + data_loc_BIRL
 }
+
+n_cpu = os.cpu_count()

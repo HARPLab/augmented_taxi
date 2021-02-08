@@ -6,12 +6,15 @@ import random
 from termcolor import colored
 import copy
 from sklearn.cluster import KMeans
+import os
+from tqdm import tqdm
 
 # Other imports
 from simple_rl.planning import ValueIteration
 from simple_rl.utils import mdp_helpers
 from policy_summarization import BEC_helpers
 from simple_rl.utils import make_mdp
+from policy_summarization import multiprocessing_helpers as mp_helpers
 
 def sample_wt_candidates(data_loc, weights, step_cost_flag, n_samples, sample_radius):
     '''
@@ -107,7 +110,70 @@ def discretize_wt_candidates(data_loc, weights, weights_lb, weights_ub, step_cos
 
     return wt_uniform_sampling
 
-def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, save_type, hardcode_envs=False):
+def solve_policy(args):
+    env_idx, mdp_code, mdp_class, hardcode_envs, mdp_parameters, wt_candidates, data_loc = args
+
+    if mdp_class == 'augmented_taxi':
+        # note that this is specially accommodates the four hand-designed environments
+        if hardcode_envs:
+            passengers, tolls, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
+        else:
+            passengers, tolls, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code, mdp_parameters)
+        mdp_parameters['passengers'] = passengers
+        mdp_parameters['tolls'] = tolls
+        mdp_parameters['env_code'] = env_code
+    elif mdp_class == 'two_goal':
+        if hardcode_envs:
+            walls, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
+        else:
+            walls, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code, mdp_parameters)
+        mdp_parameters['walls'] = walls
+        mdp_parameters['env_code'] = env_code
+    elif mdp_class == 'skateboard':
+        if hardcode_envs:
+            walls, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
+        else:
+            walls, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code, mdp_parameters)
+        mdp_parameters['walls'] = walls
+        mdp_parameters['env_code'] = env_code
+    elif mdp_class == 'cookie_crumb':
+        if hardcode_envs:
+            crumbs, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
+        else:
+            crumbs, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code, mdp_parameters)
+        mdp_parameters['crumbs'] = crumbs
+        mdp_parameters['env_code'] = env_code
+    else:
+        raise Exception("Unknown MDP class.")
+
+    # a per-environment tuple of corresponding reward weight, optimal policy, and optimal trajectory
+    wt_vi_traj_env = []
+    wt_counter = 0
+    for wt_candidate in wt_candidates:
+        mdp_parameters['weights'] = wt_candidate
+        if mdp_class == 'augmented_taxi':
+            mdp_candidate = make_mdp.make_custom_mdp('augmented_taxi', mdp_parameters)
+        elif mdp_class == 'two_goal':
+            mdp_candidate = make_mdp.make_custom_mdp('two_goal', mdp_parameters)
+        elif mdp_class == 'skateboard':
+            mdp_candidate = make_mdp.make_custom_mdp('skateboard', mdp_parameters)
+        elif mdp_class == 'cookie_crumb':
+            mdp_candidate = make_mdp.make_custom_mdp('cookie_crumb', mdp_parameters)
+        else:
+            raise Exception("Unknown MDP class.")
+
+        # parameters tailored to the 4x3 Augmented Taxi Domain
+        vi_candidate = ValueIteration(mdp_candidate, sample_rate=1, max_iterations=25)
+        iterations, value_of_init_state = vi_candidate.run_vi()
+        trajectory = mdp_helpers.rollout_policy(mdp_candidate, vi_candidate)
+        wt_vi_traj_env.append([wt_candidate, vi_candidate, trajectory, mdp_parameters.copy()])
+
+        wt_counter += 1
+
+    with open(mp_helpers.lookup_env_filename(data_loc, env_idx), 'wb') as f:
+        pickle.dump(wt_vi_traj_env, f)
+
+def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, save_type, pool, hardcode_envs=False):
     '''
     Summary: come up with an optimal policy for each of the candidates
     '''
@@ -127,116 +193,14 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, save
         else:
             raise Exception("Unknown MDP class.")
 
-    save_mark = 750
-    if save_type == 'ground_truth':
-        filename = 'models/' + data_loc + '/gt_wt_vi_traj_candidates.pickle'
-        backup_filename = 'models/' + data_loc + '/gt_wt_vi_traj_candidates_backup.pickle'
-    elif save_type == 'test':
-        filename = 'models/' + data_loc + '/test_wt_vi_traj_candidates.pickle'
-        backup_filename = 'models/' + data_loc + '/test_wt_vi_traj_candidates_backup.pickle'
-    else:
-        filename = 'models/' + data_loc + '/wt_vi_traj_candidates.pickle'
-        backup_filename = 'models/' + data_loc + '/wt_vi_traj_candidates_backup.pickle'
+    n_processed_envs = len(os.listdir('models/' + data_loc + '/gt_policies/'))
 
-    try:
-        with open(filename, 'rb') as f:
-            wt_vi_traj_candidates = pickle.load(f)
-
-        if len(wt_vi_traj_candidates) == len(mdp_codes) and len(wt_vi_traj_candidates[-1]) == len(wt_candidates):
-            # all environments and weights have been processed
-            n_processed_envs = len(mdp_codes)
-        else:
-            # a portion of the environments and weights have been processed
-            n_processed_envs = len(wt_vi_traj_candidates)
-    except:
-        wt_vi_traj_candidates = []
-        n_processed_envs = 0
-
-    # enumeration of all possible optimal policies from possible environments x weight candidates
-    # if there are environments and weights yet to be processed
-    if n_processed_envs < len(mdp_codes):
-        for env_idx in range(n_processed_envs, len(mdp_codes)):
-            mdp_code = mdp_codes[env_idx]
-
-            if mdp_class == 'augmented_taxi':
-                # note that this is specially accommodates the four hand-designed environments
-                if hardcode_envs:
-                    passengers, tolls, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
-                else:
-                    passengers, tolls, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code, mdp_parameters)
-                mdp_parameters['passengers'] = passengers
-                mdp_parameters['tolls'] = tolls
-                mdp_parameters['env_code'] = env_code
-            elif mdp_class == 'two_goal':
-                if hardcode_envs:
-                        walls, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
-                else:
-                    walls, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code, mdp_parameters)
-                mdp_parameters['walls'] = walls
-                mdp_parameters['env_code'] = env_code
-            elif mdp_class == 'skateboard':
-                if hardcode_envs:
-                        walls, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
-                else:
-                    walls, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code, mdp_parameters)
-                mdp_parameters['walls'] = walls
-                mdp_parameters['env_code'] = env_code
-            elif mdp_class == 'cookie_crumb':
-                if hardcode_envs:
-                        crumbs, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
-                else:
-                    crumbs, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code, mdp_parameters)
-                mdp_parameters['crumbs'] = crumbs
-                mdp_parameters['env_code'] = env_code
-            else:
-                raise Exception("Unknown MDP class.")
-
-            # a per-environment tuple of corresponding reward weight, optimal policy, and optimal trajectory
-            wt_vi_traj_env = []
-            wt_counter = 0
-            for wt_candidate in wt_candidates:
-                mdp_parameters['weights'] = wt_candidate
-                if mdp_class == 'augmented_taxi':
-                    mdp_candidate = make_mdp.make_custom_mdp('augmented_taxi', mdp_parameters)
-                elif mdp_class == 'two_goal':
-                    mdp_candidate = make_mdp.make_custom_mdp('two_goal', mdp_parameters)
-                elif mdp_class == 'skateboard':
-                    mdp_candidate = make_mdp.make_custom_mdp('skateboard', mdp_parameters)
-                elif mdp_class == 'cookie_crumb':
-                    mdp_candidate = make_mdp.make_custom_mdp('cookie_crumb', mdp_parameters)
-                else:
-                    raise Exception("Unknown MDP class.")
-
-                # parameters tailored to the 4x3 Augmented Taxi Domain
-                vi_candidate = ValueIteration(mdp_candidate, sample_rate=1, max_iterations=50)
-                iterations, value_of_init_state = vi_candidate.run_vi()
-                trajectory = mdp_helpers.rollout_policy(mdp_candidate, vi_candidate)
-                wt_vi_traj_env.append([wt_candidate, vi_candidate, trajectory, mdp_parameters.copy()])
-
-                wt_counter += 1
-                print('wt_counter: {}, iterations: {}, init_val: {}, wt_candidate: {}'.format(wt_counter, iterations,
-                                                                                       value_of_init_state,
-                                                                                       wt_candidate))
-            wt_vi_traj_candidates.append(wt_vi_traj_env)
-            n_processed_envs += 1
-            print('Finished analyzing environment {}'.format(n_processed_envs))
-
-            if n_processed_envs % save_mark == 0:
-                with open(filename, 'wb') as f:
-                    pickle.dump(wt_vi_traj_candidates, f)
-
-                # make a backup in case the overwriting in the code above fails
-                # shutil.copy2(filename, backup_filename)
-
-                print("Saved!")
-
-        with open(filename, 'wb') as f:
-            pickle.dump(wt_vi_traj_candidates, f)
-
-        # make a backup in case the overwriting in the code above fails
-        # shutil.copy2(filename, backup_filename)
-
-    return wt_vi_traj_candidates
+    print("Solving for the optimal policy in each environment:")
+    mp_helpers.attempt_pool_restart(pool)
+    args = [(i, mdp_codes[i], mdp_class, hardcode_envs, mdp_parameters, wt_candidates, data_loc) for i in range(n_processed_envs, len(mdp_codes))]
+    list(tqdm(pool.imap(solve_policy, args), total=len(args)))
+    pool.close()
+    pool.join()
 
 def _in_summary(mdp, summary, initial_state):
     '''

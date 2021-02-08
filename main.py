@@ -6,6 +6,7 @@ import dill as pickle
 import numpy as np
 import copy
 from termcolor import colored
+from pathos.multiprocessing import ProcessPool as Pool
 
 # Other imports.
 sys.path.append("simple_rl")
@@ -59,26 +60,20 @@ def obtain_BIRL_summary(mdp_class, data_loc, mdp_parameters, BIRL_params, step_c
 
     return bayesian_IRL_summary, wt_candidates, history_priors
 
-def obtain_BEC_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_type, summary_variant, n_train_demos, BEC_depth=1, visualize_summary=False):
+def obtain_BEC_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, n_train_demos, pool, visualize_summary=False):
     try:
         with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
             BEC_summary = pickle.load(f)
     except:
-        wt_vi_traj_candidates = ps_helpers.obtain_env_policies(mdp_class, data_loc, np.expand_dims(weights, axis=0),
-                                                               mdp_parameters, 'ground_truth')
+        ps_helpers.obtain_env_policies(mdp_class, data_loc, np.expand_dims(weights, axis=0),
+                                                               mdp_parameters, 'ground_truth', pool)
+
         try:
             with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
                 policy_constraints, min_subset_constraints_record, env_record, traj_record = pickle.load(f)
         except:
-            if summary_type == 'demo':
-                # a) use optimal trajectories from starting states to extract constraints
-                opt_trajs = []
-                for wt_vi_traj_candidate in wt_vi_traj_candidates:
-                    opt_trajs.append(wt_vi_traj_candidate[0][2])
-                policy_constraints, min_subset_constraints_record, env_record, traj_record = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_depth=BEC_depth, trajectories=opt_trajs, print_flag=True)
-            else:
-                # b) use full policy to extract constraints
-                policy_constraints, min_subset_constraints_record, env_record, traj_record = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, print_flag=True)
+            # use full policy to extract constraints
+            policy_constraints, min_subset_constraints_record, env_record, traj_record = BEC.extract_constraints(data_loc, step_cost_flag, pool, print_flag=True)
             with open('models/' + data_loc + '/base_constraints.pickle', 'wb') as f:
                 pickle.dump((policy_constraints, min_subset_constraints_record, env_record, traj_record), f)
 
@@ -96,7 +91,7 @@ def obtain_BEC_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_f
                 BEC_summary = pickle.load(f)
         except:
             # BEC_summary = BEC.obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=n_train_demos)
-            BEC_summary = BEC.obtain_summary_counterfactual(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=n_train_demos)
+            BEC_summary = BEC.obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_train_demos=n_train_demos)
             with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
                 pickle.dump(BEC_summary, f)
 
@@ -105,6 +100,7 @@ def obtain_BEC_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_f
 
     return BEC_summary
 
+# out of date
 def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_params, step_cost_flag, summary=None, visualize_test_env=False):
     '''
     Summary: Correlate the difficulty of a test environment with the generalized area of the BEC region obtain by the
@@ -128,7 +124,7 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
                 opt_trajs = []
                 for wt_vi_traj_candidate in wt_vi_traj_candidates:
                     opt_trajs.append(wt_vi_traj_candidate[0][2])
-                policy_constraints, min_subset_constraints_record, env_record, traj_record = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, BEC_depth=BEC_depth, trajectories=opt_trajs, print_flag=True)
+                policy_constraints, min_subset_constraints_record, env_record, traj_record = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, trajectories=opt_trajs, print_flag=True)
             else:
                 # b) use full policy to extract constraints
                 policy_constraints, min_subset_constraints_record, env_record, traj_record = BEC.extract_constraints(wt_vi_traj_candidates, weights, step_cost_flag, print_flag=True)
@@ -146,6 +142,8 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints
 
 if __name__ == "__main__":
+    pool = Pool(params.n_cpu)
+
     # a) generate an agent if you want to explore the Augmented Taxi MDP
     # generate_agent(params.mdp_class, params.data_loc['base'], params.mdp_parameters, visualize=True)
 
@@ -155,8 +153,8 @@ if __name__ == "__main__":
     #                                                                           visualize_history_priors=False, visualize_summary=True)
     # c) obtain a BEC summary of the agent's policy
     BEC_summary = obtain_BEC_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
-                                                  params.step_cost_flag, params.BEC['summary_type'], params.BEC['summary_variant'],
-                                                  params.BEC['n_train_demos'], BEC_depth=params.BEC['depth'], visualize_summary=True)
+                                                  params.step_cost_flag, params.BEC['summary_variant'],
+                                                  params.BEC['n_train_demos'], pool, visualize_summary=True)
     # d) obtain test environments
     # obtain_test_environments(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,
     #                          params.step_cost_flag, summary=BEC_summary, visualize_test_env=True)
