@@ -11,10 +11,3 @@ def list_env_filenames(data_loc):
     filenames = sorted(os.listdir(save_dir))
 
     return filenames
-
-def attempt_pool_restart(pool):
-    try:
-        pool.restart()
-    except:
-        pass
-

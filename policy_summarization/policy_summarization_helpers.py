@@ -173,7 +173,7 @@ def solve_policy(args):
     with open(mp_helpers.lookup_env_filename(data_loc, env_idx), 'wb') as f:
         pickle.dump(wt_vi_traj_env, f)
 
-def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, save_type, pool, hardcode_envs=False):
+def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, pool, hardcode_envs=False):
     '''
     Summary: come up with an optimal policy for each of the candidates
     '''
@@ -196,11 +196,12 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, save
     n_processed_envs = len(os.listdir('models/' + data_loc + '/gt_policies/'))
 
     print("Solving for the optimal policy in each environment:")
-    mp_helpers.attempt_pool_restart(pool)
+    pool.restart()
     args = [(i, mdp_codes[i], mdp_class, hardcode_envs, mdp_parameters, wt_candidates, data_loc) for i in range(n_processed_envs, len(mdp_codes))]
     list(tqdm(pool.imap(solve_policy, args), total=len(args)))
     pool.close()
     pool.join()
+    pool.terminate()
 
 def _in_summary(mdp, summary, initial_state):
     '''

@@ -128,7 +128,7 @@ def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_pairs=None, prin
     n_envs = len(os.listdir('models/' + data_loc + '/gt_policies/'))
 
     print("Extracting the BEC constraints in each environment:")
-    mp_helpers.attempt_pool_restart(pool)
+    pool.restart()
     if vi_traj_pairs is None:
         # a) policy-driven BEC: generate constraints by considering the expected feature counts after taking one
         # suboptimal action in every possible state in the state space, then acting optimally afterward. see eq 13, 14
@@ -137,6 +137,7 @@ def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_pairs=None, prin
         results = list(tqdm(pool.imap(extract_constraints_policy, args), total=len(args)))
         pool.close()
         pool.join()
+        pool.terminate()
 
         for result in results:
             min_subset_constraints_record.extend(result[0])
@@ -153,6 +154,7 @@ def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_pairs=None, prin
         results = list(tqdm(pool.imap(extract_constraints_demonstration, args), total=len(args)))
         pool.close()
         pool.join()
+        pool.terminate()
 
         for result in results:
             min_subset_constraints_record.extend(result[0])
@@ -246,9 +248,9 @@ def obtain_potential_summary_demos(BEC_lengths_record, n_demos, n_clusters=6, ty
     return covering_demos_idxs
 
 def compute_counterfactuals(args):
-    w_human_normalized, agent_filename, trajs_opt, min_BEC_constraints_running, feature_flag, step_cost_flag = args
+    data_loc, model_idx, env_idx, w_human_normalized, env_filename, trajs_opt, min_BEC_constraints_running, feature_flag, step_cost_flag = args
 
-    with open(agent_filename, 'rb') as f:
+    with open(env_filename, 'rb') as f:
         wt_vi_traj_env = pickle.load(f)
 
     agent = wt_vi_traj_env[0][1]
@@ -344,8 +346,10 @@ def compute_counterfactuals(args):
         constraints_env.append(constraints)
         info_gain_env.append(info_gain)
 
-    return best_human_trajs_record_env, constraints_env, info_gain_env
+    with open('models/' + data_loc + '/counterfactual_data/model' + str(model_idx) + 'cf_data_env' + str(env_idx).zfill(5) + '.pickle', 'wb') as f:
+        pickle.dump((best_human_trajs_record_env, constraints_env), f)
 
+    return info_gain_env
 
 
 def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool,
@@ -353,6 +357,25 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
 
     summary = []
     feature_flag = 0
+
+    # assuming that traj_record / env_record are sorted properly by env order, chunk via environment for faster multiprocessing
+    current_env = 0
+    chunked_traj_record = []
+    chunked_env_record = [0]
+    chunked_trajs = []
+    for idx, env in enumerate(env_record):
+        if env != current_env:
+            # record the old chunk
+            chunked_traj_record.append(chunked_trajs)
+
+            # start a new chunk
+            current_env = env
+            chunked_env_record.append(env)
+            chunked_trajs = [traj_record[idx]]
+        else:
+            # continue the chunk
+            chunked_trajs.append(traj_record[idx])
+    chunked_traj_record.append(chunked_trajs)
 
     # assume that the human starts off knowing which quadrant the agent's weight belongs to
     min_BEC_constraints_running = [np.array([[0, -1, 0]]), np.array([[1, 0, 0]])]
@@ -363,58 +386,34 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
         # use extreme vertices (vertices comprising the convex hull that have a extreme value in at least a single axis) as the human model
         extreme_human_models = BEC_helpers.obtain_extreme_vertices(min_BEC_constraints_running, weights, step_cost_flag)
 
-        constraints_record = []
         info_gains_record = []
-        human_counterfactual_trajs_record = []  # save the best trajectories of the human's model (given the benefit of the doubt)
 
         print("Length of summary: {}".format(len(summary)))
-
         for model_idx, human_model in enumerate(extreme_human_models):
             print(colored('Model #: {}'.format(model_idx), 'red'))
             print(colored('Model val: {}'.format(human_model), 'red'))
 
             w_human_normalized = human_model
-
-            constraints_model = []
-            human_counterfactual_trajs_model = []
             info_gains_model = []
 
-            mp_helpers.attempt_pool_restart(pool)
+            # based on the human's current model, obtain the information gain generated when comparing to the agent's
+            # optimal trajectories in each environment (human's corresponding optimal trajectories and constraints
+            # are saved for reference later)
+            print("Obtaining counterfactual information gains:")
 
-            # assuming that traj_record / env_record are sorted properly by env order, chunk via environment
-            current_env = 0
-            chunked_traj_record = []
-            chunked_env_record = [0]
-            chunked_trajs = []
-            for idx, env in enumerate(env_record):
-                if env != current_env:
-                    # record the old chunk
-                    chunked_traj_record.append(chunked_trajs)
+            cf_data_dir = 'models/' + data_loc + '/counterfactual_data/model' + str(model_idx)
+            os.makedirs(cf_data_dir, exist_ok=True)
 
-                    # start a new chunk
-                    current_env = env
-                    chunked_env_record.append(env)
-                    chunked_trajs = [traj_record[idx]]
-                else:
-                    # continue the chunk
-                    chunked_trajs.append(traj_record[idx])
-            chunked_traj_record.append(chunked_trajs)
-
-            # based on the human's current model, obtain the human's optimal trajectories and corresponding constraints
-            # and information gain generated when comparing to the agent's optimal trajectories in each environment
-            print("Obtaining human counterfactual trajectories and corresponding constraints and information gains:")
-            args = [(w_human_normalized, mp_helpers.lookup_env_filename(data_loc, chunked_env_record[i]), chunked_traj_record[i], min_BEC_constraints_running, feature_flag, step_cost_flag) for i in range(len(chunked_traj_record))]
-            results = list(tqdm(pool.imap(compute_counterfactuals, args), total=len(args)))
+            pool.restart()
+            args = [(data_loc, model_idx, i, w_human_normalized, mp_helpers.lookup_env_filename(data_loc, chunked_env_record[i]), chunked_traj_record[i], min_BEC_constraints_running, feature_flag, step_cost_flag) for i in range(len(chunked_traj_record))]
+            info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals, args), total=len(args)))
             pool.close()
             pool.join()
+            pool.terminate()
 
-            for result in results:
-                human_counterfactual_trajs_model.extend(result[0])
-                constraints_model.extend(result[1])
-                info_gains_model.extend(result[2])
+            for info_gain_env in info_gain_envs:
+                info_gains_model.append(info_gain_env)
 
-            human_counterfactual_trajs_record.append(human_counterfactual_trajs_model)
-            constraints_record.append(constraints_model)
             info_gains_record.append(info_gains_model)
 
         # no need to continue search for demonstrations if none of them will improve the human's understanding
@@ -433,120 +432,29 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
         # todo: let's just try returning the smallest information gain for now (so that we can have incremental demonstrations)
         #  there often isn't enough demonstrations to generate 6 clusters, as I initially tried to do below
         info_gains[info_gains <= 0] = np.float('inf')
-        select_model, best_idx = np.unravel_index(np.argmin(info_gains), info_gains.shape)
+        select_model, best_env_idx, best_traj_idx = np.unravel_index(np.argmin(info_gains), info_gains.shape)
         print(colored('Max infogain: {}'.format(np.max(info_gains)), 'blue'))
         print(colored('Max Min infogain: {}'.format(np.min(info_gains)), 'blue')) # smallest infogain above zero
 
-        constraints_select_model = constraints_record[select_model]
-        human_counterfactual_trajs_select_model = human_counterfactual_trajs_record[select_model]
-
-        # kmeans = KMeans(n_clusters=n_clusters).fit(np.array(info_gains).reshape(-1, 1))
-        # cluster_centers = kmeans.cluster_centers_
-        # labels = kmeans.labels_
-        #
-        # ordering = np.arange(0, n_clusters)
-        # sorted_zipped = sorted(zip(cluster_centers, ordering))
-        # cluster_centers_sorted, ordering_sorted = list(zip(*sorted_zipped))
-        #
-        # partition_idx = ordering_sorted[cluster_idxs[len(summary)]]
-        # covering_demo_idxs = [i for i, x in enumerate(labels) if x == partition_idx]
-        # best_idx = random.sample(covering_demo_idxs, 1)[0]
-
-        best_env_idx = env_record[best_idx]
-        # record information associated with the best selected summary demo
-        best_traj = traj_record[best_idx]
-        best_human_trajs = human_counterfactual_trajs_select_model[best_idx]
+        best_traj = chunked_traj_record[best_env_idx][best_traj_idx]
+        with open('models/' + data_loc + '/counterfactual_data/model' + str(select_model) + 'cf_data_env' + str(
+                best_env_idx).zfill(5) + '.pickle', 'rb') as f:
+            best_human_trajs_record_env, constraints_env = pickle.load(f)
+        best_human_trajs = best_human_trajs_record_env[best_traj_idx]
 
         filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
         with open(filename, 'rb') as f:
             wt_vi_traj_env = pickle.load(f)
         best_mdp = wt_vi_traj_env[0][1].mdp
-        min_BEC_constraints_running.extend(constraints_select_model[best_idx])
+        best_mdp.set_init_state(best_traj[0][0]) # for completeness
+        min_BEC_constraints_running.extend(constraints_env[best_traj_idx])
         min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)[0]
-        summary.append([best_mdp, best_traj, constraints_select_model[best_idx], best_human_trajs])
 
-        # todo: now that demonstration are selected via information gain, selected demonstrations likely don't need to
-        #  explicitly deleted. previously selected demos won't be selected again if they don't add any new information,
-        #  or they may be able to provide the necessary information again if the human's model has strayed
-        del traj_record[best_idx]
-        del env_record[best_idx]
+        summary.append([best_mdp, best_traj, constraints_env[best_traj_idx], best_human_trajs])
 
         # this method doesn't always finish, so save the summary along the way
         with open('models/augmented_taxi/BEC_summary.pickle', 'wb') as f:
             pickle.dump(summary, f)
-
-    # # manual exploration of two sets of demonstrations that have equal BEC lengths but appear to differ in informativeness
-    # # for idx in [1367, 1368, 8824, 8835]:
-    # for idx in [110, 1210]:
-    #     print(idx)
-    #     traj_opt = traj_record[idx]
-    #     agent = wt_vi_traj_candidates[env_record[idx]][0][1]
-    #     mdp = agent.mdp
-    #
-    #     # if desired, also visualize the BEC constraints of the agent's optimal demonstration
-    #     visualize_constraints(min_subset_constraints_record[idx], weights, step_cost_flag, scale=abs(1 / weights[0, -1]),
-    #                           fig_name=str(idx) + '_BEC_raw.png')
-    #
-    #     # solve for the human's optimal trajectory
-    #     mdp_human = copy.deepcopy(mdp)
-    #     mdp_human.set_init_state(traj_opt[0][0])
-    #     w_human = np.array([[26, 0, -1]])
-    #     mdp_human.weights = w_human / np.linalg.norm(w_human[0, :], ord=1)
-    #     vi_human = ValueIteration(mdp_human, sample_rate=1, max_iterations=25)
-    #     vi_human.run_vi()
-    #
-    #     constraints = []
-    #
-    #     # # a) accumulate the reward features and generate a single constraint
-    #     # # reward features of optimal action
-    #     # mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
-    #     # traj_hyp = mdp_helpers.rollout_policy(mdp_human, vi_human)
-    #     # mu_sb = mdp_human.accumulate_reward_features(traj_hyp, discount=True)
-    #     # constraints.append(mu_sa - mu_sb)
-    #
-    #     # b) contrast differing expected feature counts for each state-action pair along the agent's optimal trajectory
-    #     for sas_idx in range(len(traj_opt)):
-    #         # reward features of optimal action
-    #         mu_sa = mdp.accumulate_reward_features(traj_opt[sas_idx:], discount=True)
-    #
-    #         sas = traj_opt[sas_idx]
-    #         cur_state = sas[0]
-    #
-    #         # currently assumes that all actions are executable from all states
-    #         traj_hyp = mdp_helpers.rollout_policy(mdp_human, vi_human, cur_state)
-    #         mu_sb = mdp_human.accumulate_reward_features(traj_hyp, discount=True)
-    #
-    #         constraints.append(mu_sa - mu_sb)
-    #
-    #         # mdp_human.visualize_trajectory(traj_hyp)
-    #
-    #     # # c) contrast differing expected feature counts for each state-action pair along the human's optimal trajectory
-    #     # cur_state = traj_opt[0][0]
-    #     # traj_human = mdp_helpers.rollout_policy(mdp_human, vi_human, cur_state)
-    #     # for sas_idx in range(len(traj_human)):
-    #     #     # reward features of optimal action
-    #     #     mu_sb = mdp.accumulate_reward_features(traj_human[sas_idx:], discount=True)
-    #     #
-    #     #     sas = traj_human[sas_idx]
-    #     #     cur_state = sas[0]
-    #     #
-    #     #     # currently assumes that all actions are executable from all states
-    #     #     traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=cur_state)
-    #     #     mu_sa = mdp_human.accumulate_reward_features(traj_opt, discount=True)
-    #     #
-    #     #     constraints.append(mu_sa - mu_sb)
-    #
-    #     try:
-    #         constraints = BEC_helpers.clean_up_constraints(constraints, weights, step_cost_flag)
-    #         visualize_constraints(constraints, weights, step_cost_flag, scale=abs(1 / weights[0, -1]), fig_name=str(idx) + '.png')
-    #         print(BEC_helpers.calculate_BEC_length(constraints, weights, step_cost_flag)[0])
-    #     except:
-    #         print("No valid constraints")
-    #
-    #     print(constraints)
-    #     # if desired, visualize the agent's and human's optimal trajectories
-    #     mdp.visualize_trajectory(traj_opt)
-    #     # mdp_human.visualize_trajectory(traj_hyp)
 
     return summary
 
@@ -838,9 +746,9 @@ def visualize_constraints(constraints, weights, step_cost_flag, plot_lim=[(-1, 1
     plt.tight_layout()
     if fig_name is not None:
         plt.savefig(fig_name, dpi=200, transparent=True)
-        plt.clf()
     if not just_save:
         plt.show()
+    plt.clf()
 
 
 def visualize_summary(BEC_summaries_collection, weights, step_cost_flag):

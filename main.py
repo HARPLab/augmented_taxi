@@ -37,6 +37,7 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
         mdp_agent.reset()  # reset the current state to the initial state
         mdp_agent.visualize_interaction()
 
+# out of date
 def obtain_BIRL_summary(mdp_class, data_loc, mdp_parameters, BIRL_params, step_cost_flag, visualize_history_priors=False, visualize_summary=False):
     try:
         with open('models/' + data_loc + '/BIRL_summary_{}.pickle'.format(BIRL_params['eval_fn']), 'rb') as f:
@@ -65,8 +66,7 @@ def obtain_BEC_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_f
         with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
             BEC_summary = pickle.load(f)
     except:
-        ps_helpers.obtain_env_policies(mdp_class, data_loc, np.expand_dims(weights, axis=0),
-                                                               mdp_parameters, 'ground_truth', pool)
+        ps_helpers.obtain_env_policies(mdp_class, data_loc, np.expand_dims(weights, axis=0), mdp_parameters, pool)
 
         try:
             with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
@@ -113,7 +113,7 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
             test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = pickle.load(f)
 
     except:
-        wt_vi_traj_candidates = ps_helpers.obtain_env_policies(mdp_class, data_loc, np.expand_dims(weights, axis=0), mdp_parameters, 'ground_truth')
+        wt_vi_traj_candidates = ps_helpers.obtain_env_policies(mdp_class, data_loc, np.expand_dims(weights, axis=0), mdp_parameters)
 
         try:
             with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
