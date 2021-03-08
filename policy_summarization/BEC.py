@@ -110,7 +110,7 @@ def extract_constraints_demonstration(args):
     return min_subset_constraints_record, traj_record, env_record, policy_constraints
 
 
-def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_pairs=None, print_flag=False):
+def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=None, print_flag=False):
     '''
     :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
     :param weights (numpy array): Ground truth reward weights used by agent to derive its optimal policy
@@ -129,7 +129,7 @@ def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_pairs=None, prin
 
     print("Extracting the BEC constraints in each environment:")
     pool.restart()
-    if vi_traj_pairs is None:
+    if vi_traj_triplets is None:
         # a) policy-driven BEC: generate constraints by considering the expected feature counts after taking one
         # suboptimal action in every possible state in the state space, then acting optimally afterward. see eq 13, 14
         # of Brown et al. 'Machine Teaching for Inverse Reinforcement Learning: Algorithms and Applications' 2019
@@ -148,9 +148,9 @@ def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_pairs=None, prin
         # b) demonstration-driven BEC: generate constraints by considering the expected feature counts after taking one
         # suboptimal action in every state along a trajectory (demonstration), then acting optimally afterward.
         # see eq 16 of Brown et al. 'Machine Teaching for Inverse Reinforcement Learning: Algorithms and Applications' 2019
-        # need to specify the environment, environment idx, and corresponding optimal trajectories (second, first, and
-        # third elements of vi_traj_pair, respectively) that you want to extract constraints from
-        args = [(vi_traj_pair[0], vi_traj_pair[1], vi_traj_pair[2], step_cost_flag) for vi_traj_pair in enumerate(vi_traj_pairs)]
+        # need to specify the environment idx, environment, and corresponding optimal trajectories (first, second, and
+        # third elements of vi_traj_triplet, respectively) that you want to extract constraints from
+        args = [(vi_traj_triplet[0], vi_traj_triplet[1], vi_traj_triplet[2], step_cost_flag) for vi_traj_triplet in vi_traj_triplets]
         results = list(tqdm(pool.imap(extract_constraints_demonstration, args), total=len(args)))
         pool.close()
         pool.join()
@@ -346,7 +346,7 @@ def compute_counterfactuals(args):
         constraints_env.append(constraints)
         info_gain_env.append(info_gain)
 
-    with open('models/' + data_loc + '/counterfactual_data/model' + str(model_idx) + 'cf_data_env' + str(env_idx).zfill(5) + '.pickle', 'wb') as f:
+    with open('models/' + data_loc + '/counterfactual_data/model' + str(model_idx) + '/cf_data_env' + str(env_idx).zfill(5) + '.pickle', 'wb') as f:
         pickle.dump((best_human_trajs_record_env, constraints_env), f)
 
     return info_gain_env
@@ -437,7 +437,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
         print(colored('Max Min infogain: {}'.format(np.min(info_gains)), 'blue')) # smallest infogain above zero
 
         best_traj = chunked_traj_record[best_env_idx][best_traj_idx]
-        with open('models/' + data_loc + '/counterfactual_data/model' + str(select_model) + 'cf_data_env' + str(
+        with open('models/' + data_loc + '/counterfactual_data/model' + str(select_model) + '/cf_data_env' + str(
                 best_env_idx).zfill(5) + '.pickle', 'rb') as f:
             best_human_trajs_record_env, constraints_env = pickle.load(f)
         best_human_trajs = best_human_trajs_record_env[best_traj_idx]
