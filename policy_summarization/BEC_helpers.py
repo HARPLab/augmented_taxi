@@ -148,6 +148,34 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
 
     return nonredundant_constraints, redundant_constraints
 
+def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_record):
+    '''
+    Summary: For each constraint in min_subset_constraints_record, see if it matches one of the BEC_constraints
+    '''
+    BEC_constraint_bookkeeping = []
+
+    # keep track of which demo conveys which of the BEC constraints
+    for constraints in min_subset_constraints_record:
+        covers = []
+        for BEC_constraint_idx in range(len(BEC_constraints)):
+            contains_BEC_constraint = False
+            for constraint in constraints:
+                if equal_constraints(constraint, BEC_constraints[BEC_constraint_idx]):
+                    contains_BEC_constraint = True
+            if contains_BEC_constraint:
+                covers.append(1)
+            else:
+                covers.append(0)
+
+        BEC_constraint_bookkeeping.append(covers)
+
+    BEC_constraint_bookkeeping = np.array(BEC_constraint_bookkeeping)
+
+    return BEC_constraint_bookkeeping
+
+'''
+reward weight in 2D with known step cost
+'''
 def constraints_to_halfspace_matrix(constraints, weights, step_cost_flag):
     '''
     Summary: convert the half space representation of a convex polygon (Ax < b) into the corresponding polytope vertices
@@ -296,27 +324,83 @@ def obtain_extreme_vertices(constraints, weights, step_cost_flag):
 
     return unique_extreme_vertices
 
-def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_record):
+'''
+reward weight in 3D with known step cost
+'''
+def constraints_to_halfspace_matrix_sage(constraints):
     '''
-    Summary: For each constraint in min_subset_constraints_record, see if it matches one of the BEC_constraints
+    Summary: convert the half space representation of a convex polygon (Ax < b) into the corresponding polytope vertices
+
+    [-1,7,3,4] represents the inequality 7x_1 + 3x_2 + 4x_3 >= 1
     '''
-    BEC_constraint_bookkeeping = []
+    n_boundary_constraints = 6
+    ieqs = np.zeros((len(constraints) + n_boundary_constraints, len(constraints[0][0]) + 1))
 
-    # keep track of which demo conveys which of the BEC constraints
-    for constraints in min_subset_constraints_record:
-        covers = []
-        for BEC_constraint_idx in range(len(BEC_constraints)):
-            contains_BEC_constraint = False
-            for constraint in constraints:
-                if equal_constraints(constraint, BEC_constraints[BEC_constraint_idx]):
-                    contains_BEC_constraint = True
-            if contains_BEC_constraint:
-                covers.append(1)
-            else:
-                covers.append(0)
+    for j in range(len(constraints)):
+        ieqs[j, 0] = 0
+        ieqs[j, 1:] = np.array([constraints[j][0][0], constraints[j][0][1], constraints[j][0][2]])
 
-        BEC_constraint_bookkeeping.append(covers)
+    # constrain the area of interest to a unit cube
+    ieqs[len(constraints), :] = np.array([1, 1, 0, 0])
+    ieqs[len(constraints) + 1, :] = np.array([1, -1, 0, 0])
+    ieqs[len(constraints) + 2, :] = np.array([1, 0, 1, 0])
+    ieqs[len(constraints) + 3, :] = np.array([1, 0, -1, 0])
+    ieqs[len(constraints) + 4, :] = np.array([1, 0, 0, 1])
+    ieqs[len(constraints) + 5, :] = np.array([1, 0, 0, -1])
 
-    BEC_constraint_bookkeeping = np.array(BEC_constraint_bookkeeping)
+    return ieqs
 
-    return BEC_constraint_bookkeeping
+def calc_dihedral_supp(plane1, plane2):
+    '''
+    Calculate the supplement to the dihedral angle between two planes
+    Plane equation: Ax + By + Cz + D = 0
+
+    :param plane1: [D, A, B, C]
+    :param plane2: [D, A, B, C]
+    :return: supplement
+    '''
+    angle = np.arccos((plane1[1] * plane2[1] + plane1[2] * plane2[2] + plane1[3] * plane2[3]) /
+              (np.sqrt(plane1[1] ** 2 + plane1[2] ** 2 + plane1[3] ** 2) * np.sqrt(
+                  plane2[1] ** 2 + plane2[2] ** 2 + plane2[3] ** 2)))
+
+    # take the supplement of the dihedral angle
+    supplement = np.pi - angle
+
+    return supplement
+
+def calc_solid_angle(poly):
+    '''
+    Use the spherical excess formula to calculate the area of the spherical polygon
+    '''
+    hrep = np.array(poly.Hrepresentation())
+
+    facet_adj_triu = np.triu(poly.facet_adjacency_matrix())  # upper triangular matrix of fact adjacencies
+    boundary_facet_idxs = np.where(hrep[:, 0] != 0)[0]       # boundary facets have a non-zero offset (D in plane eq)
+
+    dihedral_angles = []
+    for curr_facet_idx in range(facet_adj_triu.shape[0]):
+        adj_facet_idxs = np.where(facet_adj_triu[curr_facet_idx, :] > 0)[0]
+        for adj_facet_idx in adj_facet_idxs:
+            # no need to consider the dihedral angles between a bounding facet
+            if adj_facet_idx not in boundary_facet_idxs:
+                # calculate the dihedral angle
+                dihedral_angles.append(calc_dihedral_supp(hrep[curr_facet_idx, :], hrep[adj_facet_idx, :]))
+
+    # spherical excess formular
+    return sum(dihedral_angles) - (len(dihedral_angles) - 2) * np.pi
+
+def lies_on_constraint_plane(poly, point):
+    '''
+    See if this point lies on one of the constraint planes comprising the polyhedron
+    '''
+    hrep = np.array(poly.Hrepresentation())
+    boundary_facet_idxs = np.where(hrep[:, 0] != 0)[0]
+
+    for constraint_idx, constraint in enumerate(hrep):
+        if constraint_idx not in boundary_facet_idxs:
+            # constraint should go through the origin, so compare to 0
+            if np.isclose(point[0] * constraint[1] + point[1] * constraint[2] + point[2] * constraint[3], 0):
+                return True
+
+    return False
+

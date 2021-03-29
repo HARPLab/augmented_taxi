@@ -7,9 +7,10 @@ mdp_class = 'augmented_taxi'
 # mdp_class = 'taxi'
 # mdp_class = 'cookie_crumb'
 
+w_norm_order = 2
 if mdp_class == 'augmented_taxi':
     w = np.array([[26, -3, -1]])
-    w_normalized = w / np.linalg.norm(w[0, :], ord=1)
+    w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order)
 
     mdp_parameters = {
         'agent': {'x': 4, 'y': 1, 'has_passenger': 0},
@@ -31,7 +32,7 @@ if mdp_class == 'augmented_taxi':
     }
 elif mdp_class == 'two_goal':
     w = np.array([[7.25, 10.5, -1]])
-    w_normalized = w / np.linalg.norm(w[0, :], ord=1)
+    w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order)
 
     mdp_parameters = {
         'agent': {'x': 3, 'y': 5},
@@ -49,7 +50,7 @@ elif mdp_class == 'two_goal':
     }
 elif mdp_class == 'skateboard':
     w = np.array([[9, -0.3, -1]])
-    w_normalized = w / np.linalg.norm(w[0, :], ord=1),
+    w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order),
 
     mdp_parameters = {
         'agent': {'x': 4, 'y': 4, 'has_skateboard': 0},
@@ -67,7 +68,7 @@ elif mdp_class == 'skateboard':
     }
 elif mdp_class == 'cookie_crumb':
     w = np.array([[2.5, 1.7, -1]])
-    w_normalized = w / np.linalg.norm(w[0, :], ord=1),
+    w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order),
 
     mdp_parameters = {
         'agent': {'x': 4, 'y': 1},
@@ -88,7 +89,7 @@ elif mdp_class == 'cookie_crumb':
 elif mdp_class == 'taxi':
     # drop off reward, none, step cost
     w = np.array([[15, 0, -1]])
-    w_normalized = w / np.linalg.norm(w[0, :], ord=1)
+    w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order)
 
     mdp_parameters = {
         'agent': {'x': 4, 'y': 1, 'has_passenger': 0},
@@ -113,7 +114,7 @@ keys_map = ['K_UP', 'K_DOWN', 'K_LEFT', 'K_RIGHT', 'K_p', 'K_d', 'K_7', 'K_8', '
 weights = {
     'lb': np.array([-1., -1., -0.03125]),
     'ub': np.array([1., 1., -0.03125]),
-    'val': w / np.linalg.norm(w[0, :], ord=1)
+    'val': w / np.linalg.norm(w[0, :], ord=w_norm_order)
 }
 
 weights_human = {

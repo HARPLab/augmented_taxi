@@ -7,6 +7,11 @@ import numpy as np
 import copy
 from termcolor import colored
 from pathos.multiprocessing import ProcessPool as Pool
+import sage.all
+import sage.geometry.polyhedron.base as Polyhedron
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
 
 # Other imports.
 sys.path.append("simple_rl")
@@ -17,6 +22,11 @@ from simple_rl.utils import make_mdp
 from policy_summarization import bayesian_IRL
 from policy_summarization import policy_summarization_helpers as ps_helpers
 from policy_summarization import BEC
+import policy_summarization.multiprocessing_helpers as mp_helpers
+from simple_rl.utils import mdp_helpers
+import policy_summarization.BEC_helpers as BEC_helpers
+import policy_summarization.BEC_visualization as BEC_viz
+
 
 def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
     try:
@@ -36,6 +46,82 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
         mdp_agent.visualize_agent(fixed_agent)
         mdp_agent.reset()  # reset the current state to the initial state
         mdp_agent.visualize_interaction()
+
+def explore_BEC_solid_angle(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, pool):
+    ps_helpers.obtain_env_policies(mdp_class, data_loc, np.expand_dims(weights, axis=0), mdp_parameters, pool, hardcode_envs=True)
+
+    vi_traj_triplets = []
+    for i in range(4):
+        env_filename = mp_helpers.lookup_env_filename(data_loc, i)
+
+        with open(env_filename, 'rb') as f:
+            wt_vi_traj_env = pickle.load(f)
+
+        mdp = wt_vi_traj_env[0][1].mdp
+        agent = wt_vi_traj_env[0][1]
+        weights = mdp.weights
+        trajectory = mdp_helpers.rollout_policy(mdp, agent)
+
+        vi_traj_triplets.append((i, agent, trajectory))
+
+    try:
+        with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
+            policy_constraints, min_subset_constraints_record, env_record, traj_record = pickle.load(f)
+    except:
+        # use demo BEC to extract constraints
+        policy_constraints, min_subset_constraints_record, env_record, traj_record = BEC.extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=vi_traj_triplets, print_flag=True)
+        with open('models/' + data_loc + '/base_constraints.pickle', 'wb') as f:
+            pickle.dump((policy_constraints, min_subset_constraints_record, env_record, traj_record), f)
+
+    try:
+        with open('models/' + data_loc + '/BEC_constraints.pickle', 'rb') as f:
+            min_BEC_constraints, BEC_lengths_record = pickle.load(f)
+    except:
+        min_BEC_constraints, BEC_lengths_record = BEC.extract_BEC_constraints(policy_constraints, min_subset_constraints_record, weights, step_cost_flag)
+
+        with open('models/' + data_loc + '/BEC_constraints.pickle', 'wb') as f:
+            pickle.dump((min_BEC_constraints, BEC_lengths_record), f)
+
+    # for j, triplet in enumerate(vi_traj_triplets):
+    #     triplet[1].mdp.visualize_trajectory(triplet[2])
+    #     BEC.visualize_constraints(min_subset_constraints_record[j], weights, step_cost_flag)
+
+    # for constraints in min_subset_constraints_record:
+    #     BEC_viz.visualize_planes(constraints)
+
+    constraints_record = [item for sublist in min_subset_constraints_record for item in sublist]
+
+    for constraints_record in min_subset_constraints_record:
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+
+        ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints_record)
+
+        poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
+
+        solid_angle = BEC_helpers.calc_solid_angle(poly)
+        print(solid_angle)
+
+        # visualize the BEC constraint planes
+        hrep = np.array(poly.Hrepresentation())
+        boundary_facet_idxs = np.where(hrep[:, 0] != 0)
+        # first remove boundary constraint planes (those with a non-zero offset)
+        min_constraints = np.delete(hrep, boundary_facet_idxs, axis=0)
+        min_constraints = min_constraints[:, 1:]
+        min_constraints = [constraint.reshape(1, -1) for constraint in min_constraints]
+
+        for constraints in [min_constraints]:
+            BEC_viz.visualize_planes(constraints, fig, ax)
+
+        # visualize spherical polygon
+        BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax)
+
+        ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100)
+
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        plt.show()
 
 def obtain_BEC_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, n_train_demos, pool, visualize_summary=False):
     try:
@@ -124,9 +210,11 @@ if __name__ == "__main__":
     # generate_agent(params.mdp_class, params.data_loc['base'], params.mdp_parameters, visualize=True)
 
     # b) obtain a BEC summary of the agent's policy
-    BEC_summary = obtain_BEC_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
-                                                  params.step_cost_flag, params.BEC['summary_variant'],
-                                                  params.BEC['n_train_demos'], pool, visualize_summary=True)
+    # BEC_summary = obtain_BEC_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
+    #                                               params.step_cost_flag, params.BEC['summary_variant'],
+    #                                               params.BEC['n_train_demos'], pool, visualize_summary=True)
     # c) obtain test environments
     # obtain_test_environments(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,
     #                          params.step_cost_flag, summary=BEC_summary, visualize_test_env=True)
+
+    explore_BEC_solid_angle(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.step_cost_flag, pool)
