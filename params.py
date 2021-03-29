@@ -122,7 +122,7 @@ weights_human = {
     'val': np.array([[0.875, -0.5, -0.03125]])
 }
 
-
+# todo: maybe update so that step_cost_flag == False corresponds to working in 2D Euclidean space with a known step cost
 step_cost_flag = True    # indicates that the last weight element is a known step cost. code currently assumes a 2D
                          # weight vector if step_cost_flag = False, and a 3D weight vector if step_cost_flag = True
 
@@ -140,36 +140,9 @@ BEC = {
     'test_difficulty': 'medium'                 # expected ease for human to correctly predict the agent's actions in this test environment (low, medium, high)
 }
 
-# BIRL parameters
-n_wt = 1                                      # total number of weight candidates (including the ground truth)
-                                              # tip: select n_wt to such that n_wt_partitions is an int to ensure that the exact
-                                              # number of desired weight candidates is actually incorporated. see ps_helpers.discretize_wt_candidates()
-                                              # also note that n_wt = n_wt_partitions ** (# of weights you're discretizing over) + 1
-iter_idx = None                               # weight dimension to discretize over. If None, discretize uniformly over all dimensions
-
-
-if iter_idx == None:
-    data_loc_BIRL = str(n_wt) + '_wt_' + 'uniform'
-    if step_cost_flag:
-        n_wt_partitions = int((n_wt - 1) ** (1.0 / (weights['val'].shape[1] - 1)))
-    else:
-        n_wt_partitions = int((n_wt - 1) ** (1.0 / weights['val'].shape[1]))
-else:
-    data_loc_BIRL = str(n_wt) + '_wt_' + 'iter_idx_' + str(iter_idx)
-    n_wt_partitions = n_wt - 1
-
-BIRL = {
-    'n_wt': n_wt,
-    'iter_idx': iter_idx,
-    'eval_fn': 'approx_MP',             # desired likelihood function for computing the posterior probability of weight candidates
-    'n_demonstrations': 10,             # total number of demonstrations sought, in order of decreasing effectiveness
-    'n_wt_partitions': n_wt_partitions
-}
-
 data_loc = {
     'base': 'base',
     'BEC': mdp_class,
-    'BIRL': mdp_class + '/' + data_loc_BIRL
 }
 
 n_cpu = os.cpu_count()

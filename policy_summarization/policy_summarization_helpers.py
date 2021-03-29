@@ -265,6 +265,9 @@ def obtain_test_environments(wt_vi_traj_candidates, min_subset_constraints_recor
     # go through the BEC constraints of each possible optimal demo in each environment and store the corresponding
     # BEC lengths
     for j, constraints in enumerate(min_subset_constraints_record):
+        # todo: this may be redundant since the BEC lengths are already calculated for generating the summary
+        if j % 1000 == 0:
+            print('{}/{} of constraints checked to see if they\'re in the summary'.format(j, len(min_subset_constraints_record)))
         if not _in_summary(wt_vi_traj_candidates[env_record[j]][0][1].mdp, summary, traj_record[j][0][0]):
             BEC_length = BEC_helpers.calculate_BEC_length(constraints, weights, step_cost_flag)[0]
             BEC_lengths.append(BEC_length)

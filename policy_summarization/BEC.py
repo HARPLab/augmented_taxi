@@ -518,7 +518,10 @@ def obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, 
         visual_dissimilarities = np.zeros(len(filtered_combo))
         complexities = np.zeros(len(filtered_combo))
         BEC_lengths = np.zeros(len(filtered_combo))  # an average of BEC lengths of constituent demos of a summary
+        # visualize_constraints(min_BEC_constraints, weights, step_cost_flag)
         for j, combo in enumerate(filtered_combo):
+            if j % 1000 == 0:
+                print("{}/{}".format(j, len(filtered_combo)))
             visual_dissimilarity = 0
             if len(combo) >= 2:
                 # compare every possible pairing of this set of demos
@@ -567,6 +570,7 @@ def obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, 
             zip(*sorted_zipped))
 
         best_idxs = filtered_combo_sorted[0]
+        print(best_idxs)
 
         for best_idx in best_idxs:
             best_env_idx = env_record[best_idx]
@@ -755,7 +759,8 @@ def visualize_summary(BEC_summaries_collection, weights, step_cost_flag):
     '''
     Summary: visualize the BEC demonstrations
     '''
-    min_BEC_constraints_running = []
+    # min_BEC_constraints_running = []
+    min_BEC_constraints_running = [np.array([[0, -1, 0]]), np.array([[1, 0, 0]])] # assuming that the human knows the correct quadrant as a prior
     for summary_idx, BEC_summary in enumerate(BEC_summaries_collection):
         print("Showing demo {} out of {}".format(summary_idx + 1, len(BEC_summaries_collection)))
         # print('BEC_length: {}'.format(BEC_helpers.calculate_BEC_length(BEC_summary[2], weights, step_cost_flag)[0]))

@@ -17,9 +17,11 @@ docs/sphinx/
 examples/experiments_to_reproduce/*
 models/*
 scratch.py
+scratch2.py
 images/
 histograms/
 dfs.pickle
 dfs_processed.pickle
 *#
 *.png
+sandbox.py

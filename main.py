@@ -37,30 +37,6 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
         mdp_agent.reset()  # reset the current state to the initial state
         mdp_agent.visualize_interaction()
 
-# out of date
-def obtain_BIRL_summary(mdp_class, data_loc, mdp_parameters, BIRL_params, step_cost_flag, visualize_history_priors=False, visualize_summary=False):
-    try:
-        with open('models/' + data_loc + '/BIRL_summary_{}.pickle'.format(BIRL_params['eval_fn']), 'rb') as f:
-            bayesian_IRL_summary, wt_candidates, history_priors = pickle.load(f)
-    except:
-        wt_candidates = ps_helpers.discretize_wt_candidates(data_loc, mdp_parameters['weights'], mdp_parameters['weights_lb'], mdp_parameters['weights_ub'],
-                                                            step_cost_flag,
-                                                            n_wt_partitions=BIRL_params['n_wt_partitions'],
-                                                            iter_idx=BIRL_params['iter_idx'])
-        wt_vi_traj_candidates = ps_helpers.obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, 'BIRL')
-
-        bayesian_IRL_summary, wt_candidates, history_priors = bayesian_IRL.obtain_summary(
-            BIRL_params['n_demonstrations'], mdp_parameters['weights'], wt_candidates, wt_vi_traj_candidates,
-            BIRL_params['eval_fn'])
-
-        with open('models/' + data_loc + '/BIRL_summary_{}.pickle'.format(BIRL_params['eval_fn']), 'wb') as f:
-            pickle.dump((bayesian_IRL_summary, wt_candidates, history_priors), f)
-
-    if visualize_history_priors or visualize_summary:
-        bayesian_IRL.visualize_summary(bayesian_IRL_summary, wt_candidates, history_priors, visualize_summary=visualize_summary, visualize_history_priors=visualize_history_priors)
-
-    return bayesian_IRL_summary, wt_candidates, history_priors
-
 def obtain_BEC_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, n_train_demos, pool, visualize_summary=False):
     try:
         with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
@@ -147,14 +123,10 @@ if __name__ == "__main__":
     # a) generate an agent if you want to explore the Augmented Taxi MDP
     # generate_agent(params.mdp_class, params.data_loc['base'], params.mdp_parameters, visualize=True)
 
-    # b) obtain a Bayesian IRL summary of the agent's policy
-    # bayesian_IRL_summary, wt_candidates, history_priors = obtain_BIRL_summary(params.mdp_class, params.data_loc['BIRL'], params.mdp_parameters,
-    #                                                                           params.BIRL, params.step_cost_flag,
-    #                                                                           visualize_history_priors=False, visualize_summary=True)
-    # c) obtain a BEC summary of the agent's policy
+    # b) obtain a BEC summary of the agent's policy
     BEC_summary = obtain_BEC_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
                                                   params.step_cost_flag, params.BEC['summary_variant'],
                                                   params.BEC['n_train_demos'], pool, visualize_summary=True)
-    # d) obtain test environments
+    # c) obtain test environments
     # obtain_test_environments(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,
     #                          params.step_cost_flag, summary=BEC_summary, visualize_test_env=True)
