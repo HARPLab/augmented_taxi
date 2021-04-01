@@ -123,9 +123,9 @@ weights_human = {
     'val': np.array([[0.875, -0.5, -0.03125]])
 }
 
-# todo: maybe update so that step_cost_flag == False corresponds to working in 2D Euclidean space with a known step cost
-step_cost_flag = True    # indicates that the last weight element is a known step cost. code currently assumes a 2D
-                         # weight vector if step_cost_flag = False, and a 3D weight vector if step_cost_flag = True
+# If true, code assumes that the last weight of a 1x3 weight vector is a known step cost and works in 2D Euclidean space
+# If false, code assumes 1x3 weight vector (no weights are known) and works on the 2-sphere (in 3D)
+step_cost_flag = False
 
 
 # BEC parameters

@@ -14,6 +14,8 @@ import time
 from tqdm import tqdm
 import os
 import policy_summarization.multiprocessing_helpers as mp_helpers
+import sage.all
+import sage.geometry.polyhedron.base as Polyhedron
 
 def extract_constraints_policy(args):
     env_idx, data_loc, step_cost_flag = args
@@ -166,7 +168,7 @@ def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=None, p
 
 def extract_BEC_constraints(policy_constraints, min_subset_constraints_record, weights, step_cost_flag):
     '''
-    Summary: Obtain the minimum BEC constraints across all environments
+    Summary: Obtain the minimum BEC constraints across all environments / demonstrations
     '''
     constraints_record = [item for sublist in policy_constraints for item in sublist]
 
@@ -176,8 +178,16 @@ def extract_BEC_constraints(policy_constraints, min_subset_constraints_record, w
     # then determine the BEC lengths of all other potential demos that could be shown
     BEC_lengths_record = []
 
-    for j, min_subset_constraints in enumerate(min_subset_constraints_record):
-        BEC_lengths_record.append(BEC_helpers.calculate_BEC_length(min_subset_constraints, weights, step_cost_flag)[0])
+    if step_cost_flag:
+        # calculate the 2D intersection between minimum constraints and L1 norm constraint for each demonstration
+        for j, min_subset_constraints in enumerate(min_subset_constraints_record):
+            BEC_lengths_record.append(BEC_helpers.calculate_BEC_length(min_subset_constraints, weights, step_cost_flag)[0])
+    else:
+        # calculate the solid angle between the minimum constraints for each demonstration
+        for min_subset_constraints in min_subset_constraints_record:
+            ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(min_subset_constraints)
+            poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
+            BEC_lengths_record.append(BEC_helpers.calc_solid_angle(poly))
 
     # ordered from most constraining to least constraining
     return min_BEC_constraints, BEC_lengths_record

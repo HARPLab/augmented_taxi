@@ -1,6 +1,8 @@
 import numpy as np
 from pypoman import compute_polygon_hull, indicate_violating_constraints
 from scipy.optimize import linprog
+import sage.all
+import sage.geometry.polyhedron.base as Polyhedron
 
 from policy_summarization import computational_geometry as cg
 
@@ -104,47 +106,69 @@ def remove_redundant_constraints_lp(constraints, weights, step_cost_flag):
 
 def remove_redundant_constraints(constraints, weights, step_cost_flag):
     '''
-    Summary: Remove redundant constraint that do not change the underlying intersection between the BEC region and the
-    L1 constraints
+    Summary: Remove redundant constraints
     '''
+    if step_cost_flag:
+        # Remove redundant constraint that do not change the underlying intersection between the BEC region and the
+        # L1 constraints
+        try:
+            BEC_length_all_constraints, nonredundant_constraint_idxs = calculate_BEC_length(constraints, weights,
+                                                                                            step_cost_flag)
+        except:
+            # a subset of these constraints aren't numerically stable (e.g. you can have a constraint that's ever so slightly
+            # over the ground truth reward weight and thus fail to yield a proper polygonal convex hull. remove the violating constraints
+            A, b = constraints_to_halfspace_matrix(constraints, weights, step_cost_flag)
+            violating_idxs = indicate_violating_constraints(A, b)
 
-    try:
-        BEC_length_all_constraints, nonredundant_constraint_idxs = calculate_BEC_length(constraints, weights,
-                                                                                        step_cost_flag)
-    except:
-        # a subset of these constraints aren't numerically stable (e.g. you can have a constraint that's ever so slightly
-        # over the ground truth reward weight and thus fail to yield a proper polygonal convex hull. remove the violating constraints
-        A, b = constraints_to_halfspace_matrix(constraints, weights, step_cost_flag)
-        violating_idxs = indicate_violating_constraints(A, b)
+            for violating_idx in sorted(violating_idxs[0], reverse=True):
+                del constraints[violating_idx]
 
-        for violating_idx in sorted(violating_idxs[0], reverse=True):
-            del constraints[violating_idx]
+            BEC_length_all_constraints, nonredundant_constraint_idxs = calculate_BEC_length(constraints, weights,
+                                                                                            step_cost_flag)
 
-        BEC_length_all_constraints, nonredundant_constraint_idxs = calculate_BEC_length(constraints, weights,
-                                                                                        step_cost_flag)
+        nonredundant_constraints = [constraints[x] for x in nonredundant_constraint_idxs]
 
-    nonredundant_constraints = [constraints[x] for x in nonredundant_constraint_idxs]
+        redundant_constraints = []
 
-    redundant_constraints = []
+        for query_idx, query_constraint in enumerate(constraints):
+            if query_idx not in nonredundant_constraint_idxs:
+                redundant_constraints.append(query_constraint)
+            else:
+                # see if this is truly non-redundant or crosses an L1 constraint exactly where another constraint does
+                constraints_other = []
+                for constraint_idx, constraint in enumerate(nonredundant_constraints):
+                    if not equal_constraints(query_constraint, constraint):
+                        constraints_other.append(constraint)
+                if len(constraints_other) > 0:
+                    BEC_length = calculate_BEC_length(constraints_other, weights, step_cost_flag)[0]
 
-    for query_idx, query_constraint in enumerate(constraints):
-        if query_idx not in nonredundant_constraint_idxs:
-            redundant_constraints.append(query_constraint)
-        else:
-            # see if this is truly non-redundant or crosses an L1 constraint exactly where another constraint does
-            constraints_other = []
-            for constraint_idx, constraint in enumerate(nonredundant_constraints):
-                if not equal_constraints(query_constraint, constraint):
-                    constraints_other.append(constraint)
-            if len(constraints_other) > 0:
-                BEC_length = calculate_BEC_length(constraints_other, weights, step_cost_flag)[0]
+                    # simply remove the first redundant constraint. can also remove the redundant constraint that's
+                    # 1) conveyed by the fewest environments, 2) conveyed by a higher minimum complexity environment,
+                    # 3) doesn't work as well with visual similarity of other nonredundant constraints
+                    if np.isclose(BEC_length, BEC_length_all_constraints):
+                        nonredundant_constraints = constraints_other
+                        redundant_constraints.append(query_constraint)
+    else:
+        # remove constraints that don't belong in the minimal H-representation of the corresponding polyhedron (not
+        # including the boundary constraints/facets)
+        nonredundant_constraints = []
+        redundant_constraints = []
 
-                # simply remove the first redundant constraint. can also remove the redundant constraint that's
-                # 1) conveyed by the fewest environments, 2) conveyed by a higher minimum complexity environment,
-                # 3) doesn't work as well with visual similarity of other nonredundant constraints
-                if np.isclose(BEC_length, BEC_length_all_constraints):
-                    nonredundant_constraints = constraints_other
-                    redundant_constraints.append(query_constraint)
+        ieqs = constraints_to_halfspace_matrix_sage(constraints)
+        poly = Polyhedron.Polyhedron(ieqs=ieqs)
+        hrep = np.array(poly.Hrepresentation())
+
+        # remove boundary constraints/facets from consideration
+        boundary_facet_idxs = np.where(hrep[:, 0] != 0)
+        hrep_constraints = np.delete(hrep, boundary_facet_idxs, axis=0)
+        hrep_constraints = list(hrep_constraints[:, 1:])
+
+        for constraint in constraints:
+            # if the constraint belongs in the minimal H-representation, it's nonredundant
+            if any(np.allclose(constraint[0], hrep_constraint, atol=1e-05) for hrep_constraint in hrep_constraints):
+                nonredundant_constraints.append(constraint)
+            else:
+                redundant_constraints.append(constraint)
 
     return nonredundant_constraints, redundant_constraints
 
@@ -340,7 +364,7 @@ def constraints_to_halfspace_matrix_sage(constraints):
         ieqs[j, 0] = 0
         ieqs[j, 1:] = np.array([constraints[j][0][0], constraints[j][0][1], constraints[j][0][2]])
 
-    # constrain the area of interest to a unit cube
+    # constrain the area of interest to a cube bounding the unit sphere
     ieqs[len(constraints), :] = np.array([1, 1, 0, 0])
     ieqs[len(constraints) + 1, :] = np.array([1, -1, 0, 0])
     ieqs[len(constraints) + 2, :] = np.array([1, 0, 1, 0])
