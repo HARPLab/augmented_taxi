@@ -410,7 +410,7 @@ def calc_solid_angle(poly):
                 # calculate the dihedral angle
                 dihedral_angles.append(calc_dihedral_supp(hrep[curr_facet_idx, :], hrep[adj_facet_idx, :]))
 
-    # spherical excess formular
+    # spherical excess formula
     return sum(dihedral_angles) - (len(dihedral_angles) - 2) * np.pi
 
 def lies_on_constraint_plane(poly, point):
