@@ -156,3 +156,140 @@ def visualize_planes(constraints, fig=None, ax=None, alpha=0.5):
             Y_yz, Z_yz, = np.meshgrid(y, z)
             X = (-constraint[0, 1] * Y_yz - constraint[0, 2] * Z_yz) / constraint[0, 0]
             ax.plot_surface(X, Y_yz, Z_yz, alpha=alpha)
+
+
+def visualize_projection(constraints, weights, proj_type, plot_lim=[(-1, 1), (-1, 1)], scale=1.0, title=None, xlabel=None, ylabel=None, fig_name=None, just_save=False):
+    '''
+    Summary: Visualize the constraints. Use scale to determine whether to show L1 normalized weights and constraints or
+    weights and constraints where the step cost is 1.
+    '''
+    # This visualization function is currently specialized to handle plotting problems with two unknown weights or two
+    # unknown and one known weight. For higher dimensional constraints, this visualization function must be updated.
+
+    plt.xlim(plot_lim[0][0] * scale, plot_lim[0][1] * scale)
+    plt.ylim(plot_lim[1][0] * scale, plot_lim[1][1] * scale)
+
+    wt_marker_size = 200
+
+    wt_shading = 1. / len(constraints)
+
+    if proj_type == 'xy':
+        for constraint in constraints:
+            if constraint[0, 1] == 0.:
+                # completely vertical line
+                pt = (-weights[0, -1] * constraint[0, 2]) / constraint[0, 0]
+                plt.plot(np.array([pt, pt]) * scale, np.array([-1, 1]) * scale)
+
+                # use (1, 0) as a test point to decide which half space to color
+                if constraint[0, 0] + (weights[0, -1] * constraint[0, 2]) >= 0:
+                    # color the right side of the line
+                    plt.axvspan(pt * scale, 1 * scale, alpha=wt_shading, color='blue')
+                else:
+                    # color the left side of the line
+                    plt.axvspan(-1 * scale, pt * scale, alpha=wt_shading, color='blue')
+            else:
+                pt_1 = (constraint[0, 0] - (weights[0, -1] * constraint[0, 2])) / constraint[0, 1]
+                pt_2 = (-constraint[0, 0] - (weights[0, -1] * constraint[0, 2])) / constraint[0, 1]
+                plt.plot(np.array([-1, 1]) * scale, np.array([pt_1, pt_2]) * scale)
+
+                # use (0, 1) as a test point to decide which half space to color
+                if constraint[0, 1] + (weights[0, -1] * constraint[0, 2]) >= 0:
+                    plt.fill_between(np.array([-1, 1]) * scale, np.array([pt_1, pt_2]) * scale, np.array([1, 1]) * scale, alpha=wt_shading, color='blue')
+                else:
+                    plt.fill_between(np.array([-1, 1]) * scale, np.array([pt_1, pt_2]) * scale, np.array([-1, -1]) * scale, alpha=wt_shading, color='blue')
+
+        # plot ground truth weight
+        plt.scatter(weights[0, 0] * scale, weights[0, 1] * scale, s=wt_marker_size, color='red', zorder=2)
+        # labels
+        if xlabel is not None:
+            plt.xlabel(xlabel)
+        else:
+            plt.xlabel(r'$w_0$')
+        if ylabel is not None:
+            plt.ylabel(ylabel)
+        else:
+            plt.ylabel(r'$w_1$')
+    elif proj_type == 'xz':
+        for constraint in constraints:
+            if constraint[0, 2] == 0.:
+                # completely vertical line
+                pt = (-weights[0, 1] * constraint[0, 1]) / constraint[0, 0]
+                plt.plot(np.array([pt, pt]) * scale, np.array([-1, 1]) * scale)
+
+                # use (1, 0) as a test point to decide which half space to color
+                if constraint[0, 0] + (weights[0, 1] * constraint[0, 1]) >= 0:
+                    # color the right side of the line
+                    plt.axvspan(pt * scale, 1 * scale, alpha=wt_shading, color='blue')
+                else:
+                    # color the left side of the line
+                    plt.axvspan(-1 * scale, pt * scale, alpha=wt_shading, color='blue')
+            else:
+                pt_1 = (constraint[0, 0] - (weights[0, 1] * constraint[0, 1])) / constraint[0, 2]
+                pt_2 = (-constraint[0, 0] - (weights[0, 1] * constraint[0, 1])) / constraint[0, 2]
+                plt.plot(np.array([-1, 1]) * scale, np.array([pt_1, pt_2]) * scale)
+
+                # use (0, 1) as a test point to decide which half space to color
+                if weights[0, 1] * constraint[0, 1] + constraint[0, 2] >= 0:
+                    plt.fill_between(np.array([-1, 1]) * scale, np.array([pt_1, pt_2]) * scale, np.array([1, 1]) * scale, alpha=wt_shading, color='blue')
+                else:
+                    plt.fill_between(np.array([-1, 1]) * scale, np.array([pt_1, pt_2]) * scale, np.array([-1, -1]) * scale, alpha=wt_shading, color='blue')
+
+        # plot ground truth weight
+        plt.scatter(weights[0, 0] * scale, weights[0, 2] * scale, s=wt_marker_size, color='red', zorder=2)
+        # labels
+        if xlabel is not None:
+            plt.xlabel(xlabel)
+        else:
+            plt.xlabel(r'$w_0$')
+        if ylabel is not None:
+            plt.ylabel(ylabel)
+        else:
+            plt.ylabel(r'$w_2$')
+    else:
+        # yz
+        for constraint in constraints:
+            if constraint[0, 2] == 0.:
+                # completely vertical line
+                pt = (-weights[0, 0] * constraint[0, 0]) / constraint[0, 1]
+                plt.plot(np.array([pt, pt]) * scale, np.array([-1, 1]) * scale)
+
+                # use (1, 0) as a test point to decide which half space to color
+                if (weights[0, 0] * constraint[0, 0]) + constraint[0, 1] >= 0:
+                    # color the right side of the line
+                    plt.axvspan(pt * scale, 1 * scale, alpha=wt_shading, color='blue')
+                else:
+                    # color the left side of the line
+                    plt.axvspan(-1 * scale, pt * scale, alpha=wt_shading, color='blue')
+            else:
+                pt_1 = (constraint[0, 1] - (weights[0, 0] * constraint[0, 0])) / constraint[0, 2]
+                pt_2 = (-constraint[0, 1] - (weights[0, 0] * constraint[0, 0])) / constraint[0, 2]
+                plt.plot(np.array([-1, 1]) * scale, np.array([pt_1, pt_2]) * scale)
+
+                # use (0, 1) as a test point to decide which half space to color
+                if weights[0, 0] * constraint[0, 0] + constraint[0, 2] >= 0:
+                    plt.fill_between(np.array([-1, 1]) * scale, np.array([pt_1, pt_2]) * scale, np.array([1, 1]) * scale, alpha=wt_shading, color='blue')
+                else:
+                    plt.fill_between(np.array([-1, 1]) * scale, np.array([pt_1, pt_2]) * scale, np.array([-1, -1]) * scale, alpha=wt_shading, color='blue')
+
+        # plot ground truth weight
+        plt.scatter(weights[0, 1] * scale, weights[0, 2] * scale, s=wt_marker_size, color='red', zorder=2)
+        # labels
+        if xlabel is not None:
+            plt.xlabel(xlabel)
+        else:
+            plt.xlabel(r'$w_1$')
+        if ylabel is not None:
+            plt.ylabel(ylabel)
+        else:
+            plt.ylabel(r'$w_2$')
+
+    if title is not None:
+        plt.title(title)
+    else:
+        plt.title(proj_type)
+    plt.tight_layout()
+    if fig_name is not None:
+        plt.savefig(fig_name, dpi=200, transparent=True)
+    if not just_save:
+        plt.show()
+    plt.close()

@@ -111,17 +111,26 @@ def explore_BEC_solid_angle(mdp_class, data_loc, mdp_parameters, weights, step_c
         min_constraints = [constraint.reshape(1, -1) for constraint in min_constraints]
 
         for constraints in [min_constraints]:
-            BEC_viz.visualize_planes(constraints, fig, ax)
+            BEC_viz.visualize_planes(constraints, fig=fig, ax=ax)
 
         # visualize spherical polygon
-        BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax)
+        BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax, plot_ref_sphere=False)
 
         ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100)
 
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
+
+        if matplotlib.get_backend() == 'TkAgg':
+            mng = plt.get_current_fig_manager()
+            mng.resize(*mng.window.maxsize())
+
         plt.show()
+
+        BEC_viz.visualize_projection(constraints_record, weights, 'xy', xlabel='Dropoff', ylabel='Toll')
+        BEC_viz.visualize_projection(constraints_record, weights, 'xz', xlabel='Dropoff', ylabel='Step Cost')
+        BEC_viz.visualize_projection(constraints_record, weights, 'yz', xlabel='Toll', ylabel='Step Cost')
 
 def obtain_BEC_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, n_train_demos, pool, visualize_summary=False):
     try:
