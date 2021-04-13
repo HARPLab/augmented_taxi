@@ -9,7 +9,7 @@ mdp_class = 'augmented_taxi'
 
 w_norm_order = 2
 if mdp_class == 'augmented_taxi':
-    w = np.array([[26, -3, -1]])
+    w = np.array([[8.5, -3, -1]])
     w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order)
 
     mdp_parameters = {

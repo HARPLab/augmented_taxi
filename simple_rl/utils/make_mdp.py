@@ -99,24 +99,20 @@ def make_mdp_obj(mdp_class, mdp_code, mdp_parameters):
 def hardcode_mdp_obj(mdp_class, mdp_code):
 
     if mdp_class == 'augmented_taxi':
-        # a) for resolving weight of toll
+        # a) for resolving weight of dropping off passenger
         if mdp_code == [0, 0]:
-            requested_passenger = [{"x": 4, "y": 1, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
-            requested_tolls = [{"x": 3, "y": 1}]                              # lowerbound
+            requested_passenger = [{"x": 4, "y": 2, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
+            requested_tolls = []                                    # lowerbound
         elif mdp_code == [0, 1]:
+            requested_passenger = [{"x": 4, "y": 3, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
+            requested_tolls = []                                    # upperbound
+        # b) for resolving weight of toll
+        elif mdp_code == [1, 0]:
+            requested_passenger = [{"x": 4, "y": 1, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
+            requested_tolls = [{"x": 3, "y": 1}]                    # lowerbound
+        else:
             requested_passenger = [{"x": 4, "y": 1, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
             requested_tolls = [{"x": 3, "y": 1}, {"x": 3, "y": 2}]  # upperbound
-        # b) for resolving weight of dropping off passenger
-        elif mdp_code == [1, 0]:
-            requested_passenger = [{"x": 2, "y": 3, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
-            requested_tolls = [{"x": 2, "y": 3}, {"x": 3, "y": 3}, {"x": 4, "y": 3},
-                       {"x": 2, "y": 2}, {"x": 3, "y": 2}, {"x": 2, "y": 1},
-                       {"x": 3, "y": 1}]                              # lowerbound
-        else:
-            requested_passenger = [{"x": 2, "y": 3, "dest_x": 1, "dest_y": 1, "in_taxi": 0}]
-            requested_tolls = [{"x": 2, "y": 3}, {"x": 3, "y": 3}, {"x": 4, "y": 3},
-                       {"x": 2, "y": 2}, {"x": 3, "y": 2}, {"x": 4, "y": 2},
-                       {"x": 2, "y": 1}, {"x": 3, "y": 1}]  # upperbound
 
         return requested_passenger, requested_tolls, mdp_code
     elif mdp_class == 'two_goal':

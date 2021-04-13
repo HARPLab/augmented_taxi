@@ -166,7 +166,7 @@ def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=None, p
 
     return policy_constraints, min_subset_constraints_record, env_record, traj_record
 
-def extract_BEC_constraints(policy_constraints, min_subset_constraints_record, weights, step_cost_flag):
+def extract_BEC_constraints(policy_constraints, min_subset_constraints_record, env_record, weights, step_cost_flag, pool):
     '''
     Summary: Obtain the minimum BEC constraints across all environments / demonstrations
     '''
@@ -184,10 +184,36 @@ def extract_BEC_constraints(policy_constraints, min_subset_constraints_record, w
             BEC_lengths_record.append(BEC_helpers.calculate_BEC_length(min_subset_constraints, weights, step_cost_flag)[0])
     else:
         # calculate the solid angle between the minimum constraints for each demonstration
-        for min_subset_constraints in min_subset_constraints_record:
-            ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(min_subset_constraints)
-            poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
-            BEC_lengths_record.append(BEC_helpers.calc_solid_angle(poly))
+        # chunk constraints first for faster multiprocessing
+        # todo: should make a separate function for this since it's reused in obtain_summary_counterfactual.
+        #  or I could simply store chunked variants of constraints and trajectories in the first place)
+        current_env = 0
+        chunked_constraint_record = []
+        chunked_env_record = [0]
+        chunked_constraints = []
+        for idx, env in enumerate(env_record):
+            if env != current_env:
+                # record the old chunk
+                chunked_constraint_record.append(chunked_constraints)
+
+                # start a new chunk
+                current_env = env
+                chunked_env_record.append(env)
+                chunked_constraints = [min_subset_constraints_record[idx]]
+            else:
+                # continue the chunk
+                chunked_constraints.append(min_subset_constraints_record[idx])
+        chunked_constraint_record.append(chunked_constraints)
+
+        pool.restart()
+        BEC_lengths_record_chunked = list(tqdm(pool.imap(BEC_helpers.calc_solid_angles, chunked_constraint_record), total=len(chunked_constraint_record)))
+        pool.close()
+        pool.join()
+        pool.terminate()
+
+        print(len(BEC_lengths_record_chunked))
+        BEC_lengths_record = list(itertools.chain(*BEC_lengths_record_chunked))
+        print(len(BEC_lengths_record))
 
     # ordered from most constraining to least constraining
     return min_BEC_constraints, BEC_lengths_record
@@ -468,6 +494,53 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
 
     return summary
 
+def obtain_SCOT_summaries(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag,downsample_threshold=float("inf")):
+    min_BEC_summary = []
+
+    # if you're looking for demonstrations that will convey the most constraining BEC region or will be employing scaffolding,
+    # obtain the demos needed to convey the most constraining BEC region
+    BEC_constraints = min_BEC_constraints
+    BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(BEC_constraints,
+                                                                                min_subset_constraints_record)
+
+    # extract sets of demos+environments pairs that can cover each BEC constraint
+    sets = []
+    for constraint_idx in range(BEC_constraint_bookkeeping.shape[1]):
+        sets.append(np.argwhere(BEC_constraint_bookkeeping[:, constraint_idx] == 1).flatten().tolist())
+
+    # downsample some sets with too many members for computational feasibility
+    for j, set in enumerate(sets):
+        if len(set) > downsample_threshold:
+            sets[j] = random.sample(set, downsample_threshold)
+
+    # obtain one combination of demos+environments pairs that cover all BEC constraints
+    filtered_combo = []
+    for combination in itertools.product(*sets):
+        filtered_combo.append(np.unique(combination))
+        break
+
+    best_idxs = filtered_combo[0]
+
+    for best_idx in best_idxs:
+        best_env_idx = env_record[best_idx]
+
+        # record information associated with the best selected summary demo
+        best_traj = traj_record[best_idx]
+        filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
+        with open(filename, 'rb') as f:
+            wt_vi_traj_env = pickle.load(f)
+        best_mdp = wt_vi_traj_env[0][1].mdp
+        best_mdp.set_init_state(best_traj[0][0])  # for completeness
+        constraints_added = min_subset_constraints_record[best_idx]
+        min_BEC_summary.append([best_mdp, best_traj, constraints_added])
+
+    for best_idx in sorted(best_idxs, reverse=True):
+        del min_subset_constraints_record[best_idx]
+        del traj_record[best_idx]
+        del env_record[best_idx]
+        del BEC_lengths_record[best_idx]
+
+    return min_BEC_summary
 
 def obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=3, downsample_threshold=float("inf")):
     '''
@@ -587,9 +660,8 @@ def obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, 
 
             # record information associated with the best selected summary demo
             best_traj = traj_record[best_idx]
-            # todo: I should also change the initial state of the mdp to be the first state of the trajectory for completeness
-            # (as I have already done for the test environments / demonstrations)
             best_mdp = wt_vi_traj_candidates[best_env_idx][0][1].mdp
+            best_mdp.set_init_state(best_traj[0][0])  # for completeness
             constraints_added = min_subset_constraints_record[best_idx]
             min_BEC_summary.append([best_mdp, best_traj, constraints_added])
 
@@ -789,12 +861,12 @@ def visualize_summary(BEC_summaries_collection, weights, step_cost_flag):
         # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(summary_idx) + '.png', scale=abs(1 / weights[0, -1]))
 
         # visualize what the human would've done in this environment (giving the human the benefit of the doubt)
-        print(colored('Visualizing human counterfactuals', 'blue'))
+        # print(colored('Visualizing human counterfactuals', 'blue'))
         # visualize the counterfactual trajectory at every (s,a) pair along the agent's optimal trajectory
         # for human_opt_traj in BEC_summary[3]:
         #     BEC_summary[0].visualize_trajectory(human_opt_traj) # the environment shoudld be the same for agent and human
         # only visualize the first counterfactual trajectory (often the more informative)
-        BEC_summary[0].visualize_trajectory(BEC_summary[3][0])
+        # BEC_summary[0].visualize_trajectory(BEC_summary[3][0])
 
 
 def visualize_test_envs(test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, weights, step_cost_flag):
