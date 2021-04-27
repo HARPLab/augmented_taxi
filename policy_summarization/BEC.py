@@ -406,7 +406,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
         # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(len(summary)) + '.png', just_save=True)
 
         # uniformly sample candidate human models from the valid BEC area along 2-sphere
-        sample_human_models = BEC_helpers.sample_human_models(min_BEC_constraints_running, n_models=4)
+        sample_human_models = BEC_helpers.sample_human_models(min_BEC_constraints_running, n_models=min(pool.ncpus, 10))
 
         info_gains_record = []
 
@@ -444,8 +444,11 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
         with open('models/augmented_taxi/info_gains_' + str(len(summary)) + '.pickle', 'wb') as f:
             pickle.dump(info_gains_record, f)
 
-        # no need to continue search for demonstrations if none of them will improve the human's understanding
+        # compute the expected information gain by averaging across the various potential human models
         info_gains = np.array(info_gains_record)
+        info_gains = np.sum(info_gains, axis=0) / info_gains.shape[0]
+
+        # no need to continue search for demonstrations if none of them will improve the human's understanding
         if np.sum(info_gains) == 0:
             # sample up two more set of human models to try and find a demonstration that will improve the human's
             # understanding before concluding that there is no more information to be conveyed
