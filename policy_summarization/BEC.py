@@ -215,7 +215,6 @@ def extract_BEC_constraints(policy_constraints, min_subset_constraints_record, e
         BEC_lengths_record = list(itertools.chain(*BEC_lengths_record_chunked))
         print(len(BEC_lengths_record))
 
-    # ordered from most constraining to least constraining
     return min_BEC_constraints, BEC_lengths_record
 
 def obtain_potential_summary_demos(BEC_lengths_record, n_demos, n_clusters=6, type='scaffolding', sample_count=25):
@@ -284,7 +283,7 @@ def obtain_potential_summary_demos(BEC_lengths_record, n_demos, n_clusters=6, ty
     return covering_demos_idxs
 
 def compute_counterfactuals(args):
-    data_loc, model_idx, env_idx, w_human_normalized, env_filename, trajs_opt, min_BEC_constraints_running, feature_flag, step_cost_flag = args
+    data_loc, model_idx, env_idx, w_human_normalized, env_filename, trajs_opt, min_BEC_constraints_running, step_cost_flag, summary_len = args
 
     with open(env_filename, 'rb') as f:
         wt_vi_traj_env = pickle.load(f)
@@ -305,7 +304,6 @@ def compute_counterfactuals(args):
 
     for traj_opt in trajs_opt:
         constraints = []
-        info_gain = 0
 
         # # a) accumulate the reward features and generate a single constraint
         # mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
@@ -330,7 +328,7 @@ def compute_counterfactuals(args):
                 human_opt_traj = mdp_helpers.rollout_policy(vi_human.mdp, vi_human, cur_state)
                 human_opt_trajs = [human_opt_traj]
 
-            cur_best_reward = np.float('-inf')
+            cur_best_reward = float('-inf')
             best_reward_features = []
             best_human_traj = []
             # select the human's possible trajectory that has the highest true reward (i.e. give the human's policy the benefit of the doubt)
@@ -349,32 +347,17 @@ def compute_counterfactuals(args):
         # the hypothetical constraints that will be in the human's mind after viewing this demonstrations
         hypothetical_constraints = []
         hypothetical_constraints.extend(min_BEC_constraints_running)
-        # try conveying one feature at a time
-        try:
-            constraints = BEC_helpers.clean_up_constraints(constraints, weights, step_cost_flag)
-            if feature_flag == 0:
-                # keep only horizontal constraints (i.e. info on only the tolls)
-                filtered_constraints = []
-                for constraint in constraints:
-                    if constraint[0, 0] == 0:
-                        filtered_constraints.append(constraint)
-            elif feature_flag == 1:
-                # keep only vertical constraints (i.e. info on only the dropoff)
-                filtered_constraints = []
-                for constraint in constraints:
-                    if constraint[0, 1] == 0:
-                        filtered_constraints.append(constraint)
-            else:
-                filtered_constraints = constraints
 
-            hypothetical_constraints.extend(filtered_constraints)
-            info_gain = \
-            BEC_helpers.calculate_BEC_length(min_BEC_constraints_running, weights, step_cost_flag)[0] - \
-            BEC_helpers.calculate_BEC_length(hypothetical_constraints, weights, step_cost_flag)[0]
+        constraints = BEC_helpers.clean_up_constraints(constraints, weights, step_cost_flag)
+        hypothetical_constraints.extend(constraints)
 
-        except:
-            # print("No valid constraints")
-            pass
+        if len(min_BEC_constraints_running) > 0 and len(hypothetical_constraints) > 0:
+            info_gain = BEC_helpers.calc_solid_angles([min_BEC_constraints_running])[0] - BEC_helpers.calc_solid_angles([hypothetical_constraints])[0]
+        elif len(hypothetical_constraints) > 0:
+            info_gain = 4 * np.pi - BEC_helpers.calc_solid_angles([hypothetical_constraints])[0]
+        else:
+            info_gain = 0
+
         # mdp.visualize_trajectory(traj_opt)
         # vi_human.mdp.visualize_trajectory(traj_hyp)
 
@@ -382,7 +365,11 @@ def compute_counterfactuals(args):
         constraints_env.append(constraints)
         info_gain_env.append(info_gain)
 
-    with open('models/' + data_loc + '/counterfactual_data/model' + str(model_idx) + '/cf_data_env' + str(env_idx).zfill(5) + '.pickle', 'wb') as f:
+    # with open('models/' + data_loc + '/counterfactual_data/model' + str(model_idx) + '/cf_data_env' + str(env_idx).zfill(5) + '.pickle', 'wb') as f:
+    #     pickle.dump((best_human_trajs_record_env, constraints_env), f)
+    with open(
+            'models/' + data_loc + '/counterfactual_data_' + str(summary_len) + '/model' + str(model_idx) + '/cf_data_env' + str(env_idx).zfill(
+                    5) + '.pickle', 'wb') as f:
         pickle.dump((best_human_trajs_record_env, constraints_env), f)
 
     return info_gain_env
@@ -392,7 +379,6 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
                        n_train_demos=3, downsample_threshold=float("inf")):
 
     summary = []
-    feature_flag = 0
 
     # assuming that traj_record / env_record are sorted properly by env order, chunk via environment for faster multiprocessing
     current_env = 0
@@ -413,19 +399,19 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
             chunked_trajs.append(traj_record[idx])
     chunked_traj_record.append(chunked_trajs)
 
-    # assume that the human starts off knowing which quadrant the agent's weight belongs to
-    min_BEC_constraints_running = [np.array([[0, -1, 0]]), np.array([[1, 0, 0]])]
+    min_BEC_constraints_running = []
 
     while len(summary) < n_train_demos:
-        visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(len(summary)) + '.png', just_save=True)
+        retry_count = 0
+        # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(len(summary)) + '.png', just_save=True)
 
-        # use extreme vertices (vertices comprising the convex hull that have a extreme value in at least a single axis) as the human model
-        extreme_human_models = BEC_helpers.obtain_extreme_vertices(min_BEC_constraints_running, weights, step_cost_flag)
+        # uniformly sample candidate human models from the valid BEC area along 2-sphere
+        sample_human_models = BEC_helpers.sample_human_models(min_BEC_constraints_running, n_models=4)
 
         info_gains_record = []
 
         print("Length of summary: {}".format(len(summary)))
-        for model_idx, human_model in enumerate(extreme_human_models):
+        for model_idx, human_model in enumerate(sample_human_models):
             print(colored('Model #: {}'.format(model_idx), 'red'))
             print(colored('Model val: {}'.format(human_model), 'red'))
 
@@ -437,11 +423,12 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
             # are saved for reference later)
             print("Obtaining counterfactual information gains:")
 
-            cf_data_dir = 'models/' + data_loc + '/counterfactual_data/model' + str(model_idx)
+            # cf_data_dir = 'models/' + data_loc + '/counterfactual_data/model' + str(model_idx)
+            cf_data_dir = 'models/' + data_loc + '/counterfactual_data_' + str(len(summary)) + '/model' + str(model_idx)
             os.makedirs(cf_data_dir, exist_ok=True)
 
             pool.restart()
-            args = [(data_loc, model_idx, i, w_human_normalized, mp_helpers.lookup_env_filename(data_loc, chunked_env_record[i]), chunked_traj_record[i], min_BEC_constraints_running, feature_flag, step_cost_flag) for i in range(len(chunked_traj_record))]
+            args = [(data_loc, model_idx, i, w_human_normalized, mp_helpers.lookup_env_filename(data_loc, chunked_env_record[i]), chunked_traj_record[i], min_BEC_constraints_running, step_cost_flag, len(summary)) for i in range(len(chunked_traj_record))]
             info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals, args), total=len(args)))
             pool.close()
             pool.join()
@@ -452,28 +439,35 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
 
             info_gains_record.append(info_gains_model)
 
+        # with open('models/augmented_taxi/info_gains.pickle', 'wb') as f:
+        #     pickle.dump(info_gains_record, f)
+        with open('models/augmented_taxi/info_gains_' + str(len(summary)) + '.pickle', 'wb') as f:
+            pickle.dump(info_gains_record, f)
+
         # no need to continue search for demonstrations if none of them will improve the human's understanding
         info_gains = np.array(info_gains_record)
         if np.sum(info_gains) == 0:
-            # when feature_flag == n_features - 1, you have already considered constraints that aren't solely informative
-            # regard one feature (i.e. constraints that are axis-parallel). at this point, is no more information to gain
-            if feature_flag == 2:
+            # sample up two more set of human models to try and find a demonstration that will improve the human's
+            # understanding before concluding that there is no more information to be conveyed
+            if retry_count == 2:
                 break
             else:
-                # move onto conveying the next feature
-                feature_flag += 1
-                print(colored('Incrementing feature flag, which is now at {}'.format(feature_flag), 'red'))
+                retry_count += 1
+                print(colored('Did not find any informative demonstrations. Retry count: {}'.format(retry_count), 'red'))
                 continue
 
         # todo: let's just try returning the smallest information gain for now (so that we can have incremental demonstrations)
         #  there often isn't enough demonstrations to generate 6 clusters, as I initially tried to do below
-        info_gains[info_gains <= 0] = np.float('inf')
+        info_gains[info_gains <= 0] = float('inf')
         select_model, best_env_idx, best_traj_idx = np.unravel_index(np.argmin(info_gains), info_gains.shape)
         print(colored('Max infogain: {}'.format(np.max(info_gains)), 'blue'))
         print(colored('Max Min infogain: {}'.format(np.min(info_gains)), 'blue')) # smallest infogain above zero
 
         best_traj = chunked_traj_record[best_env_idx][best_traj_idx]
-        with open('models/' + data_loc + '/counterfactual_data/model' + str(select_model) + '/cf_data_env' + str(
+        # with open('models/' + data_loc + '/counterfactual_data/model' + str(select_model) + '/cf_data_env' + str(
+        #         best_env_idx).zfill(5) + '.pickle', 'rb') as f:
+        #     best_human_trajs_record_env, constraints_env = pickle.load(f)
+        with open('models/' + data_loc + '/counterfactual_data_' + str(len(summary)) + '/model' + str(select_model) + '/cf_data_env' + str(
                 best_env_idx).zfill(5) + '.pickle', 'rb') as f:
             best_human_trajs_record_env, constraints_env = pickle.load(f)
         best_human_trajs = best_human_trajs_record_env[best_traj_idx]
@@ -484,7 +478,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
         best_mdp = wt_vi_traj_env[0][1].mdp
         best_mdp.set_init_state(best_traj[0][0]) # for completeness
         min_BEC_constraints_running.extend(constraints_env[best_traj_idx])
-        min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)[0]
+        min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
 
         summary.append([best_mdp, best_traj, constraints_env[best_traj_idx], best_human_trajs])
 
@@ -856,7 +850,7 @@ def visualize_summary(BEC_summaries_collection, weights, step_cost_flag):
 
         # visualize the min BEC constraints extracted from all demonstrations shown thus far
         # min_BEC_constraints_running.extend(BEC_summary[2])
-        # min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)[0]
+        # min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
         # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag)
         # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(summary_idx) + '.png', scale=abs(1 / weights[0, -1]))
 

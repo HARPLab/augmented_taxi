@@ -1,6 +1,50 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+'''
+2-sphere geometry
+'''
+def sph2cat(azi, ele):
+    x = np.cos(azi) * np.sin(ele)
+    y = np.sin(azi) * np.sin(ele)
+    z = np.cos(ele)
+
+    return x, y, z
+
+def cart2sph(x, y, z):
+    '''
+    Return corresponding spherical coordinates (azimuth, elevation) of a Cartesian point (x, y, z)
+    '''
+    azi = np.arctan2(y, x)
+    ele = np.arccos(z/np.sqrt(x**2 + y**2 + z**2))
+
+    return azi, ele
+
+def sample_valid_region(constraints, min_azi, max_azi, min_ele, max_ele, n_azi, n_ele):
+    # sample along the sphere
+    u = np.linspace(min_azi, max_azi, n_azi, endpoint=True)
+    v = np.linspace(min_ele, max_ele, n_ele, endpoint=True)
+
+    x = np.outer(np.cos(u), np.sin(v)).reshape(1, -1)
+    y = np.outer(np.sin(u), np.sin(v)).reshape(1, -1)
+    z = np.outer(np.ones(np.size(u)), np.cos(v)).reshape(1, -1)
+    sph_points = np.vstack((x, y, z))
+
+    # see which points on the sphere obey all constraints
+    dist_to_plane = constraints.dot(sph_points)
+    n_constraints_satisfied = np.sum(dist_to_plane >= 0, axis=0)
+    n_min_constraints = constraints.shape[0]
+
+    idx_valid_sph_points = np.where(n_constraints_satisfied == n_min_constraints)[0]
+    valid_sph_x = np.take(x, idx_valid_sph_points)
+    valid_sph_y = np.take(y, idx_valid_sph_points)
+    valid_sph_z = np.take(z, idx_valid_sph_points)
+
+    return valid_sph_x, valid_sph_y, valid_sph_z
+
+'''
+2D convex polygon geometry
+'''
 def _find_clipped_line(n, line, polygon, normals):
     # calculate P1 - P0
     P0 = np.array([line[0][0], line[0][1]])

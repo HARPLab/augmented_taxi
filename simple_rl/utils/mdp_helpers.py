@@ -14,7 +14,7 @@ Returns:
 Summary:
     Return all possible, equally-rewarding roll outs of the agent's policy on the designated MDP
 '''
-def rollout_policy_recursive(mdp, agent, cur_state, trajs, cur_traj=[], cur_action_seq=[], max_depth=50):
+def rollout_policy_recursive(mdp, agent, cur_state, trajs, cur_traj=[], cur_action_seq=[], max_depth=25):
     if cur_state.is_terminal() or len(cur_traj) >= max_depth:
         trajs.append(cur_traj)
         return trajs
@@ -52,7 +52,7 @@ Returns:
 Summary:
     Roll out the agent's policy on the designated MDP and return the corresponding trajectory
 '''
-def rollout_policy(mdp, agent, cur_state=None, action_seq=None, max_depth=50, timeout=10):
+def rollout_policy(mdp, agent, cur_state=None, action_seq=None, max_depth=25, timeout=5):
     mdp.reset()
     depth = 0
     reward = 0

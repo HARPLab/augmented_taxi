@@ -54,7 +54,7 @@ def clean_up_constraints(constraints, weights, step_cost_flag):
     if len(normalized_constraints) > 0:
         nonduplicate_constraints = remove_duplicate_constraints(normalized_constraints)
         if len(nonduplicate_constraints) > 1:
-            min_subset_constraints, _ = remove_redundant_constraints(nonduplicate_constraints, weights, step_cost_flag)
+            min_subset_constraints = remove_redundant_constraints(nonduplicate_constraints, weights, step_cost_flag)
         else:
             min_subset_constraints = nonduplicate_constraints
     else:
@@ -128,11 +128,9 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
 
         nonredundant_constraints = [constraints[x] for x in nonredundant_constraint_idxs]
 
-        redundant_constraints = []
-
         for query_idx, query_constraint in enumerate(constraints):
             if query_idx not in nonredundant_constraint_idxs:
-                redundant_constraints.append(query_constraint)
+                pass
             else:
                 # see if this is truly non-redundant or crosses an L1 constraint exactly where another constraint does
                 constraints_other = []
@@ -147,12 +145,10 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
                     # 3) doesn't work as well with visual similarity of other nonredundant constraints
                     if np.isclose(BEC_length, BEC_length_all_constraints):
                         nonredundant_constraints = constraints_other
-                        redundant_constraints.append(query_constraint)
     else:
         # remove constraints that don't belong in the minimal H-representation of the corresponding polyhedron (not
         # including the boundary constraints/facets)
         nonredundant_constraints = []
-        redundant_constraints = []
 
         ieqs = constraints_to_halfspace_matrix_sage(constraints)
         poly = Polyhedron.Polyhedron(ieqs=ieqs)
@@ -167,10 +163,8 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
             # if the constraint belongs in the minimal H-representation, it's nonredundant
             if any(np.allclose(constraint[0], hrep_constraint, atol=1e-05) for hrep_constraint in hrep_constraints):
                 nonredundant_constraints.append(constraint)
-            else:
-                redundant_constraints.append(constraint)
 
-    return nonredundant_constraints, redundant_constraints
+    return nonredundant_constraints
 
 def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_record):
     '''
@@ -353,8 +347,9 @@ reward weight in 3D with known step cost
 '''
 def constraints_to_halfspace_matrix_sage(constraints):
     '''
-    Summary: convert the half space representation of a convex polygon (Ax < b) into the corresponding polytope vertices
+    Summary: convert list of halfspace constraints into an array of halfspace constraints. Add bounding cube
 
+    Halfspace representation of a convex polygon (Ax < b):
     [-1,7,3,4] represents the inequality 7x_1 + 3x_2 + 4x_3 >= 1
     '''
     n_boundary_constraints = 6
@@ -371,6 +366,17 @@ def constraints_to_halfspace_matrix_sage(constraints):
     ieqs[len(constraints) + 3, :] = np.array([1, 0, -1, 0])
     ieqs[len(constraints) + 4, :] = np.array([1, 0, 0, 1])
     ieqs[len(constraints) + 5, :] = np.array([1, 0, 0, -1])
+
+    return ieqs
+
+def constraints_to_halfspace_matrix_nonbounding(constraints):
+    '''
+    Summary: convert list of halfspace constraints into an array of halfspace constraints
+    '''
+    ieqs = np.zeros((len(constraints), len(constraints[0][0])))
+
+    for j in range(len(constraints)):
+        ieqs[j, :] = np.array([constraints[j][0][0], constraints[j][0][1], constraints[j][0][2]])
 
     return ieqs
 
@@ -435,4 +441,73 @@ def lies_on_constraint_plane(poly, point):
                 return True
 
     return False
+
+def sample_human_models(constraints, n_models):
+    '''
+    Summary: sample representative weights that the human could currently attribute to the agent
+    '''
+
+    sample_human_models = []
+
+    if len(constraints) > 0:
+        constraints_matrix = constraints_to_halfspace_matrix_nonbounding(constraints)
+
+        # obtain x, y, z coordinates on the sphere that obey the constraints
+        valid_sph_x, valid_sph_y, valid_sph_z = cg.sample_valid_region(constraints_matrix, 0, 2 * np.pi, 0, np.pi, 1000, 1000)
+
+        # resample coordinates on the sphere within the valid region (for higher density)
+        sph_polygon_azi = []
+        sph_polygon_ele = []
+
+        for x in range(len(valid_sph_x)):
+            azi, ele = cg.cart2sph(valid_sph_x[x], valid_sph_y[x], valid_sph_z[x])
+            sph_polygon_azi.append(azi)
+            sph_polygon_ele.append(ele)
+
+        min_azi = min(sph_polygon_azi)
+        max_azi = max(sph_polygon_azi)
+        min_ele = min(sph_polygon_ele)
+        max_ele = max(sph_polygon_ele)
+
+        # sample according to the inverse CDF of the uniform distribution along the sphere
+        u_low = min_azi / (2 * np.pi)
+        u_high = max_azi / (2 * np.pi)
+        v_low = (1 - np.cos(min_ele)) / 2
+        v_high = (1 - np.cos(max_ele)) / 2
+
+        while len(sample_human_models) < n_models:
+            theta = 2 * np.pi * np.random.uniform(low=u_low, high=u_high, size=2 * n_models)
+            phi = np.arccos(1 - 2 * np.random.uniform(low=v_low, high=v_high, size=2 * n_models))
+
+            # reject points that fall outside of the desired area
+
+            # see which points on the sphere obey all constraints
+            sph_points = np.array(list(map(cg.sph2cat, theta, phi)))
+            # constraints = np.array(constraints) # todo: verify that this casts properly
+            dist_to_plane = constraints_matrix.dot(sph_points.T)
+            n_constraints_satisfied = np.sum(dist_to_plane >= 0, axis=0)
+            n_min_constraints = constraints_matrix.shape[0]
+
+            idx_valid_sph_points = np.where(n_constraints_satisfied == n_min_constraints)[0]
+            valid_sph_points = sph_points[idx_valid_sph_points, :]
+
+            # reshape so that each element is a valid weight vector
+            valid_sph_points = valid_sph_points.reshape(valid_sph_points.shape[0], 1, valid_sph_points.shape[1])
+
+            sample_human_models.extend(valid_sph_points)
+
+        # trim so that you only return the needed number of models
+        sample_human_models = sample_human_models[:n_models]
+
+    else:
+        theta = 2 * np.pi * np.random.uniform(low=0, high=1, size=n_models)
+        phi = np.arccos(1 - 2 * np.random.uniform(low=0, high=1, size=n_models))
+
+        valid_sph_points = np.array(list(map(cg.sph2cat, theta, phi)))
+        # reshape so that each element is a valid weight vector
+        valid_sph_points = valid_sph_points.reshape(valid_sph_points.shape[0], 1, valid_sph_points.shape[1])
+
+        sample_human_models.extend(valid_sph_points)
+
+    return sample_human_models
 

@@ -47,7 +47,7 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
         mdp_agent.reset()  # reset the current state to the initial state
         mdp_agent.visualize_interaction()
 
-def explore_BEC_solid_angle(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, pool):
+def explore_BEC_solid_angle(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, pool, n_train_demos):
     hardcode_envs = False
 
     if hardcode_envs:
@@ -105,7 +105,8 @@ def explore_BEC_solid_angle(mdp_class, data_loc, mdp_parameters, weights, step_c
         with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
             BEC_summary = pickle.load(f)
     except:
-        BEC_summary = BEC.obtain_SCOT_summaries(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag)
+        # BEC_summary = BEC.obtain_SCOT_summaries(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag)
+        BEC_summary = BEC.obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_train_demos=n_train_demos)
         with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
             pickle.dump(BEC_summary, f)
 
@@ -252,4 +253,4 @@ if __name__ == "__main__":
     # obtain_test_environments(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,
     #                          params.step_cost_flag, summary=BEC_summary, visualize_test_env=True)
 
-    explore_BEC_solid_angle(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.step_cost_flag, params.BEC['summary_variant'], pool)
+    explore_BEC_solid_angle(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.step_cost_flag, params.BEC['summary_variant'], pool, params.BEC['n_train_demos'])

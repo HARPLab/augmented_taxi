@@ -1,17 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import policy_summarization.BEC_helpers as BEC_helpers
+import policy_summarization.computational_geometry as cg
 from scipy.spatial import geometric_slerp
 import matplotlib.tri as mtri
-
-def cart2sph(x, y, z):
-    '''
-    Return corresponding spherical coordinates (azimuth, elevation) of a Cartesian point (x, y, z)
-    '''
-    azi = np.arctan2(y, x)
-    ele = np.arccos(z/np.sqrt(x**2 + y**2 + z**2))
-
-    return azi, ele
 
 def visualize_spherical_polygon(poly, fig=None, ax=None, alpha=0.2, plot_ref_sphere=True):
     '''
@@ -67,49 +59,27 @@ def visualize_spherical_polygon(poly, fig=None, ax=None, alpha=0.2, plot_ref_sph
     min_constraints = np.delete(hrep, boundary_facet_idxs, axis=0)
     min_constraints = min_constraints[:, 1:]
 
-    def sample_valid_region(constraints, min_azi, max_azi, min_ele, max_ele, n_azi, n_ele):
-        # sample along the sphere
-        u = np.linspace(min_azi, max_azi, n_azi, endpoint=True)
-        v = np.linspace(min_ele, max_ele, n_ele, endpoint=True)
-
-        x = np.outer(np.cos(u), np.sin(v)).reshape(1, -1)
-        y = np.outer(np.sin(u), np.sin(v)).reshape(1, -1)
-        z = np.outer(np.ones(np.size(u)), np.cos(v)).reshape(1, -1)
-        sph_points = np.vstack((x, y, z))
-
-        # see which points on the sphere obey all constraints
-        dist_to_plane = constraints.dot(sph_points)
-        n_constraints_satisfied = np.sum(dist_to_plane >= 0, axis=0)
-        n_min_constraints = constraints.shape[0]
-
-        idx_valid_sph_points = np.where(n_constraints_satisfied == n_min_constraints)[0]
-        valid_sph_x = np.take(x, idx_valid_sph_points)
-        valid_sph_y = np.take(y, idx_valid_sph_points)
-        valid_sph_z = np.take(z, idx_valid_sph_points)
-
-        return valid_sph_x, valid_sph_y, valid_sph_z
-
     # obtain x, y, z coordinates on the sphere that obey the constraints
-    valid_sph_x, valid_sph_y, valid_sph_z = sample_valid_region(min_constraints, 0, 2 * np.pi, 0, np.pi, 1000, 1000)
+    valid_sph_x, valid_sph_y, valid_sph_z = cg.sample_valid_region(min_constraints, 0, 2 * np.pi, 0, np.pi, 1000, 1000)
 
     # resample coordinates on the sphere within the valid region (for higher density)
     sph_polygon_azi = []
     sph_polygon_ele = []
 
     for x in range(len(valid_sph_x)):
-        azi, ele = cart2sph(valid_sph_x[x], valid_sph_y[x], valid_sph_z[x])
+        azi, ele = cg.cart2sph(valid_sph_x[x], valid_sph_y[x], valid_sph_z[x])
         sph_polygon_azi.append(azi)
         sph_polygon_ele.append(ele)
 
     # obtain (the higher density of) x, y, z coordinates on the sphere that obey the constraints
     valid_sph_x, valid_sph_y, valid_sph_z = \
-        sample_valid_region(min_constraints, min(sph_polygon_azi), max(sph_polygon_azi), min(sph_polygon_ele), max(sph_polygon_ele), 50, 50)
+        cg.sample_valid_region(min_constraints, min(sph_polygon_azi), max(sph_polygon_azi), min(sph_polygon_ele), max(sph_polygon_ele), 50, 50)
 
     # create a triangulation mesh on which to interpolate using spherical coordinates
     valid_azi = []
     valid_ele = []
     for x in range(len(valid_sph_x)):
-        azi, ele = cart2sph(valid_sph_x[x], valid_sph_y[x], valid_sph_z[x])
+        azi, ele = cg.cart2sph(valid_sph_x[x], valid_sph_y[x], valid_sph_z[x])
         valid_azi.append(azi)
         valid_ele.append(ele)
     tri = mtri.Triangulation(valid_azi, valid_ele)
