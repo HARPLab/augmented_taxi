@@ -14,7 +14,7 @@ def normalize_constraints(constraints):
     zero_constraint = np.zeros(constraints[0].shape)
     for constraint in constraints:
         if not equal_constraints(constraint, zero_constraint):
-            normalized_constraints.append(constraint / np.linalg.norm(constraint[0, :], ord=1))
+            normalized_constraints.append(constraint / np.linalg.norm(constraint, ord=1))
 
     return normalized_constraints
 
@@ -41,7 +41,7 @@ def equal_constraints(c1, c2):
     '''
     Summary: Check for equality between two constraints c1 and c2
     '''
-    if np.sum(abs(c1 - c2)) <= 1e-05:
+    if np.sum(abs(c1 / np.linalg.norm(c1) - c2 / np.linalg.norm(c2))) <= 1e-05:
         return True
     else:
         return False
@@ -148,8 +148,6 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
     else:
         # remove constraints that don't belong in the minimal H-representation of the corresponding polyhedron (not
         # including the boundary constraints/facets)
-        nonredundant_constraints = []
-
         ieqs = constraints_to_halfspace_matrix_sage(constraints)
         poly = Polyhedron.Polyhedron(ieqs=ieqs)
         hrep = np.array(poly.Hrepresentation())
@@ -157,14 +155,12 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
         # remove boundary constraints/facets from consideration
         boundary_facet_idxs = np.where(hrep[:, 0] != 0)
         hrep_constraints = np.delete(hrep, boundary_facet_idxs, axis=0)
-        hrep_constraints = list(hrep_constraints[:, 1:])
+        # remove the first column since these constraints goes through the origin
+        nonredundant_constraints = hrep_constraints[:, 1:]
+        # reshape so that each element is a valid weight vector
+        nonredundant_constraints = nonredundant_constraints.reshape(nonredundant_constraints.shape[0], 1, nonredundant_constraints.shape[1])
 
-        for constraint in constraints:
-            # if the constraint belongs in the minimal H-representation, it's nonredundant
-            if any(np.allclose(constraint[0], hrep_constraint, atol=1e-05) for hrep_constraint in hrep_constraints):
-                nonredundant_constraints.append(constraint)
-
-    return nonredundant_constraints
+    return list(nonredundant_constraints)
 
 def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_record):
     '''
@@ -352,31 +348,10 @@ def constraints_to_halfspace_matrix_sage(constraints):
     Halfspace representation of a convex polygon (Ax < b):
     [-1,7,3,4] represents the inequality 7x_1 + 3x_2 + 4x_3 >= 1
     '''
-    n_boundary_constraints = 6
-    ieqs = np.zeros((len(constraints) + n_boundary_constraints, len(constraints[0][0]) + 1))
-
-    for j in range(len(constraints)):
-        ieqs[j, 0] = 0
-        ieqs[j, 1:] = np.array([constraints[j][0][0], constraints[j][0][1], constraints[j][0][2]])
-
-    # constrain the area of interest to a cube bounding the unit sphere
-    ieqs[len(constraints), :] = np.array([1, 1, 0, 0])
-    ieqs[len(constraints) + 1, :] = np.array([1, -1, 0, 0])
-    ieqs[len(constraints) + 2, :] = np.array([1, 0, 1, 0])
-    ieqs[len(constraints) + 3, :] = np.array([1, 0, -1, 0])
-    ieqs[len(constraints) + 4, :] = np.array([1, 0, 0, 1])
-    ieqs[len(constraints) + 5, :] = np.array([1, 0, 0, -1])
-
-    return ieqs
-
-def constraints_to_halfspace_matrix_nonbounding(constraints):
-    '''
-    Summary: convert list of halfspace constraints into an array of halfspace constraints
-    '''
-    ieqs = np.zeros((len(constraints), len(constraints[0][0])))
-
-    for j in range(len(constraints)):
-        ieqs[j, :] = np.array([constraints[j][0][0], constraints[j][0][1], constraints[j][0][2]])
+    constraints_stacked = np.vstack(constraints)
+    constraints_stacked = np.insert(constraints_stacked, 0, np.zeros((constraints_stacked.shape[0]), dtype='int'), axis=1)
+    constraints_stacked = np.vstack((constraints_stacked, np.array([1, 1, 0, 0]), np.array([1, -1, 0, 0]), np.array([1, 0, 1, 0]), np.array([1, 0, -1, 0]), np.array([1, 0, 0, 1]), np.array([1, 0, 0, -1])))
+    ieqs = constraints_stacked
 
     return ieqs
 
@@ -422,7 +397,7 @@ def calc_solid_angles(constraint_sets):
                     # calculate the dihedral angle
                     dihedral_angles.append(calc_dihedral_supp(hrep[curr_facet_idx, :], hrep[adj_facet_idx, :]))
 
-        # spherical excess formula
+        # spherical excess formula / Girard's theorem
         solid_angles.append(sum(dihedral_angles) - (len(dihedral_angles) - 2) * np.pi)
 
     return solid_angles
@@ -450,7 +425,7 @@ def sample_human_models(constraints, n_models):
     sample_human_models = []
 
     if len(constraints) > 0:
-        constraints_matrix = constraints_to_halfspace_matrix_nonbounding(constraints)
+        constraints_matrix = np.vstack(constraints)
 
         # obtain x, y, z coordinates on the sphere that obey the constraints
         valid_sph_x, valid_sph_y, valid_sph_z = cg.sample_valid_region(constraints_matrix, 0, 2 * np.pi, 0, np.pi, 1000, 1000)

@@ -193,7 +193,9 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, pool
         else:
             raise Exception("Unknown MDP class.")
 
-    n_processed_envs = len(os.listdir('models/' + data_loc + '/gt_policies/'))
+    policy_dir = 'models/' + data_loc + '/gt_policies/'
+    os.makedirs(policy_dir, exist_ok=True)
+    n_processed_envs = len(os.listdir(policy_dir))
 
     print("Solving for the optimal policy in each environment:")
     pool.restart()

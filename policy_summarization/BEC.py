@@ -57,12 +57,12 @@ def extract_constraints_policy(args):
             # toward the BEC of the policy (per definition)
             if sas_idx == 0:
                 policy_constraints.append(
-                    BEC_helpers.clean_up_constraints(constraints, weights, step_cost_flag))
+                    BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag))
 
         # also store the BEC constraints for optimal trajectory in each state, along with the associated
         # demo and environment number
         min_subset_constraints_record.append(
-            BEC_helpers.clean_up_constraints(constraints, weights, step_cost_flag))
+            BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag))
         traj_record.append(traj_opt)
         env_record.append(env_idx)
 
@@ -101,7 +101,7 @@ def extract_constraints_demonstration(args):
             constraints.append(mu_sa - mu_sb)
 
     # store the BEC constraints for each environment, along with the associated demo and environment number
-    min_subset_constraints = BEC_helpers.clean_up_constraints(constraints, weights, step_cost_flag)
+    min_subset_constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
     min_subset_constraints_record.append(min_subset_constraints)
     traj_record.append(traj_opt)
     env_record.append(env_idx)
@@ -173,7 +173,7 @@ def extract_BEC_constraints(policy_constraints, min_subset_constraints_record, e
     constraints_record = [item for sublist in policy_constraints for item in sublist]
 
     # first obtain the absolute min BEC constraint
-    min_BEC_constraints = BEC_helpers.clean_up_constraints(constraints_record, weights, step_cost_flag)
+    min_BEC_constraints = BEC_helpers.remove_redundant_constraints(constraints_record, weights, step_cost_flag)
 
     # then determine the BEC lengths of all other potential demos that could be shown
     BEC_lengths_record = []
@@ -322,6 +322,7 @@ def compute_counterfactuals(args):
 
             # obtain all optimal trajectory rollouts according to the human's model, if it has reasonable policy that converged
             if vi_human.stabilized:
+                # todo: consider forgoing this exhaustive search if computation needs to be reduced
                 human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
             # simply use a single roll out (which will likely just be noise anyway)
             else:
@@ -348,7 +349,7 @@ def compute_counterfactuals(args):
         hypothetical_constraints = []
         hypothetical_constraints.extend(min_BEC_constraints_running)
 
-        constraints = BEC_helpers.clean_up_constraints(constraints, weights, step_cost_flag)
+        constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
         hypothetical_constraints.extend(constraints)
 
         if len(min_BEC_constraints_running) > 0 and len(hypothetical_constraints) > 0:
@@ -406,7 +407,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
         # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(len(summary)) + '.png', just_save=True)
 
         # uniformly sample candidate human models from the valid BEC area along 2-sphere
-        sample_human_models = BEC_helpers.sample_human_models(min_BEC_constraints_running, n_models=min(pool.ncpus, 10))
+        sample_human_models = BEC_helpers.sample_human_models(min_BEC_constraints_running, n_models=4)
 
         info_gains_record = []
 
@@ -446,7 +447,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
 
         # compute the expected information gain by averaging across the various potential human models
         info_gains = np.array(info_gains_record)
-        info_gains = np.sum(info_gains, axis=0) / info_gains.shape[0]
+        info_gains_avg = np.sum(info_gains, axis=0) / info_gains.shape[0]
 
         # no need to continue search for demonstrations if none of them will improve the human's understanding
         if np.sum(info_gains) == 0:
@@ -459,12 +460,16 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
                 print(colored('Did not find any informative demonstrations. Retry count: {}'.format(retry_count), 'red'))
                 continue
 
-        # todo: let's just try returning the smallest information gain for now (so that we can have incremental demonstrations)
-        #  there often isn't enough demonstrations to generate 6 clusters, as I initially tried to do below
-        info_gains[info_gains <= 0] = float('inf')
-        select_model, best_env_idx, best_traj_idx = np.unravel_index(np.argmin(info_gains), info_gains.shape)
-        print(colored('Max infogain: {}'.format(np.max(info_gains)), 'blue'))
-        print(colored('Max Min infogain: {}'.format(np.min(info_gains)), 'blue')) # smallest infogain above zero
+        # todo: let's just try returning the smallest nonzero information gain for now (so that we can have incremental demonstrations)
+        info_gains_avg[info_gains_avg == 0] = float('inf')
+        # todo: this just finds the first index of the minimum value. could later select from all minimum value indices based on another criteria
+        best_env_idx, best_traj_idx = np.unravel_index(np.argmin(info_gains_avg), info_gains_avg.shape)
+
+        # update the human model to the one that provided the most information gain (to be conservative)
+        select_model = np.argmax(info_gains[:, best_env_idx, best_traj_idx])
+
+        print(colored('Min avg infogain: {}'.format(np.min(info_gains_avg)), 'blue')) # smallest infogain above zero
+        print(colored('Select model infogain: {}'.format(info_gains[select_model, best_env_idx, best_traj_idx]), 'blue'))
 
         best_traj = chunked_traj_record[best_env_idx][best_traj_idx]
         # with open('models/' + data_loc + '/counterfactual_data/model' + str(select_model) + '/cf_data_env' + str(

@@ -135,19 +135,19 @@ class CookieCrumbOOMDP(OOMDP):
         return reward_features
 
     def accumulate_reward_features(self, trajectory, discount=False):
-        reward_features = np.zeros(self.weights.shape)
+        reward_features = np.zeros(self.weights.shape, dtype='int')
 
         # discount the accumulated reward features directly here as you're considering the entire trajectory and likely
         # won't be discounting per (s, a, s') tuple
         if discount:
             step = 0
             for sas in trajectory:
-                reward_features += self.gamma ** step * self.compute_reward_features(sas[0], sas[1], sas[2])
+                reward_features = reward_features + self.gamma ** step * self.compute_reward_features(sas[0], sas[1], sas[2])
                 step += 1
         # but still provide the option to return undiscounted accumulated reward features as well
         else:
             for sas in trajectory:
-                reward_features += self.compute_reward_features(sas[0], sas[1], sas[2])
+                reward_features = reward_features + self.compute_reward_features(sas[0], sas[1], sas[2])
 
         return reward_features
 

@@ -240,7 +240,7 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints
 
 if __name__ == "__main__":
-    pool = Pool(params.n_cpu)
+    pool = Pool(min(params.n_cpu, 50))
 
     # a) generate an agent if you want to explore the Augmented Taxi MDP
     # generate_agent(params.mdp_class, params.data_loc['base'], params.mdp_parameters, visualize=True)
