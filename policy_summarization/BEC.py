@@ -402,6 +402,9 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
 
     min_BEC_constraints_running = []
 
+    # clear the demonstration generation log
+    open('demo_gen_log.txt', 'w').close()
+
     while len(summary) < n_train_demos:
         retry_count = 0
         # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(len(summary)) + '.png', just_save=True)
@@ -412,9 +415,16 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
         info_gains_record = []
 
         print("Length of summary: {}".format(len(summary)))
+        with open('demo_gen_log.txt', 'a') as myfile:
+            myfile.write('Length of summary: {}\n'.format(len(summary)))
+
         for model_idx, human_model in enumerate(sample_human_models):
             print(colored('Model #: {}'.format(model_idx), 'red'))
             print(colored('Model val: {}'.format(human_model), 'red'))
+
+            with open('demo_gen_log.txt', 'a') as myfile:
+                myfile.write('Model #: {}\n'.format(model_idx))
+                myfile.write('Model val: {}\n'.format(human_model))
 
             w_human_normalized = human_model
             info_gains_model = []
@@ -458,6 +468,8 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
             else:
                 retry_count += 1
                 print(colored('Did not find any informative demonstrations. Retry count: {}'.format(retry_count), 'red'))
+                with open('demo_gen_log.txt', 'a') as myfile:
+                    myfile.write('Did not find any informative demonstrations. Retry count: {}\n'.format(retry_count))
                 continue
 
         # todo: let's just try returning the smallest nonzero information gain for now (so that we can have incremental demonstrations)
@@ -470,6 +482,10 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
 
         print(colored('Min avg infogain: {}'.format(np.min(info_gains_avg)), 'blue')) # smallest infogain above zero
         print(colored('Select model infogain: {}'.format(info_gains[select_model, best_env_idx, best_traj_idx]), 'blue'))
+        with open('demo_gen_log.txt', 'a') as myfile:
+            myfile.write('Min avg infogain: {}\n'.format(np.min(info_gains_avg)).format(retry_count))
+            myfile.write('Select model infogain: {}\n'.format(info_gains[select_model, best_env_idx, best_traj_idx]))
+            myfile.write('\n')
 
         best_traj = chunked_traj_record[best_env_idx][best_traj_idx]
         # with open('models/' + data_loc + '/counterfactual_data/model' + str(select_model) + '/cf_data_env' + str(

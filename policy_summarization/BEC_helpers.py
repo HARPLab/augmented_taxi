@@ -461,7 +461,6 @@ def sample_human_models(constraints, n_models):
 
             # see which points on the sphere obey all constraints
             sph_points = np.array(list(map(cg.sph2cat, theta, phi)))
-            # constraints = np.array(constraints) # todo: verify that this casts properly
             dist_to_plane = constraints_matrix.dot(sph_points.T)
             n_constraints_satisfied = np.sum(dist_to_plane >= 0, axis=0)
             n_min_constraints = constraints_matrix.shape[0]
