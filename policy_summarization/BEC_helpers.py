@@ -390,9 +390,12 @@ def calc_solid_angles(constraint_sets):
 
         dihedral_angles = []
         for curr_facet_idx in range(facet_adj_triu.shape[0]):
+            # no need to consider adjacent facets to a boundary facet as you're removed from the sphere center
+            if curr_facet_idx in boundary_facet_idxs:
+                continue
             adj_facet_idxs = np.where(facet_adj_triu[curr_facet_idx, :] > 0)[0]
             for adj_facet_idx in adj_facet_idxs:
-                # no need to consider the dihedral angles between a bounding facet
+                # no need to consider the dihedral angles to a bounding facet
                 if adj_facet_idx not in boundary_facet_idxs:
                     # calculate the dihedral angle
                     dihedral_angles.append(calc_dihedral_supp(hrep[curr_facet_idx, :], hrep[adj_facet_idx, :]))
