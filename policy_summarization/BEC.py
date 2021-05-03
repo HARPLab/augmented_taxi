@@ -356,7 +356,7 @@ def compute_counterfactuals(args):
         skip_demo = False
         if variable_filter is not None:
             for constraint in constraints:
-                if variable_filter.dot(constraint.T)[0, 0] > 0:
+                if abs(variable_filter.dot(constraint.T)[0, 0]) > 0:
                     # conveys information about variable designated to be filtered out, so block this demonstration
                     skip_demo = True
                     info_gain = 0
@@ -392,8 +392,10 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
 
     # todo: testing out variable scaffolding
     variable_filter = np.array([[0, 1, 0]]) # 1's for variable you wish to filter out
-
     summary = []
+    retry_count = 0
+    # clear the demonstration generation log
+    open('models/' + data_loc + '/demo_gen_log.txt', 'w').close()
 
     # assuming that traj_record / env_record are sorted properly by env order, chunk via environment for faster multiprocessing
     current_env = 0
@@ -416,27 +418,23 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
 
     min_BEC_constraints_running = []
 
-    # clear the demonstration generation log
-    open('demo_gen_log.txt', 'w').close()
-
     while len(summary) < n_train_demos:
-        retry_count = 0
         # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(len(summary)) + '.png', just_save=True)
 
         # uniformly sample candidate human models from the valid BEC area along 2-sphere
-        sample_human_models = BEC_helpers.sample_human_models(min_BEC_constraints_running, n_models=4)
+        sample_human_models = BEC_helpers.sample_human_models(min_BEC_constraints_running, n_models=10)
 
         info_gains_record = []
 
         print("Length of summary: {}".format(len(summary)))
-        with open('demo_gen_log.txt', 'a') as myfile:
+        with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
             myfile.write('Length of summary: {}\n'.format(len(summary)))
 
         for model_idx, human_model in enumerate(sample_human_models):
             print(colored('Model #: {}'.format(model_idx), 'red'))
             print(colored('Model val: {}'.format(human_model), 'red'))
 
-            with open('demo_gen_log.txt', 'a') as myfile:
+            with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
                 myfile.write('Model #: {}\n'.format(model_idx))
                 myfile.write('Model val: {}\n'.format(human_model))
 
@@ -479,22 +477,31 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
             else:
                 retry_count += 1
                 print(colored('Did not find any informative demonstrations. Retry count: {}'.format(retry_count), 'red'))
-                with open('demo_gen_log.txt', 'a') as myfile:
+                with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
                     myfile.write('Did not find any informative demonstrations. Retry count: {}\n'.format(retry_count))
+
+                # no more informative demonstrations with this filter, so remove it
+                if variable_filter is not None:
+                    print(colored('Setting variable filter to None\n', 'red'))
+                    with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
+                        myfile.write('Setting variable filter to None\n')
+                    variable_filter = None
+
                 continue
 
         # todo: let's just try returning the smallest nonzero information gain for now (so that we can have incremental demonstrations)
-        info_gains_avg[info_gains_avg == 0] = float('inf')
+        info_gains_avg[info_gains_avg == 0] = float('-inf')
         # todo: this just finds the first index of the minimum value. could later select from all minimum value indices based on another criteria
-        best_env_idx, best_traj_idx = np.unravel_index(np.argmin(info_gains_avg), info_gains_avg.shape)
+        best_env_idx, best_traj_idx = np.unravel_index(np.argmax(info_gains_avg), info_gains_avg.shape)
+        best_env_idxs, best_traj_idxs = np.where(info_gains_avg == max(info_gains_avg.flatten())) # todo: for development purposes
 
         # update the human model to the one that provided the most information gain (to be conservative)
         select_model = np.argmax(info_gains[:, best_env_idx, best_traj_idx])
 
-        print(colored('Min avg infogain: {}'.format(np.min(info_gains_avg)), 'blue')) # smallest infogain above zero
+        print(colored('Max avg infogain: {}'.format(np.max(info_gains_avg)), 'blue')) # smallest infogain above zero
         print(colored('Select model infogain: {}'.format(info_gains[select_model, best_env_idx, best_traj_idx]), 'blue'))
-        with open('demo_gen_log.txt', 'a') as myfile:
-            myfile.write('Min avg infogain: {}\n'.format(np.min(info_gains_avg)).format(retry_count))
+        with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
+            myfile.write('Max avg infogain: {}\n'.format(np.max(info_gains_avg)).format(retry_count))
             myfile.write('Select model infogain: {}\n'.format(info_gains[select_model, best_env_idx, best_traj_idx]))
             myfile.write('\n')
 
@@ -515,11 +522,14 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
         min_BEC_constraints_running.extend(constraints_env[best_traj_idx])
         min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
 
-        summary.append([best_mdp, best_traj, constraints_env[best_traj_idx], best_human_trajs])
+        summary.append([best_mdp, best_traj, constraints_env[best_traj_idx], best_human_trajs, best_env_idx, best_traj_idx, select_model, best_env_idxs, best_traj_idxs, sample_human_models])
 
         # this method doesn't always finish, so save the summary along the way
         with open('models/augmented_taxi/BEC_summary.pickle', 'wb') as f:
             pickle.dump(summary, f)
+
+        # reset the retry count
+        retry_count = 0
 
     return summary
 

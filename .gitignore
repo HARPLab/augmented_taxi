@@ -27,3 +27,4 @@ dfs_processed.pickle
 sandbox.py
 cysignals_crash_logs/
 tests/
+demo_gen_log.txt
