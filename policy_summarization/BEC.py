@@ -283,7 +283,7 @@ def obtain_potential_summary_demos(BEC_lengths_record, n_demos, n_clusters=6, ty
     return covering_demos_idxs
 
 def compute_counterfactuals(args):
-    data_loc, model_idx, env_idx, w_human_normalized, env_filename, trajs_opt, min_BEC_constraints_running, step_cost_flag, summary_len = args
+    data_loc, model_idx, env_idx, w_human_normalized, env_filename, trajs_opt, min_BEC_constraints_running, step_cost_flag, summary_len, variable_filter = args
 
     with open(env_filename, 'rb') as f:
         wt_vi_traj_env = pickle.load(f)
@@ -352,12 +352,22 @@ def compute_counterfactuals(args):
         constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
         hypothetical_constraints.extend(constraints)
 
-        if len(min_BEC_constraints_running) > 0 and len(hypothetical_constraints) > 0:
-            info_gain = BEC_helpers.calc_solid_angles([min_BEC_constraints_running])[0] - BEC_helpers.calc_solid_angles([hypothetical_constraints])[0]
-        elif len(hypothetical_constraints) > 0:
-            info_gain = 4 * np.pi - BEC_helpers.calc_solid_angles([hypothetical_constraints])[0]
-        else:
-            info_gain = 0
+        # don't consider environments that convey information about a variable you don't currently wish to convey
+        skip_demo = False
+        if variable_filter is not None:
+            for constraint in constraints:
+                if variable_filter.dot(constraint.T)[0, 0] > 0:
+                    # conveys information about variable designated to be filtered out, so block this demonstration
+                    skip_demo = True
+                    info_gain = 0
+
+        if not skip_demo:
+            if len(min_BEC_constraints_running) > 0 and len(hypothetical_constraints) > 0:
+                info_gain = BEC_helpers.calc_solid_angles([min_BEC_constraints_running])[0] - BEC_helpers.calc_solid_angles([hypothetical_constraints])[0]
+            elif len(hypothetical_constraints) > 0:
+                info_gain = 4 * np.pi - BEC_helpers.calc_solid_angles([hypothetical_constraints])[0]
+            else:
+                info_gain = 0
 
         # mdp.visualize_trajectory(traj_opt)
         # vi_human.mdp.visualize_trajectory(traj_hyp)
@@ -374,10 +384,14 @@ def compute_counterfactuals(args):
         pickle.dump((best_human_trajs_record_env, constraints_env), f)
 
     return info_gain_env
+    # return list(np.arange(100))
 
 
 def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool,
                        n_train_demos=3, downsample_threshold=float("inf")):
+
+    # todo: testing out variable scaffolding
+    variable_filter = np.array([[0, 1, 0]]) # 1's for variable you wish to filter out
 
     summary = []
 
@@ -439,16 +453,13 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
             os.makedirs(cf_data_dir, exist_ok=True)
 
             pool.restart()
-            args = [(data_loc, model_idx, i, w_human_normalized, mp_helpers.lookup_env_filename(data_loc, chunked_env_record[i]), chunked_traj_record[i], min_BEC_constraints_running, step_cost_flag, len(summary)) for i in range(len(chunked_traj_record))]
+            args = [(data_loc, model_idx, i, w_human_normalized, mp_helpers.lookup_env_filename(data_loc, chunked_env_record[i]), chunked_traj_record[i], min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter) for i in range(len(chunked_traj_record))]
             info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals, args), total=len(args)))
             pool.close()
             pool.join()
             pool.terminate()
 
-            for info_gain_env in info_gain_envs:
-                info_gains_model.append(info_gain_env)
-
-            info_gains_record.append(info_gains_model)
+            info_gains_record.append(info_gain_envs)
 
         # with open('models/augmented_taxi/info_gains.pickle', 'wb') as f:
         #     pickle.dump(info_gains_record, f)
