@@ -388,7 +388,7 @@ def combine_limiting_constraints(args):
     '''
     Summary: combine the most limiting constraints across all potential human models for each potential demonstration
     '''
-    env_idx, n_sample_human_models, data_loc, curr_summary_len, weights, step_cost_flag, variable_filter, min_BEC_constraints_running = args
+    env_idx, n_sample_human_models, data_loc, curr_summary_len, weights, step_cost_flag, variable_filter, trajs_opt, min_BEC_constraints_running = args
 
     info_gains_record = []
     min_env_constraints_record = []
@@ -402,7 +402,6 @@ def combine_limiting_constraints(args):
             best_human_trajs_record_env, constraints_env = pickle.load(f)
         all_env_constraints.append(constraints_env)
 
-    # all_env_constraints_joint = list(zip(*all_env_constraints))
     all_env_constraints_joint = [list(itertools.chain.from_iterable(i)) for i in zip(*all_env_constraints)]
     # for each possible demonstration in each environment, find the non-redundant constraints across all human models
     # and use that to calculate the information gain for that demonstration
@@ -437,12 +436,63 @@ def combine_limiting_constraints(args):
         else:
             info_gains_record.append(0)
 
-    return info_gains_record, min_env_constraints_record
+
+    # obtain the counterfactual human trajectories that could've given rise to the most limiting constraints and by
+    # how many actions it differs from the agent's optimal trajectory (i.e. a notion of cost of considering a counterfactual)
+    human_counterfactual_trajs = [[] for i in range(len(min_env_constraints_record))]
+    diffs_in_opt_and_counterfactual_traj = [[] for i in range(len(min_env_constraints_record))]
+
+    for model_idx in range(n_sample_human_models):
+        with open('models/' + data_loc + '/counterfactual_data_' + str(curr_summary_len) + '/model' + str(
+                model_idx) + '/cf_data_env' + str(
+            env_idx).zfill(5) + '.pickle', 'rb') as f:
+            best_human_trajs_record_env, constraints_env = pickle.load(f)
+
+        # for each of the minimum constraint sets in each environment (with a unique starting state)
+        for traj_idx, min_env_constraints in enumerate(min_env_constraints_record):
+            in_minimum_set = False
+
+            # see if any of the constraints generated using this human trajectory match any of those in the minimum constraint set
+            for constraint in constraints_env[traj_idx]:
+                for min_env_constraint in min_env_constraints:
+                    # if there is a match, consider the difference in trajectory length compared to the agent's optimal
+                    # trajectory and store that trajectory
+                    if BEC_helpers.equal_constraints(constraint, min_env_constraint):
+                        in_minimum_set = True
+
+                        # compare the agent's optimal trajectory to equally rewarding human counterfactual trajectories
+                        # and record the minimum difference in trajectories
+                        min_dist = float('inf')
+                        for human_equivalence_traj_idx, human_traj in enumerate(best_human_trajs_record_env[traj_idx]):
+                            dist = 0
+                            if len(trajs_opt[traj_idx]) >= len(human_traj):
+                                for idx, sas in enumerate(human_traj):
+                                    if sas[1] != trajs_opt[traj_idx][idx][1]:
+                                        dist += 1
+                                dist += len(trajs_opt[traj_idx]) - len(human_traj)
+                            else:
+                                for idx, sas in enumerate(trajs_opt[traj_idx]):
+                                    if sas[1] != human_traj[idx][1]:
+                                        dist += 1
+                                dist += len(human_traj) - len(trajs_opt[traj_idx])
+                            if dist < min_dist:
+                                min_dist = dist
+
+                        diffs_in_opt_and_counterfactual_traj[traj_idx].append(min_dist)
+                        # store the required information for replaying the closest human counterfactual trajectory
+                        human_counterfactual_trajs[traj_idx].append((curr_summary_len, model_idx, env_idx, traj_idx, human_equivalence_traj_idx))
+                        break
+
+                # a counterfactual trajectory only needs to contribute one constraint in the minimal set for the
+                # corresponding optimal trajectory to be considered for the summary
+                if in_minimum_set:
+                    break
+
+    return info_gains_record, min_env_constraints_record, diffs_in_opt_and_counterfactual_traj, human_counterfactual_trajs
 
 def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool,
                        n_train_demos=3, downsample_threshold=float("inf")):
 
-    # todo: testing out variable scaffolding
     variable_filter = np.array([[0, 1, 0]]) # 1's for variable you wish to filter out
     summary = []
     retry_count = 0
@@ -468,7 +518,8 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
             chunked_trajs.append(traj_record[idx])
     chunked_traj_record.append(chunked_trajs)
 
-    min_BEC_constraints_running = []
+    # impose priors that the step cost is positive and the step cost is negative
+    min_BEC_constraints_running = [np.array([[1, 0, 0]]), np.array([[0, 0, -1]])]
 
     while len(summary) < n_train_demos:
         # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(len(summary)) + '.png', just_save=True)
@@ -545,15 +596,19 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
         # limiting constraints across all potential human models)
         print("Combining the most limiting constraints across human models:")
         pool.restart()
-        args = [(i, len(sample_human_models), data_loc, len(summary), weights, step_cost_flag, variable_filter, min_BEC_constraints_running) for
-                i in range(len(chunked_traj_record))]
-        info_gains_record, min_env_constraints_record = zip(*pool.imap(combine_limiting_constraints, tqdm(args)))
+        args = [(i, len(sample_human_models), data_loc, len(summary), weights, step_cost_flag, variable_filter,
+                 chunked_traj_record[i], min_BEC_constraints_running) for i in range(len(chunked_traj_record))]
+        info_gains_record, min_env_constraints_record, diffs_in_opt_and_counterfactual_traj, human_counterfactual_trajs = zip(
+            *pool.imap(combine_limiting_constraints, tqdm(args)))
         pool.close()
         pool.join()
         pool.terminate()
 
         with open('models/augmented_taxi/info_gains_' + str(len(summary)) + '_secondary.pickle', 'wb') as f:
             pickle.dump(info_gains_record, f)
+
+        with open('models/augmented_taxi/counterfactual_trajs_' + str(len(summary)) + '.pickle', 'wb') as f:
+            pickle.dump((diffs_in_opt_and_counterfactual_traj, human_counterfactual_trajs), f)
 
         info_gains = np.array(info_gains_record)  # todo: expects that each env supports the same number of demonstrations
 
@@ -578,10 +633,44 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
 
                 continue
 
+        # find the counterfactual trajectory with the minimum difference in number of actions
+        min_traj_diffs = []
+        max_traj_diff = 0
+        min_human_counterfactual_trajs = []
+        for env_idx, diffs_in_opt_and_counterfactual_traj_per_env in enumerate(diffs_in_opt_and_counterfactual_traj):
+            min_traj_diffs_per_env = []
+            human_counterfactual_trajs_per_env = []
+            for diffs in diffs_in_opt_and_counterfactual_traj_per_env:
+                try:
+                    min_diff = np.min(diffs)
+                    min_traj_diffs_per_env.append(min_diff)
+                    human_counterfactual_trajs_per_env.append(human_counterfactual_trajs[env_idx][np.argmin(diffs)])
 
-        # todo: this just finds the first index of the minimum value. could later select from all minimum value indices based on another criteria
-        best_env_idx, best_traj_idx = np.unravel_index(np.argmax(info_gains), info_gains.shape)
-        best_env_idxs, best_traj_idxs = np.where(info_gains == max(info_gains.flatten())) # todo: for development purposes
+                    if min_diff > max_traj_diff:
+                        max_traj_diff = min_diff
+                except:
+                    # if this demonstration didn't have any constraints to contribute across any of the human models,
+                    # simply record the difference in trajectories as being infinite (the corresponding infogain will be 0 anyway)
+                    min_traj_diffs_per_env.append(float('inf'))
+                    human_counterfactual_trajs_per_env.append([])
+            min_traj_diffs.append(min_traj_diffs_per_env)
+
+            # store the corresponding human counterfactual trajectory with the minimum difference with the agent's trajectory
+            min_human_counterfactual_trajs.append(human_counterfactual_trajs_per_env)
+        min_traj_diffs = np.array(min_traj_diffs)
+
+        # info_gains_normed = info_gains / np.max(info_gains)
+        # min_traj_diffs_normed = min_traj_diffs / max_traj_diff
+        # obj_function = info_gains_normed - min_traj_diffs_normed  # objective 1: difference, may need to weight and tune
+
+        obj_function = info_gains / min_traj_diffs                  # objective 2: scaled
+        best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
+        best_env_idxs, best_traj_idxs = np.where(obj_function == max(obj_function.flatten())) # todo: for development purposes
+
+        # todo: this just finds the first index of the minimum value. could later select from all minimum value indices based on another criteria (e.g. visual optimization)
+        # objective 3: no consideration of cost (i.e. the difference in agent and human trajectories)
+        # best_env_idx, best_traj_idx = np.unravel_index(np.argmax(info_gains), info_gains.shape)
+        # best_env_idxs, best_traj_idxs = np.where(info_gains == max(info_gains.flatten())) # todo: for development purposes
 
         print(colored('Max infogain: {}'.format(np.max(info_gains)), 'blue')) # smallest infogain above zero
         with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
@@ -589,8 +678,6 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
             myfile.write('\n')
 
         best_traj = chunked_traj_record[best_env_idx][best_traj_idx]
-        best_human_trajs = None # todo: dummy variable
-        select_model = None
         min_BEC_constraints_demo = min_env_constraints_record[best_env_idx][best_traj_idx]
 
         # shared code between a) and b)
@@ -602,7 +689,8 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
         min_BEC_constraints_running.extend(min_BEC_constraints_demo)
         min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
 
-        summary.append([best_mdp, best_traj, min_BEC_constraints_demo, best_human_trajs, best_env_idx, best_traj_idx, select_model, best_env_idxs, best_traj_idxs, sample_human_models])
+        summary.append([best_mdp, best_traj, min_BEC_constraints_demo, min_BEC_constraints_running, best_env_idx, best_traj_idx,
+                        best_env_idxs, best_traj_idxs, sample_human_models, min_human_counterfactual_trajs[best_env_idx][best_traj_idx]])
 
         # this method doesn't always finish, so save the summary along the way
         with open('models/augmented_taxi/BEC_summary.pickle', 'wb') as f:
