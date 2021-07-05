@@ -3,6 +3,7 @@ from pypoman import compute_polygon_hull, indicate_violating_constraints
 from scipy.optimize import linprog
 import sage.all
 import sage.geometry.polyhedron.base as Polyhedron
+from termcolor import colored
 
 from policy_summarization import computational_geometry as cg
 
@@ -485,6 +486,75 @@ def sample_human_models(constraints, n_models):
         valid_sph_points = valid_sph_points.reshape(valid_sph_points.shape[0], 1, valid_sph_points.shape[1])
 
         sample_human_models.extend(valid_sph_points)
+
+    return sample_human_models
+
+def sample_average_model(constraints):
+    '''
+    Summary: sample a representative average of the weights the human could currently attribute to the agent
+    '''
+
+    sample_human_models = []
+
+    if len(constraints) > 0:
+        constraints_matrix = np.vstack(constraints)
+
+        # obtain x, y, z coordinates on the sphere that obey the constraints
+        valid_sph_x, valid_sph_y, valid_sph_z = cg.sample_valid_region(constraints_matrix, 0, 2 * np.pi, 0, np.pi, 1000, 1000)
+
+        # resample coordinates on the sphere within the valid region (for higher density)
+        sph_polygon_azi = []
+        sph_polygon_ele = []
+
+        for x in range(len(valid_sph_x)):
+            azi, ele = cg.cart2sph(valid_sph_x[x], valid_sph_y[x], valid_sph_z[x])
+            sph_polygon_azi.append(azi)
+            sph_polygon_ele.append(ele)
+
+        min_azi = min(sph_polygon_azi)
+        max_azi = max(sph_polygon_azi)
+        min_ele = min(sph_polygon_ele)
+        max_ele = max(sph_polygon_ele)
+
+        # sample according to the inverse CDF of the uniform distribution along the sphere
+        u_low = min_azi / (2 * np.pi)
+        u_high = max_azi / (2 * np.pi)
+        v_low = (1 - np.cos(min_ele)) / 2
+        v_high = (1 - np.cos(max_ele)) / 2
+
+        theta = 2 * np.pi * np.random.uniform(low=u_low, high=u_high, size=1000)
+        phi = np.arccos(1 - 2 * np.random.uniform(low=v_low, high=v_high, size=1000))
+
+        # reject points that fall outside of the desired area
+
+        # see which points on the sphere obey all constraints
+        sph_points = np.array(list(map(cg.sph2cat, theta, phi)))
+        dist_to_plane = constraints_matrix.dot(sph_points.T)
+        n_constraints_satisfied = np.sum(dist_to_plane >= 0, axis=0)
+        n_min_constraints = constraints_matrix.shape[0]
+
+        idx_valid_sph_points = np.where(n_constraints_satisfied == n_min_constraints)[0]
+        valid_sph_points = sph_points[idx_valid_sph_points, :]
+
+        center = np.mean(valid_sph_points, axis=0)
+        center_tiled = np.tile(center, (valid_sph_points.shape[0], 1))
+        distances = np.linalg.norm(valid_sph_points - center_tiled, axis=1)
+
+        closest_center_point = valid_sph_points[np.argmin(distances), :]
+
+        # reshape so that each element is a valid weight vector
+        closest_center_point = closest_center_point.reshape(1, -1)
+
+        sample_human_models.append(closest_center_point)
+    else:
+        theta = 2 * np.pi * np.random.uniform(low=0, high=1, size=1)
+        phi = np.arccos(1 - 2 * np.random.uniform(low=0, high=1, size=1))
+
+        valid_sph_points = np.array(cg.sph2cat(theta, phi))
+        # reshape so that each element is a valid weight vector
+        valid_sph_points = valid_sph_points.reshape(1, -1)
+
+        sample_human_models.append(valid_sph_points)
 
     return sample_human_models
 
