@@ -303,6 +303,7 @@ def compute_counterfactuals(args):
         best_human_trajs_record_env = []
         constraints_env = []
         info_gain_env = []
+        diffs_in_opt_and_counterfactual_traj_env = []
 
         for traj_opt in trajs_opt:
             constraints = []
@@ -370,17 +371,46 @@ def compute_counterfactuals(args):
             best_human_trajs_record_env.append(best_human_trajs_record)
             constraints_env.append(constraints)
             info_gain_env.append(info_gain)
+
+            # calculate by how many actions the human's counterfactual trajectory differs from the agent's optimal
+            # trajectory (i.e. a notion of cost of considering a counterfactual)
+
+            # you should only consider the difference for the first counterfactual human trajectory (as opposed to
+            # counterfactual trajectories that could've arisen from states after the first state)
+            human_traj = best_human_trajs_record[0]
+
+            # if the human's policy hasn't stabilized, then the human trajectory will be an empty list
+            agent_actions = [sas[1] for sas in traj_opt]
+            human_actions = [sas[1] for sas in human_traj]
+
+            # find all actions that are common and in the same sequence between the agent and human actions
+            matcher = difflib.SequenceMatcher(None, human_actions, agent_actions, autojunk=False)
+            matches = matcher.get_matching_blocks()
+            overlap = 0
+            for match in matches:
+                overlap += match[2]
+            # the distance between the two trajectories is the number of actions that aren't shared in sequence
+            dist = max(len(human_actions), len(agent_actions)) - overlap
+
+            # take a nonlinear transformation to discount longer trajectories less (sometimes long demonstrations
+            # are needed to provide information and we don't want to penalize too heavily, else you will end up with
+            # many incremental demonstrations)
+            dist = np.sqrt(dist)
+
+            diffs_in_opt_and_counterfactual_traj_env.append(dist)
+
     # else just populate with dummy variables
     else:
         best_human_trajs_record_env = [[[]] for i in range(len(trajs_opt))]
         constraints_env = [[] for i in range(len(trajs_opt))]
         info_gain_env = [0 for i in range(len(trajs_opt))]
+        diffs_in_opt_and_counterfactual_traj_env = [float('inf') for i in range(len(trajs_opt))]
 
     with open('models/' + data_loc + '/counterfactual_data_' + str(summary_len) + '/model' + str(model_idx) +
               '/cf_data_env' + str(env_idx).zfill(5) + '.pickle', 'wb') as f:
         pickle.dump((best_human_trajs_record_env, constraints_env), f)
 
-    return info_gain_env
+    return info_gain_env, diffs_in_opt_and_counterfactual_traj_env
 
 def combine_limiting_constraints(args):
     '''
@@ -564,10 +594,11 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
         # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(len(summary)) + '.png', just_save=True)
 
         # uniformly sample candidate human models from the valid BEC area along 2-sphere
-        # sample_human_models = BEC_helpers.sample_human_models(min_BEC_constraints_running, n_models=10)
-        sample_human_models = BEC_helpers.sample_average_model(min_BEC_constraints_running)
+        sample_human_models = BEC_helpers.sample_human_models(min_BEC_constraints_running, n_models=8)
+        # sample_human_models = BEC_helpers.sample_average_model(min_BEC_constraints_running)
 
         info_gains_record = []
+        diffs_in_opt_and_counterfactual_traj_record = []
 
         print("Length of summary: {}".format(len(summary)))
         with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
@@ -592,12 +623,13 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
 
             pool.restart() # todo: maybe there's no need to terminate and restart pool multiple times in the same function
             args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, chunked_env_record[i]), chunked_traj_record[i], min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter) for i in range(len(chunked_traj_record))]
-            info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals, args), total=len(args)))
+            info_gain_envs, diffs_in_opt_and_counterfactual_traj_env = zip(*pool.imap(compute_counterfactuals, tqdm(args), total=len(args)))
             pool.close()
             pool.join()
             pool.terminate()
 
             info_gains_record.append(info_gain_envs)
+            diffs_in_opt_and_counterfactual_traj_record.append(diffs_in_opt_and_counterfactual_traj_env)
 
         with open('models/' + data_loc + '/info_gains_' + str(len(summary)) + '.pickle', 'wb') as f:
             pickle.dump(info_gains_record, f)
@@ -655,24 +687,6 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
 
         # b) select the demonstration that best balances maximizing information with minimizing cost (i.e. the difference
         # between the optimal trajectories of the agent and the human)
-        diffs_in_opt_and_counterfactual_traj_record = []
-
-        for model_idx, human_model in enumerate(sample_human_models):
-            print("Quantifying the difference between the optimal trajectories of the agent and the human:")
-            pool.restart()
-            args = [(model_idx, i, len(sample_human_models), data_loc, len(summary), weights, step_cost_flag, variable_filter,
-                     chunked_traj_record[i], min_BEC_constraints_running) for i in range(len(chunked_traj_record))]
-            diffs_in_opt_and_counterfactual_traj = list(tqdm(pool.imap(record_diff_in_traj, args), total=len(args)))
-
-            pool.close()
-            pool.join()
-            pool.terminate()
-
-            diffs_in_opt_and_counterfactual_traj_record.append(diffs_in_opt_and_counterfactual_traj)
-
-        with open('models/' + data_loc + '/info_gains_' + str(len(summary)) + '_secondary.pickle', 'wb') as f:
-            pickle.dump(info_gains_record, f)
-
         with open('models/' + data_loc + '/diffs_counterfactual_trajs_' + str(len(summary)) + '.pickle', 'wb') as f:
             pickle.dump((diffs_in_opt_and_counterfactual_traj_record), f)
 
