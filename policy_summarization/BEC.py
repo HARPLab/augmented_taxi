@@ -563,18 +563,30 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
                        n_train_demos=3, downsample_threshold=float("inf")):
 
     variable_filter = np.array([[0, 1, 0]]) # 1's for variable you wish to filter out
+    # variable_filter = None # 1's for variable you wish to filter out todo:two-goal
+
     summary = []
     retry_count = 0
     # clear the demonstration generation log
     open('models/' + data_loc + '/demo_gen_log.txt', 'w').close()
+    consistent_state_count = True   # whether there are a consistent number of states across various environments
 
     # assuming that traj_record / env_record are sorted properly by env order, chunk via environment for faster multiprocessing
     current_env = 0
     chunked_traj_record = []
     chunked_env_record = [0]
     chunked_trajs = []
+    previous_state_count = None
     for idx, env in enumerate(env_record):
         if env != current_env:
+            if previous_state_count == None:
+                previous_state_count = len(chunked_trajs)
+            else:
+                if previous_state_count != len(chunked_trajs):
+                    consistent_state_count = False
+                else:
+                    previous_state_count = len(chunked_trajs)
+
             # record the old chunk
             chunked_traj_record.append(chunked_trajs)
 
@@ -589,6 +601,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
 
     # impose priors that the step cost is positive and the step cost is negative
     min_BEC_constraints_running = [np.array([[1, 0, 0]]), np.array([[0, 0, -1]])]
+    # min_BEC_constraints_running = [np.array([[1, 0, 0]]), np.array([[0, 1, 0]]), np.array([[0, 0, -1]])] # todo:two-goal
 
     while len(summary) < n_train_demos:
         # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(len(summary)) + '.png', just_save=True)
@@ -634,13 +647,19 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
         with open('models/' + data_loc + '/info_gains_' + str(len(summary)) + '.pickle', 'wb') as f:
             pickle.dump(info_gains_record, f)
 
-        # todo: I'm currently only using info_gains to check whether to increment the retry_count or not. maybe I should
-        #  use the later computation of info_gains with the limiting constraints across user models for retry_count
-        # compute the expected information gain by averaging across the various potential human models
-        info_gains = np.array(info_gains_record) # todo: expects that each env supports the same number of demonstrations
+        no_info_flag = False
+        if consistent_state_count:
+            info_gains = np.array(info_gains_record)
+            if np.sum(info_gains) == 0:
+                no_info_flag = True
+        else:
+            info_gains_flattened_across_models = list(itertools.chain.from_iterable(info_gains_record))
+            info_gains_flattened_across_envs = list(itertools.chain.from_iterable(info_gains_flattened_across_models))
+            if sum(info_gains_flattened_across_envs) == 0:
+                no_info_flag = True
 
         # no need to continue search for demonstrations if none of them will improve the human's understanding
-        if np.sum(info_gains) == 0:
+        if no_info_flag:
             # sample up two more set of human models to try and find a demonstration that will improve the human's
             # understanding before concluding that there is no more information to be conveyed
             if retry_count == 1:
@@ -690,25 +709,48 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
         with open('models/' + data_loc + '/diffs_counterfactual_trajs_' + str(len(summary)) + '.pickle', 'wb') as f:
             pickle.dump((diffs_in_opt_and_counterfactual_traj_record), f)
 
-        traj_diffs = np.array(diffs_in_opt_and_counterfactual_traj_record) + np.finfo(float).eps # prevent division by zero
+        if consistent_state_count:
+            traj_diffs = np.array(diffs_in_opt_and_counterfactual_traj_record) + np.finfo(float).eps # prevent division by zero
 
-        # info_gains_normed = info_gains / np.max(info_gains)
-        # min_traj_diffs_normed = traj_diffs / max(traj_diffs)
-        # obj_function = info_gains_normed - min_traj_diffs_normed  # objective 1: difference, may need to weight and tune
+            # info_gains_normed = info_gains / np.max(info_gains)
+            # min_traj_diffs_normed = traj_diffs / max(traj_diffs)
+            # obj_function = info_gains_normed - min_traj_diffs_normed  # objective 1: difference, may need to weight and tune
 
-        obj_function = info_gains / traj_diffs                  # objective 2: scaled
-        select_model, best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
-        # best_env_idxs, best_traj_idxs = np.where(obj_function == max(obj_function.flatten())) # todo: for development purposes
+            obj_function = info_gains / traj_diffs                  # objective 2: scaled
+            select_model, best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
+            # best_env_idxs, best_traj_idxs = np.where(obj_function == max(obj_function.flatten())) # todo: for development purposes
 
-        # todo: this just finds the first index of the minimum value. could later select from all minimum value indices based on another criteria (e.g. visual optimization)
-        # objective 3: no consideration of cost (i.e. the difference in agent and human trajectories)
-        # select_model, best_env_idx, best_traj_idx = np.unravel_index(np.argmax(info_gains), info_gains.shape)
-        # best_env_idxs, best_traj_idxs = np.where(info_gains == max(info_gains.flatten())) # todo: for development purposes
+            # todo: this just finds the first index of the minimum value. could later select from all minimum value indices based on another criteria (e.g. visual optimization)
+            # objective 3: no consideration of cost (i.e. the difference in agent and human trajectories)
+            # select_model, best_env_idx, best_traj_idx = np.unravel_index(np.argmax(info_gains), info_gains.shape)
+            # best_env_idxs, best_traj_idxs = np.where(info_gains == max(info_gains.flatten())) # todo: for development purposes
 
-        print(colored('Max infogain: {}'.format(np.max(info_gains)), 'blue')) # smallest infogain above zero
-        with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
-            myfile.write('Max infogain: {}\n'.format(np.max(info_gains)).format(retry_count))
-            myfile.write('\n')
+            print(colored('Max infogain: {}'.format(np.max(info_gains)), 'blue'))  # smallest infogain above zero
+
+            with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
+                myfile.write('Max infogain: {}\n'.format(np.max(info_gains)).format(retry_count))
+                myfile.write('\n')
+        else:
+            best_obj = float('-inf')
+            select_model = 0
+            best_env_idx = 0
+            best_traj_idx = 0
+            best_info_gain = 0
+            for model_idx, info_gains_per_model in enumerate(info_gains_record):
+                for env_idx, info_gains_per_env in enumerate(info_gains_per_model):
+                    for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
+                        if info_gain_per_traj > best_obj:
+                            best_info_gain = info_gain_per_traj
+                            best_obj = info_gain_per_traj / (diffs_in_opt_and_counterfactual_traj_record[model_idx][env_idx][traj_idx] + np.finfo(float).eps) # prevent division by zero
+                            select_model = model_idx
+                            best_env_idx = env_idx
+                            best_traj_idx = traj_idx
+
+            print(colored('Max infogain: {}'.format(best_info_gain), 'blue'))  # smallest infogain above zero
+
+            with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
+                myfile.write('Max infogain: {}\n'.format(best_info_gain).format(retry_count))
+                myfile.write('\n')
 
         with open('models/' + data_loc + '/counterfactual_data_' + str(len(summary)) + '/model' + str(
                 select_model) + '/cf_data_env' + str(
@@ -729,7 +771,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
         min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
         summary.append([best_mdp, best_traj, constraints_env[best_traj_idx], min_BEC_constraints_running,
                         best_human_trajs, best_env_idx, best_traj_idx, sample_human_models, select_model,
-                        info_gains, traj_diffs])
+                        info_gains_record, diffs_in_opt_and_counterfactual_traj_record])
 
         # this method doesn't always finish, so save the summary along the way
         with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
