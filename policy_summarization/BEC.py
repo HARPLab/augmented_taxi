@@ -284,7 +284,7 @@ def obtain_potential_summary_demos(BEC_lengths_record, n_demos, n_clusters=6, ty
     return covering_demos_idxs
 
 def compute_counterfactuals(args):
-    data_loc, model_idx, env_idx, w_human_normalized, env_filename, trajs_opt, min_BEC_constraints_running, step_cost_flag, summary_len, variable_filter = args
+    data_loc, model_idx, env_idx, w_human_normalized, env_filename, trajs_opt, min_BEC_constraints_running, step_cost_flag, summary_len, variable_filter, consider_human_models_jointly = args
 
     with open(env_filename, 'rb') as f:
         wt_vi_traj_env = pickle.load(f)
@@ -372,51 +372,47 @@ def compute_counterfactuals(args):
             constraints_env.append(constraints)
             info_gain_env.append(info_gain)
 
-            # calculate by how many actions the human's counterfactual trajectory differs from the agent's optimal
-            # trajectory (i.e. a notion of cost of considering a counterfactual)
+            if not consider_human_models_jointly:
+                # you should only consider the difference for the first counterfactual human trajectory (as opposed to
+                # counterfactual trajectories that could've arisen from states after the first state)
+                human_traj = best_human_trajs_record[0]
 
-            # you should only consider the difference for the first counterfactual human trajectory (as opposed to
-            # counterfactual trajectories that could've arisen from states after the first state)
-            human_traj = best_human_trajs_record[0]
+                # consider both actions and states when finding overlap between trajectories
+                # find all actions that are common and in the same sequence between the agent and human actions
+                matcher = difflib.SequenceMatcher(None, human_traj, traj_opt, autojunk=False)
+                matches = matcher.get_matching_blocks()
+                overlap = 0
+                for match in matches:
+                    overlap += match[2]
 
-            # if the human's policy hasn't stabilized, then the human trajectory will be an empty list
-            agent_actions = [sas[1] for sas in traj_opt]
-            human_actions = [sas[1] for sas in human_traj]
+                # percentage of the human counterfactual that doesn't overlap with the agent's trajectory
+                dist = 1 - (overlap / len(human_traj)) + np.finfo(float).eps
 
-            # find all actions that are common and in the same sequence between the agent and human actions
-            matcher = difflib.SequenceMatcher(None, human_actions, agent_actions, autojunk=False)
-            matches = matcher.get_matching_blocks()
-            overlap = 0
-            for match in matches:
-                overlap += match[2]
-            # the distance between the two trajectories is the number of actions that aren't shared in sequence
-            dist = max(len(human_actions), len(agent_actions)) - overlap
-
-            # take a nonlinear transformation to discount longer trajectories less (sometimes long demonstrations
-            # are needed to provide information and we don't want to penalize too heavily, else you will end up with
-            # many incremental demonstrations)
-            dist = np.sqrt(dist)
-
-            diffs_in_opt_and_counterfactual_traj_env.append(dist)
+                diffs_in_opt_and_counterfactual_traj_env.append(dist)
 
     # else just populate with dummy variables
     else:
         best_human_trajs_record_env = [[[]] for i in range(len(trajs_opt))]
         constraints_env = [[] for i in range(len(trajs_opt))]
         info_gain_env = [0 for i in range(len(trajs_opt))]
-        diffs_in_opt_and_counterfactual_traj_env = [float('inf') for i in range(len(trajs_opt))]
+        if not consider_human_models_jointly:
+            diffs_in_opt_and_counterfactual_traj_env = [float('inf') for i in range(len(trajs_opt))]
 
     with open('models/' + data_loc + '/counterfactual_data_' + str(summary_len) + '/model' + str(model_idx) +
               '/cf_data_env' + str(env_idx).zfill(5) + '.pickle', 'wb') as f:
         pickle.dump((best_human_trajs_record_env, constraints_env), f)
 
-    return info_gain_env, diffs_in_opt_and_counterfactual_traj_env
+    if consider_human_models_jointly:
+        return info_gain_env
+    else:
+        return info_gain_env, diffs_in_opt_and_counterfactual_traj_env
 
 def combine_limiting_constraints(args):
     '''
     Summary: combine the most limiting constraints across all potential human models for each potential demonstration
     '''
-    env_idx, n_sample_human_models, data_loc, curr_summary_len, weights, step_cost_flag, variable_filter, trajs_opt, min_BEC_constraints_running = args
+    env_idx, n_sample_human_models, data_loc, curr_summary_len, weights, step_cost_flag, variable_filter,\
+    trajs_opt, min_BEC_constraints_running = args
 
     info_gains_record = []
     min_env_constraints_record = []
@@ -469,6 +465,7 @@ def combine_limiting_constraints(args):
     # how many actions it differs from the agent's optimal trajectory (i.e. a notion of cost of considering a counterfactual)
     human_counterfactual_trajs = [[] for i in range(len(min_env_constraints_record))]
     diffs_in_opt_and_counterfactual_traj = [[] for i in range(len(min_env_constraints_record))]
+    diffs_in_opt_and_counterfactual_traj_avg = []
 
     for model_idx in range(n_sample_human_models):
         with open('models/' + data_loc + '/counterfactual_data_' + str(curr_summary_len) + '/model' + str(
@@ -488,28 +485,25 @@ def combine_limiting_constraints(args):
                     if BEC_helpers.equal_constraints(constraint, min_env_constraint):
                         in_minimum_set = True
 
-                        # todo: this is an outdated and incorrect method of calculating distances. use difflib instead
-                        # compare the agent's optimal trajectory to equally rewarding human counterfactual trajectories
-                        # and record the minimum difference in trajectories
-                        min_dist = float('inf')
-                        for human_equivalence_traj_idx, human_traj in enumerate(best_human_trajs_record_env[traj_idx]):
-                            dist = 0
-                            if len(trajs_opt[traj_idx]) >= len(human_traj):
-                                for idx, sas in enumerate(human_traj):
-                                    if sas[1] != trajs_opt[traj_idx][idx][1]:
-                                        dist += 1
-                                dist += len(trajs_opt[traj_idx]) - len(human_traj)
-                            else:
-                                for idx, sas in enumerate(trajs_opt[traj_idx]):
-                                    if sas[1] != human_traj[idx][1]:
-                                        dist += 1
-                                dist += len(human_traj) - len(trajs_opt[traj_idx])
-                            if dist < min_dist:
-                                min_dist = dist
+                        # you should only consider the difference for the first counterfactual human trajectory (as opposed to
+                        # counterfactual trajectories that could've arisen from states after the first state)
+                        human_traj = best_human_trajs_record_env[traj_idx][0]
+                        traj_opt = trajs_opt[traj_idx]
 
-                        diffs_in_opt_and_counterfactual_traj[traj_idx].append(min_dist)
+                        # consider both actions and states when finding overlap between trajectories
+                        # find all actions that are common and in the same sequence between the agent and human actions
+                        matcher = difflib.SequenceMatcher(None, human_traj, traj_opt, autojunk=False)
+                        matches = matcher.get_matching_blocks()
+                        overlap = 0
+                        for match in matches:
+                            overlap += match[2]
+
+                        # percentage of the human counterfactual that doesn't overlap with the agent's trajectory
+                        dist = 1 - (overlap / len(human_traj)) + np.finfo(float).eps
+
+                        diffs_in_opt_and_counterfactual_traj[traj_idx].append(dist)
                         # store the required information for replaying the closest human counterfactual trajectory
-                        human_counterfactual_trajs[traj_idx].append((curr_summary_len, model_idx, env_idx, traj_idx, human_equivalence_traj_idx))
+                        human_counterfactual_trajs[traj_idx].append((curr_summary_len, model_idx, env_idx, traj_idx))
                         break
 
                 # a counterfactual trajectory only needs to contribute one constraint in the minimal set for the
@@ -517,50 +511,17 @@ def combine_limiting_constraints(args):
                 if in_minimum_set:
                     break
 
-    return info_gains_record, min_env_constraints_record, diffs_in_opt_and_counterfactual_traj, human_counterfactual_trajs
-
-def record_diff_in_traj(args):
-    '''
-    Summary: quantify the difference between the agent's optimal trajectory and human's counterfactual trajectory
-    '''
-    model_idx, env_idx, n_sample_human_models, data_loc, curr_summary_len, weights, step_cost_flag, variable_filter, trajs_opt, min_BEC_constraints_running = args
-
-    # obtain the counterfactual human trajectories that could've given rise to the most limiting constraints and by
-    # how many actions it differs from the agent's optimal trajectory (i.e. a notion of cost of considering a counterfactual)
-    diffs_in_opt_and_counterfactual_traj = []
-
-    with open('models/' + data_loc + '/counterfactual_data_' + str(curr_summary_len) + '/model' + str(
-            model_idx) + '/cf_data_env' + str(
-        env_idx).zfill(5) + '.pickle', 'rb') as f:
-        best_human_trajs_record_env, constraints_env = pickle.load(f)
-
-    for traj_idx in range(len(trajs_opt)):
-        # you should only consider the difference for the first counterfactual human trajectory (as opposed to
-        # counterfactual trajectories that could've arisen from states after the first state)
-        human_traj = best_human_trajs_record_env[traj_idx][0]
-
-        # if the human's policy hasn't stabilized, then the human trajectory will be an empty list
-        if len(human_traj) > 0:
-            agent_actions = [sas[1] for sas in trajs_opt[traj_idx]]
-            human_actions = [sas[1] for sas in human_traj]
-
-            # find all actions that are common and in the same sequence between the agent and human actions
-            matcher = difflib.SequenceMatcher(None, human_actions, agent_actions, autojunk=False)
-            matches = matcher.get_matching_blocks()
-            overlap = 0
-            for match in matches:
-                overlap += match[2]
-            # the distance between the two trajectories is the number of actions that aren't shared in sequence
-            dist = max(len(human_actions), len(agent_actions)) - overlap
+    # take the average difference across all counterfactual trajectories that contributed to the most limiting constraints
+    for traj_idx, diffs in enumerate(diffs_in_opt_and_counterfactual_traj):
+        if len(diffs) > 0:
+            diffs_in_opt_and_counterfactual_traj_avg.append(np.mean(diffs))
         else:
-            dist = float('inf')
+            diffs_in_opt_and_counterfactual_traj_avg.append(float('inf'))
 
-        diffs_in_opt_and_counterfactual_traj.append(dist)
-
-    return diffs_in_opt_and_counterfactual_traj
+    return info_gains_record, min_env_constraints_record, diffs_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs
 
 def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool,
-                       n_train_demos=3, downsample_threshold=float("inf")):
+                       n_train_demos=3, downsample_threshold=float("inf"), consider_human_models_jointly=True):
 
     variable_filter = np.array([[0, 1, 0]]) # 1's for variable you wish to filter out
     # variable_filter = None # 1's for variable you wish to filter out todo:two-goal
@@ -630,22 +591,33 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
             # are saved for reference later)
             print("Obtaining counterfactual information gains:")
 
-            # cf_data_dir = 'models/' + data_loc + '/counterfactual_data/model' + str(model_idx)
             cf_data_dir = 'models/' + data_loc + '/counterfactual_data_' + str(len(summary)) + '/model' + str(model_idx)
             os.makedirs(cf_data_dir, exist_ok=True)
+            if consider_human_models_jointly:
+                pool.restart()
+                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, chunked_env_record[i]), chunked_traj_record[i], min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter, consider_human_models_jointly) for i in range(len(chunked_traj_record))]
+                info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals, args), total=len(args)))
+                pool.close()
+                pool.join()
+                pool.terminate()
 
-            pool.restart() # todo: maybe there's no need to terminate and restart pool multiple times in the same function
-            args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, chunked_env_record[i]), chunked_traj_record[i], min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter) for i in range(len(chunked_traj_record))]
-            info_gain_envs, diffs_in_opt_and_counterfactual_traj_env = zip(*pool.imap(compute_counterfactuals, tqdm(args), total=len(args)))
-            pool.close()
-            pool.join()
-            pool.terminate()
+                info_gains_record.append(info_gain_envs)
+            else:
+                pool.restart() # todo: maybe there's no need to terminate and restart pool multiple times in the same function
+                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, chunked_env_record[i]), chunked_traj_record[i], min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter, consider_human_models_jointly) for i in range(len(chunked_traj_record))]
+                info_gain_envs, diffs_in_opt_and_counterfactual_traj_env = zip(*pool.imap(compute_counterfactuals, tqdm(args), total=len(args)))
+                pool.close()
+                pool.join()
+                pool.terminate()
 
-            info_gains_record.append(info_gain_envs)
-            diffs_in_opt_and_counterfactual_traj_record.append(diffs_in_opt_and_counterfactual_traj_env)
+                info_gains_record.append(info_gain_envs)
+                diffs_in_opt_and_counterfactual_traj_record.append(diffs_in_opt_and_counterfactual_traj_env)
 
         with open('models/' + data_loc + '/info_gains_' + str(len(summary)) + '.pickle', 'wb') as f:
             pickle.dump(info_gains_record, f)
+
+        # with open('models/' + data_loc + '/diffs_counterfactual_trajs_' + str(len(summary)) + '.pickle', 'wb') as f:
+        #     pickle.dump((diffs_in_opt_and_counterfactual_traj_record), f)
 
         no_info_flag = False
         if consistent_state_count:
@@ -679,99 +651,89 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
 
                 continue
 
-        # # a) select the env/demo that maximizes the average information gain across the various human models (analyze
-        # # each human model separately)
-        # info_gains_avg = np.sum(info_gains, axis=0) / info_gains.shape[0]
-        # info_gains_avg[info_gains_avg == 0] = float('-inf')
-        # # todo: this just finds the first index of the minimum value. could later select from all minimum value indices based on another criteria
-        # best_env_idx, best_traj_idx = np.unravel_index(np.argmax(info_gains_avg), info_gains_avg.shape)
-        # best_env_idxs, best_traj_idxs = np.where(info_gains_avg == max(info_gains_avg.flatten())) # todo: for development purposes
-        #
-        # # update the human model to the one that provided the most information gain (to be conservative)
-        # select_model = np.argmax(info_gains[:, best_env_idx, best_traj_idx])
-        #
-        # print(colored('Max avg infogain: {}'.format(np.max(info_gains_avg)), 'blue')) # smallest infogain above zero
-        # print(colored('Select model infogain: {}'.format(info_gains[select_model, best_env_idx, best_traj_idx]), 'blue'))
-        # with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
-        #     myfile.write('Max avg infogain: {}\n'.format(np.max(info_gains_avg)).format(retry_count))
-        #     myfile.write('Select model infogain: {}\n'.format(info_gains[select_model, best_env_idx, best_traj_idx]))
-        #     myfile.write('\n')
-        #
-        # best_traj = chunked_traj_record[best_env_idx][best_traj_idx]
-        # with open('models/' + data_loc + '/counterfactual_data_' + str(len(summary)) + '/model' + str(select_model) + '/cf_data_env' + str(
-        #         best_env_idx).zfill(5) + '.pickle', 'rb') as f:
-        #     best_human_trajs_record_env, constraints_env = pickle.load(f)
-        # best_human_trajs = best_human_trajs_record_env[best_traj_idx]
-        # min_BEC_constraints_demo = constraints_env[best_traj_idx]
+        if consider_human_models_jointly:
+            # todo: just consider consistent state counts for now (adapt for two goal later)
+            print("Combining the most limiting constraints across human models:")
+            pool.restart()
+            args = [(i, len(sample_human_models), data_loc, len(summary), weights, step_cost_flag, variable_filter,
+                     chunked_traj_record[i], min_BEC_constraints_running) for
+                    i in range(len(chunked_traj_record))]
+            info_gains_record, min_env_constraints_record, diffs_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(
+                *pool.imap(combine_limiting_constraints, tqdm(args)))
+            pool.close()
+            pool.join()
+            pool.terminate()
 
-        # b) select the demonstration that best balances maximizing information with minimizing cost (i.e. the difference
-        # between the optimal trajectories of the agent and the human)
-        with open('models/' + data_loc + '/diffs_counterfactual_trajs_' + str(len(summary)) + '.pickle', 'wb') as f:
-            pickle.dump((diffs_in_opt_and_counterfactual_traj_record), f)
+            info_gains = np.array(info_gains_record)
+            traj_diffs = np.array(diffs_in_opt_and_counterfactual_traj_avg) + np.finfo(
+                float).eps  # prevent division by zero
 
-        if consistent_state_count:
-            traj_diffs = np.array(diffs_in_opt_and_counterfactual_traj_record) + np.finfo(float).eps # prevent division by zero
-
-            # info_gains_normed = info_gains / np.max(info_gains)
-            # min_traj_diffs_normed = traj_diffs / max(traj_diffs)
-            # obj_function = info_gains_normed - min_traj_diffs_normed  # objective 1: difference, may need to weight and tune
-
-            obj_function = info_gains / traj_diffs                  # objective 2: scaled
-            select_model, best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
+            obj_function = info_gains / traj_diffs  # objective 2: scaled
+            best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
             # best_env_idxs, best_traj_idxs = np.where(obj_function == max(obj_function.flatten())) # todo: for development purposes
 
-            # todo: this just finds the first index of the minimum value. could later select from all minimum value indices based on another criteria (e.g. visual optimization)
-            # objective 3: no consideration of cost (i.e. the difference in agent and human trajectories)
-            # select_model, best_env_idx, best_traj_idx = np.unravel_index(np.argmax(info_gains), info_gains.shape)
-            # best_env_idxs, best_traj_idxs = np.where(info_gains == max(info_gains.flatten())) # todo: for development purposes
+            best_traj = chunked_traj_record[best_env_idx][best_traj_idx]
 
-            print(colored('Max infogain: {}'.format(np.max(info_gains)), 'blue'))  # smallest infogain above zero
+            max_info_gain = np.max(info_gains)
 
-            with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
-                myfile.write('Max infogain: {}\n'.format(np.max(info_gains)).format(retry_count))
-                myfile.write('\n')
+            filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
+            with open(filename, 'rb') as f:
+                wt_vi_traj_env = pickle.load(f)
+            best_mdp = wt_vi_traj_env[0][1].mdp
+            best_mdp.set_init_state(best_traj[0][0]) # for completeness
+            min_BEC_constraints_running.extend(min_env_constraints_record[best_env_idx][best_traj_idx])
+            min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
+            summary.append([best_mdp, best_traj, min_env_constraints_record[best_env_idx][best_traj_idx], min_BEC_constraints_running,
+                            None, best_env_idx, best_traj_idx, sample_human_models, human_counterfactual_trajs,
+                            info_gains_record, diffs_in_opt_and_counterfactual_traj_record])
         else:
-            best_obj = float('-inf')
-            select_model = 0
-            best_env_idx = 0
-            best_traj_idx = 0
-            best_info_gain = 0
-            for model_idx, info_gains_per_model in enumerate(info_gains_record):
-                for env_idx, info_gains_per_env in enumerate(info_gains_per_model):
-                    for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
-                        if info_gain_per_traj > best_obj:
-                            best_info_gain = info_gain_per_traj
-                            best_obj = info_gain_per_traj / (diffs_in_opt_and_counterfactual_traj_record[model_idx][env_idx][traj_idx] + np.finfo(float).eps) # prevent division by zero
-                            select_model = model_idx
-                            best_env_idx = env_idx
-                            best_traj_idx = traj_idx
+            # b) consider each human model separately
+            if consistent_state_count:
+                traj_diffs = np.array(diffs_in_opt_and_counterfactual_traj_record) + np.finfo(float).eps # prevent division by zero
 
-            print(colored('Max infogain: {}'.format(best_info_gain), 'blue'))  # smallest infogain above zero
+                obj_function = info_gains / traj_diffs                  # objective 2: scaled
+                select_model, best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
+                # best_env_idxs, best_traj_idxs = np.where(obj_function == max(obj_function.flatten())) # todo: for development purposes
 
-            with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
-                myfile.write('Max infogain: {}\n'.format(best_info_gain).format(retry_count))
-                myfile.write('\n')
+                max_info_gain = np.max(info_gains)
+            else:
+                best_obj = float('-inf')
+                select_model = best_env_idx = best_traj_idx = best_info_gain = 0
+                for model_idx, info_gains_per_model in enumerate(info_gains_record):
+                    for env_idx, info_gains_per_env in enumerate(info_gains_per_model):
+                        for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
+                            if info_gain_per_traj > best_obj:
+                                best_info_gain = info_gain_per_traj
+                                best_obj = info_gain_per_traj / (diffs_in_opt_and_counterfactual_traj_record[model_idx][env_idx][traj_idx] + np.finfo(float).eps) # prevent division by zero
+                                select_model = model_idx
+                                best_env_idx = env_idx
+                                best_traj_idx = traj_idx
 
-        with open('models/' + data_loc + '/counterfactual_data_' + str(len(summary)) + '/model' + str(
-                select_model) + '/cf_data_env' + str(
-                best_env_idx).zfill(5) + '.pickle', 'rb') as f:
-            best_human_trajs_record_env, constraints_env = pickle.load(f)
+                max_info_gain = best_info_gain
 
-        best_human_trajs = best_human_trajs_record_env[best_traj_idx]
+            with open('models/' + data_loc + '/counterfactual_data_' + str(len(summary)) + '/model' + str(
+                    select_model) + '/cf_data_env' + str(
+                    best_env_idx).zfill(5) + '.pickle', 'rb') as f:
+                best_human_trajs_record_env, constraints_env = pickle.load(f)
 
-        best_traj = chunked_traj_record[best_env_idx][best_traj_idx]
+            best_human_trajs = best_human_trajs_record_env[best_traj_idx]
+            best_traj = chunked_traj_record[best_env_idx][best_traj_idx]
 
-        # shared code between a) and b)
-        filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
-        with open(filename, 'rb') as f:
-            wt_vi_traj_env = pickle.load(f)
-        best_mdp = wt_vi_traj_env[0][1].mdp
-        best_mdp.set_init_state(best_traj[0][0]) # for completeness
-        min_BEC_constraints_running.extend(constraints_env[best_traj_idx])
-        min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
-        summary.append([best_mdp, best_traj, constraints_env[best_traj_idx], min_BEC_constraints_running,
-                        best_human_trajs, best_env_idx, best_traj_idx, sample_human_models, select_model,
-                        info_gains_record, diffs_in_opt_and_counterfactual_traj_record])
+            filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
+            with open(filename, 'rb') as f:
+                wt_vi_traj_env = pickle.load(f)
+            best_mdp = wt_vi_traj_env[0][1].mdp
+            best_mdp.set_init_state(best_traj[0][0]) # for completeness
+            min_BEC_constraints_running.extend(constraints_env[best_traj_idx])
+            min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
+            summary.append([best_mdp, best_traj, constraints_env[best_traj_idx], min_BEC_constraints_running,
+                            best_human_trajs, best_env_idx, best_traj_idx, sample_human_models, select_model,
+                            info_gains_record, diffs_in_opt_and_counterfactual_traj_record])
+
+        print(colored('Max infogain: {}'.format(max_info_gain), 'blue'))
+        with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
+            myfile.write('Max infogain: {}\n'.format(max_info_gain))
+            myfile.write('\n')
 
         # this method doesn't always finish, so save the summary along the way
         with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
