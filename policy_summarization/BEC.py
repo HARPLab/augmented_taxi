@@ -16,7 +16,6 @@ import os
 import policy_summarization.multiprocessing_helpers as mp_helpers
 import sage.all
 import sage.geometry.polyhedron.base as Polyhedron
-import difflib
 
 def extract_constraints_policy(args):
     env_idx, data_loc, step_cost_flag = args
@@ -341,13 +340,8 @@ def compute_counterfactuals(args):
                 constraints.append(mu_sa - best_reward_features)
                 best_human_trajs_record.append(best_human_traj)
 
-            # the hypothetical constraints that will be in the human's mind after viewing this demonstrations
-            hypothetical_constraints = []
-            hypothetical_constraints.extend(min_BEC_constraints_running)
-
             if len(constraints) > 0:
                 constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
-            hypothetical_constraints.extend(constraints)
 
             # don't consider environments that convey information about a variable you don't currently wish to convey
             skip_demo = False
@@ -358,13 +352,7 @@ def compute_counterfactuals(args):
                         skip_demo = True
 
             if not skip_demo:
-                if len(min_BEC_constraints_running) > 0 and len(hypothetical_constraints) > 0:
-                    info_gain = BEC_helpers.calc_solid_angles([min_BEC_constraints_running])[0] - \
-                                BEC_helpers.calc_solid_angles([hypothetical_constraints])[0]
-                elif len(hypothetical_constraints) > 0:
-                    info_gain = 4 * np.pi - BEC_helpers.calc_solid_angles([hypothetical_constraints])[0]
-                else:
-                    info_gain = 0
+                info_gain = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, constraints)
             else:
                 info_gain = 0
 
@@ -375,18 +363,7 @@ def compute_counterfactuals(args):
             if not consider_human_models_jointly:
                 # you should only consider the difference for the first counterfactual human trajectory (as opposed to
                 # counterfactual trajectories that could've arisen from states after the first state)
-                human_traj = best_human_trajs_record[0]
-
-                # consider both actions and states when finding overlap between trajectories
-                # find all actions that are common and in the same sequence between the agent and human actions
-                matcher = difflib.SequenceMatcher(None, human_traj, traj_opt, autojunk=False)
-                matches = matcher.get_matching_blocks()
-                overlap = 0
-                for match in matches:
-                    overlap += match[2]
-
-                # percentage of the human counterfactual that doesn't overlap with the agent's trajectory
-                dist = 1 - (overlap / len(human_traj)) + np.finfo(float).eps
+                dist = BEC_helpers.calculate_counterfactual_cost(best_human_trajs_record[0], traj_opt)
 
                 diffs_in_opt_and_counterfactual_traj_env.append(dist)
 
@@ -447,19 +424,10 @@ def combine_limiting_constraints(args):
                     skip_demo = True
 
         if not skip_demo:
-            if len(min_BEC_constraints_running) > 0 and len(min_env_constraints) > 0:
-                hypothetical_constraints = min_env_constraints.copy()
-                hypothetical_constraints.extend(min_BEC_constraints_running)
-
-                info_gains_record.append(BEC_helpers.calc_solid_angles([min_BEC_constraints_running])[0] - \
-                                      BEC_helpers.calc_solid_angles([hypothetical_constraints])[0])
-            elif len(min_env_constraints) > 0:
-                info_gains_record.append(4 * np.pi - BEC_helpers.calc_solid_angles([min_env_constraints])[0])
-            else:
-                info_gains_record.append(0)
+            ig = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, min_env_constraints)
+            info_gains_record.append(ig)
         else:
             info_gains_record.append(0)
-
 
     # obtain the counterfactual human trajectories that could've given rise to the most limiting constraints and by
     # how many actions it differs from the agent's optimal trajectory (i.e. a notion of cost of considering a counterfactual)
@@ -487,19 +455,7 @@ def combine_limiting_constraints(args):
 
                         # you should only consider the difference for the first counterfactual human trajectory (as opposed to
                         # counterfactual trajectories that could've arisen from states after the first state)
-                        human_traj = best_human_trajs_record_env[traj_idx][0]
-                        traj_opt = trajs_opt[traj_idx]
-
-                        # consider both actions and states when finding overlap between trajectories
-                        # find all actions that are common and in the same sequence between the agent and human actions
-                        matcher = difflib.SequenceMatcher(None, human_traj, traj_opt, autojunk=False)
-                        matches = matcher.get_matching_blocks()
-                        overlap = 0
-                        for match in matches:
-                            overlap += match[2]
-
-                        # percentage of the human counterfactual that doesn't overlap with the agent's trajectory
-                        dist = 1 - (overlap / len(human_traj)) + np.finfo(float).eps
+                        dist = BEC_helpers.calculate_counterfactual_cost(best_human_trajs_record_env[traj_idx][0], trajs_opt[traj_idx])
 
                         diffs_in_opt_and_counterfactual_traj[traj_idx].append(dist)
                         # store the required information for replaying the closest human counterfactual trajectory
@@ -685,7 +641,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
             min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
             summary.append([best_mdp, best_traj, min_env_constraints_record[best_env_idx][best_traj_idx], min_BEC_constraints_running,
                             None, best_env_idx, best_traj_idx, sample_human_models, human_counterfactual_trajs,
-                            info_gains_record, diffs_in_opt_and_counterfactual_traj_record])
+                            info_gains_record, diffs_in_opt_and_counterfactual_traj_avg])
         else:
             # b) consider each human model separately
             if consistent_state_count:

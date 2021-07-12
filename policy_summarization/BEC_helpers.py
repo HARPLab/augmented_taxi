@@ -4,6 +4,7 @@ from scipy.optimize import linprog
 import sage.all
 import sage.geometry.polyhedron.base as Polyhedron
 from termcolor import colored
+import difflib
 
 from policy_summarization import computational_geometry as cg
 
@@ -558,3 +559,35 @@ def sample_average_model(constraints):
 
     return sample_human_models
 
+def calculate_information_gain(previous_constraints, new_constraints):
+    if len(previous_constraints) > 0 and len(new_constraints) > 0:
+        hypothetical_constraints = new_constraints.copy()
+        hypothetical_constraints.extend(previous_constraints)
+
+        old_BEC = calc_solid_angles([previous_constraints])[0]
+        new_BEC = calc_solid_angles([hypothetical_constraints])[0]
+
+        ig = (old_BEC - new_BEC) / new_BEC
+    elif len(new_constraints) > 0:
+        old_BEC = 4 * np.pi
+        new_BEC = calc_solid_angles([previous_constraints])[0]
+
+        ig = (old_BEC - new_BEC) / new_BEC
+    else:
+        ig = 0
+
+    return ig
+
+def calculate_counterfactual_cost(human_traj, agent_traj):
+    # consider both actions and states when finding overlap between trajectories
+    # find all actions that are common and in the same sequence between the agent and human actions
+    matcher = difflib.SequenceMatcher(None, human_traj, agent_traj, autojunk=False)
+    matches = matcher.get_matching_blocks()
+    overlap = 0
+    for match in matches:
+        overlap += match[2]
+
+    # percentage of the human counterfactual that doesn't overlap with the agent's trajectory
+    dist = 1 - (overlap / len(human_traj)) + np.finfo(float).eps
+
+    return dist
