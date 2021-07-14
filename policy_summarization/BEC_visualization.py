@@ -4,6 +4,7 @@ import policy_summarization.BEC_helpers as BEC_helpers
 import policy_summarization.computational_geometry as cg
 from scipy.spatial import geometric_slerp
 import matplotlib.tri as mtri
+from termcolor import colored
 
 def visualize_spherical_polygon(poly, fig=None, ax=None, alpha=0.2, plot_ref_sphere=True):
     '''
@@ -61,6 +62,11 @@ def visualize_spherical_polygon(poly, fig=None, ax=None, alpha=0.2, plot_ref_sph
 
     # obtain x, y, z coordinates on the sphere that obey the constraints
     valid_sph_x, valid_sph_y, valid_sph_z = cg.sample_valid_region(min_constraints, 0, 2 * np.pi, 0, np.pi, 1000, 1000)
+
+    if len(valid_sph_x) == 0:
+        print(colored("Was unable to sample valid points for visualizing the BEC (which is likely too small).",
+                      'red'))
+        return
 
     # resample coordinates on the sphere within the valid region (for higher density)
     sph_polygon_azi = []

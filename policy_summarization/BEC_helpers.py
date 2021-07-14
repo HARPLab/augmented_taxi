@@ -435,6 +435,11 @@ def sample_human_models(constraints, n_models):
         # obtain x, y, z coordinates on the sphere that obey the constraints
         valid_sph_x, valid_sph_y, valid_sph_z = cg.sample_valid_region(constraints_matrix, 0, 2 * np.pi, 0, np.pi, 1000, 1000)
 
+        if len(valid_sph_x) == 0:
+            print(colored("Was unable to sample valid human models within the BEC (which is likely too small).",
+                        'red'))
+            return sample_human_models
+
         # resample coordinates on the sphere within the valid region (for higher density)
         sph_polygon_azi = []
         sph_polygon_ele = []

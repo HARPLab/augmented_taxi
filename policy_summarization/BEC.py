@@ -479,8 +479,9 @@ def combine_limiting_constraints(args):
 def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool,
                        n_train_demos=3, downsample_threshold=float("inf"), consider_human_models_jointly=True):
 
-    variable_filter = np.array([[0, 1, 0]]) # 1's for variable you wish to filter out
-    # variable_filter = None # 1's for variable you wish to filter out todo:two-goal
+    # 1's for variable you wish to filter out initially
+    variable_filter = np.array([[0, 1, 0]]) # for augmented taxi and skateboard
+    # variable_filter = None # for two-goal
 
     summary = []
     retry_count = 0
@@ -526,6 +527,9 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
         # uniformly sample candidate human models from the valid BEC area along 2-sphere
         sample_human_models = BEC_helpers.sample_human_models(min_BEC_constraints_running, n_models=8)
         # sample_human_models = BEC_helpers.sample_average_model(min_BEC_constraints_running)
+        if len(sample_human_models) == 0:
+            print(colored("Likely cannot reduce the BEC further through additional demonstrations. Returning.", 'red'))
+            return summary
 
         info_gains_record = []
         diffs_in_opt_and_counterfactual_traj_record = []
@@ -620,17 +624,32 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
             pool.join()
             pool.terminate()
 
-            info_gains = np.array(info_gains_record)
-            traj_diffs = np.array(diffs_in_opt_and_counterfactual_traj_avg) + np.finfo(
-                float).eps  # prevent division by zero
+            if consistent_state_count:
+                info_gains = np.array(info_gains_record)
+                traj_diffs = np.array(diffs_in_opt_and_counterfactual_traj_avg) + np.finfo(
+                    float).eps  # prevent division by zero
 
-            obj_function = info_gains / traj_diffs  # objective 2: scaled
-            best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
-            # best_env_idxs, best_traj_idxs = np.where(obj_function == max(obj_function.flatten())) # todo: for development purposes
+                obj_function = info_gains / traj_diffs  # objective 2: scaled
+                best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
+                # best_env_idxs, best_traj_idxs = np.where(obj_function == max(obj_function.flatten())) # todo: for development purposes
+
+                max_info_gain = np.max(info_gains)
+            else:
+                best_obj = float('-inf')
+                best_env_idx = best_traj_idx = best_info_gain = 0
+                for env_idx, info_gains_per_env in enumerate(info_gains_record):
+                    for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
+                        if info_gain_per_traj > best_obj:
+                            best_info_gain = info_gain_per_traj
+                            best_obj = info_gain_per_traj / (
+                                        diffs_in_opt_and_counterfactual_traj_avg[env_idx][
+                                            traj_idx] + np.finfo(float).eps)  # prevent division by zero
+                            best_env_idx = env_idx
+                            best_traj_idx = traj_idx
+
+                max_info_gain = best_info_gain
 
             best_traj = chunked_traj_record[best_env_idx][best_traj_idx]
-
-            max_info_gain = np.max(info_gains)
 
             filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
             with open(filename, 'rb') as f:

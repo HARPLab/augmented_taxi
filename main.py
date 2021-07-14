@@ -107,8 +107,9 @@ def explore_BEC_solid_angle(mdp_class, data_loc, mdp_parameters, weights, step_c
     except:
         # BEC_summary = BEC.obtain_SCOT_summaries(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag)
         BEC_summary = BEC.obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_train_demos=n_train_demos)
-        with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
-            pickle.dump(BEC_summary, f)
+        if len(BEC_summary) > 0:
+            with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
+                pickle.dump(BEC_summary, f)
 
     BEC.visualize_summary(BEC_summary, weights, step_cost_flag)
 

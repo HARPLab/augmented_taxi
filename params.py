@@ -1,9 +1,9 @@
 import numpy as np
 import os
 
-mdp_class = 'augmented_taxi'
+# mdp_class = 'augmented_taxi'
 # mdp_class = 'two_goal'
-# mdp_class = 'skateboard'
+mdp_class = 'skateboard'
 # mdp_class = 'taxi'
 # mdp_class = 'cookie_crumb'
 
