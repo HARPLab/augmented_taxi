@@ -5,6 +5,7 @@ import sage.all
 import sage.geometry.polyhedron.base as Polyhedron
 from termcolor import colored
 import difflib
+import sklearn
 
 from policy_summarization import computational_geometry as cg
 
@@ -422,9 +423,10 @@ def lies_on_constraint_plane(poly, point):
 
     return False
 
-def sample_human_models(constraints, n_models):
+def sample_human_models_random(constraints, n_models):
     '''
-    Summary: sample representative weights that the human could currently attribute to the agent
+    Summary: sample representative weights that the human could currently attribute to the agent accordingly to a
+    uniformly random distribution
     '''
 
     sample_human_models = []
@@ -467,7 +469,8 @@ def sample_human_models(constraints, n_models):
             # reject points that fall outside of the desired area
 
             # see which points on the sphere obey all constraints
-            sph_points = np.array(list(map(cg.sph2cat, theta, phi)))
+            theta_grid, phi_grid = np.meshgrid(theta, phi)
+            sph_points = np.array(cg.sph2cat(theta_grid.flatten(), phi_grid.flatten())).T
             dist_to_plane = constraints_matrix.dot(sph_points.T)
             n_constraints_satisfied = np.sum(dist_to_plane >= 0, axis=0)
             n_min_constraints = constraints_matrix.shape[0]
@@ -534,7 +537,8 @@ def sample_average_model(constraints):
         # reject points that fall outside of the desired area
 
         # see which points on the sphere obey all constraints
-        sph_points = np.array(list(map(cg.sph2cat, theta, phi)))
+        theta_grid, phi_grid = np.meshgrid(theta, phi)
+        sph_points = np.array(cg.sph2cat(theta_grid.flatten(), phi_grid.flatten())).T
         dist_to_plane = constraints_matrix.dot(sph_points.T)
         n_constraints_satisfied = np.sum(dist_to_plane >= 0, axis=0)
         n_min_constraints = constraints_matrix.shape[0]
@@ -564,6 +568,116 @@ def sample_average_model(constraints):
 
     return sample_human_models
 
+def sample_human_models_uniform(constraints, n_models):
+    '''
+    Summary: sample representative weights that the human could currently attribute to the agent, by greedily selecting
+    points that minimize the maximize distance to any other point (k-centers problem)
+    '''
+
+    sample_human_models = []
+
+    if len(constraints) > 0:
+        constraints_matrix = np.vstack(constraints)
+
+        # obtain x, y, z coordinates on the sphere that obey the constraints
+        valid_sph_x, valid_sph_y, valid_sph_z = cg.sample_valid_region(constraints_matrix, 0, 2 * np.pi, 0, np.pi, 1000, 1000)
+
+        if len(valid_sph_x) == 0:
+            print(colored("Was unable to sample valid human models within the BEC (which is likely too small).",
+                        'red'))
+            return sample_human_models
+
+        # resample coordinates on the sphere within the valid region (for higher density)
+        sph_polygon_azi = []
+        sph_polygon_ele = []
+
+        for x in range(len(valid_sph_x)):
+            azi, ele = cg.cart2sph(valid_sph_x[x], valid_sph_y[x], valid_sph_z[x])
+            sph_polygon_azi.append(azi)
+            sph_polygon_ele.append(ele)
+
+        min_azi = min(sph_polygon_azi)
+        max_azi = max(sph_polygon_azi)
+        min_ele = min(sph_polygon_ele)
+        max_ele = max(sph_polygon_ele)
+
+        # sample according to the inverse CDF of the uniform distribution along the sphere
+        u_low = min_azi / (2 * np.pi)
+        u_high = max_azi / (2 * np.pi)
+        v_low = (1 - np.cos(min_ele)) / 2
+        v_high = (1 - np.cos(max_ele)) / 2
+
+        density_factor = 5
+        while len(sample_human_models) < n_models:
+            theta = 2 * np.pi * np.linspace(u_low, u_high, density_factor * n_models)
+            phi = np.arccos(1 - 2 * np.linspace(v_low, v_high, density_factor * n_models))
+
+            # reject points that fall outside of the desired area
+
+            # see which points on the sphere obey all constraints
+            theta_grid, phi_grid = np.meshgrid(theta, phi)
+            sph_points = np.array(cg.sph2cat(theta_grid.flatten(), phi_grid.flatten())).T
+            dist_to_plane = constraints_matrix.dot(sph_points.T)
+            n_constraints_satisfied = np.sum(dist_to_plane >= 0, axis=0)
+            n_min_constraints = constraints_matrix.shape[0]
+
+            idx_valid_sph_points = np.where(n_constraints_satisfied == n_min_constraints)[0]
+            valid_sph_points = sph_points[idx_valid_sph_points, :]
+
+            # greedily select k 'centers' such that the maximum distance from any point to a center is minimized
+            # solution is never worse than twice the optimal solution (2-approximation greedy algorithm)
+            # https://www.geeksforgeeks.org/k-centers-problem-set-1-greedy-approximate-algorithm/
+            if len(valid_sph_points) < n_models:
+                density_factor += 1
+            elif len(valid_sph_points) == n_models:
+                sample_human_models.extend(valid_sph_points)
+            else:
+                pairwise = sklearn.metrics.pairwise.euclidean_distances(valid_sph_points)
+                select_idxs = selectKcities(pairwise.shape[0], pairwise, n_models)
+                select_sph_points = valid_sph_points[select_idxs]
+                # reshape so that each element is a valid weight vector
+                select_sph_points = select_sph_points.reshape(select_sph_points.shape[0], 1, select_sph_points.shape[1])
+                sample_human_models.extend(select_sph_points)
+    else:
+        theta = 2 * np.pi * np.linspace(0, 1, np.ceil(np.sqrt(n_models)))
+        phi = np.arccos(1 - 2 * np.linspace(0, 1, np.ceil(np.sqrt(n_models))))
+
+        theta_grid, phi_grid = np.meshgrid(theta, phi)
+
+        valid_sph_points = np.array(cg.sph2cat(theta_grid.flatten(), phi_grid.flatten())).T
+
+        # reshape so that each element is a valid weight vector
+        valid_sph_points = valid_sph_points.reshape(valid_sph_points.shape[0], 1, valid_sph_points.shape[1])
+        valid_sph_points = valid_sph_points[:n_models]
+
+        sample_human_models.extend(valid_sph_points)
+
+    return sample_human_models
+
+def selectKcities(n, weights, k):
+    dist = [float('inf')] * n
+    centers = []
+
+    # index of city having the maximum distance to it's closest center
+    max = 0
+    for i in range(k):
+        centers.append(max)
+        for j in range(n):
+            # updating the distance of the cities to their closest centers
+            dist[j] = min(dist[j], weights[max][j])
+
+        # updating the index of the city with the maximum distance to it's closest center
+        max = np.argmax(dist)
+
+    # maximum distance of a city to a center that is our answer
+    # print(dist[max])
+
+    # cities that were chosen to be made centers
+    # for i in centers:
+    #     print(i, end=" ")
+
+    return centers
+
 def calculate_information_gain(previous_constraints, new_constraints):
     if len(previous_constraints) > 0 and len(new_constraints) > 0:
         hypothetical_constraints = new_constraints.copy()
@@ -572,18 +686,18 @@ def calculate_information_gain(previous_constraints, new_constraints):
         old_BEC = calc_solid_angles([previous_constraints])[0]
         new_BEC = calc_solid_angles([hypothetical_constraints])[0]
 
-        ig = (old_BEC - new_BEC) / new_BEC
+        ig = old_BEC / new_BEC
     elif len(new_constraints) > 0:
         old_BEC = 4 * np.pi
         new_BEC = calc_solid_angles([previous_constraints])[0]
 
-        ig = (old_BEC - new_BEC) / new_BEC
+        ig = old_BEC / new_BEC
     else:
         ig = 0
 
     return ig
 
-def calculate_counterfactual_cost(human_traj, agent_traj):
+def calculate_counterfactual_overlap_pct(human_traj, agent_traj):
     # consider both actions and states when finding overlap between trajectories
     # find all actions that are common and in the same sequence between the agent and human actions
     matcher = difflib.SequenceMatcher(None, human_traj, agent_traj, autojunk=False)
@@ -592,7 +706,7 @@ def calculate_counterfactual_cost(human_traj, agent_traj):
     for match in matches:
         overlap += match[2]
 
-    # percentage of the human counterfactual that doesn't overlap with the agent's trajectory
-    dist = 1 - (overlap / len(human_traj)) + np.finfo(float).eps
+    # percentage of the human counterfactual that overlaps with the agent's trajectory
+    overlap_pct = overlap / len(human_traj)
 
-    return dist
+    return overlap_pct

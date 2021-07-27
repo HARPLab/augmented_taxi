@@ -122,7 +122,7 @@ class SkateboardOOMDP(OOMDP):
                 base_step_cost_flag = 1
         # pick up and drop off actions are penalized according to the skateboard cost
         else:
-            skateboard_step_cost_flag = 1
+            base_step_cost_flag = 1
 
 
         if next_state.get_agent_x() == self.goal['x'] and next_state.get_agent_y() == self.goal['y']:

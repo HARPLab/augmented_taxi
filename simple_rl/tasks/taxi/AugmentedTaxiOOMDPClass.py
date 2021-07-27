@@ -130,9 +130,14 @@ class AugmentedTaxiOOMDP(OOMDP):
         if next_state.is_an_exit_state(self.ref_exit_state):
             step_cost_flag = 0
 
+        # if len(self.tolls) != 0:
+        #     moved_into_toll = taxi_helpers._moved_into_toll(self, state, next_state)
+        #     if moved_into_toll and not next_state.is_an_exit_state(self.ref_exit_state):
+        #         toll_flag = 1
+
         if len(self.tolls) != 0:
-            moved_into_toll = taxi_helpers._moved_into_toll(self, state, next_state)
-            if moved_into_toll and not next_state.is_an_exit_state(self.ref_exit_state):
+            moved_off_of_toll = taxi_helpers._moved_off_of_toll(self, state, next_state)
+            if moved_off_of_toll and not next_state.is_an_exit_state(self.ref_exit_state):
                 toll_flag = 1
 
         # at_traffic, prob_traffic = taxi_helpers.at_traffic(self, state.get_agent_x(), state.get_agent_y())

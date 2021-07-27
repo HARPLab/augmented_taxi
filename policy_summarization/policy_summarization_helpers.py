@@ -252,6 +252,45 @@ def select_test_demos(cluster_idx, n_desired_test_env, wt_vi_traj_candidates, en
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints
 
 
+def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_record, summary):
+    visual_dissimilarities = np.zeros(len(best_env_idxs))
+    complexities = np.zeros(len(best_env_idxs))
+
+    prev_env_idx = None
+    for j, best_env_idx in enumerate(best_env_idxs):
+
+        if prev_env_idx != best_env_idx:
+            filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
+            with open(filename, 'rb') as f:
+                wt_vi_traj_env = pickle.load(f)
+            best_mdp = wt_vi_traj_env[0][1].mdp
+
+        # compare the visual dissimilarity to the most recent summary (only if it's not the first summary
+        # and you didn't recently switch which variable you wished to convey
+        if len(summary) > 0:
+            # get similar demos (todo: consider various scenarios for similarity and dissimilarity later)
+            visual_dissimilarities[j] = best_mdp.measure_visual_dissimilarity(
+                chunked_traj_record[best_env_idx][best_traj_idxs[j]][0][0], summary[-1][0], summary[-1][1][0][0])
+
+        # get demos of low visual complexity
+        complexities[j] = best_mdp.measure_env_complexity()
+
+        prev_env_idx = best_env_idx
+
+    tie_breaker = np.arange(len(best_env_idxs))
+    np.random.shuffle(tie_breaker)
+    # sorts from small to large values
+
+    # sort first for visual simplicity, then visual similarity
+    sorted_zipped = sorted(zip(complexities, visual_dissimilarities, tie_breaker, best_env_idxs, best_traj_idxs))
+    complexities_sorted, visual_dissimilarities_sorted, _, best_env_idxs_sorted, best_traj_idxs_sorted = list(
+        zip(*sorted_zipped))
+
+    best_env_idx = best_env_idxs_sorted[0]
+    best_traj_idx = best_traj_idxs_sorted[0]
+
+    return best_env_idx, best_traj_idx
+
 def obtain_test_environments(wt_vi_traj_candidates, min_subset_constraints_record, env_record, traj_record, weights, n_desired_test_env, difficulty, step_cost_flag, summary=None, BEC_summary_type=None):
     '''
     Summary: Correlate the difficulty of a test environment with the generalized area of the BEC region obtain by the

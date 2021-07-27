@@ -14,10 +14,15 @@ Returns:
 Summary:
     Return all possible, equally-rewarding roll outs of the agent's policy on the designated MDP
 '''
-def rollout_policy_recursive(mdp, agent, cur_state, trajs, cur_traj=[], cur_action_seq=[], max_depth=25):
+def rollout_policy_recursive(mdp, agent, cur_state, trajs, cur_traj=[], cur_action_seq=[], max_depth=25, max_num_of_trajs=10):
+    # cap the maximum number of recursive trajectories that'll be returned (can be unreasonable to enumerate all
+    # equally rewarding trajectories sometimes)
+    if len(trajs) > max_num_of_trajs:
+        return
+
     if cur_state.is_terminal() or len(cur_traj) >= max_depth:
         trajs.append(cur_traj)
-        return trajs
+        return
 
     maxq_actions = agent.get_max_q_actions(cur_state)
     for action in maxq_actions:
