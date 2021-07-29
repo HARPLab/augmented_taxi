@@ -478,13 +478,31 @@ def combine_limiting_constraints(args):
 
 def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool,
                        n_train_demos=3, downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001):
-
-    # 1's for variable you wish to filter out initially
-    # variable_filter = np.array([[0, 1, 0]])  # for augmented taxi and skateboard
-    variable_filter = np.array([[1, 0, 0]])  # for two-goal
-
     summary = []
     retry_count = 0
+
+    # impose priors
+    if data_loc == 'augmented_taxi' or data_loc == 'skateboard':
+        # impose priors that the dropoff reward is positive and the step reward is negative
+        min_BEC_constraints_running = [np.array([[1, 0, 0]]), np.array([[0, 0, -1]])]
+    elif data_loc == 'two_goal':
+        # impose priors that the two goal rewards are positive and the step reward is negative
+        min_BEC_constraints_running = [np.array([[1, 0, 0]]), np.array([[0, 1, 0]]), np.array([[0, 0, -1]])]
+    else:
+        min_BEC_constraints_running = []
+
+
+    # count how many zeros are present for each reward weight (i.e. variable) in the minimum BEC constraints
+    # (which are obtained using one-step deviations). such constraints suggest the opportunity for variable scaffolding
+    zero_counter = np.zeros(weights.shape[1])
+    for constraint in min_BEC_constraints:
+        zero_idxs = np.where(constraint == 0)[1]
+        for idx in zero_idxs:
+            zero_counter[idx] += 1
+
+    variable_filter, zero_counter, retry_count = BEC_helpers.update_variable_filter(None, zero_counter, retry_count, initialize=True)
+    print('variable filter: {}'.format(variable_filter))
+
     # clear the demonstration generation log
     open('models/' + data_loc + '/demo_gen_log.txt', 'w').close()
     consistent_state_count = True   # whether there are a consistent number of states across various environments
@@ -516,10 +534,6 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
             # continue the chunk
             chunked_trajs.append(traj_record[idx])
     chunked_traj_record.append(chunked_trajs)
-
-    # impose priors that the step cost is positive and the step cost is negative
-    # min_BEC_constraints_running = [np.array([[1, 0, 0]]), np.array([[0, 0, -1]])] # for taxi and skateboard
-    min_BEC_constraints_running = [np.array([[1, 0, 0]]), np.array([[0, 1, 0]]), np.array([[0, 0, -1]])] # todo:two-goal
 
     while len(summary) < n_train_demos:
         # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(len(summary)) + '.png', just_save=True)
@@ -595,17 +609,12 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
             if retry_count == 1:
                 break
             else:
-                retry_count += 1
-                print(colored('Did not find any informative demonstrations. Retry count: {}'.format(retry_count), 'red'))
-                with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
-                    myfile.write('Did not find any informative demonstrations. Retry count: {}\n'.format(retry_count))
+                # no more informative demonstrations with this variable filter, so update it
+                variable_filter, zero_counter, retry_count = BEC_helpers.update_variable_filter(variable_filter, zero_counter,
+                                                                                                retry_count)
 
-                # no more informative demonstrations with this filter, so remove it
-                if variable_filter is not None:
-                    print(colored('Setting variable filter to None\n', 'red'))
-                    with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
-                        myfile.write('Setting variable filter to None\n')
-                    variable_filter = None
+                print(colored('Did not find any informative demonstrations. Retry count: {}'.format(retry_count), 'red'))
+                print('variable filter: {}'.format(variable_filter))
 
                 continue
 
@@ -639,20 +648,15 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
                 if retry_count == 1:
                     break
                 else:
-                    retry_count += 1
-                    print(colored('Did not find any informative demonstrations. Retry count: {}'.format(retry_count), 'red'))
-                    with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
-                        myfile.write('Did not find any informative demonstrations. Retry count: {}\n'.format(retry_count))
+                    # no more informative demonstrations with this variable filter, so update it
+                    variable_filter, zero_counter, retry_count = BEC_helpers.update_variable_filter(variable_filter,
+                                                                                                    zero_counter,
+                                                                                                    retry_count)
 
-                    # no more informative demonstrations with this filter, so remove it
-                    if variable_filter is not None:
-                        print(colored('Setting variable filter to None\n', 'red'))
-                        with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
-                            myfile.write('Setting variable filter to None\n')
-                        variable_filter = None
+                    print(colored('Did not find any informative demonstrations. Retry count: {}'.format(retry_count), 'red'))
+                    print('variable filter: {}'.format(variable_filter))
 
                     continue
-
 
             if consistent_state_count:
                 info_gains = np.array(info_gains_record)
