@@ -30,6 +30,8 @@ if mdp_class == 'augmented_taxi':
         'weights_lb': w_normalized,
         'weights_ub': w_normalized
     }
+
+    priors = [np.array([[1, 0, 0]]), np.array([[0, 0, -1]])]
 elif mdp_class == 'two_goal':
     w = np.array([[7.25, 10.5, -1]])
     w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order)
@@ -48,6 +50,8 @@ elif mdp_class == 'two_goal':
         'weights_lb': w_normalized,
         'weights_ub': w_normalized
     }
+
+    priors = [np.array([[1, 0, 0]]), np.array([[0, 1, 0]]), np.array([[0, 0, -1]])]
 elif mdp_class == 'skateboard':
     w = np.array([[9, -0.3, -1]])
     w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order),
@@ -66,6 +70,8 @@ elif mdp_class == 'skateboard':
         'weights_lb': w_normalized,
         'weights_ub': w_normalized
     }
+
+    priors = [np.array([[1, 0, 0]]), np.array([[0, 0, -1]])]
 elif mdp_class == 'cookie_crumb':
     w = np.array([[2.5, 1.7, -1]])
     w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order),

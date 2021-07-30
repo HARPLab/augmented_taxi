@@ -47,9 +47,7 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
         mdp_agent.reset()  # reset the current state to the initial state
         mdp_agent.visualize_interaction()
 
-def explore_BEC_solid_angle(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, pool, n_train_demos):
-    hardcode_envs = False
-
+def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, pool, n_train_demos, priors, hardcode_envs=False):
     if hardcode_envs:
         # using 4 hardcoded environments
         ps_helpers.obtain_env_policies(mdp_class, data_loc, np.expand_dims(weights, axis=0), mdp_parameters, pool, hardcode_envs=True)
@@ -72,16 +70,16 @@ def explore_BEC_solid_angle(mdp_class, data_loc, mdp_parameters, weights, step_c
 
     try:
         with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
-            policy_constraints, min_subset_constraints_record, env_record, traj_record = pickle.load(f)
+            policy_constraints, min_subset_constraints_record, env_record, traj_record, consistent_state_count = pickle.load(f)
     except:
         if hardcode_envs:
             # use demo BEC to extract constraints
-            policy_constraints, min_subset_constraints_record, env_record, traj_record = BEC.extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=vi_traj_triplets, print_flag=True)
+            policy_constraints, min_subset_constraints_record, env_record, traj_record, consistent_state_count = BEC.extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=vi_traj_triplets, print_flag=True)
         else:
             # use policy BEC to extract constraints
-            policy_constraints, min_subset_constraints_record, env_record, traj_record = BEC.extract_constraints(data_loc, step_cost_flag, pool, print_flag=True)
+            policy_constraints, min_subset_constraints_record, env_record, traj_record, consistent_state_count = BEC.extract_constraints(data_loc, step_cost_flag, pool, print_flag=True)
         with open('models/' + data_loc + '/base_constraints.pickle', 'wb') as f:
-            pickle.dump((policy_constraints, min_subset_constraints_record, env_record, traj_record), f)
+            pickle.dump((policy_constraints, min_subset_constraints_record, env_record, traj_record, consistent_state_count), f)
 
     try:
         with open('models/' + data_loc + '/BEC_constraints.pickle', 'rb') as f:
@@ -92,35 +90,34 @@ def explore_BEC_solid_angle(mdp_class, data_loc, mdp_parameters, weights, step_c
         with open('models/' + data_loc + '/BEC_constraints.pickle', 'wb') as f:
             pickle.dump((min_BEC_constraints, BEC_lengths_record), f)
 
-    # for j, triplet in enumerate(vi_traj_triplets):
-    #     triplet[1].mdp.visualize_trajectory(triplet[2])
-    #     BEC.visualize_constraints(min_subset_constraints_record[j], weights, step_cost_flag)
-
-    # for constraints in min_subset_constraints_record:
-    #     BEC_viz.visualize_planes(constraints)
-
-    constraints_record = [item for sublist in min_subset_constraints_record for item in sublist]
-
     try:
         with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
             BEC_summary = pickle.load(f)
     except:
-        # BEC_summary = BEC.obtain_SCOT_summaries(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag)
-        BEC_summary = BEC.obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_train_demos=n_train_demos)
+        # SCOT_summary = BEC.obtain_SCOT_summaries(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag)
+
+        BEC_summary = BEC.obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, consistent_state_count, n_train_demos=n_train_demos, priors=priors)
+
         if len(BEC_summary) > 0:
             with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
                 pickle.dump(BEC_summary, f)
 
+        # it = 0
+        # while it < 1:
+        #     BEC_summary = BEC.obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_train_demos=n_train_demos)
+        #     if len(BEC_summary) > 0:
+        #         with open('models/' + data_loc + '/BEC_summary' + str(it) + '_it.pickle', 'wb') as f:
+        #             pickle.dump(BEC_summary, f)
+        #     it += 1
+
+
     BEC.visualize_summary(BEC_summary, weights, step_cost_flag)
 
-    # visualizations
-    # for constraints_record in min_subset_constraints_record:
-    constraints_record = []
+    # constraint  visualization
+    constraints_record = priors
     for summary in BEC_summary:
-        print('new summary')
         print(summary[2])
         constraints_record.extend(summary[2])
-        # constraints_record = summary[2]
 
         fig = plt.figure()
         ax = fig.gca(projection='3d')
@@ -131,14 +128,8 @@ def explore_BEC_solid_angle(mdp_class, data_loc, mdp_parameters, weights, step_c
         ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints_record)
         poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
 
-        # visualize the BEC constraint planes
-        hrep = np.array(poly.Hrepresentation())
-        boundary_facet_idxs = np.where(hrep[:, 0] != 0)
-        # first remove boundary constraint planes (those with a non-zero offset)
-        min_constraints = np.delete(hrep, boundary_facet_idxs, axis=0)
-        min_constraints = min_constraints[:, 1:]
-        min_constraints = [constraint.reshape(1, -1) for constraint in min_constraints]
-
+        min_constraints = BEC_helpers.remove_redundant_constraints(constraints_record, weights, step_cost_flag)
+        print(min_constraints)
         for constraints in [min_constraints]:
             BEC_viz.visualize_planes(constraints, fig=fig, ax=ax)
 
@@ -146,8 +137,15 @@ def explore_BEC_solid_angle(mdp_class, data_loc, mdp_parameters, weights, step_c
         BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax, plot_ref_sphere=False)
 
         ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100)
-        ax.set_xlabel('X - Dropoff')
-        ax.set_ylabel('Y - Toll')
+        if mdp_class == 'augmented_taxi':
+            ax.set_xlabel('X - Dropoff')
+            ax.set_ylabel('Y - Toll')
+        elif mdp_class == 'two_goal':
+            ax.set_xlabel('X - Goal 1 (grey)')
+            ax.set_ylabel('Y - Goal 2 (green)')
+        else:
+            ax.set_xlabel('X - Goal')
+            ax.set_ylabel('Y - Skateboard')
         ax.set_zlabel('Z - Step Cost')
 
         if matplotlib.get_backend() == 'TkAgg':
@@ -155,47 +153,6 @@ def explore_BEC_solid_angle(mdp_class, data_loc, mdp_parameters, weights, step_c
             mng.resize(*mng.window.maxsize())
 
         plt.show()
-
-        BEC_viz.visualize_projection(constraints_record, weights, 'xy', xlabel='Dropoff', ylabel='Toll')
-        BEC_viz.visualize_projection(constraints_record, weights, 'xz', xlabel='Dropoff', ylabel='Step Cost')
-        BEC_viz.visualize_projection(constraints_record, weights, 'yz', xlabel='Toll', ylabel='Step Cost')
-
-def obtain_BEC_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, n_train_demos, pool, visualize_summary=False):
-    try:
-        with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
-            BEC_summary = pickle.load(f)
-    except:
-        ps_helpers.obtain_env_policies(mdp_class, data_loc, np.expand_dims(weights, axis=0), mdp_parameters, pool)
-
-        try:
-            with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
-                policy_constraints, min_subset_constraints_record, env_record, traj_record = pickle.load(f)
-        except:
-            # use full policy to extract constraints
-            policy_constraints, min_subset_constraints_record, env_record, traj_record = BEC.extract_constraints(data_loc, step_cost_flag, pool, print_flag=True)
-            with open('models/' + data_loc + '/base_constraints.pickle', 'wb') as f:
-                pickle.dump((policy_constraints, min_subset_constraints_record, env_record, traj_record), f)
-
-        try:
-            with open('models/' + data_loc + '/BEC_constraints.pickle', 'rb') as f:
-                min_BEC_constraints, BEC_lengths_record = pickle.load(f)
-        except:
-            min_BEC_constraints, BEC_lengths_record = BEC.extract_BEC_constraints(policy_constraints, min_subset_constraints_record, weights, step_cost_flag)
-
-            with open('models/' + data_loc + '/BEC_constraints.pickle', 'wb') as f:
-                pickle.dump((min_BEC_constraints, BEC_lengths_record), f)
-
-        try:
-            with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
-                BEC_summary = pickle.load(f)
-        except:
-            # BEC_summary = BEC.obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=n_train_demos)
-            BEC_summary = BEC.obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_train_demos=n_train_demos)
-            with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
-                pickle.dump(BEC_summary, f)
-
-    if visualize_summary:
-        BEC.visualize_summary(BEC_summary, weights, step_cost_flag)
 
     return BEC_summary
 
@@ -247,11 +204,10 @@ if __name__ == "__main__":
     # generate_agent(params.mdp_class, params.data_loc['base'], params.mdp_parameters, visualize=True)
 
     # b) obtain a BEC summary of the agent's policy
-    # BEC_summary = obtain_BEC_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
-    #                                               params.step_cost_flag, params.BEC['summary_variant'],
-    #                                               params.BEC['n_train_demos'], pool, visualize_summary=True)
+    BEC_summary = obtain_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
+                            params.step_cost_flag, params.BEC['summary_variant'], pool, params.BEC['n_train_demos'], params.priors)
+
     # c) obtain test environments
     # obtain_test_environments(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,
     #                          params.step_cost_flag, summary=BEC_summary, visualize_test_env=True)
 
-    explore_BEC_solid_angle(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.step_cost_flag, params.BEC['summary_variant'], pool, params.BEC['n_train_demos'])

@@ -28,7 +28,6 @@ def extract_constraints_policy(args):
     weights = mdp.weights
 
     min_subset_constraints_record = []    # minimum BEC constraints conveyed by a trajectory
-    env_record = []
     policy_constraints = []               # BEC constraints that define a policy (i.e. constraints arising from one action
                                           # deviations from every possible starting state and the corresponding optimal trajectories)
     traj_record = []
@@ -65,15 +64,13 @@ def extract_constraints_policy(args):
         min_subset_constraints_record.append(
             BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag))
         traj_record.append(traj_opt)
-        env_record.append(env_idx)
 
-    return min_subset_constraints_record, traj_record, env_record, policy_constraints
+    return env_idx, traj_record, policy_constraints, min_subset_constraints_record
 
 def extract_constraints_demonstration(args):
     env_idx, vi, traj_opt, step_cost_flag = args
 
     min_subset_constraints_record = []    # minimum BEC constraints conveyed by a trajectory
-    env_record = []
     policy_constraints = []               # BEC constraints that define a policy (i.e. constraints arising from one action
                                           # deviations from every possible starting state and the corresponding optimal trajectories)
     traj_record = []
@@ -105,12 +102,11 @@ def extract_constraints_demonstration(args):
     min_subset_constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
     min_subset_constraints_record.append(min_subset_constraints)
     traj_record.append(traj_opt)
-    env_record.append(env_idx)
     # slightly abusing the term 'policy' here since I'm only considering a subset of possible trajectories (i.e.
     # demos) that the policy can generate in these environments
     policy_constraints.append(min_subset_constraints)
 
-    return min_subset_constraints_record, traj_record, env_record, policy_constraints
+    return env_idx, traj_record, policy_constraints, min_subset_constraints_record
 
 
 def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=None, print_flag=False):
@@ -142,11 +138,22 @@ def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=None, p
         pool.join()
         pool.terminate()
 
+        # determine whether this domain has a consistent set of states between constituent MDPs
+        consistent_state_count = True
+        previous_state_count = None
         for result in results:
-            min_subset_constraints_record.extend(result[0])
-            traj_record.extend(result[1])
-            env_record.extend(result[2])
-            policy_constraints.extend(result[3])
+            if previous_state_count == None:
+                previous_state_count = len(result[1])
+            else:
+                if previous_state_count != len(result[1]):
+                    consistent_state_count = False
+                else:
+                    previous_state_count = len(result[1])
+
+            env_record.append(result[0])
+            traj_record.append(result[1])
+            policy_constraints.extend(result[2])
+            min_subset_constraints_record.append(result[3])
     else:
         # b) demonstration-driven BEC: generate constraints by considering the expected feature counts after taking one
         # suboptimal action in every state along a trajectory (demonstration), then acting optimally afterward.
@@ -160,12 +167,15 @@ def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=None, p
         pool.terminate()
 
         for result in results:
-            min_subset_constraints_record.extend(result[0])
-            traj_record.extend(result[1])
-            env_record.extend(result[2])
-            policy_constraints.extend(result[3])
+            env_record.append(result[0])
+            traj_record.append(result[1])
+            policy_constraints.extend(result[2])
+            min_subset_constraints_record.append(result[3])
 
-    return policy_constraints, min_subset_constraints_record, env_record, traj_record
+        # this isn't really relevant for demonstration BEC
+        consistent_state_count = False
+
+    return policy_constraints, min_subset_constraints_record, env_record, traj_record, consistent_state_count
 
 def extract_BEC_constraints(policy_constraints, min_subset_constraints_record, env_record, weights, step_cost_flag, pool):
     '''
@@ -181,33 +191,13 @@ def extract_BEC_constraints(policy_constraints, min_subset_constraints_record, e
 
     if step_cost_flag:
         # calculate the 2D intersection between minimum constraints and L1 norm constraint for each demonstration
-        for j, min_subset_constraints in enumerate(min_subset_constraints_record):
+        min_subset_constraints_record_flattened = [item for sublist in min_subset_constraints_record for item in sublist]
+        for j, min_subset_constraints in enumerate(min_subset_constraints_record_flattened):
             BEC_lengths_record.append(BEC_helpers.calculate_BEC_length(min_subset_constraints, weights, step_cost_flag)[0])
     else:
         # calculate the solid angle between the minimum constraints for each demonstration
-        # chunk constraints first for faster multiprocessing
-        # todo: should make a separate function for this since it's reused in obtain_summary_counterfactual.
-        #  or I could simply store chunked variants of constraints and trajectories in the first place)
-        current_env = 0
-        chunked_constraint_record = []
-        chunked_env_record = [0]
-        chunked_constraints = []
-        for idx, env in enumerate(env_record):
-            if env != current_env:
-                # record the old chunk
-                chunked_constraint_record.append(chunked_constraints)
-
-                # start a new chunk
-                current_env = env
-                chunked_env_record.append(env)
-                chunked_constraints = [min_subset_constraints_record[idx]]
-            else:
-                # continue the chunk
-                chunked_constraints.append(min_subset_constraints_record[idx])
-        chunked_constraint_record.append(chunked_constraints)
-
         pool.restart()
-        BEC_lengths_record_chunked = list(tqdm(pool.imap(BEC_helpers.calc_solid_angles, chunked_constraint_record), total=len(chunked_constraint_record)))
+        BEC_lengths_record_chunked = list(tqdm(pool.imap(BEC_helpers.calc_solid_angles, min_subset_constraints_record), total=len(min_subset_constraints_record)))
         pool.close()
         pool.join()
         pool.terminate()
@@ -476,21 +466,13 @@ def combine_limiting_constraints(args):
 
     return info_gains_record, min_env_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs
 
-def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool,
-                       n_train_demos=3, downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001):
+def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, consistent_state_count,
+                       n_train_demos=3, priors=[], downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001):
     summary = []
     retry_count = 0
 
     # impose priors
-    if data_loc == 'augmented_taxi' or data_loc == 'skateboard':
-        # impose priors that the dropoff reward is positive and the step reward is negative
-        min_BEC_constraints_running = [np.array([[1, 0, 0]]), np.array([[0, 0, -1]])]
-    elif data_loc == 'two_goal':
-        # impose priors that the two goal rewards are positive and the step reward is negative
-        min_BEC_constraints_running = [np.array([[1, 0, 0]]), np.array([[0, 1, 0]]), np.array([[0, 0, -1]])]
-    else:
-        min_BEC_constraints_running = []
-
+    min_BEC_constraints_running = priors
 
     # count how many zeros are present for each reward weight (i.e. variable) in the minimum BEC constraints
     # (which are obtained using one-step deviations). such constraints suggest the opportunity for variable scaffolding
@@ -505,35 +487,6 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
 
     # clear the demonstration generation log
     open('models/' + data_loc + '/demo_gen_log.txt', 'w').close()
-    consistent_state_count = True   # whether there are a consistent number of states across various environments
-
-    # assuming that traj_record / env_record are sorted properly by env order, chunk via environment for faster multiprocessing
-    current_env = 0
-    chunked_traj_record = []
-    chunked_env_record = [0]
-    chunked_trajs = []
-    previous_state_count = None
-    for idx, env in enumerate(env_record):
-        if env != current_env:
-            if previous_state_count == None:
-                previous_state_count = len(chunked_trajs)
-            else:
-                if previous_state_count != len(chunked_trajs):
-                    consistent_state_count = False
-                else:
-                    previous_state_count = len(chunked_trajs)
-
-            # record the old chunk
-            chunked_traj_record.append(chunked_trajs)
-
-            # start a new chunk
-            current_env = env
-            chunked_env_record.append(env)
-            chunked_trajs = [traj_record[idx]]
-        else:
-            # continue the chunk
-            chunked_trajs.append(traj_record[idx])
-    chunked_traj_record.append(chunked_trajs)
 
     while len(summary) < n_train_demos:
         # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(len(summary)) + '.png', just_save=True)
@@ -569,7 +522,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
             os.makedirs(cf_data_dir, exist_ok=True)
             if consider_human_models_jointly:
                 pool.restart()
-                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, chunked_env_record[i]), chunked_traj_record[i], min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter, consider_human_models_jointly) for i in range(len(chunked_traj_record))]
+                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter, consider_human_models_jointly) for i in range(len(traj_record))]
                 info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals, args), total=len(args)))
                 pool.close()
                 pool.join()
@@ -578,7 +531,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
                 info_gains_record.append(info_gain_envs)
             else:
                 pool.restart() # todo: maybe there's no need to terminate and restart pool multiple times in the same function
-                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, chunked_env_record[i]), chunked_traj_record[i], min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter, consider_human_models_jointly) for i in range(len(chunked_traj_record))]
+                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter, consider_human_models_jointly) for i in range(len(traj_record))]
                 info_gain_envs, overlap_in_opt_and_counterfactual_traj_env = zip(*pool.imap(compute_counterfactuals, tqdm(args), total=len(args)))
                 pool.close()
                 pool.join()
@@ -622,8 +575,8 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
             print("Combining the most limiting constraints across human models:")
             pool.restart()
             args = [(i, len(sample_human_models), data_loc, len(summary), weights, step_cost_flag, variable_filter,
-                     chunked_traj_record[i], min_BEC_constraints_running) for
-                    i in range(len(chunked_traj_record))]
+                     traj_record[i], min_BEC_constraints_running) for
+                    i in range(len(traj_record))]
             info_gains_record, min_env_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(
                 *pool.imap(combine_limiting_constraints, tqdm(args)))
             pool.close()
@@ -667,7 +620,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
                 best_env_idxs, best_traj_idxs = np.where(obj_function == max(obj_function.flatten()))
                 max_info_gain = np.max(info_gains)
 
-                best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_record, summary)
+                best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
 
             else:
                 best_obj = float('-inf')
@@ -687,9 +640,9 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
                             best_env_idxs = [env_idx]
                             best_traj_idxs = [traj_idx]
 
-                best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_record, summary)
+                best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
 
-            best_traj = chunked_traj_record[best_env_idx][best_traj_idx]
+            best_traj = traj_record[best_env_idx][best_traj_idx]
 
             filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
             with open(filename, 'rb') as f:
@@ -732,7 +685,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
                 best_human_trajs_record_env, constraints_env = pickle.load(f)
 
             best_human_trajs = best_human_trajs_record_env[best_traj_idx]
-            best_traj = chunked_traj_record[best_env_idx][best_traj_idx]
+            best_traj = traj_record[best_env_idx][best_traj_idx]
 
             filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
             with open(filename, 'rb') as f:
