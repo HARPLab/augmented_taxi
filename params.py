@@ -144,7 +144,9 @@ BEC = {
 
     'n_test_demos': 30,                        # number of desired test demonstration
 
-    'test_difficulty': 'medium'                 # expected ease for human to correctly predict the agent's actions in this test environment (low, medium, high)
+    'test_difficulty': 'medium',               # expected ease for human to correctly predict the agent's actions in this test environment (low, medium, high)
+
+    'n_human_models': 8
 }
 
 data_loc = {

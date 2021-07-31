@@ -8,6 +8,7 @@ import copy
 from sklearn.cluster import KMeans
 import os
 from tqdm import tqdm
+from collections import defaultdict
 
 # Other imports
 from simple_rl.planning import ValueIteration
@@ -218,7 +219,7 @@ def _in_summary(mdp, summary, initial_state):
             return True
     return False
 
-def select_test_demos(cluster_idx, n_desired_test_env, wt_vi_traj_candidates, env_idxs , traj_opts, BEC_lengths, BEC_constraints, n_clusters=6):
+def select_test_demos(cluster_idx, data_loc, n_desired_test_env, env_idxs , traj_opts, BEC_lengths, BEC_constraints, n_clusters=6):
     kmeans = KMeans(n_clusters=n_clusters).fit(np.array(BEC_lengths).reshape(-1, 1))
     cluster_centers = kmeans.cluster_centers_
     labels = kmeans.labels_
@@ -237,8 +238,14 @@ def select_test_demos(cluster_idx, n_desired_test_env, wt_vi_traj_candidates, en
 
     selected_env_idxs = [env_idxs[k] for k in test_demo_idxs]
 
-    test_wt_vi_traj_tuples = [copy.deepcopy(wt_vi_traj_candidates[k][0]) for k in
-                              selected_env_idxs]
+    test_wt_vi_traj_tuples = []
+    for k in selected_env_idxs:
+        env_filename = mp_helpers.lookup_env_filename(data_loc, k)
+
+        with open(env_filename, 'rb') as f:
+            wt_vi_traj_env = pickle.load(f)
+
+        test_wt_vi_traj_tuples.append(copy.deepcopy(wt_vi_traj_env[0]))
 
     test_traj_opts = [traj_opts[k] for k in test_demo_idxs]
 
@@ -291,57 +298,51 @@ def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_recor
 
     return best_env_idx, best_traj_idx
 
-def obtain_test_environments(wt_vi_traj_candidates, min_subset_constraints_record, env_record, traj_record, weights, n_desired_test_env, difficulty, step_cost_flag, summary=None, BEC_summary_type=None):
+def obtain_test_environments(data_loc, priors, min_subset_constraints_record, env_record, traj_record, weights, BEC_lengths_record, n_desired_test_env, difficulty, step_cost_flag, summary=None):
     '''
     Summary: Correlate the difficulty of a test environment with the generalized area of the BEC region obtain by the
     corresponding optimal demonstration. Return the desired number and difficulty of test environments (to be given
     to the human to test his understanding of the agent's policy).
     '''
-    env_idxs = []
-    env_complexities = []
-    BEC_lengths = []
-    BEC_constraints = []
-    traj_opts = []
+    traj_record_filtered = copy.deepcopy(traj_record)
+    min_subset_constraints_record_filtered = copy.deepcopy(min_subset_constraints_record)
 
-    # go through the BEC constraints of each possible optimal demo in each environment and store the corresponding
-    # BEC lengths
-    for j, constraints in enumerate(min_subset_constraints_record):
-        # todo: this may be redundant since the BEC lengths are already calculated for generating the summary
-        if j % 1000 == 0:
-            print('{}/{} of constraints checked to see if they\'re in the summary'.format(j, len(min_subset_constraints_record)))
-        if not _in_summary(wt_vi_traj_candidates[env_record[j]][0][1].mdp, summary, traj_record[j][0][0]):
-            BEC_length = BEC_helpers.calculate_BEC_length(constraints, weights, step_cost_flag)[0]
-            BEC_lengths.append(BEC_length)
-            env_complexities.append(wt_vi_traj_candidates[env_record[j]][0][1].mdp.measure_env_complexity())
-            env_idxs.append(env_record[j])
-            BEC_constraints.append(constraints)
-            traj_opts.append(traj_record[j])
+    # remove environment and trajectory indices that comprise the summary
+    summary_idxs = defaultdict(lambda: [])
+    for summary_tuple in summary:
+        best_env_idx = summary_tuple[4]
+        best_traj_idx = summary_tuple[5]
 
-    if BEC_summary_type == 'demo':
-        # demo test environment generation is outdated
-        if difficulty == 'high':
-            test_wt_vi_traj_tuples = [wt_vi_traj_candidates[k][0] for k in
-                                            env_record_sorted[unique_idxs[:n_desired_test_env]]]
-            test_BEC_lengths = [BEC_lengths_sorted[k] for k in unique_idxs[:n_desired_test_env]]
-            test_BEC_constraints = [BEC_constraints_sorted[k] for k in unique_idxs[:n_desired_test_env]]
-        else:
-            test_wt_vi_traj_tuples = [wt_vi_traj_candidates[k][0] for k in
-                                            env_record_sorted[unique_idxs[-n_desired_test_env:]]]
-            test_BEC_lengths = [BEC_lengths_sorted[k] for k in unique_idxs[-n_desired_test_env:]]
-            test_BEC_constraints = [BEC_constraints_sorted[k] for k in unique_idxs[-n_desired_test_env:]]
-    else:
-        if difficulty == 'high':
-            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(0, n_desired_test_env, wt_vi_traj_candidates, env_idxs, traj_opts, BEC_lengths, BEC_constraints)
-        if difficulty == 'medium':
-            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(2, n_desired_test_env,
-                                                                                               wt_vi_traj_candidates,
-                                                                                               env_idxs, traj_opts,
-                                                                                               BEC_lengths, BEC_constraints)
+        summary_idxs[best_env_idx].append(best_traj_idx)
 
-        if difficulty == 'low':
-            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(4, n_desired_test_env,
-                                                                                               wt_vi_traj_candidates,
-                                                                                               env_idxs, traj_opts,
-                                                                                               BEC_lengths, BEC_constraints)
+    for env_idx in summary_idxs.keys():
+        traj_idxs = summary_idxs[env_idx]
+        for traj_idx in sorted(traj_idxs, reverse=True):
+            del traj_record_filtered[env_idx][traj_idx]
+            del min_subset_constraints_record_filtered[env_idx][traj_idx]
+            del BEC_lengths_record[env_idx][traj_idx]
+
+    # flatten relevant lists for easy sorting
+    envs_record_flattened = []
+    for j, env_idx in enumerate(env_record):
+        envs_record_flattened.extend([env_idx] * len(traj_record_filtered[j]))
+
+    traj_record_flattened = [item for sublist in traj_record_filtered for item in sublist]
+    BEC_lengths_record_flattened = [item for sublist in BEC_lengths_record for item in sublist]
+    min_subset_constraints_record_flattened = [item for sublist in min_subset_constraints_record_filtered for item in sublist]
+
+    if difficulty == 'high':
+        test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(0, data_loc, n_desired_test_env, envs_record_flattened, traj_record_flattened, BEC_lengths_record_flattened, min_subset_constraints_record_flattened)
+    if difficulty == 'medium':
+        test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(2, data_loc, n_desired_test_env,
+                                                                                           envs_record_flattened,
+                                                                                           traj_record_flattened,
+                                                                                           BEC_lengths_record_flattened, min_subset_constraints_record_flattened)
+
+    if difficulty == 'low':
+        test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(4, data_loc, n_desired_test_env,
+                                                                                           envs_record_flattened,
+                                                                                           traj_record_flattened,
+                                                                                           BEC_lengths_record_flattened, min_subset_constraints_record_flattened)
 
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints
