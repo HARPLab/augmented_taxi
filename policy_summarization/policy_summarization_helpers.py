@@ -298,7 +298,7 @@ def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_recor
 
     return best_env_idx, best_traj_idx
 
-def obtain_test_environments(data_loc, priors, min_subset_constraints_record, env_record, traj_record, weights, BEC_lengths_record, n_desired_test_env, difficulty, step_cost_flag, summary=None):
+def obtain_test_environments(data_loc, min_subset_constraints_record, env_record, traj_record, weights, BEC_lengths_record, n_desired_test_env, difficulty, step_cost_flag, summary=None, overlap_in_trajs_avg=None, c=0.001):
     '''
     Summary: Correlate the difficulty of a test environment with the generalized area of the BEC region obtain by the
     corresponding optimal demonstration. Return the desired number and difficulty of test environments (to be given
@@ -306,6 +306,9 @@ def obtain_test_environments(data_loc, priors, min_subset_constraints_record, en
     '''
     traj_record_filtered = copy.deepcopy(traj_record)
     min_subset_constraints_record_filtered = copy.deepcopy(min_subset_constraints_record)
+    BEC_lengths_record_filtered = copy.deepcopy(BEC_lengths_record)
+    if overlap_in_trajs_avg is not None:
+        overlap_in_trajs_avg_filtered = copy.deepcopy(overlap_in_trajs_avg)
 
     # remove environment and trajectory indices that comprise the summary
     summary_idxs = defaultdict(lambda: [])
@@ -320,7 +323,9 @@ def obtain_test_environments(data_loc, priors, min_subset_constraints_record, en
         for traj_idx in sorted(traj_idxs, reverse=True):
             del traj_record_filtered[env_idx][traj_idx]
             del min_subset_constraints_record_filtered[env_idx][traj_idx]
-            del BEC_lengths_record[env_idx][traj_idx]
+            del BEC_lengths_record_filtered[env_idx][traj_idx]
+            if overlap_in_trajs_avg is not None:
+                del overlap_in_trajs_avg_filtered[env_idx][traj_idx]
 
     # flatten relevant lists for easy sorting
     envs_record_flattened = []
@@ -328,21 +333,26 @@ def obtain_test_environments(data_loc, priors, min_subset_constraints_record, en
         envs_record_flattened.extend([env_idx] * len(traj_record_filtered[j]))
 
     traj_record_flattened = [item for sublist in traj_record_filtered for item in sublist]
-    BEC_lengths_record_flattened = [item for sublist in BEC_lengths_record for item in sublist]
     min_subset_constraints_record_flattened = [item for sublist in min_subset_constraints_record_filtered for item in sublist]
+    if overlap_in_trajs_avg is None:
+        obj_func_flattened = [item for sublist in BEC_lengths_record_filtered for item in sublist]
+    else:
+        BEC_lengths_record_flattened = [item for sublist in BEC_lengths_record_filtered for item in sublist]
+        overlap_in_trajs_avg_flattened = [item for sublist in overlap_in_trajs_avg_filtered for item in sublist]
+        obj_func_flattened = np.array(BEC_lengths_record_flattened) * (np.array(overlap_in_trajs_avg_flattened) + c)
 
     if difficulty == 'high':
-        test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(0, data_loc, n_desired_test_env, envs_record_flattened, traj_record_flattened, BEC_lengths_record_flattened, min_subset_constraints_record_flattened)
+        test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(0, data_loc, n_desired_test_env, envs_record_flattened, traj_record_flattened, obj_func_flattened, min_subset_constraints_record_flattened)
     if difficulty == 'medium':
         test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(2, data_loc, n_desired_test_env,
                                                                                            envs_record_flattened,
                                                                                            traj_record_flattened,
-                                                                                           BEC_lengths_record_flattened, min_subset_constraints_record_flattened)
+                                                                                           obj_func_flattened, min_subset_constraints_record_flattened)
 
     if difficulty == 'low':
         test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = select_test_demos(4, data_loc, n_desired_test_env,
                                                                                            envs_record_flattened,
                                                                                            traj_record_flattened,
-                                                                                           BEC_lengths_record_flattened, min_subset_constraints_record_flattened)
+                                                                                           obj_func_flattened, min_subset_constraints_record_flattened)
 
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints
