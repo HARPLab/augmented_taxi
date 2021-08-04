@@ -466,7 +466,7 @@ def combine_limiting_constraints_BEC(args):
     '''
     Summary: combine the most limiting constraints across all potential human models for each potential demonstration
     '''
-    env_idx, n_sample_human_models, priors, data_loc, curr_summary_len, weights, trajs_opt, step_cost_flag = args
+    env_idx, n_sample_human_models, prior, posterior, data_loc, curr_summary_len, weights, trajs_opt, step_cost_flag, pool= args
 
     min_env_constraints_record = []
     all_env_constraints = []
@@ -485,7 +485,7 @@ def combine_limiting_constraints_BEC(args):
     # and use that to calculate the information gain for that demonstration
     for traj_idx in range(len(all_env_constraints_joint)):
         traj_constraints_joint = all_env_constraints_joint[traj_idx].copy()
-        traj_constraints_joint.extend(priors)
+        traj_constraints_joint.extend(prior)
 
         if len(traj_constraints_joint) > 1:
             min_env_constraints = BEC_helpers.remove_redundant_constraints(traj_constraints_joint,
@@ -548,12 +548,12 @@ def combine_limiting_constraints_BEC(args):
 
 
 def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
-                       n_train_demos=3, priors=[], downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001):
+                       n_train_demos=3, prior=[], downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001):
     summary = []
     retry_count = 0
 
-    # impose priors
-    min_BEC_constraints_running = priors.copy()
+    # impose prior
+    min_BEC_constraints_running = prior.copy()
 
     # count how many zeros are present for each reward weight (i.e. variable) in the minimum BEC constraints
     # (which are obtained using one-step deviations). such constraints suggest the opportunity for variable scaffolding

@@ -13,6 +13,7 @@ import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import os
 
 # Other imports.
 sys.path.append("simple_rl")
@@ -48,7 +49,7 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
         mdp_agent.reset()  # reset the current state to the initial state
         mdp_agent.visualize_interaction()
 
-def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, pool, n_train_demos, n_human_models, priors, hardcode_envs=False):
+def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, pool, n_train_demos, n_human_models, prior, hardcode_envs=False):
     if hardcode_envs:
         # using 4 hardcoded environments
         ps_helpers.obtain_env_policies(mdp_class, data_loc, np.expand_dims(weights, axis=0), mdp_parameters, pool, hardcode_envs=True)
@@ -97,7 +98,7 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
     except:
         # SCOT_summary = BEC.obtain_SCOT_summaries(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag)
 
-        BEC_summary = BEC.obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count, n_train_demos=n_train_demos, priors=priors)
+        BEC_summary = BEC.obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count, n_train_demos=n_train_demos, prior=prior)
 
         if len(BEC_summary) > 0:
             with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
@@ -157,7 +158,7 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
 
     return BEC_summary
 
-def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_params, step_cost_flag, n_human_models, priors, summary=None, use_counterfactual=True, visualize_test_env=False):
+def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_params, step_cost_flag, n_human_models, prior, posterior, summary=None, use_counterfactual=True, visualize_test_env=False):
     '''
     Summary: Correlate the difficulty of a test environment with the generalized area of the BEC region obtain by the
     corresponding optimal demonstration. Return the desired number and difficulty of test environments (to be given
@@ -198,9 +199,40 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
             with open('models/' + data_loc + '/BEC_constraints_counterfactual.pickle', 'rb') as f:
                 min_subset_constraints_record_counterfactual, BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = pickle.load(f)
         except:
+            equal_prior_posterior = True
+            if len(prior) == len(posterior):
+                for j, posterior_constraint in enumerate(posterior):
+                    if not np.array_equal(posterior_constraint, prior[j]):
+                        equal_prior_posterior = False
+            else:
+                equal_prior_posterior = False
+
+            if not equal_prior_posterior:
+                sample_human_models = BEC_helpers.sample_human_models_uniform(posterior, n_human_models)
+
+                for model_idx, human_model in enumerate(sample_human_models):
+                    cf_data_dir = 'models/' + data_loc + '/counterfactual_data_-1/model' + str(model_idx)
+                    os.makedirs(cf_data_dir, exist_ok=True)
+
+                    print(colored('Model #: {}'.format(model_idx), 'red'))
+                    print(colored('Model val: {}'.format(human_model), 'red'))
+
+                    # assuming that I'm considering human models jointly
+                    pool.restart()
+                    args = [
+                        (data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]),
+                         traj_record[i], posterior, step_cost_flag, -1, None,
+                         True) for i in range(len(traj_record))]
+                    _ = list(tqdm(pool.imap(BEC.compute_counterfactuals, args), total=len(args)))
+                    pool.close()
+                    pool.join()
+                    pool.terminate()
+
             pool.restart()
-            # sample human models from the prior (i.e. counterfactual data 0)
-            args = [(i, n_human_models, priors, data_loc, 0, weights, traj_record[i], step_cost_flag) for i in range(len(env_record))]
+            if equal_prior_posterior:
+                args = [(i, n_human_models, prior, posterior, data_loc, 0, weights, traj_record[i], step_cost_flag, pool) for i in range(len(env_record))]
+            else:
+                args = [(i, n_human_models, prior, posterior, data_loc, -1, weights, traj_record[i], step_cost_flag, pool) for i in range(len(env_record))]
             min_subset_constraints_record_counterfactual, BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(*pool.imap(BEC.combine_limiting_constraints_BEC, tqdm(args)))
             pool.close()
             pool.join()
@@ -211,7 +243,7 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
 
         if use_counterfactual:
             test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = \
-                ps_helpers.obtain_test_environments(data_loc, min_subset_constraints_record_counterfactual, env_record, traj_record, weights, BEC_lengths_record_counterfactual, BEC_params['n_test_demos'], BEC_params['test_difficulty'], step_cost_flag, summary=summary, overlap_in_trajs_avg=overlap_in_opt_and_counterfactual_traj_avg)
+                ps_helpers.obtain_test_environments(data_loc, min_subset_constraints_record_counterfactual, env_record, traj_record, weights, BEC_lengths_record_counterfactual, BEC_params['n_test_demos'], BEC_params['test_difficulty'], step_cost_flag, summary=summary)
         else:
             test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = \
                 ps_helpers.obtain_test_environments(data_loc, min_subset_constraints_record, env_record,
@@ -235,9 +267,9 @@ if __name__ == "__main__":
     # b) obtain a BEC summary of the agent's policy
     BEC_summary = obtain_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
                             params.step_cost_flag, params.BEC['summary_variant'], pool, params.BEC['n_train_demos'],
-                            params.BEC['n_human_models'], params.priors)
+                            params.BEC['n_human_models'], params.prior)
 
     # c) obtain test environments
     obtain_test_environments(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,
-                             params.step_cost_flag, params.BEC['n_human_models'], params.priors, summary=BEC_summary, visualize_test_env=True)
+                             params.step_cost_flag, params.BEC['n_human_models'], params.prior, params.posterior, summary=BEC_summary, visualize_test_env=True)
 
