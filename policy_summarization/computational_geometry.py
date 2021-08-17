@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from spherical_geometry import great_circle_arc
 
 '''
 2-sphere geometry
@@ -41,6 +42,22 @@ def sample_valid_region(constraints, min_azi, max_azi, min_ele, max_ele, n_azi, 
     valid_sph_z = np.take(z, idx_valid_sph_points)
 
     return valid_sph_x, valid_sph_y, valid_sph_z
+
+def sort_points_by_angle(points, center):
+    '''
+    Sort points in a coherent angular order around a center point and a reference direction (i.e. north)
+    Taken from the Spherical Geometry python library: https://github.com/spacetelescope/spherical_geometry
+    '''
+
+    north = [0., 0., 1.]
+    ang = great_circle_arc.angle(north, center, points)
+    pt = [points[i, :] for i in range(points.shape[0])]
+
+    duo = list(zip(pt, ang))
+    duo = sorted(duo, key=lambda d: d[1])
+    points = np.asarray([d[0] for d in duo])
+
+    return list(points)
 
 '''
 2D convex polygon geometry

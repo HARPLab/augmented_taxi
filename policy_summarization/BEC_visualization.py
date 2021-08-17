@@ -6,7 +6,7 @@ from scipy.spatial import geometric_slerp
 import matplotlib.tri as mtri
 from termcolor import colored
 
-def visualize_spherical_polygon(poly, fig=None, ax=None, alpha=0.2, plot_ref_sphere=True):
+def visualize_spherical_polygon(poly, fig=None, ax=None, alpha=0.2, color='y', plot_ref_sphere=True):
     '''
     Visualize the spherical polygon created by the intersection between the constraint polyhedron and a unit sphere
     '''
@@ -99,7 +99,7 @@ def visualize_spherical_polygon(poly, fig=None, ax=None, alpha=0.2, plot_ref_sph
     tri.set_mask(second_or)
 
     # plot valid x, y, z coordinates on sphere as a mesh of valid triangles
-    ax.plot_trisurf(valid_sph_x, valid_sph_y, valid_sph_z, triangles=tri.triangles, mask=second_or, color='y', alpha=1)
+    ax.plot_trisurf(valid_sph_x, valid_sph_y, valid_sph_z, triangles=tri.triangles, mask=second_or, color=color, alpha=1)
 
     ax.set_xlim(-1, 1)
     ax.set_ylim(-1, 1)

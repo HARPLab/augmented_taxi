@@ -17,6 +17,9 @@ import policy_summarization.multiprocessing_helpers as mp_helpers
 from policy_summarization import policy_summarization_helpers as ps_helpers
 import sage.all
 import sage.geometry.polyhedron.base as Polyhedron
+from spherical_geometry import polygon as sph_polygon
+import policy_summarization.BEC_visualization as BEC_viz
+from policy_summarization import computational_geometry as cg
 
 def extract_constraints_policy(args):
     env_idx, data_loc, step_cost_flag = args
@@ -468,6 +471,9 @@ def combine_limiting_constraints_BEC(args):
     '''
     env_idx, n_sample_human_models, prior, posterior, data_loc, curr_summary_len, weights, trajs_opt, step_cost_flag, pool= args
 
+    human_model = posterior
+    human_model = BEC_helpers.remove_redundant_constraints(human_model, weights, step_cost_flag)
+
     min_env_constraints_record = []
     all_env_constraints = []
     BEC_areas = []
@@ -481,22 +487,45 @@ def combine_limiting_constraints_BEC(args):
         all_env_constraints.append(constraints_env)
 
     all_env_constraints_joint = [list(itertools.chain.from_iterable(i)) for i in zip(*all_env_constraints)]
-    # for each possible demonstration in each environment, find the non-redundant constraints across all human models
-    # and use that to calculate the information gain for that demonstration
+
+    # obtain spherical polygon comprising the posterior (human's model)
+    posterior_ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(human_model)
+    posterior_poly = Polyhedron.Polyhedron(ieqs=posterior_ieqs)
+
+    posterior_spherical_polygon_vertices = np.array(BEC_helpers.obtain_sph_polygon_vertices(posterior_poly, add_noise=True))  # add noise to help smooth calculation
+    inside_posterior_sph_polygon = BEC_helpers.sample_average_model(posterior, sample_rate=100)[0][0]
+
+    posterior_spherical_polygon_vertices = cg.sort_points_by_angle(posterior_spherical_polygon_vertices, inside_posterior_sph_polygon)
+    posterior_sph_polygon = sph_polygon.SphericalPolygon(posterior_spherical_polygon_vertices, inside=tuple(inside_posterior_sph_polygon))
+
+    # if abs(BEC_helpers.calc_solid_angles([human_model])[0] - posterior_sph_polygon.area()) > 1 or np.isnan(posterior_sph_polygon.area()):
+    #     raise AssertionError("Too much deviation in prior BEC areas")
+
+    # for each possible demonstration in each environment, find the overlap in area between the spherical polygon
+    # comprising the posterior and the counterfactual constraints created by the demonstration
     for traj_idx in range(len(all_env_constraints_joint)):
-        traj_constraints_joint = all_env_constraints_joint[traj_idx].copy()
-        traj_constraints_joint.extend(prior)
+        all_env_constraints_joint_traj = all_env_constraints_joint[traj_idx]
+        all_env_constraints_joint_traj = BEC_helpers.remove_redundant_constraints(all_env_constraints_joint_traj, weights, step_cost_flag)
 
-        if len(traj_constraints_joint) > 1:
-            min_env_constraints = BEC_helpers.remove_redundant_constraints(traj_constraints_joint,
-                                                                           weights, step_cost_flag)
+        traj_ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(all_env_constraints_joint_traj)
+        traj_poly = Polyhedron.Polyhedron(ieqs=traj_ieqs)  # automatically finds the minimal H-representation
+        traj_spherical_polygon_vertices = np.array(BEC_helpers.obtain_sph_polygon_vertices(traj_poly, add_noise=True)) # add noise to help smooth calculation
+
+        inside_traj_sph_polygon = BEC_helpers.sample_average_model(all_env_constraints_joint_traj, sample_rate=100)[0][0]
+
+        traj_spherical_polygon_vertices = cg.sort_points_by_angle(traj_spherical_polygon_vertices, inside_traj_sph_polygon)
+        traj_sph_polygon = sph_polygon.SphericalPolygon(traj_spherical_polygon_vertices, inside=tuple(inside_traj_sph_polygon))
+
+        # if abs(BEC_helpers.calc_solid_angles([all_env_constraints_joint_traj])[0] - traj_sph_polygon.area()) > 1  or np.isnan(traj_sph_polygon.area()):
+        #     print('env: {}, traj: {}'.format(env_idx, traj_idx))
+        #     raise AssertionError("Too much deviation in trajectory BEC areas")
+
+        if traj_sph_polygon.intersects_poly(posterior_sph_polygon):
+            BEC_areas.append(traj_sph_polygon.intersection(posterior_sph_polygon).area())
         else:
-            min_env_constraints = traj_constraints_joint
+            BEC_areas.append(0)
 
-        solid_angle = BEC_helpers.calc_solid_angles([min_env_constraints])[0]
-
-        BEC_areas.append(solid_angle)
-        min_env_constraints_record.append(min_env_constraints)
+        min_env_constraints_record.append(all_env_constraints_joint[traj_idx])
 
     # obtain the counterfactual human trajectories that could've given rise to the most limiting constraints and
     # how much it overlaps the agent's optimal trajectory
@@ -1166,7 +1195,7 @@ def visualize_summary(BEC_summaries_collection, weights, step_cost_flag):
         # BEC_summary[0].visualize_trajectory(BEC_summary[3][0])
 
 
-def visualize_test_envs(test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, weights, step_cost_flag):
+def visualize_test_envs(posterior, test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, weights, step_cost_flag):
     for j, test_wt_vi_traj_tuple in enumerate(test_wt_vi_traj_tuples):
         print('Visualizing test environment {} with BEC length of {}'.format(j, test_BEC_lengths[j]))
 
@@ -1174,3 +1203,21 @@ def visualize_test_envs(test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_const
         trajectory_candidate = test_wt_vi_traj_tuple[2]
         vi_candidate.mdp.visualize_trajectory(trajectory_candidate)
         # visualize_constraints(test_BEC_constraints[j], weights, step_cost_flag)
+
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+
+        ieqs_posterior = BEC_helpers.constraints_to_halfspace_matrix_sage(posterior)
+        poly_posterior = Polyhedron.Polyhedron(ieqs=ieqs_posterior)  # automatically finds the minimal H-representation
+        BEC_viz.visualize_spherical_polygon(poly_posterior, fig=fig, ax=ax, plot_ref_sphere=False, color='g')
+
+        ieqs_test = BEC_helpers.constraints_to_halfspace_matrix_sage(test_BEC_constraints[j])
+        poly_test = Polyhedron.Polyhedron(ieqs=ieqs_test)
+        BEC_viz.visualize_spherical_polygon(poly_test, fig=fig, ax=ax, plot_ref_sphere=False)
+
+        ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100)
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+
+        plt.show()

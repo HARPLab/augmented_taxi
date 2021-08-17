@@ -209,7 +209,7 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
 
             if not equal_prior_posterior:
                 sample_human_models = BEC_helpers.sample_human_models_uniform(posterior, n_human_models)
-
+                print("Obtaining counterfactual data for human models sampled from the posterior: ")
                 for model_idx, human_model in enumerate(sample_human_models):
                     cf_data_dir = 'models/' + data_loc + '/counterfactual_data_-1/model' + str(model_idx)
                     os.makedirs(cf_data_dir, exist_ok=True)
@@ -219,10 +219,11 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
 
                     # assuming that I'm considering human models jointly
                     pool.restart()
+                    n_processed_envs = len(os.listdir(cf_data_dir))
                     args = [
                         (data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]),
                          traj_record[i], posterior, step_cost_flag, -1, None,
-                         True) for i in range(len(traj_record))]
+                         True) for i in range(n_processed_envs, len(traj_record))]
                     _ = list(tqdm(pool.imap(BEC.compute_counterfactuals, args), total=len(args)))
                     pool.close()
                     pool.join()
@@ -233,6 +234,8 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
                 args = [(i, n_human_models, prior, posterior, data_loc, 0, weights, traj_record[i], step_cost_flag, pool) for i in range(len(env_record))]
             else:
                 args = [(i, n_human_models, prior, posterior, data_loc, -1, weights, traj_record[i], step_cost_flag, pool) for i in range(len(env_record))]
+
+            print("Obtaining overlap in BEC area between posterior human model and potential test demosntrations: ")
             min_subset_constraints_record_counterfactual, BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(*pool.imap(BEC.combine_limiting_constraints_BEC, tqdm(args)))
             pool.close()
             pool.join()
@@ -255,7 +258,7 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
             pickle.dump((test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints), f)
 
     if visualize_test_env:
-        BEC.visualize_test_envs(test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, weights, step_cost_flag)
+        BEC.visualize_test_envs(posterior, test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, weights, step_cost_flag)
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints
 
 if __name__ == "__main__":

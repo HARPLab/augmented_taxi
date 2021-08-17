@@ -383,28 +383,39 @@ def calc_solid_angles(constraint_sets):
     solid_angles = []
 
     for constraint_set in constraint_sets:
-        ieqs = constraints_to_halfspace_matrix_sage(constraint_set)
-        poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
+        if len(constraint_set) == 1:
+            # hemisphere
+            solid_angles.append(2 * np.pi)
+        elif len(constraint_set) == 2:
+            # lune / diangle, whose area is 2 * theta (https://www.math.csi.cuny.edu/abhijit/623/spherical-triangle.pdf)
+            constraints_stacked = np.vstack(constraint_set)
+            constraints_stacked = np.insert(constraints_stacked, 0,
+                                            np.zeros((constraints_stacked.shape[0]), dtype='int'), axis=1)
+            theta = calc_dihedral_supp(constraints_stacked[0, :], constraints_stacked[1, :])
+            solid_angles.append(2 * theta)
+        else:
+            ieqs = constraints_to_halfspace_matrix_sage(constraint_set)
+            poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
 
-        hrep = np.array(poly.Hrepresentation())
+            hrep = np.array(poly.Hrepresentation())
 
-        facet_adj_triu = np.triu(poly.facet_adjacency_matrix())  # upper triangular matrix of fact adjacencies
-        boundary_facet_idxs = np.where(hrep[:, 0] != 0)[0]       # boundary facets have a non-zero offset (D in plane eq)
+            facet_adj_triu = np.triu(poly.facet_adjacency_matrix())  # upper triangular matrix of fact adjacencies
+            boundary_facet_idxs = np.where(hrep[:, 0] != 0)[0]       # boundary facets have a non-zero offset (D in plane eq)
 
-        dihedral_angles = []
-        for curr_facet_idx in range(facet_adj_triu.shape[0]):
-            # no need to consider adjacent facets to a boundary facet as you're removed from the sphere center
-            if curr_facet_idx in boundary_facet_idxs:
-                continue
-            adj_facet_idxs = np.where(facet_adj_triu[curr_facet_idx, :] > 0)[0]
-            for adj_facet_idx in adj_facet_idxs:
-                # no need to consider the dihedral angles to a bounding facet
-                if adj_facet_idx not in boundary_facet_idxs:
-                    # calculate the dihedral angle
-                    dihedral_angles.append(calc_dihedral_supp(hrep[curr_facet_idx, :], hrep[adj_facet_idx, :]))
+            dihedral_angles = []
+            for curr_facet_idx in range(facet_adj_triu.shape[0]):
+                # no need to consider adjacent facets to a boundary facet as you're removed from the sphere center
+                if curr_facet_idx in boundary_facet_idxs:
+                    continue
+                adj_facet_idxs = np.where(facet_adj_triu[curr_facet_idx, :] > 0)[0]
+                for adj_facet_idx in adj_facet_idxs:
+                    # no need to consider the dihedral angles to a bounding facet
+                    if adj_facet_idx not in boundary_facet_idxs:
+                        # calculate the dihedral angle
+                        dihedral_angles.append(calc_dihedral_supp(hrep[curr_facet_idx, :], hrep[adj_facet_idx, :]))
 
-        # spherical excess formula / Girard's theorem
-        solid_angles.append(sum(dihedral_angles) - (len(dihedral_angles) - 2) * np.pi)
+            # spherical excess formula / Girard's theorem
+            solid_angles.append(sum(dihedral_angles) - (len(dihedral_angles) - 2) * np.pi)
 
     return solid_angles
 
@@ -422,6 +433,23 @@ def lies_on_constraint_plane(poly, point):
                 return True
 
     return False
+
+def obtain_sph_polygon_vertices(polyhedron, add_noise=False):
+    '''
+    If a vertex of a polyhedron doesn't lie at the origin or isn't vertex of a bounding box (i.e. it actually
+    lies on a constraint plane), the project it onto the sphere and return it
+    '''
+    vertices = np.array(polyhedron.vertices())
+    spherical_polygon_vertices = []
+    for vertex_idx, vertex in enumerate(vertices):
+        if (vertex != np.array([0, 0, 0])).any() and lies_on_constraint_plane(polyhedron, vertex):
+            vertex_normed = vertex / np.linalg.norm(vertex)
+            if add_noise:
+                spherical_polygon_vertices.append(vertex_normed + 0.0001)
+            else:
+                spherical_polygon_vertices.append(vertex_normed)
+
+    return spherical_polygon_vertices
 
 def sample_human_models_random(constraints, n_models):
     '''
@@ -498,7 +526,7 @@ def sample_human_models_random(constraints, n_models):
 
     return sample_human_models
 
-def sample_average_model(constraints):
+def sample_average_model(constraints, sample_rate=1000):
     '''
     Summary: sample a representative average of the weights the human could currently attribute to the agent
     '''
@@ -509,7 +537,7 @@ def sample_average_model(constraints):
         constraints_matrix = np.vstack(constraints)
 
         # obtain x, y, z coordinates on the sphere that obey the constraints
-        valid_sph_x, valid_sph_y, valid_sph_z = cg.sample_valid_region(constraints_matrix, 0, 2 * np.pi, 0, np.pi, 1000, 1000)
+        valid_sph_x, valid_sph_y, valid_sph_z = cg.sample_valid_region(constraints_matrix, 0, 2 * np.pi, 0, np.pi, sample_rate, sample_rate)
 
         # resample coordinates on the sphere within the valid region (for higher density)
         sph_polygon_azi = []
@@ -531,8 +559,8 @@ def sample_average_model(constraints):
         v_low = (1 - np.cos(min_ele)) / 2
         v_high = (1 - np.cos(max_ele)) / 2
 
-        theta = 2 * np.pi * np.random.uniform(low=u_low, high=u_high, size=1000)
-        phi = np.arccos(1 - 2 * np.random.uniform(low=v_low, high=v_high, size=1000))
+        theta = 2 * np.pi * np.random.uniform(low=u_low, high=u_high, size=sample_rate)
+        phi = np.arccos(1 - 2 * np.random.uniform(low=v_low, high=v_high, size=sample_rate))
 
         # reject points that fall outside of the desired area
 
