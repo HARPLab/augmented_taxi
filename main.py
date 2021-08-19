@@ -167,7 +167,7 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
     # use generalized area of the BEC region to select test environments
     try:
         with open('models/' + data_loc + '/test_environments.pickle', 'rb') as f:
-            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = pickle.load(f)
+            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = pickle.load(f)
 
     except:
         ps_helpers.obtain_env_policies(mdp_class, data_loc, np.expand_dims(weights, axis=0), mdp_parameters, pool)
@@ -235,7 +235,7 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
             else:
                 args = [(i, n_human_models, prior, posterior, data_loc, -1, weights, traj_record[i], step_cost_flag, pool) for i in range(len(env_record))]
 
-            print("Obtaining overlap in BEC area between posterior human model and potential test demosntrations: ")
+            print("Obtaining overlap in BEC area between posterior human model and potential test demonstrations: ")
             min_subset_constraints_record_counterfactual, BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(*pool.imap(BEC.combine_limiting_constraints_BEC, tqdm(args)))
             pool.close()
             pool.join()
@@ -245,20 +245,20 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
                 pickle.dump((min_subset_constraints_record_counterfactual, BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs), f)
 
         if use_counterfactual:
-            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = \
-                ps_helpers.obtain_test_environments(data_loc, min_subset_constraints_record_counterfactual, env_record, traj_record, weights, BEC_lengths_record_counterfactual, BEC_params['n_test_demos'], BEC_params['test_difficulty'], step_cost_flag, summary=summary)
+            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = \
+                ps_helpers.obtain_test_environments(data_loc, min_subset_constraints_record_counterfactual, env_record, traj_record, weights, BEC_lengths_record_counterfactual, BEC_params['n_test_demos'], BEC_params['test_difficulty'], step_cost_flag, summary=summary, human_counterfactual_trajs=human_counterfactual_trajs)
         else:
-            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = \
+            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = \
                 ps_helpers.obtain_test_environments(data_loc, min_subset_constraints_record, env_record,
                                                     traj_record, weights, BEC_lengths_record,
                                                     BEC_params['n_test_demos'], BEC_params['test_difficulty'],
                                                     step_cost_flag, summary=summary)
 
         with open('models/' + data_loc + '/test_environments.pickle', 'wb') as f:
-            pickle.dump((test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints), f)
+            pickle.dump((test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs), f)
 
     if visualize_test_env:
-        BEC.visualize_test_envs(posterior, test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, weights, step_cost_flag)
+        BEC.visualize_test_envs(posterior, test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs, weights, step_cost_flag)
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints
 
 if __name__ == "__main__":

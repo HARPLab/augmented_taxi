@@ -342,7 +342,7 @@ def compute_counterfactuals(args):
                         skip_demo = True
 
             if not skip_demo:
-                info_gain = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, constraints)
+                info_gain = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, constraints, weights, step_cost_flag)
             else:
                 info_gain = 0
 
@@ -414,7 +414,7 @@ def combine_limiting_constraints_IG(args):
                     skip_demo = True
 
         if not skip_demo:
-            ig = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, min_env_constraints)
+            ig = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, min_env_constraints, weights, step_cost_flag)
             info_gains_record.append(ig)
         else:
             info_gains_record.append(0)
@@ -504,28 +504,36 @@ def combine_limiting_constraints_BEC(args):
     # for each possible demonstration in each environment, find the overlap in area between the spherical polygon
     # comprising the posterior and the counterfactual constraints created by the demonstration
     for traj_idx in range(len(all_env_constraints_joint)):
-        all_env_constraints_joint_traj = all_env_constraints_joint[traj_idx]
-        all_env_constraints_joint_traj = BEC_helpers.remove_redundant_constraints(all_env_constraints_joint_traj, weights, step_cost_flag)
+        all_env_constraints_joint_traj = all_env_constraints_joint[traj_idx].copy()
 
-        traj_ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(all_env_constraints_joint_traj)
-        traj_poly = Polyhedron.Polyhedron(ieqs=traj_ieqs)  # automatically finds the minimal H-representation
-        traj_spherical_polygon_vertices = np.array(BEC_helpers.obtain_sph_polygon_vertices(traj_poly, add_noise=True)) # add noise to help smooth calculation
-
-        inside_traj_sph_polygon = BEC_helpers.sample_average_model(all_env_constraints_joint_traj, sample_rate=100)[0][0]
-
-        traj_spherical_polygon_vertices = cg.sort_points_by_angle(traj_spherical_polygon_vertices, inside_traj_sph_polygon)
-        traj_sph_polygon = sph_polygon.SphericalPolygon(traj_spherical_polygon_vertices, inside=tuple(inside_traj_sph_polygon))
-
-        # if abs(BEC_helpers.calc_solid_angles([all_env_constraints_joint_traj])[0] - traj_sph_polygon.area()) > 1  or np.isnan(traj_sph_polygon.area()):
-        #     print('env: {}, traj: {}'.format(env_idx, traj_idx))
-        #     raise AssertionError("Too much deviation in trajectory BEC areas")
-
-        if traj_sph_polygon.intersects_poly(posterior_sph_polygon):
-            BEC_areas.append(traj_sph_polygon.intersection(posterior_sph_polygon).area())
+        if len(all_env_constraints_joint_traj) == 0:
+            BEC_areas.append(posterior_sph_polygon.area())
         else:
-            BEC_areas.append(0)
+            if len(all_env_constraints_joint_traj) > 1:
+                all_env_constraints_joint_traj = BEC_helpers.remove_redundant_constraints(all_env_constraints_joint_traj,
+                                                                                          weights, step_cost_flag)
 
-        min_env_constraints_record.append(all_env_constraints_joint[traj_idx])
+            traj_ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(all_env_constraints_joint_traj)
+            traj_poly = Polyhedron.Polyhedron(ieqs=traj_ieqs)  # automatically finds the minimal H-representation
+            traj_spherical_polygon_vertices = np.array(BEC_helpers.obtain_sph_polygon_vertices(traj_poly, add_noise=True)) # add noise to help smooth calculation
+
+            inside_traj_sph_polygon = BEC_helpers.sample_average_model(all_env_constraints_joint_traj, sample_rate=100)[0][0]
+
+            traj_spherical_polygon_vertices = cg.sort_points_by_angle(traj_spherical_polygon_vertices, inside_traj_sph_polygon)
+            traj_sph_polygon = sph_polygon.SphericalPolygon(traj_spherical_polygon_vertices, inside=tuple(inside_traj_sph_polygon))
+
+            # if abs(BEC_helpers.calc_solid_angles([all_env_constraints_joint_traj])[0] - traj_sph_polygon.area()) > 1  or np.isnan(traj_sph_polygon.area()):
+            #     print('env: {}, traj: {}'.format(env_idx, traj_idx))
+            #     raise AssertionError("Too much deviation in trajectory BEC areas")
+
+            if traj_sph_polygon.intersects_poly(posterior_sph_polygon):
+                BEC_areas.append(traj_sph_polygon.intersection(posterior_sph_polygon).area())
+                # intersection_area = traj_sph_polygon.intersection(posterior_sph_polygon).area()
+                # BEC_areas.append(intersection_area / (posterior_sph_polygon.area() - intersection_area))
+            else:
+                BEC_areas.append(0)
+
+        min_env_constraints_record.append(all_env_constraints_joint_traj)
 
     # obtain the counterfactual human trajectories that could've given rise to the most limiting constraints and
     # how much it overlaps the agent's optimal trajectory
@@ -657,12 +665,12 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
         no_info_flag = False
         if consistent_state_count:
             info_gains = np.array(info_gains_record)
-            if np.sum(info_gains) == 0:
+            if np.sum(info_gains > 1) == 0:
                 no_info_flag = True
         else:
             info_gains_flattened_across_models = list(itertools.chain.from_iterable(info_gains_record))
             info_gains_flattened_across_envs = list(itertools.chain.from_iterable(info_gains_flattened_across_models))
-            if sum(info_gains_flattened_across_envs) == 0:
+            if sum(np.array(info_gains_flattened_across_envs) > 1) == 0:
                 no_info_flag = True
 
         # no need to continue search for demonstrations if none of them will improve the human's understanding
@@ -698,11 +706,11 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
             no_info_flag = False
             if consistent_state_count:
                 info_gains = np.array(info_gains_record)
-                if np.sum(info_gains) == 0:
+                if np.sum(info_gains > 1) == 0:
                     no_info_flag = True
             else:
                 info_gains_flattened_across_trajs = list(itertools.chain.from_iterable(info_gains_record))
-                if sum(info_gains_flattened_across_trajs) == 0:
+                if sum(np.array(info_gains_flattened_across_trajs) > 1) == 0:
                     no_info_flag = True
 
             if no_info_flag:

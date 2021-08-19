@@ -706,10 +706,11 @@ def selectKcities(n, weights, k):
 
     return centers
 
-def calculate_information_gain(previous_constraints, new_constraints):
+def calculate_information_gain(previous_constraints, new_constraints, weights, step_cost_flag):
     if len(previous_constraints) > 0 and len(new_constraints) > 0:
         hypothetical_constraints = new_constraints.copy()
         hypothetical_constraints.extend(previous_constraints)
+        hypothetical_constraints = remove_redundant_constraints(hypothetical_constraints, weights, step_cost_flag)
 
         old_BEC = calc_solid_angles([previous_constraints])[0]
         new_BEC = calc_solid_angles([hypothetical_constraints])[0]
@@ -717,7 +718,7 @@ def calculate_information_gain(previous_constraints, new_constraints):
         ig = old_BEC / new_BEC
     elif len(new_constraints) > 0:
         old_BEC = 4 * np.pi
-        new_BEC = calc_solid_angles([previous_constraints])[0]
+        new_BEC = calc_solid_angles([new_constraints])[0]
 
         ig = old_BEC / new_BEC
     else:
