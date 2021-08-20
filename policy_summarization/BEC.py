@@ -662,6 +662,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
             pickle.dump(info_gains_record, f)
 
 
+        # do a quick check of whether there's any information to be gained from any of the trajectories
         no_info_flag = False
         if consistent_state_count:
             info_gains = np.array(info_gains_record)
@@ -681,9 +682,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
                 break
             else:
                 # no more informative demonstrations with this variable filter, so update it
-                variable_filter, zero_counter, retry_count = BEC_helpers.update_variable_filter(variable_filter, zero_counter,
-                                                                                                retry_count)
-
+                variable_filter, zero_counter, retry_count = BEC_helpers.update_variable_filter(variable_filter, zero_counter, retry_count)
                 print(colored('Did not find any informative demonstrations. Retry count: {}'.format(retry_count), 'red'))
                 print('variable filter: {}'.format(variable_filter))
 
@@ -704,42 +703,20 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
             # the possibility that no demonstration provides information gain must be checked for again,
             # in case all limiting constraints involve a masked variable and shouldn't be considered for demonstration yet
             no_info_flag = False
-            if consistent_state_count:
-                info_gains = np.array(info_gains_record)
-                if np.sum(info_gains > 1) == 0:
-                    no_info_flag = True
-            else:
-                info_gains_flattened_across_trajs = list(itertools.chain.from_iterable(info_gains_record))
-                if sum(np.array(info_gains_flattened_across_trajs) > 1) == 0:
-                    no_info_flag = True
-
-            if no_info_flag:
-                # sample up two more set of human models to try and find a demonstration that will improve the human's
-                # understanding before concluding that there is no more information to be conveyed
-                if retry_count == 1:
-                    break
-                else:
-                    # no more informative demonstrations with this variable filter, so update it
-                    variable_filter, zero_counter, retry_count = BEC_helpers.update_variable_filter(variable_filter,
-                                                                                                    zero_counter,
-                                                                                                    retry_count)
-
-                    print(colored('Did not find any informative demonstrations. Retry count: {}'.format(retry_count), 'red'))
-                    print('variable filter: {}'.format(variable_filter))
-
-                    continue
 
             if consistent_state_count:
                 info_gains = np.array(info_gains_record)
                 traj_overlap_pcts = np.array(overlap_in_opt_and_counterfactual_traj_avg)
 
                 obj_function = info_gains * (traj_overlap_pcts + c)  # objective 2: scaled
-                best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
-                best_env_idxs, best_traj_idxs = np.where(obj_function == max(obj_function.flatten()))
-                max_info_gain = np.max(info_gains)
+                if max(obj_function.flatten()) == 0:
+                    no_info_flag = True
+                else:
+                    best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
+                    best_env_idxs, best_traj_idxs = np.where(obj_function == max(obj_function.flatten()))
+                    max_info_gain = np.max(info_gains)
 
-                best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
-
+                    best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
             else:
                 best_obj = float('-inf')
                 best_env_idxs = []
@@ -757,8 +734,20 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
 
                             best_env_idxs = [env_idx]
                             best_traj_idxs = [traj_idx]
+                if best_obj == 0:
+                    no_info_flag = True
+                else:
+                    best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
 
-                best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
+            if no_info_flag:
+                if retry_count == 1:
+                    break
+                else:
+                    # no more informative demonstrations with this variable filter, so update it
+                    variable_filter, zero_counter, retry_count = BEC_helpers.update_variable_filter(variable_filter, zero_counter, retry_count)
+                    print(colored('Did not find any informative demonstrations. Retry count: {}'.format(retry_count), 'red'))
+                    print('variable filter: {}'.format(variable_filter))
+                    continue
 
             best_traj = traj_record[best_env_idx][best_traj_idx]
 
@@ -778,23 +767,47 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
 
                 obj_function = info_gains * (traj_overlap_pcts + c)                  # objective 2: scaled
                 select_model, best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
-                # best_env_idxs, best_traj_idxs = np.where(obj_function == max(obj_function.flatten())) # todo: for development purposes
 
-                max_info_gain = np.max(info_gains)
+                if max(obj_function.flatten()) == 0:
+                    no_info_flag = True
+                else:
+                    best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
+                    best_env_idxs, best_traj_idxs = np.where(obj_function == max(obj_function.flatten()))
+                    max_info_gain = np.max(info_gains)
+
+                    best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
             else:
                 best_obj = float('-inf')
                 select_model = best_env_idx = best_traj_idx = best_info_gain = 0
                 for model_idx, info_gains_per_model in enumerate(info_gains_record):
                     for env_idx, info_gains_per_env in enumerate(info_gains_per_model):
                         for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
-                            if info_gain_per_traj > best_obj:
-                                best_info_gain = info_gain_per_traj
-                                best_obj = info_gain_per_traj * (overlap_in_opt_and_counterfactual_traj_record[model_idx][env_idx][traj_idx] + c) # prevent division by zero
-                                select_model = model_idx
-                                best_env_idx = env_idx
-                                best_traj_idx = traj_idx
+                            obj = info_gain_per_traj * (overlap_in_opt_and_counterfactual_traj_record[model_idx][env_idx][traj_idx] + c)
 
-                max_info_gain = best_info_gain
+                            if np.isclose(obj, best_obj):
+                                best_env_idxs.append(env_idx)
+                                best_traj_idxs.append(traj_idx)
+                            elif obj > best_obj:
+                                best_obj = obj
+                                max_info_gain = info_gain_per_traj
+
+                                best_env_idxs = [env_idx]
+                                best_traj_idxs = [traj_idx]
+
+                if best_obj == 0:
+                    no_info_flag = True
+                else:
+                    best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
+
+            if no_info_flag:
+                if retry_count == 1:
+                    break
+                else:
+                    # no more informative demonstrations with this variable filter, so update it
+                    variable_filter, zero_counter, retry_count = BEC_helpers.update_variable_filter(variable_filter, zero_counter, retry_count)
+                    print(colored('Did not find any informative demonstrations. Retry count: {}'.format(retry_count), 'red'))
+                    print('variable filter: {}'.format(variable_filter))
+                    continue
 
             with open('models/' + data_loc + '/counterfactual_data_' + str(len(summary)) + '/model' + str(
                     select_model) + '/cf_data_env' + str(
@@ -1203,7 +1216,7 @@ def visualize_summary(BEC_summaries_collection, weights, step_cost_flag):
         # BEC_summary[0].visualize_trajectory(BEC_summary[3][0])
 
 
-def visualize_test_envs(posterior, test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, weights, step_cost_flag):
+def visualize_test_envs(posterior, test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs, weights, step_cost_flag):
     for j, test_wt_vi_traj_tuple in enumerate(test_wt_vi_traj_tuples):
         print('Visualizing test environment {} with BEC length of {}'.format(j, test_BEC_lengths[j]))
 
