@@ -271,6 +271,9 @@ def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_recor
     for j, best_env_idx in enumerate(best_env_idxs):
 
         if prev_env_idx != best_env_idx:
+            # reset the visual dissimilarity dictionary for a new MDP
+            average_dissimilarity_dict = {}
+
             filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
             with open(filename, 'rb') as f:
                 wt_vi_traj_env = pickle.load(f)
@@ -282,6 +285,23 @@ def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_recor
             # get similar demos (todo: consider various scenarios for similarity and dissimilarity later)
             visual_dissimilarities[j] = best_mdp.measure_visual_dissimilarity(
                 chunked_traj_record[best_env_idx][best_traj_idxs[j]][0][0], summary[-1][0], summary[-1][1][0][0])
+        else:
+            first_state = chunked_traj_record[best_env_idx][best_traj_idxs[j]][0][0]
+
+            if first_state in average_dissimilarity_dict:
+                # compare visual dissimilarity of this state to other states in this MDP, trying to minimize dissimilarity
+                visual_dissimilarities[j] = average_dissimilarity_dict[first_state]
+            else:
+                # measure and store how dissimilar this first state is to other states in this MDP
+                average_dissimilarity = 0
+                for other_state_idx, other_state in enumerate(best_mdp.states):
+                    if first_state != other_state:
+                        average_dissimilarity += best_mdp.measure_visual_dissimilarity(first_state, best_mdp, other_state)
+
+                average_dissimilarity = average_dissimilarity / (len(best_mdp.states) - 1)
+                average_dissimilarity_dict[first_state] = average_dissimilarity
+
+                visual_dissimilarities[j] = average_dissimilarity
 
         # get demos of low visual complexity
         complexities[j] = best_mdp.measure_env_complexity()
