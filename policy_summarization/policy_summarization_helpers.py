@@ -333,6 +333,8 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
     BEC_lengths_record_filtered = copy.deepcopy(BEC_lengths_record)
     if overlap_in_trajs_avg is not None:
         overlap_in_trajs_avg_filtered = copy.deepcopy(overlap_in_trajs_avg)
+    if human_counterfactual_trajs is not None:
+        human_counterfactual_trajs_filtered = copy.deepcopy(human_counterfactual_trajs)
 
     # remove environment and trajectory indices that comprise the summary
     summary_idxs = defaultdict(lambda: [])
@@ -351,7 +353,7 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
             if overlap_in_trajs_avg is not None:
                 del overlap_in_trajs_avg_filtered[env_idx][traj_idx]
             if human_counterfactual_trajs is not None:
-                del human_counterfactual_trajs[env_idx][traj_idx]
+                del human_counterfactual_trajs_filtered[env_idx][traj_idx]
 
     # flatten relevant lists for easy sorting
     envs_record_flattened = []
@@ -360,7 +362,10 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
 
     traj_record_flattened = [item for sublist in traj_record_filtered for item in sublist]
     min_subset_constraints_record_flattened = [item for sublist in min_subset_constraints_record_filtered for item in sublist]
-    human_counterfactual_trajs_flattened = [item for sublist in human_counterfactual_trajs for item in sublist]
+    if human_counterfactual_trajs is not None:
+        human_counterfactual_trajs_flattened = [item for sublist in human_counterfactual_trajs_filtered for item in sublist]
+    else:
+        human_counterfactual_trajs_flattened = None
 
     if overlap_in_trajs_avg is None:
         obj_func_flattened = [item for sublist in BEC_lengths_record_filtered for item in sublist]

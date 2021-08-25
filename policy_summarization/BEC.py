@@ -686,6 +686,65 @@ def combine_limiting_constraints_BEC(args):
 
     return min_env_constraints_record, BEC_areas, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs
 
+def overlap_demo_BEC_and_human_posterior(args):
+    '''
+    Summary: combine the most limiting constraints across all potential human models for each potential demonstration
+    '''
+    env_idx, min_subset_constraints, prior, posterior, weights, step_cost_flag, pool= args
+
+    human_model = posterior
+    human_model = BEC_helpers.remove_redundant_constraints(human_model, weights, step_cost_flag)
+
+    BEC_areas = []
+
+    # obtain spherical polygon comprising the posterior (human's model)
+    posterior_ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(human_model)
+    posterior_poly = Polyhedron.Polyhedron(ieqs=posterior_ieqs)
+
+    posterior_spherical_polygon_vertices = np.array(BEC_helpers.obtain_sph_polygon_vertices(posterior_poly, add_noise=True))  # add noise to help smooth calculation
+    inside_posterior_sph_polygon = BEC_helpers.sample_average_model(posterior, sample_rate=100)[0][0]
+
+    posterior_spherical_polygon_vertices = cg.sort_points_by_angle(posterior_spherical_polygon_vertices, inside_posterior_sph_polygon)
+    posterior_sph_polygon = sph_polygon.SphericalPolygon(posterior_spherical_polygon_vertices, inside=tuple(inside_posterior_sph_polygon))
+
+    # if abs(BEC_helpers.calc_solid_angles([human_model])[0] - posterior_sph_polygon.area()) > 1 or np.isnan(posterior_sph_polygon.area()):
+    #     raise AssertionError("Too much deviation in prior BEC areas")
+
+    # for each possible demonstration in each environment, find the overlap in area between the spherical polygon
+    # comprising the posterior and the counterfactual constraints created by the demonstration
+    for constraints in min_subset_constraints:
+        constraints_copy = constraints.copy()
+
+        if len(constraints_copy) == 0:
+            # todo: I'm not sure that this is necessarily correct because a single model in this area yielded no
+            #  different trajectory / no new constraints. doesn't mean that every model in this area will be equivalent
+            print(colored("NO CONSTRAINTS", 'r'))
+            BEC_areas.append(posterior_sph_polygon.area())
+        else:
+            if len(constraints_copy) > 1:
+                constraints_copy = BEC_helpers.remove_redundant_constraints(constraints_copy,
+                                                                                          weights, step_cost_flag)
+
+            traj_ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints_copy)
+            traj_poly = Polyhedron.Polyhedron(ieqs=traj_ieqs)  # automatically finds the minimal H-representation
+            traj_spherical_polygon_vertices = np.array(BEC_helpers.obtain_sph_polygon_vertices(traj_poly, add_noise=True)) # add noise to help smooth calculation
+
+            inside_traj_sph_polygon = BEC_helpers.sample_average_model(constraints_copy, sample_rate=100)[0][0]
+
+            traj_spherical_polygon_vertices = cg.sort_points_by_angle(traj_spherical_polygon_vertices, inside_traj_sph_polygon)
+            traj_sph_polygon = sph_polygon.SphericalPolygon(traj_spherical_polygon_vertices, inside=tuple(inside_traj_sph_polygon))
+
+            # if abs(BEC_helpers.calc_solid_angles([constraints_copy])[0] - traj_sph_polygon.area()) > 1  or np.isnan(traj_sph_polygon.area()):
+            #     print('env: {}, traj: {}'.format(env_idx, traj_idx))
+            #     raise AssertionError("Too much deviation in trajectory BEC areas")
+
+            if traj_sph_polygon.intersects_poly(posterior_sph_polygon):
+                BEC_areas.append(traj_sph_polygon.intersection(posterior_sph_polygon).area())
+            else:
+                BEC_areas.append(0)
+
+    return BEC_areas
+
 
 def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
                        n_train_demos=3, prior=[], downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001):
