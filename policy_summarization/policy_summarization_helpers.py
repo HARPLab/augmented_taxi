@@ -322,7 +322,7 @@ def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_recor
 
     return best_env_idx, best_traj_idx
 
-def obtain_test_environments(data_loc, min_subset_constraints_record, env_record, traj_record, weights, BEC_lengths_record, n_desired_test_env, difficulty, step_cost_flag, summary=None, overlap_in_trajs_avg=None, c=0.001, human_counterfactual_trajs=None):
+def obtain_test_environments(data_loc, min_subset_constraints_record, env_record, traj_record, reward_record, weights, BEC_lengths_record, n_desired_test_env, difficulty, step_cost_flag, summary=None, overlap_in_trajs_avg=None, c=0.001, human_counterfactual_trajs=None):
     '''
     Summary: Correlate the difficulty of a test environment with the generalized area of the BEC region obtain by the
     corresponding optimal demonstration. Return the desired number and difficulty of test environments (to be given
@@ -344,6 +344,48 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
 
         summary_idxs[best_env_idx].append(best_traj_idx)
 
+    env_traj_tracer = []
+    # todo: 8 and -1 are currently hardcoded
+    human_exit_demo = []
+    for env_idx in range(256):
+        print(env_idx)
+        best_human_trajs_record_env_across_models = []
+        human_rewards_env_across_models = []
+        env_traj_tracer_env = []
+        human_exit_demo_env = []
+        for model_idx in range(8):
+            with open('models/' + data_loc + '/counterfactual_data_' + str(-1) + '/model' + str(
+                    model_idx) + '/cf_data_env' + str(
+                env_idx).zfill(5) + '.pickle', 'rb') as f:
+                best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
+
+            # only consider the first best human trajectory (no need to consider partial trajectories)
+            first_best_human_trajs_record = [best_human_trajs_record[0] for best_human_trajs_record in
+                                             best_human_trajs_record_env]
+            best_human_trajs_record_env_across_models.append(first_best_human_trajs_record)
+            human_rewards_env_across_models.append(human_rewards_env)
+
+        # reorder such that each subarray is a comparison amongst the models
+        human_rewards_env_across_models_per_traj = [list(itertools.chain.from_iterable(i)) for i in
+                                                    zip(*human_rewards_env_across_models)]
+        best_human_trajs_record_env_across_models_per_traj = [i for i in
+                                                              zip(*best_human_trajs_record_env_across_models)]
+        for traj_idx in range(len(human_rewards_env_across_models_per_traj)):
+            human_rewards_across_models = np.array(human_rewards_env_across_models_per_traj[traj_idx]).flatten()
+            for j, reward in enumerate(human_rewards_across_models):
+                if reward == reward_record[env_idx][traj_idx]:
+                    human_rewards_across_models[j] = 0
+            # if 0, then every trajectory is either correct or is an exit.
+            if np.sum(human_rewards_across_models) == 0:
+                human_exit_demo_env.append(True)
+            else:
+                human_exit_demo_env.append(False)
+
+            env_traj_tracer_env.append((env_idx, traj_idx))
+
+        env_traj_tracer.append(env_traj_tracer_env)
+        human_exit_demo.append(human_exit_demo_env)
+
     for env_idx in summary_idxs.keys():
         traj_idxs = summary_idxs[env_idx]
         for traj_idx in sorted(traj_idxs, reverse=True):
@@ -354,6 +396,8 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
                 del overlap_in_trajs_avg_filtered[env_idx][traj_idx]
             if human_counterfactual_trajs is not None:
                 del human_counterfactual_trajs_filtered[env_idx][traj_idx]
+            del env_traj_tracer[env_idx][traj_idx]
+            del human_exit_demo[env_idx][traj_idx]
 
     # flatten relevant lists for easy sorting
     envs_record_flattened = []
@@ -373,6 +417,72 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
         BEC_lengths_record_flattened = [item for sublist in BEC_lengths_record_filtered for item in sublist]
         overlap_in_trajs_avg_flattened = [item for sublist in overlap_in_trajs_avg_filtered for item in sublist]
         obj_func_flattened = np.array(BEC_lengths_record_flattened) * (np.array(overlap_in_trajs_avg_flattened) + c)
+
+    # todo: I can probably just do this above while im flattening
+    exit_demo = []
+    for traj_opt in traj_record_flattened:
+        exit_demo.append(traj_opt[0][1] == 'exit')
+
+    human_exit_demo_flattened = [item for sublist in human_exit_demo for item in sublist]
+    env_traj_tracer_flattened = [item for sublist in env_traj_tracer for item in sublist]
+
+    envs_record_flattened_exit = []
+    traj_record_flattened_exit = []
+    obj_func_flattened_exit = []
+    min_subset_constraints_record_flattened_exit = []
+    human_counterfactual_trajs_flattened_exit = []
+    overlap_in_trajs_avg_flattened_exit = []
+    env_traj_tracer_flattened_exit = []
+
+    envs_record_flattened_nonexit = []
+    traj_record_flattened_nonexit = []
+    obj_func_flattened_nonexit = []
+    min_subset_constraints_record_flattened_nonexit = []
+    human_counterfactual_trajs_flattened_nonexit = []
+    overlap_in_trajs_avg_flattened_nonexit = []
+    env_traj_tracer_flattened_nonexit = []
+
+    for j, exit in enumerate(exit_demo):
+        if exit or human_exit_demo_flattened[j]:
+            envs_record_flattened_exit.append(envs_record_flattened[j])
+            traj_record_flattened_exit.append(traj_record_flattened[j])
+            obj_func_flattened_exit.append(obj_func_flattened[j])
+            min_subset_constraints_record_flattened_exit.append(min_subset_constraints_record_flattened[j])
+            if human_counterfactual_trajs_flattened is not None:
+                human_counterfactual_trajs_flattened_exit.append(human_counterfactual_trajs_flattened[j])
+            else:
+                human_counterfactual_trajs_flattened_exit = None
+            if overlap_in_trajs_avg is not None:
+                overlap_in_trajs_avg_flattened_exit.append(overlap_in_trajs_avg_flattened[j])
+            env_traj_tracer_flattened_exit.append(env_traj_tracer_flattened[j])
+        else:
+            envs_record_flattened_nonexit.append(envs_record_flattened[j])
+            traj_record_flattened_nonexit.append(traj_record_flattened[j])
+            obj_func_flattened_nonexit.append(obj_func_flattened[j])
+            min_subset_constraints_record_flattened_nonexit.append(min_subset_constraints_record_flattened[j])
+            if human_counterfactual_trajs_flattened is not None:
+                human_counterfactual_trajs_flattened_nonexit.append(human_counterfactual_trajs_flattened[j])
+            else:
+                human_counterfactual_trajs_flattened_nonexit = None
+            if overlap_in_trajs_avg is not None:
+                overlap_in_trajs_avg_flattened_nonexit.append(overlap_in_trajs_avg_flattened[j])
+            env_traj_tracer_flattened_nonexit.append(env_traj_tracer_flattened[j])
+
+    consider_exits = False
+    if consider_exits:
+        envs_record_flattened = envs_record_flattened_exit
+        traj_record_flattened = traj_record_flattened_exit
+        obj_func_flattened = obj_func_flattened_exit
+        min_subset_constraints_record_flattened = min_subset_constraints_record_flattened_exit
+        human_counterfactual_trajs_flattened = human_counterfactual_trajs_flattened_exit
+        overlap_in_trajs_avg_flattened = overlap_in_trajs_avg_flattened_exit
+    else:
+        envs_record_flattened = envs_record_flattened_nonexit
+        traj_record_flattened = traj_record_flattened_nonexit
+        obj_func_flattened = obj_func_flattened_nonexit
+        min_subset_constraints_record_flattened = min_subset_constraints_record_flattened_nonexit
+        human_counterfactual_trajs_flattened = human_counterfactual_trajs_flattened_nonexit
+        overlap_in_trajs_avg_flattened = overlap_in_trajs_avg_flattened_nonexit
 
     if difficulty == 'high':
         test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = select_test_demos(0, data_loc, n_desired_test_env, envs_record_flattened, traj_record_flattened, obj_func_flattened, min_subset_constraints_record_flattened, human_counterfactual_trajs_flattened)
