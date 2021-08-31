@@ -322,7 +322,7 @@ def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_recor
 
     return best_env_idx, best_traj_idx
 
-def obtain_test_environments(data_loc, min_subset_constraints_record, env_record, traj_record, reward_record, weights, BEC_lengths_record, n_desired_test_env, difficulty, step_cost_flag, summary=None, overlap_in_trajs_avg=None, c=0.001, human_counterfactual_trajs=None, n_clusters=12):
+def obtain_test_environments(data_loc, min_subset_constraints_record, env_record, traj_record, reward_record, weights, BEC_lengths_record, n_desired_test_env, difficulty, step_cost_flag, counterfactual_folder_idx, summary=None, overlap_in_trajs_avg=None, c=0.001, human_counterfactual_trajs=None, n_clusters=12):
     '''
     Summary: Correlate the difficulty of a test environment with the generalized area of the BEC region obtain by the
     corresponding optimal demonstration. Return the desired number and difficulty of test environments (to be given
@@ -349,7 +349,7 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
     #  human posterior and demo BEC are calculated
     human_exit_demo = []
     human_traj_overlap = []
-    for env_idx in range(256):
+    for env_idx in range(len(traj_record_filtered)):
         print(env_idx)
         best_human_trajs_record_env_across_models = []
         human_rewards_env_across_models = []
@@ -357,7 +357,7 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
         human_exit_demo_env = []
         human_traj_overlap_env = []
         for model_idx in range(8):
-            with open('models/' + data_loc + '/counterfactual_data_' + str(-1) + '/model' + str(
+            with open('models/' + data_loc + '/counterfactual_data_' + str(counterfactual_folder_idx) + '/model' + str(
                     model_idx) + '/cf_data_env' + str(
                 env_idx).zfill(5) + '.pickle', 'rb') as f:
                 best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)

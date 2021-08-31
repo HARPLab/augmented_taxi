@@ -378,6 +378,7 @@ def compute_counterfactuals(args):
         info_gain_env = [0 for i in range(len(trajs_opt))]
         if not consider_human_models_jointly:
             overlap_in_opt_and_counterfactual_traj_env = [float('inf') for i in range(len(trajs_opt))]
+        human_rewards_env = [0 for i in range(len(trajs_opt))]
 
     with open('models/' + data_loc + '/counterfactual_data_' + str(summary_len) + '/model' + str(model_idx) +
               '/cf_data_env' + str(env_idx).zfill(5) + '.pickle', 'wb') as f:
@@ -404,7 +405,7 @@ def combine_limiting_constraints_IG(args):
         with open('models/' + data_loc + '/counterfactual_data_' + str(curr_summary_len) + '/model' + str(
                 model_idx) + '/cf_data_env' + str(
             env_idx).zfill(5) + '.pickle', 'rb') as f:
-            best_human_trajs_record_env, constraints_env = pickle.load(f)
+            best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
         all_env_constraints.append(constraints_env)
 
     all_env_constraints_joint = [list(itertools.chain.from_iterable(i)) for i in zip(*all_env_constraints)]
@@ -443,7 +444,7 @@ def combine_limiting_constraints_IG(args):
         with open('models/' + data_loc + '/counterfactual_data_' + str(curr_summary_len) + '/model' + str(
                 model_idx) + '/cf_data_env' + str(
             env_idx).zfill(5) + '.pickle', 'rb') as f:
-            best_human_trajs_record_env, constraints_env = pickle.load(f)
+            best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
 
         # for each of the minimum constraint sets in each environment (with a unique starting state)
         for traj_idx, min_env_constraints in enumerate(min_env_constraints_record):
@@ -509,7 +510,7 @@ def average_constraints_BEC(args):
         with open('models/' + data_loc + '/counterfactual_data_' + str(curr_summary_len) + '/model' + str(
                 model_idx) + '/cf_data_env' + str(
             env_idx).zfill(5) + '.pickle', 'rb') as f:
-            best_human_trajs_record_env, constraints_env = pickle.load(f)
+            best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
 
         # for each possible demonstration in each environment, find the overlap in area between the spherical polygon
         # comprising the posterior and the counterfactual constraints created by the demonstration
@@ -559,7 +560,7 @@ def average_constraints_BEC(args):
         with open('models/' + data_loc + '/counterfactual_data_' + str(curr_summary_len) + '/model' + str(
                 model_idx) + '/cf_data_env' + str(
            env_idx).zfill(5) + '.pickle', 'rb') as f:
-            best_human_trajs_record_env, constraints_env = pickle.load(f)
+            best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
 
         # for each of the minimum constraint sets in each environment (with a unique starting state)
         for traj_idx in range(len(trajs_opt)):
@@ -600,7 +601,7 @@ def combine_limiting_constraints_BEC(args):
         with open('models/' + data_loc + '/counterfactual_data_' + str(curr_summary_len) + '/model' + str(
                 model_idx) + '/cf_data_env' + str(
             env_idx).zfill(5) + '.pickle', 'rb') as f:
-            best_human_trajs_record_env, constraints_env = pickle.load(f)
+            best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
         all_env_constraints.append(constraints_env)
 
     all_env_constraints_joint = [list(itertools.chain.from_iterable(i)) for i in zip(*all_env_constraints)]
@@ -664,7 +665,7 @@ def combine_limiting_constraints_BEC(args):
         with open('models/' + data_loc + '/counterfactual_data_' + str(curr_summary_len) + '/model' + str(
                 model_idx) + '/cf_data_env' + str(
            env_idx).zfill(5) + '.pickle', 'rb') as f:
-            best_human_trajs_record_env, constraints_env = pickle.load(f)
+            best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
 
         # for each of the minimum constraint sets in each environment (with a unique starting state)
         for traj_idx, min_env_constraints in enumerate(min_env_constraints_record):
@@ -1049,7 +1050,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
             with open('models/' + data_loc + '/counterfactual_data_' + str(len(summary)) + '/model' + str(
                     select_model) + '/cf_data_env' + str(
                     best_env_idx).zfill(5) + '.pickle', 'rb') as f:
-                best_human_trajs_record_env, constraints_env = pickle.load(f)
+                best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
 
             best_human_trajs = best_human_trajs_record_env[best_traj_idx]
             best_traj = traj_record[best_env_idx][best_traj_idx]

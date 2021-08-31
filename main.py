@@ -195,20 +195,23 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
             with open('models/' + data_loc + '/BEC_constraints.pickle', 'wb') as f:
                 pickle.dump((min_BEC_constraints, BEC_lengths_record), f)
 
+        equal_prior_posterior = True
+        counterfactual_folder_idx = 0
+        if len(prior) == len(posterior):
+            for j, posterior_constraint in enumerate(posterior):
+                if not np.array_equal(posterior_constraint, prior[j]):
+                    equal_prior_posterior = False
+                    counterfactual_folder_idx = -1
+        else:
+            equal_prior_posterior = False
+            counterfactual_folder_idx = -1
+
         try:
             # with open('models/' + data_loc + '/BEC_constraints_counterfactual.pickle', 'rb') as f:
             #     min_subset_constraints_record_counterfactual, BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = pickle.load(f)
             with open('models/' + data_loc + '/BEC_constraints_counterfactual.pickle', 'rb') as f:
                 BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = pickle.load(f)
         except:
-            equal_prior_posterior = True
-            if len(prior) == len(posterior):
-                for j, posterior_constraint in enumerate(posterior):
-                    if not np.array_equal(posterior_constraint, prior[j]):
-                        equal_prior_posterior = False
-            else:
-                equal_prior_posterior = False
-
             if not equal_prior_posterior:
                 sample_human_models = BEC_helpers.sample_human_models_uniform(posterior, n_human_models)
                 print("Obtaining counterfactual data for human models sampled from the posterior: ")
@@ -224,7 +227,7 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
                     n_processed_envs = len(os.listdir(cf_data_dir))
                     args = [
                         (data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]),
-                         traj_record[i], posterior, step_cost_flag, -1, None,
+                         traj_record[i], posterior, step_cost_flag, counterfactual_folder_idx, None,
                          True) for i in range(n_processed_envs, len(traj_record))]
                     _ = list(tqdm(pool.imap(BEC.compute_counterfactuals, args), total=len(args)))
                     pool.close()
@@ -232,10 +235,7 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
                     pool.terminate()
 
             # pool.restart()
-            # if equal_prior_posterior:
-            #     args = [(i, n_human_models, prior, posterior, data_loc, 0, weights, traj_record[i], step_cost_flag, pool) for i in range(len(env_record))]
-            # else:
-            #     args = [(i, n_human_models, prior, posterior, data_loc, -1, weights, traj_record[i], step_cost_flag, pool) for i in range(len(env_record))]
+            # args = [(i, n_human_models, prior, posterior, data_loc, counterfactual_folder_idx, weights, traj_record[i], step_cost_flag, pool) for i in range(len(env_record))]
             #
             # print("Obtaining overlap in BEC area between posterior human model and potential test demonstrations: ")
             # min_subset_constraints_record_counterfactual, BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(*pool.imap(BEC.combine_limiting_constraints_BEC, tqdm(args)))
@@ -249,7 +249,7 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
 
             # take the overlap of the human posterior with BEC of suboptimal trajectories of one-step deviation
             pool.restart()
-            args = [(i, n_human_models, min_subset_constraints, prior, posterior, data_loc, -1, weights, traj_record[i], step_cost_flag, pool)
+            args = [(i, n_human_models, min_subset_constraints, prior, posterior, data_loc, counterfactual_folder_idx, weights, traj_record[i], step_cost_flag, pool)
                     for i, min_subset_constraints in enumerate(min_subset_constraints_record)]
 
             print("Obtaining overlap in BEC area between posterior human model and potential test demonstrations: ")
@@ -261,10 +261,8 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
                 pickle.dump((BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs), f)
 
         if use_counterfactual:
-            # test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = \
-            #     ps_helpers.obtain_test_environments(data_loc, min_subset_constraints_record_counterfactual, env_record, traj_record, weights, BEC_lengths_record_counterfactual, BEC_params['n_test_demos'], BEC_params['test_difficulty'], step_cost_flag, summary=summary, human_counterfactual_trajs=human_counterfactual_trajs)
             test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = \
-                ps_helpers.obtain_test_environments(data_loc, min_subset_constraints_record, env_record, traj_record, reward_record, weights, BEC_lengths_record_counterfactual, BEC_params['n_test_demos'], BEC_params['test_difficulty'], step_cost_flag, summary=summary, human_counterfactual_trajs=human_counterfactual_trajs)
+                ps_helpers.obtain_test_environments(data_loc, min_subset_constraints_record, env_record, traj_record, reward_record, weights, BEC_lengths_record_counterfactual, BEC_params['n_test_demos'], BEC_params['test_difficulty'], step_cost_flag, counterfactual_folder_idx, summary=summary, human_counterfactual_trajs=human_counterfactual_trajs)
         else:
             test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = \
                 ps_helpers.obtain_test_environments(data_loc, min_subset_constraints_record, env_record,
