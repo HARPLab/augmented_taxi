@@ -322,7 +322,7 @@ def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_recor
 
     return best_env_idx, best_traj_idx
 
-def obtain_test_environments(data_loc, min_subset_constraints_record, env_record, traj_record, reward_record, weights, BEC_lengths_record, n_desired_test_env, difficulty, step_cost_flag, summary=None, overlap_in_trajs_avg=None, c=0.001, human_counterfactual_trajs=None):
+def obtain_test_environments(data_loc, min_subset_constraints_record, env_record, traj_record, reward_record, weights, BEC_lengths_record, n_desired_test_env, difficulty, step_cost_flag, summary=None, overlap_in_trajs_avg=None, c=0.001, human_counterfactual_trajs=None, n_clusters=12):
     '''
     Summary: Correlate the difficulty of a test environment with the generalized area of the BEC region obtain by the
     corresponding optimal demonstration. Return the desired number and difficulty of test environments (to be given
@@ -345,14 +345,17 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
         summary_idxs[best_env_idx].append(best_traj_idx)
 
     env_traj_tracer = []
-    # todo: 8 and -1 are currently hardcoded
+    # todo: 8 and -1 are currently hardcoded. I can also probably just move this to when the overlap between
+    #  human posterior and demo BEC are calculated
     human_exit_demo = []
+    human_traj_overlap = []
     for env_idx in range(256):
         print(env_idx)
         best_human_trajs_record_env_across_models = []
         human_rewards_env_across_models = []
         env_traj_tracer_env = []
         human_exit_demo_env = []
+        human_traj_overlap_env = []
         for model_idx in range(8):
             with open('models/' + data_loc + '/counterfactual_data_' + str(-1) + '/model' + str(
                     model_idx) + '/cf_data_env' + str(
@@ -370,11 +373,57 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
                                                     zip(*human_rewards_env_across_models)]
         best_human_trajs_record_env_across_models_per_traj = [i for i in
                                                               zip(*best_human_trajs_record_env_across_models)]
+
         for traj_idx in range(len(human_rewards_env_across_models_per_traj)):
             human_rewards_across_models = np.array(human_rewards_env_across_models_per_traj[traj_idx]).flatten()
-            for j, reward in enumerate(human_rewards_across_models):
-                if reward == reward_record[env_idx][traj_idx]:
-                    human_rewards_across_models[j] = 0
+            best_human_counterfactual_trajs = best_human_trajs_record_env_across_models_per_traj[traj_idx]
+            avg_overlap_pct = 0
+            overlap_counter = 0
+            max_overlap_pct = 0
+            min_overlap_pct = 1
+            for model_idx, reward in enumerate(human_rewards_across_models):
+                # if reward == reward_record[env_idx][traj_idx]:
+                #     human_rewards_across_models[model_idx] = 0
+                # else:
+                #     # method 1: get the average traj overlap amongst suboptimal trajectories
+                #     # if the human considered a suboptimal trajectory, consider the overlap
+                #     # avg_overlap_pct += BEC_helpers.calculate_counterfactual_overlap_pct(
+                #     #     best_human_counterfactual_trajs[model_idx], traj_record_filtered[env_idx][traj_idx])
+                #     # overlap_counter += 1
+                #
+                #     # method 2: get the max traj overlap amongst non-exit trajectories
+                #     overlap_pct = BEC_helpers.calculate_counterfactual_overlap_pct(
+                #         best_human_counterfactual_trajs[model_idx], traj_record_filtered[env_idx][traj_idx])
+                #     if overlap_pct > max_overlap_pct:
+                #         max_overlap_pct = overlap_pct
+
+                # method 3: get the average traj overlap amongst non exit-human trajectories
+                # if best_human_counterfactual_trajs[model_idx][0][1] != 'exit':
+                #     avg_overlap_pct += BEC_helpers.calculate_counterfactual_overlap_pct(
+                #         best_human_counterfactual_trajs[model_idx], traj_record_filtered[env_idx][traj_idx])
+                #     overlap_counter += 1
+
+                # method 4: get the min traj overlap amongst non-exit trajectories
+                if best_human_counterfactual_trajs[model_idx][0][1] != 'exit':
+                    overlap_pct = BEC_helpers.calculate_counterfactual_overlap_pct(
+                        best_human_counterfactual_trajs[model_idx], traj_record_filtered[env_idx][traj_idx])
+                    if overlap_pct < min_overlap_pct:
+                        min_overlap_pct = overlap_pct
+
+            # method 1: get the average traj overlap amongst non-exit trajectories
+            # if overlap_counter > 0:
+            #     avg_overlap_pct = avg_overlap_pct / overlap_counter
+            # human_traj_overlap_env.append(avg_overlap_pct)
+            # method 2: get the max traj overlap amongst non-exit trajectories
+            # human_traj_overlap_env.append(max_overlap_pct)
+            # method 3: get the average traj overlap amongst non-exit trajectories
+            # if overlap_counter > 0:
+            #     avg_overlap_pct = avg_overlap_pct / overlap_counter
+            # human_traj_overlap_env.append(avg_overlap_pct)
+            # method 4: get the min traj overlap amongst non-exit trajectories
+            human_traj_overlap_env.append(min_overlap_pct)
+
+            # the code right below is outdated and human_exit_demo_env actually isn't being used
             # if 0, then every trajectory is either correct or is an exit.
             if np.sum(human_rewards_across_models) == 0:
                 human_exit_demo_env.append(True)
@@ -385,6 +434,7 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
 
         env_traj_tracer.append(env_traj_tracer_env)
         human_exit_demo.append(human_exit_demo_env)
+        human_traj_overlap.append(human_traj_overlap_env)
 
     for env_idx in summary_idxs.keys():
         traj_idxs = summary_idxs[env_idx]
@@ -398,6 +448,7 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
                 del human_counterfactual_trajs_filtered[env_idx][traj_idx]
             del env_traj_tracer[env_idx][traj_idx]
             del human_exit_demo[env_idx][traj_idx]
+            del human_traj_overlap[env_idx][traj_idx]
 
     # flatten relevant lists for easy sorting
     envs_record_flattened = []
@@ -410,13 +461,17 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
         human_counterfactual_trajs_flattened = [item for sublist in human_counterfactual_trajs_filtered for item in sublist]
     else:
         human_counterfactual_trajs_flattened = None
+    human_traj_overlap_flattened = [item for sublist in human_traj_overlap for item in sublist]
 
-    if overlap_in_trajs_avg is None:
-        obj_func_flattened = [item for sublist in BEC_lengths_record_filtered for item in sublist]
-    else:
-        BEC_lengths_record_flattened = [item for sublist in BEC_lengths_record_filtered for item in sublist]
-        overlap_in_trajs_avg_flattened = [item for sublist in overlap_in_trajs_avg_filtered for item in sublist]
-        obj_func_flattened = np.array(BEC_lengths_record_flattened) * (np.array(overlap_in_trajs_avg_flattened) + c)
+    # if overlap_in_trajs_avg is None:
+    #     obj_func_flattened = [item for sublist in BEC_lengths_record_filtered for item in sublist]
+    # else:
+    #     BEC_lengths_record_flattened = [item for sublist in BEC_lengths_record_filtered for item in sublist]
+    #     overlap_in_trajs_avg_flattened = [item for sublist in overlap_in_trajs_avg_filtered for item in sublist]
+    #     obj_func_flattened = np.array(BEC_lengths_record_flattened) * (np.array(overlap_in_trajs_avg_flattened) + c)
+
+    BEC_lengths_record_flattened = [item for sublist in BEC_lengths_record_filtered for item in sublist]
+    obj_func_flattened = np.array(BEC_lengths_record_flattened) * (np.array(human_traj_overlap_flattened) + c)
 
     # todo: I can probably just do this above while im flattening
     exit_demo = []
@@ -443,7 +498,7 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
     env_traj_tracer_flattened_nonexit = []
 
     for j, exit in enumerate(exit_demo):
-        if exit or human_exit_demo_flattened[j]:
+        if exit:
             envs_record_flattened_exit.append(envs_record_flattened[j])
             traj_record_flattened_exit.append(traj_record_flattened[j])
             obj_func_flattened_exit.append(obj_func_flattened[j])
@@ -470,32 +525,34 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
 
     consider_exits = False
     if consider_exits:
-        envs_record_flattened = envs_record_flattened_exit
-        traj_record_flattened = traj_record_flattened_exit
-        obj_func_flattened = obj_func_flattened_exit
-        min_subset_constraints_record_flattened = min_subset_constraints_record_flattened_exit
-        human_counterfactual_trajs_flattened = human_counterfactual_trajs_flattened_exit
-        overlap_in_trajs_avg_flattened = overlap_in_trajs_avg_flattened_exit
+        envs_record_flattened_select = envs_record_flattened_exit
+        traj_record_flattened_select = traj_record_flattened_exit
+        obj_func_flattened_select = obj_func_flattened_exit
+        min_subset_constraints_record_flattened_select = min_subset_constraints_record_flattened_exit
+        human_counterfactual_trajs_flattened_select = human_counterfactual_trajs_flattened_exit
+        overlap_in_trajs_avg_flattened_select = overlap_in_trajs_avg_flattened_exit
     else:
-        envs_record_flattened = envs_record_flattened_nonexit
-        traj_record_flattened = traj_record_flattened_nonexit
-        obj_func_flattened = obj_func_flattened_nonexit
-        min_subset_constraints_record_flattened = min_subset_constraints_record_flattened_nonexit
-        human_counterfactual_trajs_flattened = human_counterfactual_trajs_flattened_nonexit
-        overlap_in_trajs_avg_flattened = overlap_in_trajs_avg_flattened_nonexit
+        envs_record_flattened_select = envs_record_flattened_nonexit
+        traj_record_flattened_select = traj_record_flattened_nonexit
+        obj_func_flattened_select = obj_func_flattened_nonexit
+        min_subset_constraints_record_flattened_select = min_subset_constraints_record_flattened_nonexit
+        human_counterfactual_trajs_flattened_select = human_counterfactual_trajs_flattened_nonexit
+        overlap_in_trajs_avg_flattened_select = overlap_in_trajs_avg_flattened_nonexit
 
     if difficulty == 'high':
-        test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = select_test_demos(0, data_loc, n_desired_test_env, envs_record_flattened, traj_record_flattened, obj_func_flattened, min_subset_constraints_record_flattened, human_counterfactual_trajs_flattened)
+        test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = select_test_demos(
+            0, data_loc, n_desired_test_env, envs_record_flattened_select, traj_record_flattened_select, obj_func_flattened_select,
+            min_subset_constraints_record_flattened_select, human_counterfactual_trajs_flattened_select, n_clusters=n_clusters)
     if difficulty == 'medium':
-        test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = select_test_demos(2, data_loc, n_desired_test_env,
-                                                                                           envs_record_flattened,
-                                                                                           traj_record_flattened,
-                                                                                           obj_func_flattened, min_subset_constraints_record_flattened, human_counterfactual_trajs_flattened)
+        test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = select_test_demos(int(np.ceil(n_clusters / 2)), data_loc, n_desired_test_env,
+                                                                                           envs_record_flattened_select,
+                                                                                           traj_record_flattened_select,
+                                                                                           obj_func_flattened_select, min_subset_constraints_record_flattened_select, human_counterfactual_trajs_flattened_select, n_clusters=n_clusters)
 
     if difficulty == 'low':
-        test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = select_test_demos(4, data_loc, n_desired_test_env,
-                                                                                           envs_record_flattened,
-                                                                                           traj_record_flattened,
-                                                                                           obj_func_flattened, min_subset_constraints_record_flattened, human_counterfactual_trajs_flattened)
+        test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = select_test_demos(n_clusters-1, data_loc, n_desired_test_env,
+                                                                                           envs_record_flattened_select,
+                                                                                           traj_record_flattened_select,
+                                                                                           obj_func_flattened_select, min_subset_constraints_record_flattened_select, human_counterfactual_trajs_flattened_select, n_clusters=n_clusters)
 
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs
