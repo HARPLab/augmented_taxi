@@ -262,6 +262,56 @@ def select_test_demos(cluster_idx, data_loc, n_desired_test_env, env_idxs , traj
 
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs
 
+def select_test_demos_nested_cluster(cluster_idx, data_loc, n_desired_test_env, env_idxs , traj_opts, BEC_lengths, BEC_lengths_record_flattened_select, human_traj_overlap_flattened_select, BEC_constraints, human_counterfactual_trajs, n_clusters=6):
+    kmeans = KMeans(n_clusters=n_clusters).fit(np.array(human_traj_overlap_flattened_select).reshape(-1, 1))
+    cluster_centers = kmeans.cluster_centers_
+    labels = kmeans.labels_
+
+    ordering = np.arange(0, n_clusters)
+    sorted_zipped = sorted(zip(cluster_centers, ordering))
+    cluster_centers_sorted, ordering_sorted = list(zip(*sorted_zipped))
+
+    # checking out partitions one at a time
+    partition_idx = ordering_sorted[cluster_idx]
+
+    covering_demo_idxs = [i for i, x in enumerate(labels) if x == partition_idx]
+    print(len(covering_demo_idxs))
+
+    relevant_BEC_lengths = [BEC_lengths_record_flattened_select[i] for i in covering_demo_idxs]
+
+    sorted_zipped = sorted(zip(relevant_BEC_lengths, covering_demo_idxs))
+    relevant_BEC_lengths_sorted, covering_demo_idxs_sorted = list(zip(*sorted_zipped))
+
+    # get the desired number of test environments equally spaced from the covering demo idxs
+    idx = np.round(np.linspace(0, len(covering_demo_idxs_sorted) - 1, min(n_desired_test_env, len(covering_demo_idxs_sorted)))).astype(int)
+    test_demo_idxs = [covering_demo_idxs_sorted[i] for i in idx]
+
+    selected_env_idxs = [env_idxs[k] for k in test_demo_idxs]
+
+    test_wt_vi_traj_tuples = []
+    for k in selected_env_idxs:
+        env_filename = mp_helpers.lookup_env_filename(data_loc, k)
+
+        with open(env_filename, 'rb') as f:
+            wt_vi_traj_env = pickle.load(f)
+
+        test_wt_vi_traj_tuples.append(copy.deepcopy(wt_vi_traj_env[0]))
+
+    test_traj_opts = [traj_opts[k] for k in test_demo_idxs]
+
+    for k, test_traj_opt in enumerate(test_traj_opts):
+        test_wt_vi_traj_tuples[k][1].mdp.set_init_state(test_traj_opt[0][0])
+        test_wt_vi_traj_tuples[k][2] = test_traj_opt
+
+    test_BEC_lengths = [BEC_lengths[k] for k in test_demo_idxs]
+    test_BEC_constraints = [BEC_constraints[k] for k in test_demo_idxs]
+    if human_counterfactual_trajs is not None:
+        test_human_counterfactual_trajs = [human_counterfactual_trajs[k] for k in test_demo_idxs]
+    else:
+        test_human_counterfactual_trajs = None
+
+    return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs
+
 
 def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_record, summary):
     visual_dissimilarities = np.zeros(len(best_env_idxs))
@@ -322,7 +372,7 @@ def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_recor
 
     return best_env_idx, best_traj_idx
 
-def obtain_test_environments(data_loc, min_subset_constraints_record, env_record, traj_record, reward_record, weights, BEC_lengths_record, n_desired_test_env, difficulty, step_cost_flag, counterfactual_folder_idx, summary=None, overlap_in_trajs_avg=None, c=0.001, human_counterfactual_trajs=None, n_clusters=12):
+def obtain_test_environments(data_loc, min_subset_constraints_record, env_record, traj_record, reward_record, weights, BEC_lengths_record, n_desired_test_env, difficulty, step_cost_flag, counterfactual_folder_idx, summary=None, overlap_in_trajs_avg=None, c=0.001, human_counterfactual_trajs=None, n_clusters=5):
     '''
     Summary: Correlate the difficulty of a test environment with the generalized area of the BEC region obtain by the
     corresponding optimal demonstration. Return the desired number and difficulty of test environments (to be given
@@ -404,7 +454,8 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
                 #     overlap_counter += 1
 
                 # method 4: get the min traj overlap amongst non-exit trajectories
-                if best_human_counterfactual_trajs[model_idx][0][1] != 'exit':
+                # (shouldn't compare overlap if human's trajectory is as good as the agent's trajectory, even if they're qualitatively different)
+                if best_human_counterfactual_trajs[model_idx][0][1] != 'exit' and reward_record[env_idx][traj_idx] != reward:
                     overlap_pct = BEC_helpers.calculate_counterfactual_overlap_pct(
                         best_human_counterfactual_trajs[model_idx], traj_record_filtered[env_idx][traj_idx])
                     if overlap_pct < min_overlap_pct:
@@ -488,6 +539,8 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
     human_counterfactual_trajs_flattened_exit = []
     overlap_in_trajs_avg_flattened_exit = []
     env_traj_tracer_flattened_exit = []
+    BEC_lengths_record_flattened_exit = []
+    human_traj_overlap_flattened_exit = []
 
     envs_record_flattened_nonexit = []
     traj_record_flattened_nonexit = []
@@ -496,6 +549,8 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
     human_counterfactual_trajs_flattened_nonexit = []
     overlap_in_trajs_avg_flattened_nonexit = []
     env_traj_tracer_flattened_nonexit = []
+    BEC_lengths_record_flattened_nonexit = []
+    human_traj_overlap_flattened_nonexit = []
 
     for j, exit in enumerate(exit_demo):
         if exit:
@@ -510,6 +565,8 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
             if overlap_in_trajs_avg is not None:
                 overlap_in_trajs_avg_flattened_exit.append(overlap_in_trajs_avg_flattened[j])
             env_traj_tracer_flattened_exit.append(env_traj_tracer_flattened[j])
+            BEC_lengths_record_flattened_exit.append(BEC_lengths_record_flattened[j])
+            human_traj_overlap_flattened_exit.append(human_traj_overlap_flattened[j])
         else:
             envs_record_flattened_nonexit.append(envs_record_flattened[j])
             traj_record_flattened_nonexit.append(traj_record_flattened[j])
@@ -522,6 +579,8 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
             if overlap_in_trajs_avg is not None:
                 overlap_in_trajs_avg_flattened_nonexit.append(overlap_in_trajs_avg_flattened[j])
             env_traj_tracer_flattened_nonexit.append(env_traj_tracer_flattened[j])
+            BEC_lengths_record_flattened_nonexit.append(BEC_lengths_record_flattened[j])
+            human_traj_overlap_flattened_nonexit.append(human_traj_overlap_flattened[j])
 
     consider_exits = False
     if consider_exits:
@@ -531,6 +590,8 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
         min_subset_constraints_record_flattened_select = min_subset_constraints_record_flattened_exit
         human_counterfactual_trajs_flattened_select = human_counterfactual_trajs_flattened_exit
         overlap_in_trajs_avg_flattened_select = overlap_in_trajs_avg_flattened_exit
+        BEC_lengths_record_flattened_select = BEC_lengths_record_flattened_exit
+        human_traj_overlap_flattened_select = human_traj_overlap_flattened_exit
     else:
         envs_record_flattened_select = envs_record_flattened_nonexit
         traj_record_flattened_select = traj_record_flattened_nonexit
@@ -538,21 +599,43 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
         min_subset_constraints_record_flattened_select = min_subset_constraints_record_flattened_nonexit
         human_counterfactual_trajs_flattened_select = human_counterfactual_trajs_flattened_nonexit
         overlap_in_trajs_avg_flattened_select = overlap_in_trajs_avg_flattened_nonexit
+        BEC_lengths_record_flattened_select = BEC_lengths_record_flattened_nonexit
+        human_traj_overlap_flattened_select = human_traj_overlap_flattened_nonexit
 
-    if difficulty == 'high':
-        test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = select_test_demos(
-            0, data_loc, n_desired_test_env, envs_record_flattened_select, traj_record_flattened_select, obj_func_flattened_select,
-            min_subset_constraints_record_flattened_select, human_counterfactual_trajs_flattened_select, n_clusters=n_clusters)
-    if difficulty == 'medium':
-        test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = select_test_demos(int(np.ceil(n_clusters / 2)), data_loc, n_desired_test_env,
-                                                                                           envs_record_flattened_select,
-                                                                                           traj_record_flattened_select,
-                                                                                           obj_func_flattened_select, min_subset_constraints_record_flattened_select, human_counterfactual_trajs_flattened_select, n_clusters=n_clusters)
+    if consider_exits:
+        if difficulty == 'high':
+            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = select_test_demos(
+                0, data_loc, n_desired_test_env, envs_record_flattened_select, traj_record_flattened_select, obj_func_flattened_select,
+                min_subset_constraints_record_flattened_select, human_counterfactual_trajs_flattened_select, n_clusters=n_clusters)
+        if difficulty == 'medium':
+            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = select_test_demos(int(np.floor(n_clusters / 2)), data_loc, n_desired_test_env,
+                                                                                               envs_record_flattened_select,
+                                                                                               traj_record_flattened_select,
+                                                                                               obj_func_flattened_select, min_subset_constraints_record_flattened_select, human_counterfactual_trajs_flattened_select, n_clusters=n_clusters)
 
-    if difficulty == 'low':
-        test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = select_test_demos(n_clusters-1, data_loc, n_desired_test_env,
-                                                                                           envs_record_flattened_select,
-                                                                                           traj_record_flattened_select,
-                                                                                           obj_func_flattened_select, min_subset_constraints_record_flattened_select, human_counterfactual_trajs_flattened_select, n_clusters=n_clusters)
+        if difficulty == 'low':
+            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = select_test_demos(n_clusters-1, data_loc, n_desired_test_env,
+                                                                                               envs_record_flattened_select,
+                                                                                               traj_record_flattened_select,
+                                                                                               obj_func_flattened_select, min_subset_constraints_record_flattened_select, human_counterfactual_trajs_flattened_select, n_clusters=n_clusters)
+    else:
+        if difficulty == 'high':
+            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = select_test_demos_nested_cluster(
+                0, data_loc, n_desired_test_env, envs_record_flattened_select, traj_record_flattened_select, obj_func_flattened_select,
+                BEC_lengths_record_flattened_select, human_traj_overlap_flattened_select, min_subset_constraints_record_flattened_select, human_counterfactual_trajs_flattened_select, n_clusters=n_clusters)
+        if difficulty == 'medium':
+            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = select_test_demos_nested_cluster(
+                int(np.floor(n_clusters / 2)), data_loc, n_desired_test_env, envs_record_flattened_select, traj_record_flattened_select,
+                obj_func_flattened_select,
+                BEC_lengths_record_flattened_select, human_traj_overlap_flattened_select,
+                min_subset_constraints_record_flattened_select, human_counterfactual_trajs_flattened_select,
+                n_clusters=n_clusters)
+        if difficulty == 'low':
+            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs = select_test_demos_nested_cluster(
+                n_clusters-1, data_loc, n_desired_test_env, envs_record_flattened_select, traj_record_flattened_select,
+                obj_func_flattened_select,
+                BEC_lengths_record_flattened_select, human_traj_overlap_flattened_select,
+                min_subset_constraints_record_flattened_select, human_counterfactual_trajs_flattened_select,
+                n_clusters=n_clusters)
 
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs
