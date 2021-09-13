@@ -378,7 +378,7 @@ def compute_counterfactuals(args):
         info_gain_env = [0 for i in range(len(trajs_opt))]
         if not consider_human_models_jointly:
             overlap_in_opt_and_counterfactual_traj_env = [float('inf') for i in range(len(trajs_opt))]
-        human_rewards_env = [0 for i in range(len(trajs_opt))]
+        human_rewards_env = [np.array([[0]]) for i in range(len(trajs_opt))]
 
     with open('models/' + data_loc + '/counterfactual_data_' + str(summary_len) + '/model' + str(model_idx) +
               '/cf_data_env' + str(env_idx).zfill(5) + '.pickle', 'wb') as f:
@@ -707,7 +707,7 @@ def overlap_demo_BEC_and_human_posterior(args):
     '''
     Summary: combine the most limiting constraints across all potential human models for each potential demonstration
     '''
-    env_idx, n_sample_human_models, min_subset_constraints, prior, posterior, data_loc, curr_summary_len, weights, trajs_opt, step_cost_flag, pool = args
+    env_idx, n_sample_human_models, min_subset_constraints, prior, posterior, data_loc, counterfactual_folder_idx, weights, trajs_opt, step_cost_flag, pool = args
 
     human_model = posterior
     human_model = BEC_helpers.remove_redundant_constraints(human_model, weights, step_cost_flag)
@@ -729,7 +729,7 @@ def overlap_demo_BEC_and_human_posterior(args):
 
     # for each possible demonstration in each environment, find the overlap in area between the spherical polygon
     # comprising the posterior and the counterfactual constraints created by the demonstration
-    for constraints in min_subset_constraints:
+    for constraint_idx, constraints in enumerate(min_subset_constraints):
         constraints_copy = constraints.copy()
 
         if len(constraints_copy) == 0:
@@ -744,7 +744,11 @@ def overlap_demo_BEC_and_human_posterior(args):
             traj_poly = Polyhedron.Polyhedron(ieqs=traj_ieqs)  # automatically finds the minimal H-representation
             traj_spherical_polygon_vertices = np.array(BEC_helpers.obtain_sph_polygon_vertices(traj_poly, add_noise=True)) # add noise to help smooth calculation
 
-            inside_traj_sph_polygon = BEC_helpers.sample_average_model(constraints_copy, sample_rate=100)[0][0]
+            # try to obtain an inner point using a low-fidelity sampling. if it fails, resort to a high fildelity sampling
+            try:
+                inside_traj_sph_polygon = BEC_helpers.sample_average_model(constraints_copy, sample_rate=100)[0][0]
+            except:
+                inside_traj_sph_polygon = BEC_helpers.sample_average_model(constraints_copy)[0][0]
 
             traj_spherical_polygon_vertices = cg.sort_points_by_angle(traj_spherical_polygon_vertices, inside_traj_sph_polygon)
             traj_sph_polygon = sph_polygon.SphericalPolygon(traj_spherical_polygon_vertices, inside=tuple(inside_traj_sph_polygon))
@@ -766,7 +770,7 @@ def overlap_demo_BEC_and_human_posterior(args):
     overlap_in_opt_and_counterfactual_traj_avg = []
 
     for model_idx in range(n_sample_human_models):
-        with open('models/' + data_loc + '/counterfactual_data_' + str(curr_summary_len) + '/model' + str(
+        with open('models/' + data_loc + '/counterfactual_data_' + str(counterfactual_folder_idx) + '/model' + str(
                 model_idx) + '/cf_data_env' + str(
            env_idx).zfill(5) + '.pickle', 'rb') as f:
             best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
@@ -781,7 +785,7 @@ def overlap_demo_BEC_and_human_posterior(args):
             overlap_in_opt_and_counterfactual_traj[traj_idx].append(overlap_pct)
             # store the required information for replaying the closest human counterfactual trajectory
             human_counterfactual_trajs[traj_idx].append(
-                (curr_summary_len, model_idx, env_idx, traj_idx))
+                (counterfactual_folder_idx, model_idx, env_idx, traj_idx))
 
     # take the average overlap across all counterfactual trajectories that contributed to the most limiting constraints
     for traj_idx, overlap_pcts in enumerate(overlap_in_opt_and_counterfactual_traj):
@@ -800,7 +804,7 @@ def overlap_demo_BEC_and_human_posterior(args):
     # overlap_in_opt_and_counterfactual_traj_avg = []
     #
     # for model_idx in range(n_sample_human_models):
-    #     with open('models/' + data_loc + '/counterfactual_data_' + str(curr_summary_len) + '/model' + str(
+    #     with open('models/' + data_loc + '/counterfactual_data_' + str(counterfactual_folder_idx) + '/model' + str(
     #             model_idx) + '/cf_data_env' + str(
     #        env_idx).zfill(5) + '.pickle', 'rb') as f:
     #         best_human_trajs_record_env, constraints_env = pickle.load(f)
@@ -816,7 +820,7 @@ def overlap_demo_BEC_and_human_posterior(args):
     #             overlap_in_opt_and_counterfactual_traj[traj_idx] = overlap_pct
     #
     #             # store the required information for replaying the closest human counterfactual trajectory
-    #             human_counterfactual_trajs[traj_idx] = (curr_summary_len, model_idx, env_idx, traj_idx)
+    #             human_counterfactual_trajs[traj_idx] = (counterfactual_folder_idx, model_idx, env_idx, traj_idx)
     #
     #
     # return BEC_areas, overlap_in_opt_and_counterfactual_traj, human_counterfactual_trajs
@@ -902,6 +906,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
 
         # do a quick check of whether there's any information to be gained from any of the trajectories
         no_info_flag = False
+        max_info_gain = 1
         if consistent_state_count:
             info_gains = np.array(info_gains_record)
             if np.sum(info_gains > 1) == 0:
@@ -940,19 +945,23 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
 
             # the possibility that no demonstration provides information gain must be checked for again,
             # in case all limiting constraints involve a masked variable and shouldn't be considered for demonstration yet
-            no_info_flag = False
 
             if consistent_state_count:
                 info_gains = np.array(info_gains_record)
                 traj_overlap_pcts = np.array(overlap_in_opt_and_counterfactual_traj_avg)
 
                 obj_function = info_gains * (traj_overlap_pcts + c)  # objective 2: scaled
-                if max(obj_function.flatten()) == 0:
+                # don't consider demos where there is no info gain (since info gain is a ratio of the old and new, a demo
+                # with a large overlap and an info gain of 1 (i.e. no info gain) can actually have a higher objective
+                # function than a demo with a small overlap and a info gain > 1
+                obj_function[info_gains == 1] = 0
+
+                max_info_gain = np.max(info_gains)
+                if max_info_gain == 1:
                     no_info_flag = True
                 else:
                     best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
                     best_env_idxs, best_traj_idxs = np.where(obj_function == max(obj_function.flatten()))
-                    max_info_gain = np.max(info_gains)
 
                     best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
             else:
@@ -961,18 +970,21 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
                 best_traj_idxs = []
                 for env_idx, info_gains_per_env in enumerate(info_gains_record):
                     for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
-                        obj = info_gain_per_traj * (
-                                    overlap_in_opt_and_counterfactual_traj_avg[env_idx][traj_idx] + c)  # objective 2: scaled
-                        if np.isclose(obj, best_obj):
-                            best_env_idxs.append(env_idx)
-                            best_traj_idxs.append(traj_idx)
-                        elif obj > best_obj:
-                            best_obj = obj
-                            max_info_gain = info_gain_per_traj
+                        if info_gain_per_traj > 1:
+                            obj = info_gain_per_traj * (
+                                        overlap_in_opt_and_counterfactual_traj_avg[env_idx][traj_idx] + c)  # objective 2: scaled
+                            if np.isclose(obj, best_obj):
+                                best_env_idxs.append(env_idx)
+                                best_traj_idxs.append(traj_idx)
+                            elif obj > best_obj:
+                                best_obj = obj
 
-                            best_env_idxs = [env_idx]
-                            best_traj_idxs = [traj_idx]
-                if best_obj == 0:
+                                best_env_idxs = [env_idx]
+                                best_traj_idxs = [traj_idx]
+                            if info_gain_per_traj > max_info_gain:
+                                max_info_gain = info_gain_per_traj
+                                print("new max info: {}".format(max_info_gain))
+                if max_info_gain == 1:
                     no_info_flag = True
                 else:
                     best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
@@ -1001,12 +1013,15 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
         else:
             # b) consider each human model separately
             if consistent_state_count:
+                info_gains = np.array(info_gains_record)
                 traj_overlap_pcts = np.array(overlap_in_opt_and_counterfactual_traj_record)
 
                 obj_function = info_gains * (traj_overlap_pcts + c)                  # objective 2: scaled
+                obj_function[info_gains == 1] = 0
+
                 select_model, best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
 
-                if max(obj_function.flatten()) == 0:
+                if max(info_gains.flatten()) == 1:
                     no_info_flag = True
                 else:
                     best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
@@ -1016,23 +1031,27 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
                     best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
             else:
                 best_obj = float('-inf')
-                select_model = best_env_idx = best_traj_idx = best_info_gain = 0
+                select_model = best_env_idx = best_traj_idx = 0
                 for model_idx, info_gains_per_model in enumerate(info_gains_record):
                     for env_idx, info_gains_per_env in enumerate(info_gains_per_model):
                         for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
-                            obj = info_gain_per_traj * (overlap_in_opt_and_counterfactual_traj_record[model_idx][env_idx][traj_idx] + c)
+                            if info_gain_per_traj > 1:
+                                obj = info_gain_per_traj * (overlap_in_opt_and_counterfactual_traj_record[model_idx][env_idx][traj_idx] + c)
 
-                            if np.isclose(obj, best_obj):
-                                best_env_idxs.append(env_idx)
-                                best_traj_idxs.append(traj_idx)
-                            elif obj > best_obj:
-                                best_obj = obj
-                                max_info_gain = info_gain_per_traj
+                                if np.isclose(obj, best_obj):
+                                    best_env_idxs.append(env_idx)
+                                    best_traj_idxs.append(traj_idx)
+                                elif obj > best_obj:
+                                    best_obj = obj
+                                    max_info_gain = info_gain_per_traj
 
-                                best_env_idxs = [env_idx]
-                                best_traj_idxs = [traj_idx]
+                                    best_env_idxs = [env_idx]
+                                    best_traj_idxs = [traj_idx]
 
-                if best_obj == 0:
+                                if info_gain_per_traj > max_info_gain:
+                                    max_info_gain = info_gain_per_traj
+
+                if max_info_gain == 1:
                     no_info_flag = True
                 else:
                     best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
@@ -1454,10 +1473,15 @@ def visualize_summary(BEC_summaries_collection, weights, step_cost_flag):
         # BEC_summary[0].visualize_trajectory(BEC_summary[3][0])
 
 
-def visualize_test_envs(posterior, test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs, weights, step_cost_flag):
+def visualize_test_envs(posterior, test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs, test_overlap_pcts, weights, step_cost_flag):
     for j, test_wt_vi_traj_tuple in enumerate(test_wt_vi_traj_tuples):
         print('Visualizing test environment {} with BEC length of {}'.format(j, test_BEC_lengths[j]))
-
+        print(test_human_counterfactual_trajs[j])
+        try:
+            print(test_overlap_pcts[j])
+        except:
+            pass
+        print(test_BEC_constraints[j])
         vi_candidate = test_wt_vi_traj_tuple[1]
         trajectory_candidate = test_wt_vi_traj_tuple[2]
         vi_candidate.mdp.visualize_trajectory(trajectory_candidate)
@@ -1468,11 +1492,11 @@ def visualize_test_envs(posterior, test_wt_vi_traj_tuples, test_BEC_lengths, tes
 
         ieqs_posterior = BEC_helpers.constraints_to_halfspace_matrix_sage(posterior)
         poly_posterior = Polyhedron.Polyhedron(ieqs=ieqs_posterior)  # automatically finds the minimal H-representation
-        BEC_viz.visualize_spherical_polygon(poly_posterior, fig=fig, ax=ax, plot_ref_sphere=False, color='g')
+        BEC_viz.visualize_spherical_polygon(poly_posterior, fig=fig, ax=ax, plot_ref_sphere=False, color='g', alpha=0.05)
 
         ieqs_test = BEC_helpers.constraints_to_halfspace_matrix_sage(test_BEC_constraints[j])
         poly_test = Polyhedron.Polyhedron(ieqs=ieqs_test)
-        BEC_viz.visualize_spherical_polygon(poly_test, fig=fig, ax=ax, plot_ref_sphere=False)
+        BEC_viz.visualize_spherical_polygon(poly_test, fig=fig, ax=ax, plot_ref_sphere=False, alpha=0.05)
 
         ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100)
         ax.set_xlabel('X')

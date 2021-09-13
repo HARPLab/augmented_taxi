@@ -736,7 +736,11 @@ def calculate_counterfactual_overlap_pct(human_traj, agent_traj):
         overlap += match[2]
 
     # percentage of the human counterfactual that overlaps with the agent's trajectory
-    overlap_pct = overlap / len(human_traj)
+    try:
+        overlap_pct = overlap / len(human_traj)
+    except:
+        # the length of the human trajectory may be zero because the human model never converged
+        overlap_pct = 0
 
     return overlap_pct
 

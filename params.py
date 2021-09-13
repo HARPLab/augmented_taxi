@@ -32,9 +32,9 @@ if mdp_class == 'augmented_taxi':
     }
 
     prior = [np.array([[1, 0, 0]]), np.array([[0, 0, -1]])]
-    # posterior = [np.array([[1, 0, 0]]), np.array([[0, -1, 0]]), np.array([[0, 0, -1]])]
+    posterior = [np.array([[1, 0, 0]]), np.array([[0, -1, 0]]), np.array([[0, 0, -1]])]
     # posterior = [np.array([[1, 0, 0]]), np.array([[-1, 0, -18]]), np.array([[0, -1, 0]]), np.array([[0, 1, -7]])]  # +/- 100%, too similar to sign posterior
-    posterior = [np.array([[1, 0, 4]]), np.array([[-1, 0, -13]]), np.array([[0, -1, 1]]), np.array([[0, 1, -5]])]  # +/- 50%
+    # posterior = [np.array([[1, 0, 4]]), np.array([[-1, 0, -13]]), np.array([[0, -1, 1]]), np.array([[0, 1, -5]])]  # +/- 50%
 elif mdp_class == 'two_goal':
     w = np.array([[7.25, 10.5, -1]])
     w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order)
@@ -56,6 +56,8 @@ elif mdp_class == 'two_goal':
 
     prior = [np.array([[1, 0, 0]]), np.array([[0, 1, 0]]), np.array([[0, 0, -1]])]
     posterior = [np.array([[1, 0, 0]]), np.array([[0, 1, 0]]), np.array([[0, 0, -1]])]
+    # posterior = [np.array([[1, 0, 3]]), np.array([[-1, 0, -11]]), np.array([[0, 1, 3]]),
+    #              np.array([[0, -1, -16]])]  # +/- 50%
 elif mdp_class == 'skateboard':
     w = np.array([[9, -0.3, -1]])
     w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order),
@@ -77,6 +79,8 @@ elif mdp_class == 'skateboard':
 
     prior = [np.array([[1, 0, 0]]), np.array([[0, 0, -1]])]
     posterior = [np.array([[1, 0, 0]]), np.array([[0, -1, 0]]), np.array([[0, 0, -1]])]
+    # posterior = [np.array([[1, 0, 4]]), np.array([[-1, 0, -14]]), np.array([[0, 1, -1]]),
+    #              np.array([[0, -1, 0]])]  # +/- 50%
 elif mdp_class == 'cookie_crumb':
     w = np.array([[2.5, 1.7, -1]])
     w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order),
