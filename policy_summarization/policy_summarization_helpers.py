@@ -374,7 +374,7 @@ def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_recor
 
     return best_env_idx, best_traj_idx
 
-def obtain_test_environments(data_loc, min_subset_constraints_record, env_record, traj_record, reward_record, weights, BEC_lengths_record, n_desired_test_env, difficulty, step_cost_flag, counterfactual_folder_idx, summary=None, overlap_in_trajs_avg=None, c=0.001, human_counterfactual_trajs=None, n_clusters=5):
+def obtain_test_environments(data_loc, min_subset_constraints_record, env_record, traj_record, reward_record, weights, BEC_lengths_record, n_desired_test_env, difficulty, step_cost_flag, counterfactual_folder_idx, summary=None, overlap_in_trajs_avg=None, c=0.001, human_counterfactual_trajs=None, n_clusters=3):
     '''
     Summary: Correlate the difficulty of a test environment with the generalized area of the BEC region obtain by the
     corresponding optimal demonstration. Return the desired number and difficulty of test environments (to be given
@@ -528,7 +528,8 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
     #     obj_func_flattened = np.array(BEC_lengths_record_flattened) * (np.array(overlap_in_trajs_avg_flattened) + c)
 
     BEC_lengths_record_flattened = [item for sublist in BEC_lengths_record_filtered for item in sublist]
-    obj_func_flattened = np.array(BEC_lengths_record_flattened) * (np.array(human_traj_overlap_flattened) + c)
+    # obj_func_flattened = np.array(BEC_lengths_record_flattened) * (np.array(human_traj_overlap_flattened) + c)
+    obj_func_flattened = np.array(BEC_lengths_record_flattened)
 
     # todo: I can probably just do this above while im flattening
     exit_demo = []
@@ -608,19 +609,19 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
         BEC_lengths_record_flattened_select = BEC_lengths_record_flattened_nonexit
         human_traj_overlap_flattened_select = human_traj_overlap_flattened_nonexit
 
-    if consider_exits:
+    if True:
         if difficulty == 'high':
             test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs, test_overlap_pcts = select_test_demos(
                 0, data_loc, n_desired_test_env, envs_record_flattened_select, traj_record_flattened_select, obj_func_flattened_select,
                 min_subset_constraints_record_flattened_select, human_counterfactual_trajs_flattened_select, human_traj_overlap_flattened_select, n_clusters=n_clusters)
         if difficulty == 'medium':
-            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs, test_overlap_pcts = select_test_demos(int(np.floor(n_clusters / 2)), data_loc, n_desired_test_env,
+            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs, test_overlap_pcts = select_test_demos(1, data_loc, n_desired_test_env,
                                                                                                envs_record_flattened_select,
                                                                                                traj_record_flattened_select,
                                                                                                obj_func_flattened_select, min_subset_constraints_record_flattened_select, human_counterfactual_trajs_flattened_select, human_traj_overlap_flattened_select, n_clusters=n_clusters)
 
         if difficulty == 'low':
-            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs, test_overlap_pcts = select_test_demos(n_clusters-1, data_loc, n_desired_test_env,
+            test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs, test_overlap_pcts = select_test_demos(2, data_loc, n_desired_test_env,
                                                                                                envs_record_flattened_select,
                                                                                                traj_record_flattened_select,
                                                                                                obj_func_flattened_select, min_subset_constraints_record_flattened_select, human_counterfactual_trajs_flattened_select, human_traj_overlap_flattened_select, n_clusters=n_clusters)

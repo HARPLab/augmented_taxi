@@ -21,6 +21,57 @@ from spherical_geometry import polygon as sph_polygon
 import policy_summarization.BEC_visualization as BEC_viz
 from policy_summarization import computational_geometry as cg
 
+def extract_constraints_policy_no_exit(args):
+    env_idx, data_loc, step_cost_flag = args
+    with open(mp_helpers.lookup_env_filename(data_loc, env_idx), 'rb') as f:
+        wt_vi_traj_env = pickle.load(f)
+
+    mdp = wt_vi_traj_env[0][1].mdp
+    agent = FixedPolicyAgent(wt_vi_traj_env[0][1].policy)
+    weights = mdp.weights
+
+    min_subset_constraints_record = []    # minimum BEC constraints conveyed by a trajectory
+    policy_constraints = []               # BEC constraints that define a policy (i.e. constraints arising from one action
+                                          # deviations from every possible starting state and the corresponding optimal trajectories)
+    traj_record = []
+    reward_record = []                    # the rewards associated with the optimal trajectories
+
+    for state in mdp.states:
+        constraints = []
+        traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state)
+
+        for sas_idx in range(len(traj_opt)):
+            # reward features of optimal action
+            mu_sa = mdp.accumulate_reward_features(traj_opt[sas_idx:], discount=True)
+
+            sas = traj_opt[sas_idx]
+            cur_state = sas[0]
+
+            # currently assumes that all actions are executable from all states. only considering
+            # action depth of 1 currently
+            for action in mdp.actions:
+                if action != sas[1] and action != 'exit':
+                    traj_hyp = mdp_helpers.rollout_policy(mdp, agent, cur_state=cur_state, action_seq=[action])
+                    mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
+
+                    constraints.append(mu_sa - mu_sb)
+
+            # if considering only suboptimal actions of the first sas, put the corresponding constraints
+            # toward the BEC of the policy (per definition)
+            if sas_idx == 0:
+                policy_constraints.append(
+                    BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag))
+                reward_record.append(weights.dot(mu_sa.T))
+
+        # also store the BEC constraints for optimal trajectory in each state, along with the associated
+        # demo and environment number
+        min_subset_constraints_record.append(
+            BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag))
+        traj_record.append(traj_opt)
+
+    return env_idx, traj_record, policy_constraints, min_subset_constraints_record, reward_record
+
+
 def extract_constraints_policy(args):
     env_idx, data_loc, step_cost_flag = args
     with open(mp_helpers.lookup_env_filename(data_loc, env_idx), 'rb') as f:
@@ -279,6 +330,121 @@ def obtain_potential_summary_demos(BEC_lengths_record, n_demos, n_clusters=6, ty
         covering_demos_idxs.reverse()
 
     return covering_demos_idxs
+
+def compute_counterfactuals_no_exit(args):
+    data_loc, model_idx, env_idx, w_human_normalized, env_filename, trajs_opt, min_BEC_constraints_running, step_cost_flag, summary_len, variable_filter, consider_human_models_jointly = args
+
+    with open(env_filename, 'rb') as f:
+        wt_vi_traj_env = pickle.load(f)
+
+    agent = wt_vi_traj_env[0][1]
+    weights = agent.mdp.weights
+
+    human = copy.deepcopy(agent)
+    mdp = human.mdp
+    mdp.weights = w_human_normalized
+    vi_human = ValueIteration(mdp, sample_rate=1, max_iterations=25)
+    vi_human.run_vi()
+
+    # only consider counterfactual trajectories from human models whose value iteration have converged
+    if vi_human.stabilized:
+        best_human_trajs_record_env = []
+        constraints_env = []
+        info_gain_env = []
+        human_rewards_env = []
+        overlap_in_opt_and_counterfactual_traj_env = []
+
+        for traj_idx, traj_opt in enumerate(trajs_opt):
+            constraints = []
+
+            # # a) accumulate the reward features and generate a single constraint
+            # mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
+            # traj_hyp = mdp_helpers.rollout_policy(vi_human.mdp, vi_human)
+            # mu_sb = vi_human.mdp.accumulate_reward_features(traj_hyp, discount=True)
+            # constraints.append(mu_sa - mu_sb)
+
+            # b) contrast differing expected feature counts for each state-action pair along the agent's optimal trajectory
+            best_human_trajs_record = []
+            best_human_reward = 0
+            for sas_idx in range(len(traj_opt)):
+                # reward features of optimal action
+                mu_sa = mdp.accumulate_reward_features(traj_opt[sas_idx:], discount=True)
+
+                sas = traj_opt[sas_idx]
+                cur_state = sas[0]
+
+                # obtain all optimal trajectory rollouts according to the human's model (assuming that it's a reasonable policy that has converged)
+                human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
+
+                cur_best_reward = float('-inf')
+                best_reward_features = []
+                best_human_traj = []
+                # select the human's possible trajectory that has the highest true reward (i.e. give the human's policy the benefit of the doubt)
+                for traj in human_opt_trajs:
+                    if traj[0][1] != 'exit':
+                        mu_sb = mdp.accumulate_reward_features(traj, discount=True)  # the human and agent should be working with identical mdps
+                        reward_hyp = weights.dot(mu_sb.T)
+                        if reward_hyp > cur_best_reward:
+                            cur_best_reward = reward_hyp
+                            best_reward_features = mu_sb
+                            best_human_traj = traj
+
+                # only store the reward of the full trajectory
+                if sas_idx == 0:
+                    best_human_reward = cur_best_reward
+                if len(best_human_traj) != 0:
+                    constraints.append(mu_sa - best_reward_features)
+                    best_human_trajs_record.append(best_human_traj)
+                else:
+                #     constraints.append([])
+                    best_human_trajs_record.append([])
+
+            if len(constraints) > 0:
+                constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
+
+            # don't consider environments that convey information about a variable you don't currently wish to convey
+            skip_demo = False
+            if variable_filter is not None:
+                for constraint in constraints:
+                    if abs(variable_filter.dot(constraint.T)[0, 0]) > 0:
+                        # conveys information about variable designated to be filtered out, so block this demonstration
+                        skip_demo = True
+
+            if not skip_demo:
+                info_gain = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, constraints, weights, step_cost_flag)
+            else:
+                info_gain = 0
+
+            human_rewards_env.append(best_human_reward)
+            best_human_trajs_record_env.append(best_human_trajs_record)
+            constraints_env.append(constraints)
+            info_gain_env.append(info_gain)
+
+            if not consider_human_models_jointly:
+                # you should only consider the overlap for the first counterfactual human trajectory (as opposed to
+                # counterfactual trajectories that could've arisen from states after the first state)
+                overlap_pct = BEC_helpers.calculate_counterfactual_overlap_pct(best_human_trajs_record[0], traj_opt)
+
+                overlap_in_opt_and_counterfactual_traj_env.append(overlap_pct)
+
+    # else just populate with dummy variables
+    else:
+        best_human_trajs_record_env = [[[]] for i in range(len(trajs_opt))]
+        constraints_env = [[] for i in range(len(trajs_opt))]
+        info_gain_env = [0 for i in range(len(trajs_opt))]
+        if not consider_human_models_jointly:
+            overlap_in_opt_and_counterfactual_traj_env = [float('inf') for i in range(len(trajs_opt))]
+        human_rewards_env = [np.array([[0]]) for i in range(len(trajs_opt))]
+
+    with open('models/' + data_loc + '/counterfactual_data_' + str(summary_len) + '_no_exit/model' + str(model_idx) +
+              '/cf_data_env' + str(env_idx).zfill(5) + '.pickle', 'wb') as f:
+        pickle.dump((best_human_trajs_record_env, constraints_env, human_rewards_env), f)
+
+    if consider_human_models_jointly:
+        return info_gain_env
+    else:
+        return info_gain_env, overlap_in_opt_and_counterfactual_traj_env
+
 
 def compute_counterfactuals(args):
     data_loc, model_idx, env_idx, w_human_normalized, env_filename, trajs_opt, min_BEC_constraints_running, step_cost_flag, summary_len, variable_filter, consider_human_models_jointly = args
@@ -703,7 +869,7 @@ def combine_limiting_constraints_BEC(args):
 
     return min_env_constraints_record, BEC_areas, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs
 
-def overlap_demo_BEC_and_human_posterior(args):
+def overlap_demo_BEC_and_human_posterior_no_exit(args):
     '''
     Summary: combine the most limiting constraints across all potential human models for each potential demonstration
     '''
@@ -733,7 +899,7 @@ def overlap_demo_BEC_and_human_posterior(args):
         constraints_copy = constraints.copy()
 
         if len(constraints_copy) == 0:
-            print(colored("NO CONSTRAINTS", 'r'))
+            # print(colored("NO CONSTRAINTS", 'red'))
             BEC_areas.append(posterior_sph_polygon.area())
         else:
             if len(constraints_copy) > 1:
@@ -770,7 +936,7 @@ def overlap_demo_BEC_and_human_posterior(args):
     overlap_in_opt_and_counterfactual_traj_avg = []
 
     for model_idx in range(n_sample_human_models):
-        with open('models/' + data_loc + '/counterfactual_data_' + str(counterfactual_folder_idx) + '/model' + str(
+        with open('models/' + data_loc + '/counterfactual_data_' + str(counterfactual_folder_idx) + '_no_exit/model' + str(
                 model_idx) + '/cf_data_env' + str(
            env_idx).zfill(5) + '.pickle', 'rb') as f:
             best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
@@ -824,6 +990,128 @@ def overlap_demo_BEC_and_human_posterior(args):
     #
     #
     # return BEC_areas, overlap_in_opt_and_counterfactual_traj, human_counterfactual_trajs
+
+# def overlap_demo_BEC_and_human_posterior(args):
+#     '''
+#     Summary: combine the most limiting constraints across all potential human models for each potential demonstration
+#     '''
+#     env_idx, n_sample_human_models, min_subset_constraints, prior, posterior, data_loc, counterfactual_folder_idx, weights, trajs_opt, step_cost_flag, pool = args
+#
+#     human_model = posterior
+#     human_model = BEC_helpers.remove_redundant_constraints(human_model, weights, step_cost_flag)
+#
+#     BEC_areas = []
+#
+#     # obtain spherical polygon comprising the posterior (human's model)
+#     posterior_ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(human_model)
+#     posterior_poly = Polyhedron.Polyhedron(ieqs=posterior_ieqs)
+#
+#     posterior_spherical_polygon_vertices = np.array(BEC_helpers.obtain_sph_polygon_vertices(posterior_poly, add_noise=True))  # add noise to help smooth calculation
+#     inside_posterior_sph_polygon = BEC_helpers.sample_average_model(posterior, sample_rate=100)[0][0]
+#
+#     posterior_spherical_polygon_vertices = cg.sort_points_by_angle(posterior_spherical_polygon_vertices, inside_posterior_sph_polygon)
+#     posterior_sph_polygon = sph_polygon.SphericalPolygon(posterior_spherical_polygon_vertices, inside=tuple(inside_posterior_sph_polygon))
+#
+#     # if abs(BEC_helpers.calc_solid_angles([human_model])[0] - posterior_sph_polygon.area()) > 1 or np.isnan(posterior_sph_polygon.area()):
+#     #     raise AssertionError("Too much deviation in prior BEC areas")
+#
+#     # for each possible demonstration in each environment, find the overlap in area between the spherical polygon
+#     # comprising the posterior and the counterfactual constraints created by the demonstration
+#     for constraint_idx, constraints in enumerate(min_subset_constraints):
+#         constraints_copy = constraints.copy()
+#
+#         if len(constraints_copy) == 0:
+#             print(colored("NO CONSTRAINTS", 'r'))
+#             BEC_areas.append(posterior_sph_polygon.area())
+#         else:
+#             if len(constraints_copy) > 1:
+#                 constraints_copy = BEC_helpers.remove_redundant_constraints(constraints_copy,
+#                                                                                           weights, step_cost_flag)
+#
+#             traj_ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints_copy)
+#             traj_poly = Polyhedron.Polyhedron(ieqs=traj_ieqs)  # automatically finds the minimal H-representation
+#             traj_spherical_polygon_vertices = np.array(BEC_helpers.obtain_sph_polygon_vertices(traj_poly, add_noise=True)) # add noise to help smooth calculation
+#
+#             # try to obtain an inner point using a low-fidelity sampling. if it fails, resort to a high fildelity sampling
+#             try:
+#                 inside_traj_sph_polygon = BEC_helpers.sample_average_model(constraints_copy, sample_rate=100)[0][0]
+#             except:
+#                 inside_traj_sph_polygon = BEC_helpers.sample_average_model(constraints_copy)[0][0]
+#
+#             traj_spherical_polygon_vertices = cg.sort_points_by_angle(traj_spherical_polygon_vertices, inside_traj_sph_polygon)
+#             traj_sph_polygon = sph_polygon.SphericalPolygon(traj_spherical_polygon_vertices, inside=tuple(inside_traj_sph_polygon))
+#
+#             # if abs(BEC_helpers.calc_solid_angles([constraints_copy])[0] - traj_sph_polygon.area()) > 1  or np.isnan(traj_sph_polygon.area()):
+#             #     print('env: {}, traj: {}'.format(env_idx, traj_idx))
+#             #     raise AssertionError("Too much deviation in trajectory BEC areas")
+#
+#             if traj_sph_polygon.intersects_poly(posterior_sph_polygon):
+#                 BEC_areas.append(traj_sph_polygon.intersection(posterior_sph_polygon).area())
+#             else:
+#                 BEC_areas.append(0)
+#
+#     # todo: take the average
+#     # obtain the counterfactual human trajectories that could've given rise to the most limiting constraints and
+#     # how much it overlaps the agent's optimal trajectory
+#     human_counterfactual_trajs = [[] for i in range(len(trajs_opt))]
+#     overlap_in_opt_and_counterfactual_traj = [[] for i in range(len(trajs_opt))]
+#     overlap_in_opt_and_counterfactual_traj_avg = []
+#
+#     for model_idx in range(n_sample_human_models):
+#         with open('models/' + data_loc + '/counterfactual_data_' + str(counterfactual_folder_idx) + '/model' + str(
+#                 model_idx) + '/cf_data_env' + str(
+#            env_idx).zfill(5) + '.pickle', 'rb') as f:
+#             best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
+#
+#         # for each of the minimum constraint sets in each environment (with a unique starting state)
+#         for traj_idx, traj_opt in enumerate(trajs_opt):
+#             # you should only consider the overlap for the first counterfactual human trajectory (as opposed to
+#             # counterfactual trajectories that could've arisen from states after the first state)
+#             overlap_pct = BEC_helpers.calculate_counterfactual_overlap_pct(
+#                 best_human_trajs_record_env[traj_idx][0], traj_opt)
+#
+#             overlap_in_opt_and_counterfactual_traj[traj_idx].append(overlap_pct)
+#             # store the required information for replaying the closest human counterfactual trajectory
+#             human_counterfactual_trajs[traj_idx].append(
+#                 (counterfactual_folder_idx, model_idx, env_idx, traj_idx))
+#
+#     # take the average overlap across all counterfactual trajectories that contributed to the most limiting constraints
+#     for traj_idx, overlap_pcts in enumerate(overlap_in_opt_and_counterfactual_traj):
+#         if len(overlap_pcts) > 0:
+#             overlap_in_opt_and_counterfactual_traj_avg.append(np.mean(overlap_pcts))
+#         else:
+#             overlap_in_opt_and_counterfactual_traj_avg.append(0)
+#
+#     return BEC_areas, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs
+#
+#     # # todo: take the max
+#     # # obtain the counterfactual human trajectories that could've given rise to the most limiting constraints and
+#     # # how much it overlaps the agent's optimal trajectory
+#     # human_counterfactual_trajs = [[] for i in range(len(trajs_opt))]
+#     # overlap_in_opt_and_counterfactual_traj = [float('-inf') for i in range(len(trajs_opt))]
+#     # overlap_in_opt_and_counterfactual_traj_avg = []
+#     #
+#     # for model_idx in range(n_sample_human_models):
+#     #     with open('models/' + data_loc + '/counterfactual_data_' + str(counterfactual_folder_idx) + '/model' + str(
+#     #             model_idx) + '/cf_data_env' + str(
+#     #        env_idx).zfill(5) + '.pickle', 'rb') as f:
+#     #         best_human_trajs_record_env, constraints_env = pickle.load(f)
+#     #
+#     #     # for each of the minimum constraint sets in each environment (with a unique starting state)
+#     #     for traj_idx, traj_opt in enumerate(trajs_opt):
+#     #         # you should only consider the overlap for the first counterfactual human trajectory (as opposed to
+#     #         # counterfactual trajectories that could've arisen from states after the first state)
+#     #         overlap_pct = BEC_helpers.calculate_counterfactual_overlap_pct(
+#     #             best_human_trajs_record_env[traj_idx][0], traj_opt)
+#     #
+#     #         if overlap_pct > overlap_in_opt_and_counterfactual_traj[traj_idx]:
+#     #             overlap_in_opt_and_counterfactual_traj[traj_idx] = overlap_pct
+#     #
+#     #             # store the required information for replaying the closest human counterfactual trajectory
+#     #             human_counterfactual_trajs[traj_idx] = (counterfactual_folder_idx, model_idx, env_idx, traj_idx)
+#     #
+#     #
+#     # return BEC_areas, overlap_in_opt_and_counterfactual_traj, human_counterfactual_trajs
 
 
 def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
