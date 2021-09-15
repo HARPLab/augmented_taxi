@@ -137,6 +137,16 @@ def solve_policy(args):
             walls, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code, mdp_parameters)
         mdp_parameters['walls'] = walls
         mdp_parameters['env_code'] = env_code
+    elif mdp_class == 'augmented_taxi2':
+        # note that this is specially accommodates the four hand-designed environments
+        if hardcode_envs:
+            passengers, tolls, hotswap_stations, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
+        else:
+            passengers, tolls, hotswap_stations, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code, mdp_parameters)
+        mdp_parameters['passengers'] = passengers
+        mdp_parameters['tolls'] = tolls
+        mdp_parameters['hotswap_station'] = hotswap_stations
+        mdp_parameters['env_code'] = env_code
     elif mdp_class == 'cookie_crumb':
         if hardcode_envs:
             crumbs, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
@@ -152,16 +162,7 @@ def solve_policy(args):
     wt_counter = 0
     for wt_candidate in wt_candidates:
         mdp_parameters['weights'] = wt_candidate
-        if mdp_class == 'augmented_taxi':
-            mdp_candidate = make_mdp.make_custom_mdp('augmented_taxi', mdp_parameters)
-        elif mdp_class == 'two_goal':
-            mdp_candidate = make_mdp.make_custom_mdp('two_goal', mdp_parameters)
-        elif mdp_class == 'skateboard':
-            mdp_candidate = make_mdp.make_custom_mdp('skateboard', mdp_parameters)
-        elif mdp_class == 'cookie_crumb':
-            mdp_candidate = make_mdp.make_custom_mdp('cookie_crumb', mdp_parameters)
-        else:
-            raise Exception("Unknown MDP class.")
+        mdp_candidate = make_mdp.make_custom_mdp(mdp_class, mdp_parameters)
 
         # parameters tailored to the 4x3 Augmented Taxi Domain
         vi_candidate = ValueIteration(mdp_candidate, sample_rate=1, max_iterations=25)
@@ -191,6 +192,8 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, pool
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_walls']))))
         elif mdp_class == 'cookie_crumb':
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_crumbs']))))
+        elif mdp_class == 'augmented_taxi2':
+            mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_tolls'])+1)))
         else:
             raise Exception("Unknown MDP class.")
 

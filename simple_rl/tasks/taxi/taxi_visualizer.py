@@ -138,6 +138,23 @@ def _draw_augmented_state(screen,
         dest_col = (int(max(color_ls[-i-1][0]-30, 0)), int(max(color_ls[-i-1][1]-30, 0)), int(max(color_ls[-i-1][2]-30, 0)))
         pygame.draw.rect(screen, dest_col, top_left_point + (cell_width / 6, cell_height / 6), 0)
 
+    # Draw hotswap stations.
+    if "hotswap_station" in objects.keys():
+        for f in objects["hotswap_station"]:
+            x, y = f["x"], f["y"]
+            top_left_point = int(width_buffer + cell_width * (x - 1) + 70), int(
+                height_buffer + cell_height * (taxi_oomdp.height - y) + 65)
+            dest_col = (
+            int(max(color_ls[0][0] - 30, 0)), int(max(color_ls[0][1] - 30, 0)), int(max(color_ls[0][2] - 30, 0)))
+
+            n, r = 6, cell_width / 8
+            x, y = top_left_point[0], top_left_point[1]
+            color = dest_col
+            pygame.draw.polygon(screen, color, [
+                (x + r * math.cos(2 * math.pi * i / n), y + r * math.sin(2 * math.pi * i / n))
+                for i in range(n)
+            ])
+
     # Draw new agent.
     top_left_point = width_buffer + cell_width * (agent_x - 1), height_buffer + cell_height * (
                 taxi_oomdp.height - agent_y)

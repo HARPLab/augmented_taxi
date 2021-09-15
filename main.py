@@ -36,6 +36,9 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
         with open('models/' + data_loc + '/vi_agent.pickle', 'rb') as f:
             mdp_agent, vi_agent = pickle.load(f)
     except:
+        cf_data_dir = 'models/' + data_loc
+        os.makedirs(cf_data_dir, exist_ok=True)
+
         mdp_agent = make_mdp.make_custom_mdp(mdp_class, mdp_parameters)
         vi_agent = ValueIteration(mdp_agent, sample_rate=1)
         vi_agent.run_vi()
@@ -210,181 +213,87 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
         try:
             # with open('models/' + data_loc + '/BEC_constraints_counterfactual.pickle', 'rb') as f:
             #     min_subset_constraints_record_counterfactual, BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = pickle.load(f)
-            with open('models/' + data_loc + '/BEC_constraints_counterfactual_no_exit.pickle', 'rb') as f:
-                BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = pickle.load(
-                    f)
-
-            # with open('models/' + data_loc + '/base_constraints_no_exit.pickle', 'rb') as f:
-            #     policy_constraints_no_exit, min_subset_constraints_record_no_exit, env_record_no_exit, traj_record_no_exit, reward_record_no_exit, consistent_state_count_no_exit = pickle.load(
-            #         f)
-
+            with open('models/' + data_loc + '/BEC_constraints_counterfactual.pickle', 'rb') as f:
+                BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = pickle.load(f)
         except:
-            # try not using any exits
-            try:
-                with open('models/' + data_loc + '/base_constraints_no_exit.pickle', 'rb') as f:
-                    policy_constraints_no_exit, min_subset_constraints_record_no_exit, env_record_no_exit, traj_record_no_exit, reward_record_no_exit, consistent_state_count_no_exit = pickle.load(
-                        f)
-            except:
-                # use policy BEC to extract constraints
-                policy_constraints_no_exit, min_subset_constraints_record_no_exit, env_record_no_exit, traj_record_no_exit, reward_record_no_exit, consistent_state_count_no_exit = BEC.extract_constraints(
-                    data_loc, step_cost_flag, pool, print_flag=True)
-                with open('models/' + data_loc + '/base_constraints_no_exit.pickle', 'wb') as f:
-                    pickle.dump(
-                        (policy_constraints_no_exit, min_subset_constraints_record_no_exit, env_record_no_exit,
-                         traj_record_no_exit, reward_record_no_exit,
-                         consistent_state_count_no_exit), f)
+            if not equal_prior_posterior:
+                sample_human_models = BEC_helpers.sample_human_models_uniform(posterior, n_human_models)
+                print("Obtaining counterfactual data for human models sampled from the posterior: ")
+                for model_idx, human_model in enumerate(sample_human_models):
+                    cf_data_dir = 'models/' + data_loc + '/counterfactual_data_-1/model' + str(model_idx)
+                    os.makedirs(cf_data_dir, exist_ok=True)
 
-            sample_human_models = BEC_helpers.sample_human_models_uniform(posterior, n_human_models)
-            print("Obtaining counterfactual data for human models sampled from the posterior: ")
-            for model_idx, human_model in enumerate(sample_human_models):
-                cf_data_dir = 'models/' + data_loc + '/counterfactual_data_' + str(counterfactual_folder_idx) + '_no_exit/model' + str(model_idx)
-                os.makedirs(cf_data_dir, exist_ok=True)
+                    print(colored('Model #: {}'.format(model_idx), 'red'))
+                    print(colored('Model val: {}'.format(human_model), 'red'))
 
-                print(colored('Model #: {}'.format(model_idx), 'red'))
-                print(colored('Model val: {}'.format(human_model), 'red'))
+                    # assuming that I'm considering human models jointly
+                    pool.restart()
+                    n_processed_envs = len(os.listdir(cf_data_dir))
+                    args = [
+                        (data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]),
+                         traj_record[i], posterior, step_cost_flag, counterfactual_folder_idx, None,
+                         True) for i in range(n_processed_envs, len(traj_record))]
+                    _ = list(tqdm(pool.imap(BEC.compute_counterfactuals, args), total=len(args)))
+                    pool.close()
+                    pool.join()
+                    pool.terminate()
 
-                # assuming that I'm considering human models jointly
-                pool.restart()
-                n_processed_envs = len(os.listdir(cf_data_dir))
-                args = [
-                    (data_loc, model_idx, i, human_model,
-                     mp_helpers.lookup_env_filename(data_loc, env_record[i]),
-                     traj_record[i], posterior, step_cost_flag, counterfactual_folder_idx, None,
-                     True) for i in range(n_processed_envs, len(traj_record))]
-                _ = list(tqdm(pool.imap(BEC.compute_counterfactuals_no_exit, args), total=len(args)))
-                pool.close()
-                pool.join()
-                pool.terminate()
+            # pool.restart()
+            # args = [(i, n_human_models, prior, posterior, data_loc, counterfactual_folder_idx, weights, traj_record[i], step_cost_flag, pool) for i in range(len(env_record))]
+            #
+            # print("Obtaining overlap in BEC area between posterior human model and potential test demonstrations: ")
+            # min_subset_constraints_record_counterfactual, BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(*pool.imap(BEC.combine_limiting_constraints_BEC, tqdm(args)))
+            # # min_subset_constraints_record_counterfactual, BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(*pool.imap(BEC.average_constraints_BEC, tqdm(args)))
+            # pool.close()
+            # pool.join()
+            # pool.terminate()
+            #
+            # with open('models/' + data_loc + '/BEC_constraints_counterfactual.pickle', 'wb') as f:
+            #     pickle.dump((min_subset_constraints_record_counterfactual, BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs), f)
 
-            new_min_subset_constraints_record = []
-            for env_idx, min_subset_constraints in enumerate(min_subset_constraints_record_no_exit):
-                print(env_idx)
-                constraints_env_across_models = []
-                for model_idx in range(8):
-                    with open('models/' + data_loc + '/counterfactual_data_' + str(
-                            counterfactual_folder_idx) + '_no_exit/model' + str(
-                            model_idx) + '/cf_data_env' + str(
-                        env_idx).zfill(5) + '.pickle', 'rb') as f:
-                        best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
-
-                    # only consider the first best human trajectory (no need to consider partial trajectories)
-                    constraints_env_across_models.append(constraints_env)
-
-                # reorder such that each subarray is a comparison amongst the models
-                constraints_env_across_models_per_traj = [list(itertools.chain.from_iterable(i)) for i in
-                                                          zip(*constraints_env_across_models)]
-
-                new_min_subset_constraints = []
-                for traj_idx, constraints_across_models in enumerate(constraints_env_across_models_per_traj):
-                    joint_constraints = []
-                    joint_constraints.extend(constraints_across_models)
-                    # joint_constraints.extend(min_subset_constraints[traj_idx])
-                    if len(joint_constraints) > 0:
-                        joint_constraints = BEC_helpers.remove_redundant_constraints(joint_constraints, weights, step_cost_flag)
-                    new_min_subset_constraints.append(joint_constraints)
-
-                new_min_subset_constraints_record.append(new_min_subset_constraints)
-
-            min_subset_constraints_record = new_min_subset_constraints_record
+            # # add in constraints from human counterfactuals to constraints from one-step deviations
+            # new_min_subset_constraints_record = []
+            # for env_idx, min_subset_constraints in enumerate(min_subset_constraints_record):
+            #     print(env_idx)
+            #     constraints_env_across_models = []
+            #     for model_idx in range(8):
+            #         with open('models/' + data_loc + '/counterfactual_data_' + str(counterfactual_folder_idx) + '/model' + str(
+            #                 model_idx) + '/cf_data_env' + str(
+            #             env_idx).zfill(5) + '.pickle', 'rb') as f:
+            #             best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
+            #
+            #         # only consider the first best human trajectory (no need to consider partial trajectories)
+            #         constraints_env_across_models.append(constraints_env)
+            #
+            #     # reorder such that each subarray is a comparison amongst the models
+            #     constraints_env_across_models_per_traj = [list(itertools.chain.from_iterable(i)) for i in
+            #                                                           zip(*constraints_env_across_models)]
+            #
+            #
+            #     new_min_subset_constraints = []
+            #     for traj_idx, constraints_across_models in enumerate(constraints_env_across_models_per_traj):
+            #         joint_constraints = []
+            #         joint_constraints.extend(constraints_across_models)
+            #         joint_constraints.extend(min_subset_constraints[traj_idx])
+            #         joint_constraints = BEC_helpers.remove_redundant_constraints(joint_constraints, weights, step_cost_flag)
+            #         new_min_subset_constraints.append(joint_constraints)
+            #
+            #     new_min_subset_constraints_record.append(new_min_subset_constraints)
+            #
+            # min_subset_constraints_record = new_min_subset_constraints_record
 
             # take the overlap of the human posterior with BEC of suboptimal trajectories of one-step deviation
             pool.restart()
             args = [(i, n_human_models, min_subset_constraints, prior, posterior, data_loc, counterfactual_folder_idx, weights, traj_record[i], step_cost_flag, pool)
                     for i, min_subset_constraints in enumerate(min_subset_constraints_record)]
 
-
             print("Obtaining overlap in BEC area between posterior human model and potential test demonstrations: ")
-            BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(*pool.imap(BEC.overlap_demo_BEC_and_human_posterior_no_exit, tqdm(args)))
+            BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(*pool.imap(BEC.overlap_demo_BEC_and_human_posterior, tqdm(args)))
             pool.close()
             pool.join()
             pool.terminate()
-            with open('models/' + data_loc + '/BEC_constraints_counterfactual_no_exit.pickle', 'wb') as f:
+            with open('models/' + data_loc + '/BEC_constraints_counterfactual.pickle', 'wb') as f:
                 pickle.dump((BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs), f)
-
-        # try:
-        #     # with open('models/' + data_loc + '/BEC_constraints_counterfactual.pickle', 'rb') as f:
-        #     #     min_subset_constraints_record_counterfactual, BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = pickle.load(f)
-        #     with open('models/' + data_loc + '/BEC_constraints_counterfactual.pickle', 'rb') as f:
-        #         BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = pickle.load(f)
-        # except:
-        #     if not equal_prior_posterior:
-        #         sample_human_models = BEC_helpers.sample_human_models_uniform(posterior, n_human_models)
-        #         print("Obtaining counterfactual data for human models sampled from the posterior: ")
-        #         for model_idx, human_model in enumerate(sample_human_models):
-        #             cf_data_dir = 'models/' + data_loc + '/counterfactual_data_-1/model' + str(model_idx)
-        #             os.makedirs(cf_data_dir, exist_ok=True)
-        #
-        #             print(colored('Model #: {}'.format(model_idx), 'red'))
-        #             print(colored('Model val: {}'.format(human_model), 'red'))
-        #
-        #             # assuming that I'm considering human models jointly
-        #             pool.restart()
-        #             n_processed_envs = len(os.listdir(cf_data_dir))
-        #             args = [
-        #                 (data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]),
-        #                  traj_record[i], posterior, step_cost_flag, counterfactual_folder_idx, None,
-        #                  True) for i in range(n_processed_envs, len(traj_record))]
-        #             _ = list(tqdm(pool.imap(BEC.compute_counterfactuals, args), total=len(args)))
-        #             pool.close()
-        #             pool.join()
-        #             pool.terminate()
-        #
-        #     # pool.restart()
-        #     # args = [(i, n_human_models, prior, posterior, data_loc, counterfactual_folder_idx, weights, traj_record[i], step_cost_flag, pool) for i in range(len(env_record))]
-        #     #
-        #     # print("Obtaining overlap in BEC area between posterior human model and potential test demonstrations: ")
-        #     # min_subset_constraints_record_counterfactual, BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(*pool.imap(BEC.combine_limiting_constraints_BEC, tqdm(args)))
-        #     # # min_subset_constraints_record_counterfactual, BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(*pool.imap(BEC.average_constraints_BEC, tqdm(args)))
-        #     # pool.close()
-        #     # pool.join()
-        #     # pool.terminate()
-        #     #
-        #     # with open('models/' + data_loc + '/BEC_constraints_counterfactual.pickle', 'wb') as f:
-        #     #     pickle.dump((min_subset_constraints_record_counterfactual, BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs), f)
-        #
-        #     # # add in constraints from human counterfactuals to constraints from one-step deviations
-        #     # new_min_subset_constraints_record = []
-        #     # for env_idx, min_subset_constraints in enumerate(min_subset_constraints_record):
-        #     #     print(env_idx)
-        #     #     constraints_env_across_models = []
-        #     #     for model_idx in range(8):
-        #     #         with open('models/' + data_loc + '/counterfactual_data_' + str(counterfactual_folder_idx) + '/model' + str(
-        #     #                 model_idx) + '/cf_data_env' + str(
-        #     #             env_idx).zfill(5) + '.pickle', 'rb') as f:
-        #     #             best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
-        #     #
-        #     #         # only consider the first best human trajectory (no need to consider partial trajectories)
-        #     #         constraints_env_across_models.append(constraints_env)
-        #     #
-        #     #     # reorder such that each subarray is a comparison amongst the models
-        #     #     constraints_env_across_models_per_traj = [list(itertools.chain.from_iterable(i)) for i in
-        #     #                                                           zip(*constraints_env_across_models)]
-        #     #
-        #     #
-        #     #     new_min_subset_constraints = []
-        #     #     for traj_idx, constraints_across_models in enumerate(constraints_env_across_models_per_traj):
-        #     #         joint_constraints = []
-        #     #         joint_constraints.extend(constraints_across_models)
-        #     #         joint_constraints.extend(min_subset_constraints[traj_idx])
-        #     #         joint_constraints = BEC_helpers.remove_redundant_constraints(joint_constraints, weights, step_cost_flag)
-        #     #         new_min_subset_constraints.append(joint_constraints)
-        #     #
-        #     #     new_min_subset_constraints_record.append(new_min_subset_constraints)
-        #     #
-        #     # min_subset_constraints_record = new_min_subset_constraints_record
-        #
-        #     # take the overlap of the human posterior with BEC of suboptimal trajectories of one-step deviation
-        #     pool.restart()
-        #     args = [(i, n_human_models, min_subset_constraints, prior, posterior, data_loc, counterfactual_folder_idx, weights, traj_record[i], step_cost_flag, pool)
-        #             for i, min_subset_constraints in enumerate(min_subset_constraints_record)]
-        #
-        #     print("Obtaining overlap in BEC area between posterior human model and potential test demonstrations: ")
-        #     BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(*pool.imap(BEC.overlap_demo_BEC_and_human_posterior, tqdm(args)))
-        #     pool.close()
-        #     pool.join()
-        #     pool.terminate()
-        #     with open('models/' + data_loc + '/BEC_constraints_counterfactual.pickle', 'wb') as f:
-        #         pickle.dump((BEC_lengths_record_counterfactual, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs), f)
 
         if use_counterfactual:
             test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, test_human_counterfactual_trajs, test_overlap_pcts  = \
@@ -405,6 +314,8 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
 
 if __name__ == "__main__":
     pool = Pool(min(params.n_cpu, 60))
+    os.makedirs('models/' + params.data_loc['base'], exist_ok=True)
+    os.makedirs('models/' + params.data_loc['BEC'], exist_ok=True)
 
     with open('models/' + params.data_loc['BEC'] + '/params.pickle', 'wb') as f:
         pickle.dump(params, f)

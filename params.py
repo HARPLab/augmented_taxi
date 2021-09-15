@@ -3,7 +3,8 @@ import os
 
 # mdp_class = 'augmented_taxi'
 # mdp_class = 'two_goal'
-mdp_class = 'skateboard'
+# mdp_class = 'skateboard'
+mdp_class = 'augmented_taxi2'
 # mdp_class = 'taxi'
 # mdp_class = 'cookie_crumb'
 
@@ -81,6 +82,31 @@ elif mdp_class == 'skateboard':
     posterior = [np.array([[1, 0, 0]]), np.array([[0, -1, 0]]), np.array([[0, 0, -1]])]
     # posterior = [np.array([[1, 0, 4]]), np.array([[-1, 0, -14]]), np.array([[0, 1, -1]]),
     #              np.array([[0, -1, 0]])]  # +/- 50%
+elif mdp_class == 'augmented_taxi2':
+    w = np.array([[4, -3, -1]])
+    w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order)
+
+    mdp_parameters = {
+        'agent': {'x': 4, 'y': 1, 'has_passenger': 0},
+        'walls': [{'x': 1, 'y': 3}, {'x': 1, 'y': 2}],
+        'passengers': [{'x': 4, 'y': 1, 'dest_x': 1, 'dest_y': 1, 'in_taxi': 0}],
+        'tolls': [{'x': 3, 'y': 1}],
+        'available_tolls': [{"x": 3, "y": 3}, {"x": 2, "y": 2}, {"x": 3, "y": 2}, {"x": 4, "y": 2}, {"x": 3, "y": 1}],
+        'traffic': [],  # probability that you're stuck
+        'fuel_station': [],
+        'hotswap_station': [{'x': 4, 'y': 3}],
+        'available_hotswap_stations': [{'x': 4, 'y': 3}],
+        'width': 4,
+        'height': 3,
+        'gamma': 1,
+        'env_code': [],
+        'weights': w_normalized,
+        'weights_lb': w_normalized,
+        'weights_ub': w_normalized
+    }
+
+    prior = [np.array([[1, 0, 0]]), np.array([[0, 0, -1]])]
+    posterior = [np.array([[1, 0, 0]]), np.array([[0, -1, 0]]), np.array([[0, 0, -1]])]
 elif mdp_class == 'cookie_crumb':
     w = np.array([[2.5, 1.7, -1]])
     w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order),

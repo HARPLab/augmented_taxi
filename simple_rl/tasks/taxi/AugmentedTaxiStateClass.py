@@ -42,10 +42,14 @@ class AugmentedTaxiState(OOMDPState):
 
     def __hash__(self):
 
-        state_hash = str(self.get_agent_x()) + str(self.get_agent_y()) + "00"
+        state_hash = str(self.get_agent_x()) + str(self.get_agent_y())
 
         for p in self.objects["passenger"]:
             state_hash += str(p["x"]) + str(p["y"]) + str(p["in_taxi"])
+
+        if "hotswap_station" in self.objects.keys():
+            for hs in self.objects["hotswap_station"]:
+                state_hash += str(hs["x"]) + str(hs["y"])
 
         if self.track_fuel():
             state_hash += str(self.get_fuel())

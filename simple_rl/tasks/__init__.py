@@ -23,6 +23,7 @@ from simple_rl.tasks.random.RandomStateClass import RandomState
 from simple_rl.tasks.taxi.TaxiOOMDPClass import TaxiOOMDP
 from simple_rl.tasks.taxi.TaxiStateClass import TaxiState
 from simple_rl.tasks.taxi.AugmentedTaxiOOMDPClass import AugmentedTaxiOOMDP
+from simple_rl.tasks.taxi.AugmentedTaxi2OOMDPClass import AugmentedTaxi2OOMDP
 from simple_rl.tasks.taxi.AugmentedTaxiStateClass import AugmentedTaxiState
 from simple_rl.tasks.two_goal.TwoGoalOOMDPClass import TwoGoalOOMDP
 from simple_rl.tasks.two_goal.TwoGoalStateClass import TwoGoalState

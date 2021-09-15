@@ -104,7 +104,16 @@ def _moved_off_of_toll(mdp, state, next_state):
                 return True
     return False
 
-def is_taxi_terminal_state(state):
+def _moved_off_of_hotswap_station(state, next_state):
+    for station_idx, hotswap_station in enumerate(state.get_objects_of_class("hotswap_station")):
+        # if current state's agent x, y coincides with any x, y of the hotswap stations
+        if hotswap_station.attributes['x'] == state.get_agent_x() and hotswap_station.attributes['y'] == state.get_agent_y():
+            # and if the next state's agent x, y doesn't coincide with this toll
+            if hotswap_station.attributes['x'] != next_state.get_agent_x() or hotswap_station.attributes['y'] != next_state.get_agent_y():
+                return True, station_idx
+    return False, None
+
+def is_taxi_goal_state(state):
     '''
     Args:
         state (OOMDPState)
