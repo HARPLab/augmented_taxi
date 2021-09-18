@@ -987,6 +987,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
                 else:
                     best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
 
+            print("current max info: {}".format(max_info_gain))
             if no_info_flag:
                 if variable_filter is None:
                     break

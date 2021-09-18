@@ -165,7 +165,7 @@ def solve_policy(args):
         mdp_candidate = make_mdp.make_custom_mdp(mdp_class, mdp_parameters)
 
         # parameters tailored to the 4x3 Augmented Taxi Domain
-        vi_candidate = ValueIteration(mdp_candidate, sample_rate=1, max_iterations=25)
+        vi_candidate = ValueIteration(mdp_candidate, sample_rate=1)
         iterations, value_of_init_state = vi_candidate.run_vi()
         trajectory = mdp_helpers.rollout_policy(mdp_candidate, vi_candidate)
         wt_vi_traj_env.append([wt_candidate, vi_candidate, trajectory, mdp_parameters.copy()])
