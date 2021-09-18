@@ -828,7 +828,6 @@ def overlap_demo_BEC_and_human_posterior(args):
 def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
                        n_train_demos=3, prior=[], downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001):
     summary = []
-    retry_count = 0
 
     # impose prior
     min_BEC_constraints_running = prior.copy()
@@ -841,7 +840,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
         for idx in zero_idxs:
             zero_counter[idx] += 1
 
-    variable_filter, zero_counter, retry_count = BEC_helpers.update_variable_filter(None, zero_counter, retry_count, initialize=True)
+    variable_filter, zero_counter = BEC_helpers.update_variable_filter(zero_counter)
     print('variable filter: {}'.format(variable_filter))
 
     # clear the demonstration generation log
@@ -920,12 +919,12 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
         if no_info_flag:
             # sample up two more set of human models to try and find a demonstration that will improve the human's
             # understanding before concluding that there is no more information to be conveyed
-            if retry_count == 1:
+            if variable_filter is None:
                 break
             else:
                 # no more informative demonstrations with this variable filter, so update it
-                variable_filter, zero_counter, retry_count = BEC_helpers.update_variable_filter(variable_filter, zero_counter, retry_count)
-                print(colored('Did not find any informative demonstrations. Retry count: {}'.format(retry_count), 'red'))
+                variable_filter, zero_counter = BEC_helpers.update_variable_filter(zero_counter)
+                print(colored('Did not find any informative demonstrations.', 'red'))
                 print('variable filter: {}'.format(variable_filter))
 
                 continue
@@ -989,12 +988,12 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
                     best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
 
             if no_info_flag:
-                if retry_count == 1:
+                if variable_filter is None:
                     break
                 else:
                     # no more informative demonstrations with this variable filter, so update it
-                    variable_filter, zero_counter, retry_count = BEC_helpers.update_variable_filter(variable_filter, zero_counter, retry_count)
-                    print(colored('Did not find any informative demonstrations. Retry count: {}'.format(retry_count), 'red'))
+                    variable_filter, zero_counter = BEC_helpers.update_variable_filter(zero_counter)
+                    print(colored('Did not find any informative demonstrations.', 'red'))
                     print('variable filter: {}'.format(variable_filter))
                     continue
 
@@ -1056,12 +1055,12 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
                     best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
 
             if no_info_flag:
-                if retry_count == 1:
+                if variable_filter is None:
                     break
                 else:
                     # no more informative demonstrations with this variable filter, so update it
-                    variable_filter, zero_counter, retry_count = BEC_helpers.update_variable_filter(variable_filter, zero_counter, retry_count)
-                    print(colored('Did not find any informative demonstrations. Retry count: {}'.format(retry_count), 'red'))
+                    variable_filter, zero_counter = BEC_helpers.update_variable_filter(zero_counter)
+                    print(colored('Did not find any informative demonstrations.', 'red'))
                     print('variable filter: {}'.format(variable_filter))
                     continue
 
@@ -1091,9 +1090,6 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
         # this method doesn't always finish, so save the summary along the way
         with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
             pickle.dump(summary, f)
-
-        # reset the retry count
-        retry_count = 0
 
     return summary
 

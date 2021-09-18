@@ -744,23 +744,15 @@ def calculate_counterfactual_overlap_pct(human_traj, agent_traj):
 
     return overlap_pct
 
-def update_variable_filter(variable_filter, zero_counter, retry_count, initialize=False):
+def update_variable_filter(zero_counter):
     '''
     Update the variable filter based on
     '''
 
-    if sum(zero_counter) == 0 and initialize:
+    if sum(zero_counter) == 0:
         # if none of the minimum BEC constraints have 0's along any of the variables to begin with, initialize
         # the variable filter to None
         variable_filter = None
-    elif sum(zero_counter) == 0 and not initialize:
-        # if the variables with 0's in the minimum BEC constraints now been accounted for
-        if variable_filter is None:
-            # increment the retry counter if the variable filter's already None
-            retry_count += 1
-        else:
-            # or set it to none so that the retry counter can later be incremented if necessary
-            variable_filter = None
     else:
         # if there are still 0's in the minimum BEC constraints, try to filter across those variables and update the
         # zero counter accordingly
@@ -768,4 +760,4 @@ def update_variable_filter(variable_filter, zero_counter, retry_count, initializ
         variable_filter[0, np.argmax(zero_counter)] = 1
         zero_counter[np.argmax(zero_counter)] = 0
 
-    return variable_filter, zero_counter, retry_count
+    return variable_filter, zero_counter
