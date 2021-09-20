@@ -84,6 +84,16 @@ def _draw_state(screen,
                     skateboard_oomdp.height - w_y) + 5
             pygame.draw.rect(screen, (46, 49, 49), top_left_point + (cell_width - 10, cell_height - 10), 0)
 
+        # Draw paths.
+        for p in skateboard_oomdp.paths:
+            p_x, p_y = p["x"], p["y"]
+            top_left_point = width_buffer + cell_width * (p_x - 1) + 5, height_buffer + cell_height * (
+                    skateboard_oomdp.height - p_y) + 5
+            # Clear the space and redraw with correct transparency (instead of simply adding a new layer which would
+            # affect the transparency
+            pygame.draw.rect(screen, (255, 255, 255), top_left_point + (cell_width - 10, cell_height - 10), 0)
+            pygame.gfxdraw.box(screen, top_left_point + (cell_width - 10, cell_height - 10), (220, 187, 252))
+
     # Draw the destination.
     dest_x, dest_y = skateboard_oomdp.goal["x"], skateboard_oomdp.goal["y"]
     top_left_point = int(width_buffer + cell_width * (dest_x - 1) + 37), int(

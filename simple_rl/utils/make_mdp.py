@@ -7,7 +7,7 @@ Utility for making MDP instances
 # Python imports.
 
 # Other imports.
-from simple_rl.tasks import AugmentedTaxiOOMDP, TwoGoalOOMDP, SkateboardOOMDP, TaxiOOMDP, CookieCrumbOOMDP, AugmentedTaxi2OOMDP, TwoGoal2OOMDP
+from simple_rl.tasks import AugmentedTaxiOOMDP, TwoGoalOOMDP, SkateboardOOMDP, TaxiOOMDP, CookieCrumbOOMDP, AugmentedTaxi2OOMDP, TwoGoal2OOMDP, Skateboard2OOMDP
 
 def make_custom_mdp(mdp_class, mdp_parameters):
     if mdp_class == 'augmented_taxi':
@@ -31,6 +31,10 @@ def make_custom_mdp(mdp_class, mdp_parameters):
     elif mdp_class == 'two_goal2':
         mdp_candidate = TwoGoal2OOMDP(width=mdp_parameters['width'], height=mdp_parameters['height'], agent=mdp_parameters['agent'],
                                            walls=mdp_parameters['walls'], goals=mdp_parameters['goals'], gamma=mdp_parameters['gamma'],
+                                           weights=mdp_parameters['weights'], env_code=mdp_parameters['env_code'], sample_rate=1)
+    elif mdp_class == 'skateboard2':
+        mdp_candidate = Skateboard2OOMDP(width=mdp_parameters['width'], height=mdp_parameters['height'], agent=mdp_parameters['agent'],
+                                           walls=mdp_parameters['walls'], paths=mdp_parameters['paths'], goal=mdp_parameters['goal'], skateboard=mdp_parameters['skateboard'], gamma=mdp_parameters['gamma'],
                                            weights=mdp_parameters['weights'], env_code=mdp_parameters['env_code'], sample_rate=1)
     elif mdp_class == 'taxi':
         mdp_candidate = TaxiOOMDP(width=mdp_parameters['width'], height=mdp_parameters['height'], agent=mdp_parameters['agent'],
@@ -113,6 +117,16 @@ def make_mdp_obj(mdp_class, mdp_code, mdp_parameters):
         # note that what's considered mdp_code (potentially includes both initial state and environment info) and env_code
         # (only includes environment info) will always need to be manually defined
         return requested_passenger, requested_tolls, requested_hotswap_stations, mdp_code
+    elif mdp_class == 'skateboard2':
+        available_walls = mdp_parameters['available_walls']
+        requested_walls = []
+
+        for x in range(0, len(mdp_code)):
+            entry = mdp_code[x]
+            if entry:
+                requested_walls.append(available_walls[x])
+
+        return requested_walls, mdp_code
     elif mdp_class == 'cookie_crumb':
         available_crumbs = mdp_parameters['available_crumbs']
         requested_crumbs = []

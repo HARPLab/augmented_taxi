@@ -31,6 +31,20 @@ def _is_wall_in_the_way(mdp, state, dx=0, dy=0):
             return True
     return False
 
+def agent_on_path(mdp, state):
+    '''
+    Args:
+        state (SkateboardState)
+        x (int) [agent's x]
+        y (int) [agent's y]
+
+    Returns:
+        (bool): true iff the current loc of the agent is on the path.
+    '''
+    for path in mdp.paths:
+        if path["x"] == state.objects["agent"][0]["x"] and path["y"] ==  state.objects["agent"][0]["y"]:
+            return True
+    return False
 
 def _move_skateboard_on_agent(state, dx=0, dy=0):
     '''
@@ -65,3 +79,17 @@ def is_terminal_and_goal_state(mdp, state, ref_exit_state):
         return True, False
 
     return False, False
+
+def is_goal_state(mdp, state):
+    '''
+    Args:
+        state (OOMDPState)
+
+    Returns:
+        (bool): True if the agent is at one of the goals
+    '''
+
+    if state.get_agent_x() == mdp.goal["x"] and state.get_agent_y() == mdp.goal["y"]:
+        return True
+    else:
+        return False
