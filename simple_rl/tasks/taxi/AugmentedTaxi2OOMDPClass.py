@@ -147,7 +147,7 @@ class AugmentedTaxi2OOMDP(OOMDP):
             if moved_off_of_hotswap_station:
                 hotswap_flag = 1
 
-        return np.array([[hotswap_flag, toll_flag, step_cost_flag]])
+        return np.array([[toll_flag, hotswap_flag, step_cost_flag]])
 
     def accumulate_reward_features(self, trajectory, discount=False):
         reward_features = np.zeros(self.weights.shape, dtype='int')

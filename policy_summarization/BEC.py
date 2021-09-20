@@ -292,7 +292,7 @@ def compute_counterfactuals(args):
     human = copy.deepcopy(agent)
     mdp = human.mdp
     mdp.weights = w_human_normalized
-    vi_human = ValueIteration(mdp, sample_rate=1, max_iterations=25)
+    vi_human = ValueIteration(mdp, sample_rate=1)
     vi_human.run_vi()
 
     # only consider counterfactual trajectories from human models whose value iteration have converged
@@ -948,7 +948,9 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
                 info_gains = np.array(info_gains_record)
                 traj_overlap_pcts = np.array(overlap_in_opt_and_counterfactual_traj_avg)
 
-                obj_function = info_gains * (traj_overlap_pcts + c)  # objective 2: scaled
+                # obj_function = info_gains * (traj_overlap_pcts + c)  # objective 2: scaled
+                obj_function = info_gains
+
                 # don't consider demos where there is no info gain (since info gain is a ratio of the old and new, a demo
                 # with a large overlap and an info gain of 1 (i.e. no info gain) can actually have a higher objective
                 # function than a demo with a small overlap and a info gain > 1
@@ -969,8 +971,11 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
                 for env_idx, info_gains_per_env in enumerate(info_gains_record):
                     for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
                         if info_gain_per_traj > 1:
-                            obj = info_gain_per_traj * (
-                                        overlap_in_opt_and_counterfactual_traj_avg[env_idx][traj_idx] + c)  # objective 2: scaled
+
+                            # obj = info_gain_per_traj * (
+                            #             overlap_in_opt_and_counterfactual_traj_avg[env_idx][traj_idx] + c)  # objective 2: scaled
+                            obj = info_gain_per_traj
+
                             if np.isclose(obj, best_obj):
                                 best_env_idxs.append(env_idx)
                                 best_traj_idxs.append(traj_idx)
@@ -1015,7 +1020,9 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
                 info_gains = np.array(info_gains_record)
                 traj_overlap_pcts = np.array(overlap_in_opt_and_counterfactual_traj_record)
 
-                obj_function = info_gains * (traj_overlap_pcts + c)                  # objective 2: scaled
+                # obj_function = info_gains * (traj_overlap_pcts + c)                  # objective 2: scaled
+                obj_function = info_gains
+
                 obj_function[info_gains == 1] = 0
 
                 select_model, best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
@@ -1035,7 +1042,8 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
                     for env_idx, info_gains_per_env in enumerate(info_gains_per_model):
                         for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
                             if info_gain_per_traj > 1:
-                                obj = info_gain_per_traj * (overlap_in_opt_and_counterfactual_traj_record[model_idx][env_idx][traj_idx] + c)
+                                # obj = info_gain_per_traj * (overlap_in_opt_and_counterfactual_traj_record[model_idx][env_idx][traj_idx] + c)
+                                obj = info_gain_per_traj
 
                                 if np.isclose(obj, best_obj):
                                     best_env_idxs.append(env_idx)

@@ -83,7 +83,7 @@ elif mdp_class == 'skateboard':
     # posterior = [np.array([[1, 0, 4]]), np.array([[-1, 0, -14]]), np.array([[0, 1, -1]]),
     #              np.array([[0, -1, 0]])]  # +/- 50%
 elif mdp_class == 'augmented_taxi2':
-    w = np.array([[3.5, -3, -1]])
+    w = np.array([[-3, 3.5, -1]])
     w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order)
 
     mdp_parameters = {
@@ -105,7 +105,7 @@ elif mdp_class == 'augmented_taxi2':
         'weights_ub': w_normalized
     }
 
-    prior = [np.array([[1, 0, 0]]), np.array([[0, 0, -1]])]
+    prior = [np.array([[0, 0, -1]])]
     posterior = [np.array([[1, 0, 0]]), np.array([[0, -1, 0]]), np.array([[0, 0, -1]])]
 elif mdp_class == 'cookie_crumb':
     w = np.array([[2.5, 1.7, -1]])
