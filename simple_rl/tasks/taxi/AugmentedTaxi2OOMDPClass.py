@@ -388,7 +388,7 @@ class AugmentedTaxi2OOMDP(OOMDP):
         return next_state
 
     def measure_env_complexity(self):
-        # currently only measuring the number of tolls in the environment
+        # measure the number of tolls and initial hotswap stations in the environment
         return len(self.tolls) + len(self.init_state.objects['hotswap_station'])
 
     def measure_visual_dissimilarity(self, start_state, other_mdp, other_start_state):

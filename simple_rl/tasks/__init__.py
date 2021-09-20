@@ -26,6 +26,7 @@ from simple_rl.tasks.taxi.AugmentedTaxiOOMDPClass import AugmentedTaxiOOMDP
 from simple_rl.tasks.taxi.AugmentedTaxi2OOMDPClass import AugmentedTaxi2OOMDP
 from simple_rl.tasks.taxi.AugmentedTaxiStateClass import AugmentedTaxiState
 from simple_rl.tasks.two_goal.TwoGoalOOMDPClass import TwoGoalOOMDP
+from simple_rl.tasks.two_goal.TwoGoal2OOMDPClass import TwoGoal2OOMDP
 from simple_rl.tasks.two_goal.TwoGoalStateClass import TwoGoalState
 from simple_rl.tasks.skateboard.SkateboardOOMDPClass import SkateboardOOMDP
 from simple_rl.tasks.skateboard.SkateboardStateClass import SkateboardState

@@ -7,7 +7,7 @@ Utility for making MDP instances
 # Python imports.
 
 # Other imports.
-from simple_rl.tasks import AugmentedTaxiOOMDP, TwoGoalOOMDP, SkateboardOOMDP, TaxiOOMDP, CookieCrumbOOMDP, AugmentedTaxi2OOMDP
+from simple_rl.tasks import AugmentedTaxiOOMDP, TwoGoalOOMDP, SkateboardOOMDP, TaxiOOMDP, CookieCrumbOOMDP, AugmentedTaxi2OOMDP, TwoGoal2OOMDP
 
 def make_custom_mdp(mdp_class, mdp_parameters):
     if mdp_class == 'augmented_taxi':
@@ -27,6 +27,10 @@ def make_custom_mdp(mdp_class, mdp_parameters):
         mdp_candidate = AugmentedTaxi2OOMDP(width=mdp_parameters['width'], height=mdp_parameters['height'], agent=mdp_parameters['agent'],
                                            walls=mdp_parameters['walls'], passengers=mdp_parameters['passengers'], tolls=mdp_parameters['tolls'],
                                            traffic=mdp_parameters['traffic'], fuel_stations=mdp_parameters['fuel_station'], hotswap_stations=mdp_parameters['hotswap_station'], gamma=mdp_parameters['gamma'],
+                                           weights=mdp_parameters['weights'], env_code=mdp_parameters['env_code'], sample_rate=1)
+    elif mdp_class == 'two_goal2':
+        mdp_candidate = TwoGoal2OOMDP(width=mdp_parameters['width'], height=mdp_parameters['height'], agent=mdp_parameters['agent'],
+                                           walls=mdp_parameters['walls'], goals=mdp_parameters['goals'], gamma=mdp_parameters['gamma'],
                                            weights=mdp_parameters['weights'], env_code=mdp_parameters['env_code'], sample_rate=1)
     elif mdp_class == 'taxi':
         mdp_candidate = TaxiOOMDP(width=mdp_parameters['width'], height=mdp_parameters['height'], agent=mdp_parameters['agent'],
@@ -64,7 +68,7 @@ def make_mdp_obj(mdp_class, mdp_code, mdp_parameters):
         # note that what's considered mdp_code (potentially includes both initial state and environment info) and env_code
         # (only includes environment info) will always need to be manually defined
         return requested_passenger, requested_tolls, mdp_code
-    elif mdp_class == 'two_goal':
+    elif mdp_class == 'two_goal' or mdp_class == 'two_goal2':
         available_walls = mdp_parameters['available_walls']
         requested_walls = []
 

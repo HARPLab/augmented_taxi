@@ -4,7 +4,8 @@ import os
 # mdp_class = 'augmented_taxi'
 # mdp_class = 'two_goal'
 # mdp_class = 'skateboard'
-mdp_class = 'augmented_taxi2'
+# mdp_class = 'augmented_taxi2'
+mdp_class = 'two_goal2'
 # mdp_class = 'taxi'
 # mdp_class = 'cookie_crumb'
 
@@ -107,6 +108,29 @@ elif mdp_class == 'augmented_taxi2':
 
     prior = [np.array([[0, 0, -1]])]
     posterior = [np.array([[1, 0, 0]]), np.array([[0, -1, 0]]), np.array([[0, 0, -1]])]
+elif mdp_class == 'two_goal2':
+    w = np.array([[7.25, 10.5, -1]])
+    w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order)
+
+    mdp_parameters = {
+        'agent': {'x': 3, 'y': 5},
+        'goals': [{'x': 1, 'y': 1}, {'x': 5, 'y': 2}],
+        'walls': [],
+        'available_walls': [{'x': 1, 'y': 4}, {'x': 2, 'y': 4}, {'x': 3, 'y': 4}, {'x': 3, 'y': 2}, {'x': 4, 'y': 2},
+                            {'x': 5, 'y': 3}],
+        'width': 5,
+        'height': 5,
+        'gamma': 1,
+        'env_code': [],
+        'weights': w_normalized,
+        'weights_lb': w_normalized,
+        'weights_ub': w_normalized
+    }
+
+    prior = [np.array([[1, 0, 0]]), np.array([[0, 1, 0]]), np.array([[0, 0, -1]])]
+    posterior = [np.array([[1, 0, 0]]), np.array([[0, 1, 0]]), np.array([[0, 0, -1]])]
+    # posterior = [np.array([[1, 0, 3]]), np.array([[-1, 0, -11]]), np.array([[0, 1, 3]]),
+    #              np.array([[0, -1, -16]])]  # +/- 50%
 elif mdp_class == 'cookie_crumb':
     w = np.array([[2.5, 1.7, -1]])
     w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order),

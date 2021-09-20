@@ -123,7 +123,7 @@ def solve_policy(args):
         mdp_parameters['passengers'] = passengers
         mdp_parameters['tolls'] = tolls
         mdp_parameters['env_code'] = env_code
-    elif mdp_class == 'two_goal':
+    elif mdp_class == 'two_goal' or 'two_goal2':
         if hardcode_envs:
             walls, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
         else:
@@ -186,7 +186,7 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, pool
         # generate codes that govern the binary status of available tolls, walls, or crumbs
         if mdp_class == 'augmented_taxi':
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_tolls']))))
-        elif mdp_class == 'two_goal':
+        elif mdp_class == 'two_goal' or mdp_class == 'two_goal2':
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_walls']))))
         elif mdp_class == 'skateboard':
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_walls']))))
