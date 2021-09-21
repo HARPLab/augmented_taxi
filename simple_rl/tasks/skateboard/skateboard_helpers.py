@@ -31,6 +31,22 @@ def _is_wall_in_the_way(mdp, state, dx=0, dy=0):
             return True
     return False
 
+def _is_path_in_the_way(mdp, state, dx=0, dy=0):
+    '''
+    Args:
+        state (SkateboardState)
+        dx (int) [optional]
+        dy (int) [optional]
+
+    Returns:
+        (bool): true iff the new loc of the agent is occupied by a wall.
+    '''
+    for path in mdp.paths:
+        if path["x"] == state.objects["agent"][0]["x"] + dx and \
+            path["y"] == state.objects["agent"][0]["y"] + dy:
+            return True
+    return False
+
 def agent_on_path(mdp, state):
     '''
     Args:

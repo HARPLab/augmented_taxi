@@ -92,6 +92,38 @@ class Skateboard2OOMDP(OOMDP):
         # feature-based reward
         return self.weights.dot(self.compute_reward_features(state, action, next_state).T)
 
+    # allowing skateboard on the path
+    # def compute_reward_features(self, state, action, next_state=None):
+    #     '''
+    #     Args:
+    #         state (OOMDP State)
+    #         action (str)
+    #         next_state (OOMDP State)
+    #
+    #     Returns
+    #         array of reward features
+    #     '''
+    #     skateboard_step_cost_flag = 0
+    #     path_step_cost_flag = 0
+    #     # base_step_cost_flag = 0
+    #     base_step_cost_flag = 1
+    #
+    #     agent = state.get_first_obj_of_class("agent")
+    #
+    #     # movement is penalized differently based on whether you have the skateboard or not
+    #     if action == 'up' or action == 'down' or action == 'left' or action == 'right':
+    #         if agent.get_attribute("has_skateboard") == 1:
+    #             skateboard_step_cost_flag = 1
+    #         if skateboard_helpers.agent_on_path(self, state):
+    #             path_step_cost_flag = 1
+    #
+    #     # # movement is penalized differently based on whether you have the skateboard or not
+    #     # if action == 'up' or action == 'down' or action == 'left' or action == 'right':
+    #     #     if agent.get_attribute("has_skateboard") == 1:
+    #     #         skateboard_step_cost_flag = 1
+    #
+    #     return np.array([[skateboard_step_cost_flag, path_step_cost_flag, base_step_cost_flag]])
+
     def compute_reward_features(self, state, action, next_state=None):
         '''
         Args:
@@ -104,8 +136,7 @@ class Skateboard2OOMDP(OOMDP):
         '''
         skateboard_step_cost_flag = 0
         path_step_cost_flag = 0
-        # base_step_cost_flag = 0
-        base_step_cost_flag = 1
+        base_step_cost_flag = 0
 
         agent = state.get_first_obj_of_class("agent")
 
@@ -113,13 +144,14 @@ class Skateboard2OOMDP(OOMDP):
         if action == 'up' or action == 'down' or action == 'left' or action == 'right':
             if agent.get_attribute("has_skateboard") == 1:
                 skateboard_step_cost_flag = 1
-            if skateboard_helpers.agent_on_path(self, state):
+            elif skateboard_helpers.agent_on_path(self, state):
                 path_step_cost_flag = 1
-
-        # # movement is penalized differently based on whether you have the skateboard or not
-        # if action == 'up' or action == 'down' or action == 'left' or action == 'right':
-        #     if agent.get_attribute("has_skateboard") == 1:
-        #         skateboard_step_cost_flag = 1
+            else:
+                base_step_cost_flag = 1
+        elif action == 'pickup' or action == 'dropoff':
+            skateboard_step_cost_flag = 1
+        else:
+            base_step_cost_flag = 1
 
         return np.array([[skateboard_step_cost_flag, path_step_cost_flag, base_step_cost_flag]])
 
@@ -252,6 +284,10 @@ class Skateboard2OOMDP(OOMDP):
 
         if skateboard_helpers._is_wall_in_the_way(self, state, dx=dx, dy=dy):
             # There's a wall in the way.
+            return state
+
+        if skateboard_helpers._is_path_in_the_way(self, state, dx=dx, dy=dy) and state.get_first_obj_of_class("agent").get_attribute("has_skateboard"):
+            # Skateboard is not allowed on path
             return state
 
         next_state = copy.deepcopy(state)
