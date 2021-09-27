@@ -825,22 +825,24 @@ def overlap_demo_BEC_and_human_posterior(args):
     #
     # return BEC_areas, overlap_in_opt_and_counterfactual_traj, human_counterfactual_trajs
 
-def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
+def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
                        n_train_demos=3, prior=[], downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001):
     summary = []
 
     # impose prior
     min_BEC_constraints_running = prior.copy()
 
-    # count how many zeros are present for each reward weight (i.e. variable) in the minimum BEC constraints
-    # (which are obtained using one-step deviations). such constraints suggest the opportunity for variable scaffolding
-    zero_counter = np.zeros(weights.shape[1])
-    for constraint in min_BEC_constraints:
-        zero_idxs = np.where(constraint == 0)[1]
-        for idx in zero_idxs:
-            zero_counter[idx] += 1
+    # count how many nonzero constraints are present for each reward weight (i.e. variable) in the minimum BEC constraints
+    # (which are obtained using one-step deviations). mask variables in order of fewest nonzero constraints for variable scaffolding
+    # rationale: the variable with the most nonzero constraints, often the step cost, serves as a good reference/ratio variable
+    min_subset_constraints_record_flattened = [item for sublist in min_subset_constraints_record for item in sublist]
+    min_subset_constraints_record_flattened = [item for sublist in min_subset_constraints_record_flattened for item in sublist]
+    min_subset_constraints_record_array = np.array(min_subset_constraints_record_flattened)
+    nonzero_counter = (min_subset_constraints_record_array != 0).astype(float)
+    nonzero_counter = np.sum(nonzero_counter, axis=0)
+    nonzero_counter = nonzero_counter.flatten()
 
-    variable_filter, zero_counter = BEC_helpers.update_variable_filter(zero_counter)
+    variable_filter, nonzero_counter = BEC_helpers.update_variable_filter(nonzero_counter)
     print('variable filter: {}'.format(variable_filter))
 
     # clear the demonstration generation log
@@ -923,7 +925,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
                 break
             else:
                 # no more informative demonstrations with this variable filter, so update it
-                variable_filter, zero_counter = BEC_helpers.update_variable_filter(zero_counter)
+                variable_filter, nonzero_counter = BEC_helpers.update_variable_filter(nonzero_counter)
                 print(colored('Did not find any informative demonstrations.', 'red'))
                 print('variable filter: {}'.format(variable_filter))
 
@@ -998,7 +1000,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
                     break
                 else:
                     # no more informative demonstrations with this variable filter, so update it
-                    variable_filter, zero_counter = BEC_helpers.update_variable_filter(zero_counter)
+                    variable_filter, nonzero_counter = BEC_helpers.update_variable_filter(nonzero_counter)
                     print(colored('Did not find any informative demonstrations.', 'red'))
                     print('variable filter: {}'.format(variable_filter))
                     continue
@@ -1068,7 +1070,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints
                     break
                 else:
                     # no more informative demonstrations with this variable filter, so update it
-                    variable_filter, zero_counter = BEC_helpers.update_variable_filter(zero_counter)
+                    variable_filter, nonzero_counter = BEC_helpers.update_variable_filter(nonzero_counter)
                     print(colored('Did not find any informative demonstrations.', 'red'))
                     print('variable filter: {}'.format(variable_filter))
                     continue

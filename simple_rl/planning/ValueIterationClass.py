@@ -16,7 +16,7 @@ from simple_rl.planning.PlannerClass import Planner
 
 class ValueIteration(Planner):
 
-    def __init__(self, mdp, name="value_iter", delta=0.0001, max_iterations=500, sample_rate=5):
+    def __init__(self, mdp, name="value_iter", delta=0.0001, max_iterations=1000, sample_rate=5):
         '''
         Args:
             mdp (MDP)

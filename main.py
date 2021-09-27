@@ -102,7 +102,7 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
     except:
         # SCOT_summary = BEC.obtain_SCOT_summaries(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag)
 
-        BEC_summary = BEC.obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count, n_train_demos=n_train_demos, prior=prior)
+        BEC_summary = BEC.obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count, n_train_demos=n_train_demos, prior=prior)
 
         if len(BEC_summary) > 0:
             with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
