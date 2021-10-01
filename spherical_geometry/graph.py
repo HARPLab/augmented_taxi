@@ -447,8 +447,24 @@ class Graph:
 
         poly = self._trace()
         # If multiple polygons, the inside point can only be in one
-        if len(poly._polygons)==1 and not self._contains_inside_point(poly):
-            poly = poly.invert_polygon()
+        # if len(poly._polygons)==1 and not self._contains_inside_point(poly):
+        #     poly = poly.invert_polygon()
+
+        # if the inside point of the intersection polygon doesn't align with any of the inside points of the parents'
+        # inside points, then the inside point of the intersection polygon was incorrect.
+        #
+        # you can simply flip the inside point of the intersection polygon since the original inside point was taken
+        # to be the mean of the vertices (such that flipping the inside point should guarantee that you're inside the
+        # complementary polygon). this situation likely only arises when the intersection polygon is a half-sphere
+        if len(poly._polygons)==1:
+            curr_polygon = poly._polygons[0]
+            curr_inside_point = curr_polygon.inside
+
+            for source_polygon in self._source_polygons:
+                if curr_inside_point.dot(source_polygon.inside) < 0:
+                    curr_polygon._inside = curr_inside_point * -1
+                    break
+
         return poly
 
     def disjoint_polygons(self):

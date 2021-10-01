@@ -6,6 +6,8 @@ import sage.geometry.polyhedron.base as Polyhedron
 from termcolor import colored
 import difflib
 import sklearn
+import itertools
+import pickle
 
 from policy_summarization import computational_geometry as cg
 
@@ -445,7 +447,7 @@ def obtain_sph_polygon_vertices(polyhedron, add_noise=False):
         if (vertex != np.array([0, 0, 0])).any() and lies_on_constraint_plane(polyhedron, vertex):
             vertex_normed = vertex / np.linalg.norm(vertex)
             if add_noise:
-                spherical_polygon_vertices.append(vertex_normed + 0.0001)
+                spherical_polygon_vertices.append(vertex_normed + np.random.sample(3) * 0.001)
             else:
                 spherical_polygon_vertices.append(vertex_normed)
 
@@ -761,3 +763,33 @@ def update_variable_filter(nonzero_counter):
         nonzero_counter[np.argmin(nonzero_counter)] = float('inf')
 
     return variable_filter, nonzero_counter
+
+def combine_counterfactual_constraints(args):
+    '''
+    Combine combine the human counterfactual (constraints_env) and one-step deviation (min_subset_constraints) constraints
+    '''
+    data_loc, env_idx, min_subset_constraints, n_human_models, counterfactual_folder_idx, weights, step_cost_flag = args
+
+    constraints_env_across_models = []
+    for model_idx in range(n_human_models):
+        with open('models/' + data_loc + '/counterfactual_data_' + str(counterfactual_folder_idx) + '/model' + str(
+                model_idx) + '/cf_data_env' + str(
+            env_idx).zfill(5) + '.pickle', 'rb') as f:
+            best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
+
+        # only consider the first best human trajectory (no need to consider partial trajectories)
+        constraints_env_across_models.append(constraints_env)
+
+    # reorder such that each subarray is a comparison amongst the models
+    constraints_env_across_models_per_traj = [list(itertools.chain.from_iterable(i)) for i in
+                                              zip(*constraints_env_across_models)]
+
+    new_min_subset_constraints = []
+    for traj_idx, constraints_across_models in enumerate(constraints_env_across_models_per_traj):
+        joint_constraints = []
+        joint_constraints.extend(constraints_across_models)
+        joint_constraints.extend(min_subset_constraints[traj_idx])
+        joint_constraints = remove_redundant_constraints(joint_constraints, weights, step_cost_flag)
+        new_min_subset_constraints.append(joint_constraints)
+
+    return new_min_subset_constraints

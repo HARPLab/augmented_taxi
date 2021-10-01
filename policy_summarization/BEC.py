@@ -494,7 +494,14 @@ def average_constraints_BEC(args):
     posterior_poly = Polyhedron.Polyhedron(ieqs=posterior_ieqs)
 
     posterior_spherical_polygon_vertices = np.array(BEC_helpers.obtain_sph_polygon_vertices(posterior_poly, add_noise=True))  # add noise to help smooth calculation
-    inside_posterior_sph_polygon = BEC_helpers.sample_average_model(posterior, sample_rate=100)[0][0]
+    if len(human_model) > 1:
+        # taking the mean of vertices only works if they're not all lying on a shared plane (else there is
+        # ambiguity)
+        inside_posterior_sph_polygon = cg.compute_average_point(posterior_spherical_polygon_vertices)
+    else:
+        # if there is only a single constraint/plane (i.e. a half sphere), you can simply take the plane normal
+        # as the inside point (with some noise to prevent out of domain issues with trig function)
+        inside_posterior_sph_polygon = human_model[0][0] + np.random.sample(3) * 0.001
 
     posterior_spherical_polygon_vertices = cg.sort_points_by_angle(posterior_spherical_polygon_vertices, inside_posterior_sph_polygon)
     posterior_sph_polygon = sph_polygon.SphericalPolygon(posterior_spherical_polygon_vertices, inside=tuple(inside_posterior_sph_polygon))
@@ -528,7 +535,14 @@ def average_constraints_BEC(args):
                 traj_poly = Polyhedron.Polyhedron(ieqs=traj_ieqs)  # automatically finds the minimal H-representation
                 traj_spherical_polygon_vertices = np.array(BEC_helpers.obtain_sph_polygon_vertices(traj_poly, add_noise=True)) # add noise to help smooth calculation
 
-                inside_traj_sph_polygon = BEC_helpers.sample_average_model(all_env_constraints_joint_traj, sample_rate=100)[0][0]
+                if len(all_env_constraints_joint_traj) > 1:
+                    # taking the mean of vertices only works if they're not all lying on a shared plane (else there is
+                    # ambiguity)
+                    inside_traj_sph_polygon = cg.compute_average_point(traj_spherical_polygon_vertices)
+                else:
+                    # if there is only a single constraint/plane (i.e. a half sphere), you can simply take the plane normal
+                    # as the inside point (with some noise to prevent out of domain issues with trig function)
+                    inside_traj_sph_polygon = all_env_constraints_joint_traj + np.random.sample(3) * 0.001
 
                 traj_spherical_polygon_vertices = cg.sort_points_by_angle(traj_spherical_polygon_vertices, inside_traj_sph_polygon)
                 traj_sph_polygon = sph_polygon.SphericalPolygon(traj_spherical_polygon_vertices, inside=tuple(inside_traj_sph_polygon))
@@ -611,7 +625,14 @@ def combine_limiting_constraints_BEC(args):
     posterior_poly = Polyhedron.Polyhedron(ieqs=posterior_ieqs)
 
     posterior_spherical_polygon_vertices = np.array(BEC_helpers.obtain_sph_polygon_vertices(posterior_poly, add_noise=True))  # add noise to help smooth calculation
-    inside_posterior_sph_polygon = BEC_helpers.sample_average_model(posterior, sample_rate=100)[0][0]
+    if len(human_model) > 1:
+        # taking the mean of vertices only works if they're not all lying on a shared plane (else there is
+        # ambiguity)
+        inside_posterior_sph_polygon = cg.compute_average_point(posterior_spherical_polygon_vertices)
+    else:
+        # if there is only a single constraint/plane (i.e. a half sphere), you can simply take the plane normal
+        # as the inside point (with some noise to prevent out of domain issues with trig function)
+        inside_posterior_sph_polygon = human_model[0][0] + np.random.sample(3) * 0.001
 
     posterior_spherical_polygon_vertices = cg.sort_points_by_angle(posterior_spherical_polygon_vertices, inside_posterior_sph_polygon)
     posterior_sph_polygon = sph_polygon.SphericalPolygon(posterior_spherical_polygon_vertices, inside=tuple(inside_posterior_sph_polygon))
@@ -637,7 +658,14 @@ def combine_limiting_constraints_BEC(args):
             traj_poly = Polyhedron.Polyhedron(ieqs=traj_ieqs)  # automatically finds the minimal H-representation
             traj_spherical_polygon_vertices = np.array(BEC_helpers.obtain_sph_polygon_vertices(traj_poly, add_noise=True)) # add noise to help smooth calculation
 
-            inside_traj_sph_polygon = BEC_helpers.sample_average_model(all_env_constraints_joint_traj, sample_rate=100)[0][0]
+            if len(all_env_constraints_joint_traj) > 1:
+                # taking the mean of vertices only works if they're not all lying on a shared plane (else there is
+                # ambiguity)
+                inside_traj_sph_polygon = cg.compute_average_point(traj_spherical_polygon_vertices)
+            else:
+                # if there is only a single constraint/plane (i.e. a half sphere), you can simply take the plane normal
+                # as the inside point (with some noise to prevent out of domain issues with trig function)
+                inside_traj_sph_polygon = all_env_constraints_joint_traj + np.random.sample(3) * 0.001
 
             traj_spherical_polygon_vertices = cg.sort_points_by_angle(traj_spherical_polygon_vertices, inside_traj_sph_polygon)
             traj_sph_polygon = sph_polygon.SphericalPolygon(traj_spherical_polygon_vertices, inside=tuple(inside_traj_sph_polygon))
@@ -719,7 +747,14 @@ def overlap_demo_BEC_and_human_posterior(args):
     posterior_poly = Polyhedron.Polyhedron(ieqs=posterior_ieqs)
 
     posterior_spherical_polygon_vertices = np.array(BEC_helpers.obtain_sph_polygon_vertices(posterior_poly, add_noise=True))  # add noise to help smooth calculation
-    inside_posterior_sph_polygon = BEC_helpers.sample_average_model(posterior, sample_rate=100)[0][0]
+    if len(posterior) > 1:
+        # taking the mean of vertices only works if they're not all lying on a shared plane (else there is
+        # ambiguity)
+        inside_posterior_sph_polygon = cg.compute_average_point(posterior_spherical_polygon_vertices)
+    else:
+        # if there is only a single constraint/plane (i.e. a half sphere), you can simply take the plane normal
+        # as the inside point (with some noise to prevent out of domain issues with trig function)
+        inside_posterior_sph_polygon = human_model[0][0] + np.random.sample(3) * 0.001
 
     posterior_spherical_polygon_vertices = cg.sort_points_by_angle(posterior_spherical_polygon_vertices, inside_posterior_sph_polygon)
     posterior_sph_polygon = sph_polygon.SphericalPolygon(posterior_spherical_polygon_vertices, inside=tuple(inside_posterior_sph_polygon))
@@ -733,66 +768,74 @@ def overlap_demo_BEC_and_human_posterior(args):
         constraints_copy = constraints.copy()
 
         if len(constraints_copy) == 0:
-            print(colored("NO CONSTRAINTS", 'r'))
+            print(colored("NO CONSTRAINTS", 'red'))
             BEC_areas.append(posterior_sph_polygon.area())
         else:
             if len(constraints_copy) > 1:
                 constraints_copy = BEC_helpers.remove_redundant_constraints(constraints_copy,
-                                                                                          weights, step_cost_flag)
+                                                                            weights, step_cost_flag)
 
             traj_ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints_copy)
             traj_poly = Polyhedron.Polyhedron(ieqs=traj_ieqs)  # automatically finds the minimal H-representation
-            traj_spherical_polygon_vertices = np.array(BEC_helpers.obtain_sph_polygon_vertices(traj_poly, add_noise=True)) # add noise to help smooth calculation
+            traj_spherical_polygon_vertices = np.array(BEC_helpers.obtain_sph_polygon_vertices(traj_poly,
+                                                                                               add_noise=True))  # add noise to help smooth calculation
+            if len(constraints_copy) > 1:
+                # taking the mean of vertices only works if they're not all lying on a shared plane (else there is
+                # ambiguity)
+                inside_traj_sph_polygon = cg.compute_average_point(traj_spherical_polygon_vertices)
+            else:
+                # if there is only a single constraint/plane (i.e. a half sphere), you can simply take the plane normal
+                # as the inside point (with some noise to prevent out of domain issues with trig function)
+                inside_traj_sph_polygon = constraints_copy[0][0] + np.random.sample(3) * 0.001
 
-            # try to obtain an inner point using a low-fidelity sampling. if it fails, resort to a high fildelity sampling
-            try:
-                inside_traj_sph_polygon = BEC_helpers.sample_average_model(constraints_copy, sample_rate=100)[0][0]
-            except:
-                inside_traj_sph_polygon = BEC_helpers.sample_average_model(constraints_copy)[0][0]
-
-            traj_spherical_polygon_vertices = cg.sort_points_by_angle(traj_spherical_polygon_vertices, inside_traj_sph_polygon)
-            traj_sph_polygon = sph_polygon.SphericalPolygon(traj_spherical_polygon_vertices, inside=tuple(inside_traj_sph_polygon))
+            traj_spherical_polygon_vertices = cg.sort_points_by_angle(traj_spherical_polygon_vertices,
+                                                                      inside_traj_sph_polygon)
+            traj_sph_polygon = sph_polygon.SphericalPolygon(traj_spherical_polygon_vertices,
+                                                        inside=tuple(inside_traj_sph_polygon))
 
             # if abs(BEC_helpers.calc_solid_angles([constraints_copy])[0] - traj_sph_polygon.area()) > 1  or np.isnan(traj_sph_polygon.area()):
             #     print('env: {}, traj: {}'.format(env_idx, traj_idx))
             #     raise AssertionError("Too much deviation in trajectory BEC areas")
 
             if traj_sph_polygon.intersects_poly(posterior_sph_polygon):
+                if traj_sph_polygon.intersection(posterior_sph_polygon).area() > 1.05 * min(traj_sph_polygon.area(), posterior_sph_polygon.area()):
+                    # the intersection shouldn't be larger than the smaller of the two constituent areas
+                    raise AssertionError("bad intersection")
                 BEC_areas.append(traj_sph_polygon.intersection(posterior_sph_polygon).area())
             else:
                 BEC_areas.append(0)
 
-    # todo: take the average
+    # todo: take the average (this is likely no longer needed)
     # obtain the counterfactual human trajectories that could've given rise to the most limiting constraints and
     # how much it overlaps the agent's optimal trajectory
     human_counterfactual_trajs = [[] for i in range(len(trajs_opt))]
     overlap_in_opt_and_counterfactual_traj = [[] for i in range(len(trajs_opt))]
     overlap_in_opt_and_counterfactual_traj_avg = []
 
-    for model_idx in range(n_sample_human_models):
-        with open('models/' + data_loc + '/counterfactual_data_' + str(counterfactual_folder_idx) + '/model' + str(
-                model_idx) + '/cf_data_env' + str(
-           env_idx).zfill(5) + '.pickle', 'rb') as f:
-            best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
-
-        # for each of the minimum constraint sets in each environment (with a unique starting state)
-        for traj_idx, traj_opt in enumerate(trajs_opt):
-            # you should only consider the overlap for the first counterfactual human trajectory (as opposed to
-            # counterfactual trajectories that could've arisen from states after the first state)
-            overlap_pct = BEC_helpers.calculate_counterfactual_overlap_pct(
-                best_human_trajs_record_env[traj_idx][0], traj_opt)
-
-            overlap_in_opt_and_counterfactual_traj[traj_idx].append(overlap_pct)
-            # store the required information for replaying the closest human counterfactual trajectory
-            human_counterfactual_trajs[traj_idx].append(
-                (counterfactual_folder_idx, model_idx, env_idx, traj_idx))
-
-    # take the average overlap across all counterfactual trajectories that contributed to the most limiting constraints
-    for traj_idx, overlap_pcts in enumerate(overlap_in_opt_and_counterfactual_traj):
-        if len(overlap_pcts) > 0:
-            overlap_in_opt_and_counterfactual_traj_avg.append(np.mean(overlap_pcts))
-        else:
-            overlap_in_opt_and_counterfactual_traj_avg.append(0)
+    # for model_idx in range(n_sample_human_models):
+    #     with open('models/' + data_loc + '/counterfactual_data_' + str(counterfactual_folder_idx) + '/model' + str(
+    #             model_idx) + '/cf_data_env' + str(
+    #        env_idx).zfill(5) + '.pickle', 'rb') as f:
+    #         best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
+    #
+    #     # for each of the minimum constraint sets in each environment (with a unique starting state)
+    #     for traj_idx, traj_opt in enumerate(trajs_opt):
+    #         # you should only consider the overlap for the first counterfactual human trajectory (as opposed to
+    #         # counterfactual trajectories that could've arisen from states after the first state)
+    #         overlap_pct = BEC_helpers.calculate_counterfactual_overlap_pct(
+    #             best_human_trajs_record_env[traj_idx][0], traj_opt)
+    #
+    #         overlap_in_opt_and_counterfactual_traj[traj_idx].append(overlap_pct)
+    #         # store the required information for replaying the closest human counterfactual trajectory
+    #         human_counterfactual_trajs[traj_idx].append(
+    #             (counterfactual_folder_idx, model_idx, env_idx, traj_idx))
+    #
+    # # take the average overlap across all counterfactual trajectories that contributed to the most limiting constraints
+    # for traj_idx, overlap_pcts in enumerate(overlap_in_opt_and_counterfactual_traj):
+    #     if len(overlap_pcts) > 0:
+    #         overlap_in_opt_and_counterfactual_traj_avg.append(np.mean(overlap_pcts))
+    #     else:
+    #         overlap_in_opt_and_counterfactual_traj_avg.append(0)
 
     return BEC_areas, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs
 
@@ -890,7 +933,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
 
                 info_gains_record.append(info_gain_envs)
             else:
-                pool.restart() # todo: maybe there's no need to terminate and restart pool multiple times in the same function
+                pool.restart()
                 args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter, consider_human_models_jointly) for i in range(len(traj_record))]
                 info_gain_envs, overlap_in_opt_and_counterfactual_traj_env = zip(*pool.imap(compute_counterfactuals, tqdm(args), total=len(args)))
                 pool.close()

@@ -72,14 +72,11 @@ class SingleSphericalPolygon(object):
 
         if inside is None:
             self._inside = np.asanyarray(new_inside)
-
-            if not self.is_clockwise():
-                self._points = points[::-1]
         else:
             self._inside = np.asanyarray(inside)
 
-            if self.contains_point(new_inside) != self.is_clockwise():
-                self._points = points[::-1]
+        if not self.is_clockwise():
+            self._points = points[::-1]
 
     def __copy__(self):
         return deepcopy(self)
@@ -592,22 +589,10 @@ class SingleSphericalPolygon(object):
         Finds an acceptable inside point inside of *points* that is
         also inside of *polygons*.
         """
-        npoints = len(self._points)
-        if npoints > 4:
-            points = np.vstack((self._points, self._points[1]))
-            A = points[:-2]
-            B = points[1:-1]
-            C = points[2:]
-            orient = great_circle_arc.triple_product(A-B, C-B, B)
-            if np.sum(orient) < 0.0:
-                orient = -1.0 * orient
-            midpoint = great_circle_arc.midpoint(A, C)
-            candidate = max(zip(orient, midpoint), key=lambda x: x[0])
-            inside = candidate[1]
-        else:
-            # Fall back on computing the mean point
-            inside = self._points.mean(axis=0)
-            vector.normalize_vector(inside, output=inside)
+        # Fall back on computing the mean point
+        inside = self._points.mean(axis=0)
+        vector.normalize_vector(inside, output=inside)
+
         return inside
 
     def _find_new_outside(self):

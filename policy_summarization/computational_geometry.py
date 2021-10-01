@@ -45,7 +45,8 @@ def sample_valid_region(constraints, min_azi, max_azi, min_ele, max_ele, n_azi, 
 
 def sort_points_by_angle(points, center):
     '''
-    Sort points in a coherent angular order around a center point and a reference direction (i.e. north)
+    Sort points in a clockwise order around a center point (when viewing the sphere from the outside)
+    and a reference direction (i.e. north)
     Taken from the Spherical Geometry python library: https://github.com/spacetelescope/spherical_geometry
     '''
 
@@ -54,10 +55,14 @@ def sort_points_by_angle(points, center):
     pt = [points[i, :] for i in range(points.shape[0])]
 
     duo = list(zip(pt, ang))
-    duo = sorted(duo, key=lambda d: d[1])
+    duo = sorted(duo, key=lambda d: d[1], reverse=True)
     points = np.asarray([d[0] for d in duo])
 
     return list(points)
+
+def compute_average_point(points):
+    average_point = points.mean(axis=0)
+    return average_point / np.linalg.norm(average_point)
 
 '''
 2D convex polygon geometry
