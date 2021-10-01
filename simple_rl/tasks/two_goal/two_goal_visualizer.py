@@ -23,7 +23,8 @@ def _draw_state(screen,
                 show_value=False,
                 agent=None,
                 draw_statics=True,
-                agent_shape=None):
+                agent_shape=None,
+                agent_history=[]):
     '''
     Args:
         screen (pygame.Surface)
@@ -101,6 +102,23 @@ def _draw_state(screen,
             y = center[1] + dy
             pygame.draw.circle(screen, dest_col, (x, y), 5)
 
+    # Draw history of past agent locations if applicable
+    if len(agent_history) > 0:
+        for i, position in enumerate(agent_history):
+            if i == 0:
+                top_left_point = int(width_buffer + cell_width * (position[0] - 0.5)), int(
+                    height_buffer + cell_height * (two_goal_oomdp.height - position[1] + 0.5))
+                pygame.draw.circle(screen, (103, 115, 135), top_left_point, int(min(cell_width, cell_height) / 15))
+                top_left_point_rect = int(width_buffer + cell_width * (position[0] - 0.5) - cell_width/8), int(
+                    height_buffer + cell_height * (two_goal_oomdp.height - position[1] + 0.5) - 2)
+                pygame.draw.rect(screen, (103, 115, 135), top_left_point_rect + (cell_width / 4, cell_height / 20), 0)
+            else:
+                top_left_point = int(width_buffer + cell_width * (position[0] - 0.5)), int(
+                    height_buffer + cell_height * (two_goal_oomdp.height - position[1] + 0.5))
+                pygame.draw.circle(screen, (103, 115, 135), top_left_point, int(min(cell_width, cell_height) / 15))
+    agent_history.append((agent_x, agent_y))
+
+
     # Draw new agent.
     top_left_point = width_buffer + cell_width * (agent_x - 1), height_buffer + cell_height * (
                 two_goal_oomdp.height - agent_y)
@@ -139,7 +157,7 @@ def _draw_state(screen,
 
     pygame.display.flip()
 
-    return agent_shape
+    return agent_shape, agent_history
 
 def _draw_agent(center_point, screen, base_size=30):
     '''

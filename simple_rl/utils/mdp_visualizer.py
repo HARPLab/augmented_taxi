@@ -163,7 +163,7 @@ def visualize_state(mdp, draw_state, cur_state=None, scr_width=720, scr_height=7
     # Setup and draw initial state.
     cur_state = mdp.get_init_state() if cur_state is None else cur_state
 
-    agent_shape = _vis_init(screen, mdp, draw_state, cur_state, value=True)
+    agent_shape, _ = _vis_init(screen, mdp, draw_state, cur_state, value=True)
     draw_state(screen, mdp, cur_state, show_value=False, draw_statics=True)
     _draw_lower_left_text(cur_state, screen)
     pygame.display.flip()
@@ -199,7 +199,7 @@ def visualize_policy(mdp, policy, draw_state, action_char_dict, cur_state=None, 
     # Setup and draw initial state.
     cur_state = mdp.get_init_state() if cur_state is None else cur_state
 
-    agent_shape = _vis_init(screen, mdp, draw_state, cur_state, value=True)
+    agent_shape, _ = _vis_init(screen, mdp, draw_state, cur_state, value=True)
     draw_state(screen, mdp, cur_state, policy=policy, action_char_dict=action_char_dict, show_value=False, draw_statics=True)
     pygame.display.flip()
     while True:
@@ -229,7 +229,7 @@ def visualize_value(mdp, draw_state, agent=None, cur_state=None, scr_width=720, 
     # Setup and draw initial state.
     cur_state = mdp.get_init_state() if cur_state is None else cur_state
 
-    agent_shape = _vis_init(screen, mdp, draw_state, cur_state, value=True)
+    agent_shape, _ = _vis_init(screen, mdp, draw_state, cur_state, value=True)
     draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True)
     pygame.display.flip()
 
@@ -276,7 +276,7 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
     rpl = 0
     score = 0
     default_goal_x, default_goal_y = mdp.width, mdp.height
-    agent_shape = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
+    agent_shape, _ = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
 
     pygame.display.update()
     done = False
@@ -323,11 +323,11 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
                 cur_state = mdp.get_init_state()
                 mdp.reset()
                 agent.end_of_episode()
-                agent_shape = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
+                agent_shape, _ = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
 
 
             reward, cur_state = mdp.execute_agent_action(action)
-            agent_shape = draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True,agent_shape=agent_shape)
+            agent_shape, _ = draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True,agent_shape=agent_shape)
 
             score += int(reward)
 
@@ -356,7 +356,7 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
                 # Move agent.
                 action = agent.act(cur_state, reward)
                 reward, cur_state = mdp.execute_agent_action(action)
-                agent_shape = draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True,agent_shape=agent_shape)
+                agent_shape, _ = draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True,agent_shape=agent_shape)
 
                 score = round(rpl)
                 rpl += reward
@@ -369,13 +369,13 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
                 if cur_state.is_terminal():
                     cur_state = mdp.get_init_state()
                     mdp.reset()
-                    agent_shape = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
+                    agent_shape, _ = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
                     break
 
             i+=1
             cur_state = mdp.get_init_state()
             mdp.reset()
-            agent_shape = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
+            agent_shape, _ = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
 
     pygame.display.flip()
 
@@ -406,7 +406,7 @@ def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=N
     cur_state = trajectory[0][0]
 
     # Setup and draw initial state.
-    agent_shape = _vis_init(screen, mdp, draw_state, cur_state)
+    agent_shape, agent_history = _vis_init(screen, mdp, draw_state, cur_state)
     pygame.event.clear()
     step = 0
 
@@ -435,7 +435,7 @@ def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=N
                         # clear the text
                         _draw_lower_right_text('       ', screen)
 
-                agent_shape = draw_state(screen, mdp, cur_state, agent_shape=agent_shape)
+                agent_shape, agent_history = draw_state(screen, mdp, cur_state, agent_shape=agent_shape, agent_history=agent_history)
                 # print("A: " + str(action))
 
                 # Update state text.
@@ -486,7 +486,7 @@ def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_h
     cumulative_reward = 0
     step = 0
     gamma = mdp.gamma
-    agent_shape = _vis_init(screen, mdp, draw_state, cur_state, agent)
+    agent_shape, _ = _vis_init(screen, mdp, draw_state, cur_state, agent)
     pygame.event.clear()
 
     done = False
@@ -504,7 +504,7 @@ def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_h
                 print("A: " + str(action))
                 reward, cur_state = mdp.execute_agent_action(action)
                 cumulative_reward += reward * gamma ** step
-                agent_shape = draw_state(screen, mdp, cur_state, agent_shape=agent_shape)
+                agent_shape, _ = draw_state(screen, mdp, cur_state, agent_shape=agent_shape)
 
                 # Update state text.
                 _draw_lower_left_text(cur_state, screen)
@@ -546,7 +546,7 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
     # Setup and draw initial state.
     cur_state = mdp.get_init_state() if cur_state is None else cur_state
     mdp.set_curr_state(cur_state)
-    agent_shape = _vis_init(screen, mdp, draw_state, cur_state)
+    agent_shape, _ = _vis_init(screen, mdp, draw_state, cur_state)
     pygame.event.clear()
     cumulative_reward = 0
     gamma = mdp.gamma
@@ -579,7 +579,7 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
                 action = actions[keys.index(event.key)]
                 reward, cur_state = mdp.execute_agent_action(action=action)
                 cumulative_reward += reward * gamma ** step
-                agent_shape = draw_state(screen, mdp, cur_state, agent_shape=agent_shape)
+                agent_shape, _ = draw_state(screen, mdp, cur_state, agent_shape=agent_shape)
                 trajectory.append((prev_state, action, cur_state))
                 if interaction_callback is not None:
                     interaction_callback(action)
@@ -618,9 +618,9 @@ def _vis_init(screen, mdp, draw_state, cur_state, agent=None, value=False, score
     else:
         _draw_lower_left_text(cur_state, screen)
 
-    agent_shape = draw_state(screen, mdp, cur_state, agent=agent, draw_statics=True)
+    agent_shape, agent_history = draw_state(screen, mdp, cur_state, agent=agent, draw_statics=True, agent_history=[])
 
-    return agent_shape
+    return agent_shape, agent_history
 
 def convert_x_y_to_grid_cell(x, y, scr_width, scr_height, mdp_width, mdp_height):
     '''
