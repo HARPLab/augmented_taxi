@@ -16,7 +16,7 @@ from simple_rl.planning.PlannerClass import Planner
 
 class ValueIteration(Planner):
 
-    def __init__(self, mdp, name="value_iter", delta=0.0001, max_iterations=1000, sample_rate=5):
+    def __init__(self, mdp, name="value_iter", delta=1e-25, max_iterations=1000, sample_rate=5, best_action_tol=1e-05):
         '''
         Args:
             mdp (MDP)
@@ -35,6 +35,7 @@ class ValueIteration(Planner):
         self.has_computed_matrix = False
         self.bellman_backups = 0
         self.trans_dict = defaultdict(lambda:defaultdict(lambda:defaultdict(float)))
+        self.best_action_tol = best_action_tol
 
     def _compute_matrix_from_trans_func(self):
         if self.has_computed_matrix:
@@ -258,7 +259,7 @@ class ValueIteration(Planner):
         # Find best action (action w/ current max predicted Q value)
         for action in self.actions:
             q_s_a = self.get_q_value(state, action)
-            if abs(q_s_a - max_q_val) < 1e-05: # allow for slight numerical instabilities
+            if abs(q_s_a - max_q_val) < self.best_action_tol: # allow for slight numerical instabilities
                 best_action_list.append(action)
 
         return best_action_list
