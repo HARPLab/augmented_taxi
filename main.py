@@ -102,20 +102,13 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
     except:
         # SCOT_summary = BEC.obtain_SCOT_summaries(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag)
 
-        BEC_summary = BEC.obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count, n_train_demos=n_train_demos, prior=prior)
+        # BEC_summary = BEC.obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count, n_train_demos=n_train_demos, prior=prior)
+
+        BEC_summary = BEC.obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=5)
 
         if len(BEC_summary) > 0:
             with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
                 pickle.dump(BEC_summary, f)
-
-        # it = 0
-        # while it < 1:
-        #     BEC_summary = BEC.obtain_summary_counterfactual(data_loc, summary_variant, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_train_demos=n_train_demos)
-        #     if len(BEC_summary) > 0:
-        #         with open('models/' + data_loc + '/BEC_summary' + str(it) + '_it.pickle', 'wb') as f:
-        #             pickle.dump(BEC_summary, f)
-        #     it += 1
-
 
     BEC.visualize_summary(BEC_summary, weights, step_cost_flag)
 
@@ -302,5 +295,5 @@ if __name__ == "__main__":
                             params.BEC['n_human_models'], params.prior)
 
     # c) obtain test environments
-    obtain_test_environments(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,
-                             params.step_cost_flag, params.BEC['n_human_models'], params.prior, params.posterior, summary=BEC_summary, visualize_test_env=True, use_counterfactual=True)
+    # obtain_test_environments(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,
+    #                          params.step_cost_flag, params.BEC['n_human_models'], params.prior, params.posterior, summary=BEC_summary, visualize_test_env=True, use_counterfactual=True)

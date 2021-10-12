@@ -215,7 +215,7 @@ def extract_BEC_constraints(policy_constraints, min_subset_constraints_record, e
 
     return min_BEC_constraints, BEC_lengths_record
 
-def obtain_potential_summary_demos(BEC_lengths_record, n_demos, n_clusters=6, type='scaffolding', sample_count=25):
+def obtain_potential_summary_demos(BEC_lengths_record, n_demos, n_clusters=5, type='scaffolding', sample_count=25):
     covering_demos_idxs = []
 
     kmeans = KMeans(n_clusters=n_clusters).fit(np.array(BEC_lengths_record).reshape(-1, 1))
@@ -569,9 +569,13 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
     min_subset_constraints_record_flattened = [item for sublist in min_subset_constraints_record for item in sublist]
     min_subset_constraints_record_flattened = [item for sublist in min_subset_constraints_record_flattened for item in sublist]
     min_subset_constraints_record_array = np.array(min_subset_constraints_record_flattened)
-    nonzero_counter = (min_subset_constraints_record_array != 0).astype(float)
-    nonzero_counter = np.sum(nonzero_counter, axis=0)
-    nonzero_counter = nonzero_counter.flatten()
+    # # for variable scaffolding
+    # nonzero_counter = (min_subset_constraints_record_array != 0).astype(float)
+    # nonzero_counter = np.sum(nonzero_counter, axis=0)
+    # nonzero_counter = nonzero_counter.flatten()
+
+    # for no variable scaffolding
+    nonzero_counter = np.array([[float('inf'), float('inf'), float('inf')]])
 
     variable_filter, nonzero_counter = BEC_helpers.update_variable_filter(nonzero_counter)
     print('variable filter: {}'.format(variable_filter))
@@ -882,7 +886,7 @@ def obtain_SCOT_summaries(data_loc, summary_variant, min_BEC_constraints, BEC_le
 
     return min_BEC_summary
 
-def obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=3, downsample_threshold=float("inf")):
+def obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=3, downsample_threshold=float("inf")):
     '''
     :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
     :param BEC_constraints: Minimum set of constraints defining the BEC of a set of demos / policy (list of constraints)
@@ -896,6 +900,15 @@ def obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, 
     '''
     min_BEC_summary = []
     summary = []
+
+    env_traj_tracer = []
+    for j, env_idx in enumerate(env_record):
+        env_traj_tracer.extend(list(zip([env_idx] * len(traj_record[j]), list(np.arange(len(traj_record[env_idx]))))))
+
+    # the code below was made with flattened lists in mind, so flatten accordingly
+    BEC_lengths_record = [item for sublist in BEC_lengths_record for item in sublist]
+    min_subset_constraints_record = [item for sublist in min_subset_constraints_record for item in sublist]
+    traj_record = [item for sublist in traj_record for item in sublist]
 
     if summary_variant[0] == 'random':
         # select a random set of training examples
@@ -940,11 +953,39 @@ def obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, 
         # when constructing the set of summaries
         visual_dissimilarities = np.zeros(len(filtered_combo))
         complexities = np.zeros(len(filtered_combo))
-        BEC_lengths = np.zeros(len(filtered_combo))  # an average of BEC lengths of constituent demos of a summary
         # visualize_constraints(min_BEC_constraints, weights, step_cost_flag)
+
+        wt_vi_traj_dict = {}
         for j, combo in enumerate(filtered_combo):
-            if j % 1000 == 0:
+            if j % 100000 == 0:
                 print("{}/{}".format(j, len(filtered_combo)))
+
+            complexity = 0
+            for key in combo:
+                env_idx = env_traj_tracer[key][0]
+                if env_idx in wt_vi_traj_dict.keys():
+                    wt_vi_traj_env = wt_vi_traj_dict[env_idx]
+                else:
+                    filename = mp_helpers.lookup_env_filename(data_loc, env_idx)
+                    with open(filename, 'rb') as f:
+                        wt_vi_traj_env = pickle.load(f)
+                    wt_vi_traj_dict[env_idx] = wt_vi_traj_env
+
+                if summary_variant[1] == 'high':
+                    # get demos of low visual complexity
+                    complexity += wt_vi_traj_env[0][1].mdp.measure_env_complexity()
+                    # get simple demos
+                    # BEC_length += \
+                    # BEC_helpers.calculate_BEC_length(min_subset_constraints_record[env], weights, step_cost_flag)[0]
+                else:
+                    # get demos of high visual complexity
+                    complexity += -wt_vi_traj_env[0][1].mdp.measure_env_complexity()
+                    # get complex demos
+                    # BEC_length += \
+                    # -BEC_helpers.calculate_BEC_length(min_subset_constraints_record[env], weights, step_cost_flag)[0]
+
+            complexities[j] = complexity / len(combo)
+
             visual_dissimilarity = 0
             if len(combo) >= 2:
                 # compare every possible pairing of this set of demos
@@ -952,10 +993,9 @@ def obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, 
                 for pair in pairs:
                     # get similar demos
                     if summary_variant[1] == 'high':
-                        visual_dissimilarity += wt_vi_traj_candidates[
-                            env_record[pair[0]]][0][1].mdp.measure_visual_dissimilarity(traj_record[pair[0]][0][0],
-                                                                                        wt_vi_traj_candidates[
-                                                                                            env_record[pair[1]]][0][1].mdp,
+
+                        visual_dissimilarity += wt_vi_traj_dict[env_traj_tracer[pair[0]][0]][0][1].mdp.measure_visual_dissimilarity(traj_record[pair[0]][0][0],
+                                                                                        wt_vi_traj_dict[env_traj_tracer[pair[1]][0]][0][1].mdp,
                                                                                         traj_record[pair[1]][0][0])
                     else:
                         # get dissimilar demos
@@ -966,50 +1006,31 @@ def obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, 
                                                                                         traj_record[pair[1]][0][0])
                 visual_dissimilarities[j] = visual_dissimilarity / len(pairs)
 
-            complexity = 0
-            BEC_length = 0
-
-            for env in combo:
-                if summary_variant[1] == 'high':
-                    # get demos of low visual complexity
-                    complexity += wt_vi_traj_candidates[env_record[env]][0][1].mdp.measure_env_complexity()
-                    # get simple demos
-                    # BEC_length += \
-                    # BEC_helpers.calculate_BEC_length(min_subset_constraints_record[env], weights, step_cost_flag)[0]
-                else:
-                    # get demos of high visual complexity
-                    complexity += -wt_vi_traj_candidates[env_record[env]][0][1].mdp.measure_env_complexity()
-                    # get complex demos
-                    # BEC_length += \
-                    # -BEC_helpers.calculate_BEC_length(min_subset_constraints_record[env], weights, step_cost_flag)[0]
-
-            complexities[j] = complexity / len(combo)
-            # large BEC length correlates to simplicity
-            BEC_lengths[j] = -BEC_length / len(combo)
 
         tie_breaker = np.arange(len(filtered_combo))
-        sorted_zipped = sorted(zip(visual_dissimilarities, complexities, BEC_lengths, tie_breaker, filtered_combo))
-        visual_dissimilarities_sorted, complexities_sorted, BEC_lengths_sorted, _, filtered_combo_sorted = list(
+        sorted_zipped = sorted(zip(visual_dissimilarities, complexities, tie_breaker, filtered_combo))
+        visual_dissimilarities_sorted, complexities_sorted, _, filtered_combo_sorted = list(
             zip(*sorted_zipped))
 
         best_idxs = filtered_combo_sorted[0]
         print(best_idxs)
 
         for best_idx in best_idxs:
-            best_env_idx = env_record[best_idx]
+            best_env_idx = env_traj_tracer[best_idx][0]
 
             # record information associated with the best selected summary demo
             best_traj = traj_record[best_idx]
-            best_mdp = wt_vi_traj_candidates[best_env_idx][0][1].mdp
+            best_mdp = wt_vi_traj_dict[best_env_idx][0][1].mdp
             best_mdp.set_init_state(best_traj[0][0])  # for completeness
             constraints_added = min_subset_constraints_record[best_idx]
-            min_BEC_summary.append([best_mdp, best_traj, constraints_added])
+            min_BEC_summary.append([best_mdp, best_traj, constraints_added, env_traj_tracer[best_idx]])
 
         for best_idx in sorted(best_idxs, reverse=True):
             del min_subset_constraints_record[best_idx]
             del traj_record[best_idx]
-            del env_record[best_idx]
+            del env_traj_tracer[best_idx]
             del BEC_lengths_record[best_idx]
+            del env_traj_tracer[best_idx]
 
     # fill out the rest of the vacant demo slots
     included_demo_idxs = []
@@ -1029,15 +1050,24 @@ def obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, 
 
             visual_dissimilarities = np.zeros(len(covering_demo_idxs))
             complexities = np.zeros(len(covering_demo_idxs))
+
             for j, covering_demo_idx in enumerate(covering_demo_idxs):
+
+                env_idx = env_traj_tracer[covering_demo_idx][0]
+                if env_idx in wt_vi_traj_dict.keys():
+                    wt_vi_traj_env = wt_vi_traj_dict[env_idx]
+                else:
+                    filename = mp_helpers.lookup_env_filename(data_loc, env_idx)
+                    with open(filename, 'rb') as f:
+                        wt_vi_traj_env = pickle.load(f)
+                    wt_vi_traj_dict[env_idx] = wt_vi_traj_env
 
                 # only compare the visual dissimilarity to the most recent summary
                 if len(summary) > 0:
                     if summary_variant[0] == 'forward' or summary_variant[0] == 'backward':
                         if summary_variant[1] == 'high':
                             # get similar demos
-                            visual_dissimilarities[j] = wt_vi_traj_candidates[env_record[covering_demo_idx]][0][
-                                1].mdp.measure_visual_dissimilarity(
+                            visual_dissimilarities[j] = wt_vi_traj_env[0][1].mdp.measure_visual_dissimilarity(
                                 traj_record[covering_demo_idx][0][0], summary[-1][0], summary[-1][1][0][0])
                         else:
                             # get dissimilar demos
@@ -1058,7 +1088,7 @@ def obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, 
 
                 if summary_variant[1] == 'high':
                     # get demos of low visual complexity
-                    complexities[j] = wt_vi_traj_candidates[env_record[covering_demo_idx]][0][1].mdp.measure_env_complexity()
+                    complexities[j] = wt_vi_traj_env[0][1].mdp.measure_env_complexity()
                 else:
                     # get demos of high visual complexity
                     complexities[j] = -wt_vi_traj_candidates[env_record[covering_demo_idx]][0][1].mdp.measure_env_complexity()
@@ -1073,13 +1103,13 @@ def obtain_summary(summary_variant, wt_vi_traj_candidates, min_BEC_constraints, 
             included_demo_idxs.extend(best_idxs)
 
             for best_idx in best_idxs:
-                best_env_idx = env_record[best_idx]
+                best_env_idx = env_traj_tracer[best_idx][0]
 
                 # record information associated with the best selected summary demo
                 best_traj = traj_record[best_idx]
-                best_mdp = wt_vi_traj_candidates[best_env_idx][0][1].mdp
+                best_mdp = wt_vi_traj_dict[best_env_idx][0][1].mdp
                 constraints_added = min_subset_constraints_record[best_idx]
-                summary.append([best_mdp, best_traj, constraints_added])
+                summary.append([best_mdp, best_traj, constraints_added, env_traj_tracer[best_idx]])
 
                 if len(min_BEC_summary) + len(summary) >= n_train_demos:
                     summary.extend(min_BEC_summary)
