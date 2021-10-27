@@ -1036,7 +1036,7 @@ def obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_r
     included_demo_idxs = []
     ongoing_summary_constraints = []
 
-    if summary_variant == 'conceptual_only':
+    if summary_variant == 'feature_only':
         # determine how many demonstrations should be allotted to each masked variable
         # this needs to be updated if more than one variable can be masked at a time (e.g. when there are more than 3 features)
         demo_chunk_per_variable_scaffolding = int(np.ceil((n_train_demos - len(min_BEC_summary)) / (weights.shape[1] + 1)))
@@ -1063,7 +1063,7 @@ def obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_r
 
     if len(min_BEC_summary) < n_train_demos:
         while len(summary) + len(min_BEC_summary) < n_train_demos:
-            if summary_variant == 'conceptual_only':
+            if summary_variant == 'feature_only':
                 BEC_lengths_record_filtered = []
                 min_subset_constraints_record_filtered = []
                 traj_record_filtered = []
