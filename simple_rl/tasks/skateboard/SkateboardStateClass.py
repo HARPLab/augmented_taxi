@@ -24,7 +24,7 @@ class SkateboardState(OOMDPState):
 
     def __hash__(self):
 
-        state_hash = str(self.get_agent_x()) + str(self.get_agent_y()) + "00"
+        state_hash = str(self.get_agent_x()) + str(self.get_agent_y())
 
         for s in self.objects["skateboard"]:
             state_hash += str(s["x"]) + str(s["y"]) + str(s["on_agent"])

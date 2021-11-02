@@ -62,7 +62,7 @@ elif mdp_class == 'two_goal':
     #              np.array([[0, -1, -16]])]  # +/- 50%
 elif mdp_class == 'skateboard':
     w = np.array([[9, -0.3, -1]])
-    w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order),
+    w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order)
 
     mdp_parameters = {
         'agent': {'x': 4, 'y': 4, 'has_skateboard': 0},
@@ -130,16 +130,17 @@ elif mdp_class == 'two_goal2':
     prior = [np.array([[1, 0, 0]]), np.array([[0, 1, 0]]), np.array([[0, 0, -1]])]
     posterior = [np.array([[1, 0, 0]]), np.array([[0, 1, 0]]), np.array([[0, 0, -1]])]
 elif mdp_class == 'skateboard2':
-    w = np.array([[-0.15, -0.5, -1]]) # skateboard (you might want to go backward to retrieve it), path
-    w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order),
+    w = np.array([[-0.175, -0.5125, -1]]) # skateboard (you might want to go backward to retrieve it), path
+    w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order)
 
     mdp_parameters = {
         'agent': {'x': 4, 'y': 4, 'has_skateboard': 0},
         'skateboard': [{'x': 1, 'y': 4, 'on_agent': 0}],
         'goal': {'x': 6, 'y': 4},
         'walls': [],
-        'available_walls': [{'x': 2, 'y': 2}, {'x': 2, 'y': 3}, {'x': 4, 'y': 2}, {'x': 4, 'y': 3}],
-        'paths': [{'x': 2, 'y': 1}, {'x': 3, 'y': 1}, {'x': 4, 'y': 1}, {'x': 5, 'y': 1}, {'x': 6, 'y': 1},
+        'available_paths': [{'x': 1, 'y': 1}, {'x': 2, 'y': 1}, {'x': 3, 'y': 1}, {'x': 4, 'y': 1}, {'x': 5, 'y': 1}, {'x': 6, 'y': 1},
+                 {'x': 6, 'y': 2}, {'x': 6, 'y': 3}],
+        'paths': [{'x': 1, 'y': 1}, {'x': 2, 'y': 1}, {'x': 3, 'y': 1}, {'x': 4, 'y': 1}, {'x': 5, 'y': 1}, {'x': 6, 'y': 1},
                  {'x': 6, 'y': 2}, {'x': 6, 'y': 3}],
         'width': 6,
         'height': 4,

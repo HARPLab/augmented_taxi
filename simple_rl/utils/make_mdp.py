@@ -62,12 +62,10 @@ def make_mdp_obj(mdp_class, mdp_code, mdp_parameters):
 
         requested_tolls = []
 
-        # offset can facilitate additional MDP information present in the code before toll information
-        offset = 0
-        for x in range(offset, len(mdp_code)):
+        for x in range(0, len(mdp_code)):
             entry = mdp_code[x]
             if entry:
-                requested_tolls.append(available_tolls[x - offset])
+                requested_tolls.append(available_tolls[x])
 
         # note that what's considered mdp_code (potentially includes both initial state and environment info) and env_code
         # (only includes environment info) will always need to be manually defined
@@ -102,31 +100,40 @@ def make_mdp_obj(mdp_class, mdp_code, mdp_parameters):
 
         requested_tolls = []
 
-        # offset can facilitate additional MDP information present in the code before toll information
+        # offset can facilitate additional MDP information present in the code at the end of the MDP code
         offset = 1
-        for x in range(offset, len(mdp_code)):
+        for x in range(0, len(mdp_code) - offset):
             entry = mdp_code[x]
             if entry:
-                requested_tolls.append(available_tolls[x - offset])
+                requested_tolls.append(available_tolls[x])
 
         # currently only supporting one hotswap station
         requested_hotswap_stations = []
-        if mdp_code[0]:
+        if mdp_code[-offset]:
             requested_hotswap_stations.append(available_hotswap_stations[0])
 
         # note that what's considered mdp_code (potentially includes both initial state and environment info) and env_code
         # (only includes environment info) will always need to be manually defined
         return requested_passenger, requested_tolls, requested_hotswap_stations, mdp_code
     elif mdp_class == 'skateboard2':
-        available_walls = mdp_parameters['available_walls']
-        requested_walls = []
+        available_paths = mdp_parameters['available_paths']
+        requested_paths = []
 
-        for x in range(0, len(mdp_code)):
+        offset = 1
+        # let each code digit account for four of the available paths (to minimize the total number of environments)
+        for x in range(0, len(mdp_code) - offset):
             entry = mdp_code[x]
             if entry:
-                requested_walls.append(available_walls[x])
+                requested_paths.append(available_paths[x * 2])
+                requested_paths.append(available_paths[x * 2 + 1])
+                requested_paths.append(available_paths[x * 2 + 2])
+                requested_paths.append(available_paths[x * 2 + 3])
 
-        return requested_walls, mdp_code
+        requested_skateboard = []
+        if mdp_code[-offset]:
+            requested_skateboard.append(mdp_parameters['skateboard'][0])
+
+        return requested_skateboard, requested_paths, mdp_code
     elif mdp_class == 'cookie_crumb':
         available_crumbs = mdp_parameters['available_crumbs']
         requested_crumbs = []

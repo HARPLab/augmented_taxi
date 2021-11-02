@@ -353,19 +353,24 @@ class Skateboard2OOMDP(OOMDP):
         return next_state
 
     def measure_env_complexity(self):
-        return len(self.walls)
+        return len(self.paths) + len(self.init_state.objects['skateboard'])
 
     def measure_visual_dissimilarity(self, start_state, other_mdp, other_start_state):
         start_state_weight = 2
 
-        # measure the visual similarity between two MDPs through their start states and their walls effectively
+        # measure the visual similarity between two MDPs through their start states and their paths effectively
         dissimilarity = 0
 
-        # start states
-        dissimilarity += np.sum(np.abs(np.array([int(x) for x in str(hash(start_state))]) - np.array(
-            [int(x) for x in str(hash(other_start_state))]))) * start_state_weight
+        # only need to consider the overlapping portion since any discrepancies in length due to the presence or absence
+        # of skateboard will be taken care of by the env_code comparison
+        start_state_hash = str(hash(start_state))
+        other_start_state_hash = str(hash(other_start_state))
+        overlap = min(len(start_state_hash), len(other_start_state_hash))
 
-        # walls
+        dissimilarity += np.sum(np.abs(np.array([int(x) for x in start_state_hash[0:overlap]]) - np.array(
+            [int(x) for x in other_start_state[0:overlap]]))) * start_state_weight
+
+        # paths and skateboard
         dissimilarity += np.sum(np.abs(np.array(self.env_code) - np.array(other_mdp.env_code)))
 
         return dissimilarity

@@ -130,12 +130,20 @@ def solve_policy(args):
             walls, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code, mdp_parameters)
         mdp_parameters['walls'] = walls
         mdp_parameters['env_code'] = env_code
-    elif mdp_class == 'skateboard' or mdp_class == 'skateboard2':
+    elif mdp_class == 'skateboard':
         if hardcode_envs:
             walls, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
         else:
             walls, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code, mdp_parameters)
         mdp_parameters['walls'] = walls
+        mdp_parameters['env_code'] = env_code
+    elif mdp_class == 'skateboard2':
+        if hardcode_envs:
+            skateboard, paths, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
+        else:
+            skateboard, paths, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code, mdp_parameters)
+        mdp_parameters['skateboard'] = skateboard
+        mdp_parameters['paths'] = paths
         mdp_parameters['env_code'] = env_code
     elif mdp_class == 'augmented_taxi2':
         # note that this is specially accommodates the four hand-designed environments
@@ -188,8 +196,10 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, pool
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_tolls']))))
         elif mdp_class == 'two_goal' or mdp_class == 'two_goal2':
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_walls']))))
-        elif mdp_class == 'skateboard' or mdp_class == 'skateboard2':
+        elif mdp_class == 'skateboard':
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_walls']))))
+        elif mdp_class == 'skateboard2':
+            mdp_codes = list(map(list, itertools.product([0, 1], repeat=int((len(mdp_parameters['available_paths'])/4)+1))))
         elif mdp_class == 'cookie_crumb':
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_crumbs']))))
         elif mdp_class == 'augmented_taxi2':
