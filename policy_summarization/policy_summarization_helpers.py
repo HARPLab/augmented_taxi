@@ -162,6 +162,14 @@ def solve_policy(args):
             crumbs, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code, mdp_parameters)
         mdp_parameters['crumbs'] = crumbs
         mdp_parameters['env_code'] = env_code
+    elif mdp_class == 'colored_tiles':
+        if hardcode_envs:
+            A_tiles, B_tiles, env_code = make_mdp.hardcode_mdp_obj(mdp_class, mdp_code)
+        else:
+            A_tiles, B_tiles, env_code = make_mdp.make_mdp_obj(mdp_class, mdp_code, mdp_parameters)
+        mdp_parameters['A_tiles'] = A_tiles
+        mdp_parameters['B_tiles'] = B_tiles
+        mdp_parameters['env_code'] = env_code
     else:
         raise Exception("Unknown MDP class.")
 
@@ -204,6 +212,8 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, pool
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_crumbs']))))
         elif mdp_class == 'augmented_taxi2':
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_tolls'])+1)))
+        elif mdp_class == 'colored_tiles':
+            mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_A_tiles'])+len(mdp_parameters['available_B_tiles']))))
         else:
             raise Exception("Unknown MDP class.")
 

@@ -31,6 +31,8 @@ from simple_rl.tasks.two_goal.TwoGoalStateClass import TwoGoalState
 from simple_rl.tasks.skateboard.SkateboardOOMDPClass import SkateboardOOMDP
 from simple_rl.tasks.skateboard.Skateboard2OOMDPClass import Skateboard2OOMDP
 from simple_rl.tasks.skateboard.SkateboardStateClass import SkateboardState
+from simple_rl.tasks.colored_tiles.ColoredTilesOOMDPClass import ColoredTilesOOMDP
+from simple_rl.tasks.colored_tiles.ColoredTilesStateClass import ColoredTilesState
 from simple_rl.tasks.cookie_crumb.CookieCrumbOOMDPClass import CookieCrumbOOMDP
 from simple_rl.tasks.cookie_crumb.CookieCrumbStateClass import CookieCrumbState
 from simple_rl.tasks.trench.TrenchOOMDPClass import TrenchOOMDP

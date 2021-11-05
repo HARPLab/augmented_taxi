@@ -29,6 +29,8 @@ import policy_summarization.multiprocessing_helpers as mp_helpers
 from simple_rl.utils import mdp_helpers
 import policy_summarization.BEC_helpers as BEC_helpers
 import policy_summarization.BEC_visualization as BEC_viz
+import matplotlib as mpl
+mpl.rcParams['figure.facecolor'] = '1.0'
 
 
 def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):

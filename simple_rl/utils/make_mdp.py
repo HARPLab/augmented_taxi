@@ -7,7 +7,7 @@ Utility for making MDP instances
 # Python imports.
 
 # Other imports.
-from simple_rl.tasks import AugmentedTaxiOOMDP, TwoGoalOOMDP, SkateboardOOMDP, TaxiOOMDP, CookieCrumbOOMDP, AugmentedTaxi2OOMDP, TwoGoal2OOMDP, Skateboard2OOMDP
+from simple_rl.tasks import AugmentedTaxiOOMDP, TwoGoalOOMDP, SkateboardOOMDP, TaxiOOMDP, CookieCrumbOOMDP, AugmentedTaxi2OOMDP, TwoGoal2OOMDP, Skateboard2OOMDP, ColoredTilesOOMDP
 
 def make_custom_mdp(mdp_class, mdp_parameters):
     if mdp_class == 'augmented_taxi':
@@ -43,6 +43,10 @@ def make_custom_mdp(mdp_class, mdp_parameters):
         mdp_candidate = CookieCrumbOOMDP(width=mdp_parameters['width'], height=mdp_parameters['height'], agent=mdp_parameters['agent'],
                                          walls=mdp_parameters['walls'], goals=mdp_parameters['goals'], crumbs=mdp_parameters['crumbs'], gamma=mdp_parameters['gamma'],
                                          weights=mdp_parameters['weights'], env_code=mdp_parameters['env_code'], sample_rate=1)
+    elif mdp_class == 'colored_tiles':
+        mdp_candidate = ColoredTilesOOMDP(width=mdp_parameters['width'], height=mdp_parameters['height'], agent=mdp_parameters['agent'],
+                                           walls=mdp_parameters['walls'], A_tiles=mdp_parameters['A_tiles'], B_tiles=mdp_parameters['B_tiles'], goal=mdp_parameters['goal'], gamma=mdp_parameters['gamma'],
+                                           weights=mdp_parameters['weights'], env_code=mdp_parameters['env_code'], sample_rate=1)
     else:
         raise Exception("Unknown MDP class.")
 
@@ -144,6 +148,21 @@ def make_mdp_obj(mdp_class, mdp_code, mdp_parameters):
                 requested_crumbs.append(available_crumbs[x])
 
         return requested_crumbs, mdp_code
+    elif mdp_class == 'colored_tiles':
+        available_A_tiles = mdp_parameters['available_A_tiles']
+        available_B_tiles = mdp_parameters['available_B_tiles']
+        requested_A_tiles = []
+        requested_B_tiles = []
+
+        # let each code digit account for four of the available paths (to minimize the total number of environments)
+        for x in range(0, len(mdp_code)):
+            entry = mdp_code[x]
+            if entry and x < len(available_A_tiles):
+                requested_A_tiles.append(available_A_tiles[x])
+            elif entry:
+                requested_B_tiles.append(available_B_tiles[x - len(available_A_tiles)])
+
+        return requested_A_tiles, requested_B_tiles, mdp_code
     else:
         raise Exception("Unknown MDP class.")
 

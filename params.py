@@ -6,7 +6,8 @@ import os
 # mdp_class = 'skateboard'
 # mdp_class = 'augmented_taxi2'
 # mdp_class = 'two_goal2'
-mdp_class = 'skateboard2'
+# mdp_class = 'skateboard2'
+mdp_class = 'colored_tiles'
 # mdp_class = 'taxi'
 # mdp_class = 'cookie_crumb'
 
@@ -144,6 +145,29 @@ elif mdp_class == 'skateboard2':
                  {'x': 6, 'y': 2}, {'x': 6, 'y': 3}],
         'width': 6,
         'height': 4,
+        'gamma': 1,
+        'env_code': [],
+        'weights': w_normalized,
+        'weights_lb': w_normalized,
+        'weights_ub': w_normalized
+    }
+
+    prior = [np.array([[0, 0, -1]])]
+    posterior = [np.array([[-1, 0, 0]]), np.array([[0, -1, 0]]), np.array([[0, 0, -1]])]
+elif mdp_class == 'colored_tiles':
+    w = np.array([[-6.5, -5.25, -1]]) # A_tile, B_tile, step cost
+    w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order)
+
+    mdp_parameters = {
+        'agent': {'x': 1, 'y': 1},
+        'goal': {'x': 5, 'y': 1},
+        'walls': [],
+        'A_tiles': [],
+        'available_A_tiles': [{'x': 2, 'y': 2}, {'x': 3, 'y': 2}, {'x': 4, 'y': 2}, {'x': 4, 'y': 1}],
+        'B_tiles': [],
+        'available_B_tiles': [{'x': 2, 'y': 4}, {'x': 3, 'y': 4}, {'x': 4, 'y': 4}, {'x': 5, 'y': 4}, {'x': 5, 'y': 3}],
+        'width': 5,
+        'height': 5,
         'gamma': 1,
         'env_code': [],
         'weights': w_normalized,
