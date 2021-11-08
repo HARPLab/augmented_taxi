@@ -548,8 +548,11 @@ def overlap_demo_BEC_and_human_posterior(args):
             #     raise AssertionError("Too much deviation in trajectory BEC areas")
 
             if traj_sph_polygon.intersects_poly(posterior_sph_polygon):
-                if traj_sph_polygon.intersection(posterior_sph_polygon).area() > 1.05 * min(traj_sph_polygon.area(), posterior_sph_polygon.area()):
+                intersected_polygon = traj_sph_polygon.intersection(posterior_sph_polygon)
+                intersected_area = intersected_polygon.area()
+                if intersected_area > 1.05 * min(traj_sph_polygon.area(), posterior_sph_polygon.area()):
                     # the intersection shouldn't be larger than the smaller of the two constituent areas
+                    print('Env: {}, constraint idx: {}'.format(env_idx, constraint_idx))
                     raise AssertionError("bad intersection")
                 BEC_areas.append(traj_sph_polygon.intersection(posterior_sph_polygon).area())
             else:

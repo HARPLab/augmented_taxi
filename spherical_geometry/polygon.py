@@ -67,6 +67,13 @@ class SingleSphericalPolygon(object):
         if len(points) < 3:
             raise ValueError("Polygon made of too few points")
 
+        # remove points that are nearly identical for more stable polygon
+        rounded_points = np.array(points).round(2)
+        remove_idxs = [x for x in range(1, rounded_points.shape[0]) if
+                       np.array_equal(rounded_points[x, :], rounded_points[x - 1, :])]
+        for remove_idx in sorted(remove_idxs, reverse=True):
+            del points[remove_idx]
+
         self._points = points = np.asanyarray(points)
         new_inside = self._find_new_inside()
 
