@@ -574,7 +574,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
     min_subset_constraints_record_flattened = [item for sublist in min_subset_constraints_record_flattened for item in sublist]
     min_subset_constraints_record_array = np.array(min_subset_constraints_record_flattened)
 
-    if summary_variant == 'human_only':
+    if summary_variant == 'counterfactual_only':
         # no variable scaffolding
         nonzero_counter = np.array([[float('inf'), float('inf'), float('inf')]])
     else:

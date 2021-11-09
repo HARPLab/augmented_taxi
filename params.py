@@ -241,10 +241,10 @@ step_cost_flag = False
 
 # BEC parameters
 BEC = {
-    'summary_variant': 'proposed',            # [proposed, human_only, feature_only, baseline]
+    'summary_variant': 'proposed',            # [proposed, counterfactual_only, feature_only, baseline]
                                               # proposed: counterfactual (Y), feature scaffolding (Y)
                                               # feature_only: counterfactual (N), feature scaffolding (Y)
-                                              # human_only: counterfactual (Y), feature scaffolding (N)
+                                              # counterfactual_only: counterfactual (Y), feature scaffolding (N)
                                               # (Frontiers21) baseline: counterfactual (N), feature scaffolding (N)
 
     'n_train_demos': 15,                       # number of desired training demonstrations
