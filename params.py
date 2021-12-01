@@ -242,7 +242,7 @@ step_cost_flag = False
 
 # BEC parameters
 BEC = {
-    'summary_variant': 'counterfactual_only',            # [proposed, counterfactual_only, feature_only, baseline]
+    'summary_variant': 'proposed',            # [proposed, counterfactual_only, feature_only, baseline]
                                               # proposed: counterfactual (Y), feature scaffolding (Y)
                                               # feature_only: counterfactual (N), feature scaffolding (Y)
                                               # counterfactual_only: counterfactual (Y), feature scaffolding (N)
@@ -256,7 +256,7 @@ BEC = {
 
     'n_human_models': 8,                      # expected ease for human to correctly predict the agent's actions in this test environment (low, medium, high)
 
-    'obj_func_proportion': 0.7                  # proportion of the max objective function (i.e. info gain) to aim for
+    'obj_func_proportion': 1                  # proportion of the max objective function (i.e. info gain) to aim for
                                               # when selecting the next demonstration (range: 0 - 1). selecting a value
                                               # less than 1 may yield a greater number of demonstrations
 }

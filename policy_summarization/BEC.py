@@ -805,8 +805,8 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
             best_mdp.set_init_state(best_traj[0][0]) # for completeness
             min_BEC_constraints_running.extend(min_env_constraints_record[best_env_idx][best_traj_idx])
             min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
-            summary.append([best_mdp, best_traj, min_env_constraints_record[best_env_idx][best_traj_idx], min_BEC_constraints_running, best_env_idx, best_traj_idx,
-                            None, sample_human_models, human_counterfactual_trajs, info_gains_record, overlap_in_opt_and_counterfactual_traj_avg])
+            summary.append([best_mdp, best_traj, (best_env_idx, best_traj_idx), min_env_constraints_record[best_env_idx][best_traj_idx],
+                            sample_human_models])
         else:
             # b) consider each human model separately
             if consistent_state_count:
@@ -871,7 +871,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
                     best_env_idx).zfill(5) + '.pickle', 'rb') as f:
                 best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
 
-            best_human_trajs = best_human_trajs_record_env[best_traj_idx]
+            # best_human_trajs = best_human_trajs_record_env[best_traj_idx]
             best_traj = traj_record[best_env_idx][best_traj_idx]
 
             filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
@@ -881,8 +881,8 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
             best_mdp.set_init_state(best_traj[0][0]) # for completeness
             min_BEC_constraints_running.extend(constraints_env[best_traj_idx])
             min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
-            summary.append([best_mdp, best_traj, constraints_env[best_traj_idx], min_BEC_constraints_running, best_env_idx, best_traj_idx,
-                            best_human_trajs, sample_human_models, select_model, info_gains_record, overlap_in_opt_and_counterfactual_traj_record])
+            summary.append([best_mdp, best_traj, (best_env_idx, best_traj_idx), constraints_env[best_traj_idx],
+                            sample_human_models, select_model])
 
         print(colored('Max infogain: {}'.format(max_info_gain), 'blue'))
         with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
@@ -1078,7 +1078,7 @@ def obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_r
         best_mdp = wt_vi_traj_dict[best_env_idx][0][1].mdp
         best_mdp.set_init_state(best_traj[0][0])  # for completeness
         constraints_added = min_subset_constraints_record[best_idx]
-        min_BEC_summary.append([best_mdp, best_traj, constraints_added, env_traj_tracer[best_idx]])
+        min_BEC_summary.append([best_mdp, best_traj, env_traj_tracer[best_idx], constraints_added])
 
     for best_idx in sorted(best_idxs, reverse=True):
         del min_subset_constraints_record[best_idx]
@@ -1231,7 +1231,7 @@ def obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_r
                     best_traj = traj_record_filtered[best_idx]
                     best_mdp = wt_vi_traj_dict[best_env_idx][0][1].mdp
                     constraints_added = min_subset_constraints_record_filtered[best_idx]
-                    summary.append([best_mdp, best_traj, constraints_added, env_traj_tracer_filtered[best_idx]])
+                    summary.append([best_mdp, best_traj, env_traj_tracer_filtered[best_idx], constraints_added])
                     print('Constrained added: {}'.format(constraints_added))
                     ongoing_summary_constraints.extend(constraints_added)
 
@@ -1356,32 +1356,11 @@ def visualize_summary(BEC_summaries_collection, weights, step_cost_flag):
     '''
     Summary: visualize the BEC demonstrations
     '''
-    # min_BEC_constraints_running = []
-    min_BEC_constraints_running = [np.array([[0, -1, 0]]), np.array([[1, 0, 0]])] # assuming that the human knows the correct quadrant as a prior
     for summary_idx, BEC_summary in enumerate(BEC_summaries_collection):
         print("Showing demo {} out of {}".format(summary_idx + 1, len(BEC_summaries_collection)))
-        # print('BEC_length: {}'.format(BEC_helpers.calculate_BEC_length(BEC_summary[2], weights, step_cost_flag)[0]))
 
         # visualize demonstration
         BEC_summary[0].visualize_trajectory(BEC_summary[1])
-
-        # visualize the min BEC constraints of this particular demonstration
-        # visualize_constraints(BEC_summary[2], weights, step_cost_flag)
-        # visualize_constraints(BEC_summary[2], weights, step_cost_flag, fig_name=str(summary_idx) + '.png', scale=abs(1 / weights[0, -1]))
-
-        # visualize the min BEC constraints extracted from all demonstrations shown thus far
-        # min_BEC_constraints_running.extend(BEC_summary[2])
-        # min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
-        # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag)
-        # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(summary_idx) + '.png', scale=abs(1 / weights[0, -1]))
-
-        # visualize what the human would've done in this environment (giving the human the benefit of the doubt)
-        # print(colored('Visualizing human counterfactuals', 'blue'))
-        # visualize the counterfactual trajectory at every (s,a) pair along the agent's optimal trajectory
-        # for human_opt_traj in BEC_summary[3]:
-        #     BEC_summary[0].visualize_trajectory(human_opt_traj) # the environment shoudld be the same for agent and human
-        # only visualize the first counterfactual trajectory (often the more informative)
-        # BEC_summary[0].visualize_trajectory(BEC_summary[3][0])
 
 
 def visualize_test_envs(posterior, test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, selected_env_traj_tracers, weights, step_cost_flag):

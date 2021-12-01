@@ -363,8 +363,8 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
     # remove environment and trajectory indices that comprise the summary
     summary_idxs = defaultdict(lambda: [])
     for summary_tuple in summary:
-        best_env_idx = summary_tuple[4]
-        best_traj_idx = summary_tuple[5]
+        best_env_idx = summary_tuple[2][0]
+        best_traj_idx = summary_tuple[2][1]
 
         summary_idxs[best_env_idx].append(best_traj_idx)
 
