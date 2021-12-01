@@ -561,7 +561,7 @@ def overlap_demo_BEC_and_human_posterior(args):
     return BEC_areas
 
 def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
-                       n_train_demos=3, prior=[], downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001):
+                       n_train_demos=3, prior=[], downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=1):
     summary = []
 
     # impose prior
@@ -693,42 +693,93 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
                 # obj_function = info_gains * (traj_overlap_pcts + c)  # objective 2: scaled
                 obj_function = info_gains
 
-                # don't consider demos where there is no info gain (since info gain is a ratio of the old and new, a demo
-                # with a large overlap and an info gain of 1 (i.e. no info gain) can actually have a higher objective
-                # function than a demo with a small overlap and a info gain > 1
+                # not considering demos where there is no info gain helps ensure that the final demonstration
+                # provides the maximum info gain (in conjuction with previously shown demonstrations)
                 obj_function[info_gains == 1] = 0
 
                 max_info_gain = np.max(info_gains)
                 if max_info_gain == 1:
                     no_info_flag = True
                 else:
-                    best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
-                    best_env_idxs, best_traj_idxs = np.where(obj_function == max(obj_function.flatten()))
+                    # if visuals aren't considered, then you can simply return one of the demos that maximizes the obj function
+                    # best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
+
+                    if obj_func_proportion == 1:
+                        # a) select the trajectory with the maximal information gain
+                        best_env_idxs, best_traj_idxs = np.where(obj_function == max(obj_function.flatten()))
+                    else:
+                        # b) select the trajectory closest to the desired partial information gain (to obtain more demonstrations0
+                        obj_function_flat = obj_function.flatten()
+                        obj_function_flat.sort()
+
+                        best_obj = obj_function_flat[-1]
+                        target_obj = obj_func_proportion * best_obj
+                        target_idx = np.argmin(abs(obj_function_flat - target_obj))
+                        closest_obj = obj_function_flat[target_idx]
+                        best_env_idxs, best_traj_idxs = np.where(obj_function == obj_function_flat[closest_obj])
 
                     best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
             else:
                 best_obj = float('-inf')
                 best_env_idxs = []
                 best_traj_idxs = []
-                for env_idx, info_gains_per_env in enumerate(info_gains_record):
-                    for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
-                        if info_gain_per_traj > 1:
 
-                            # obj = info_gain_per_traj * (
-                            #             overlap_in_opt_and_counterfactual_traj_avg[env_idx][traj_idx] + c)  # objective 2: scaled
-                            obj = info_gain_per_traj
+                if obj_func_proportion == 1:
+                    # a) select the trajectory with the maximal information gain
+                    for env_idx, info_gains_per_env in enumerate(info_gains_record):
+                        for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
+                            if info_gain_per_traj > 1:
 
-                            if np.isclose(obj, best_obj):
-                                best_env_idxs.append(env_idx)
-                                best_traj_idxs.append(traj_idx)
-                            elif obj > best_obj:
-                                best_obj = obj
+                                # obj = info_gain_per_traj * (
+                                #             overlap_in_opt_and_counterfactual_traj_avg[env_idx][traj_idx] + c)  # objective 2: scaled
+                                obj = info_gain_per_traj
 
-                                best_env_idxs = [env_idx]
-                                best_traj_idxs = [traj_idx]
-                            if info_gain_per_traj > max_info_gain:
-                                max_info_gain = info_gain_per_traj
-                                print("new max info: {}".format(max_info_gain))
+                                if np.isclose(obj, best_obj):
+                                    best_env_idxs.append(env_idx)
+                                    best_traj_idxs.append(traj_idx)
+                                elif obj > best_obj:
+                                    best_obj = obj
+
+                                    best_env_idxs = [env_idx]
+                                    best_traj_idxs = [traj_idx]
+                                if info_gain_per_traj > max_info_gain:
+                                    max_info_gain = info_gain_per_traj
+                                    print("new max info: {}".format(max_info_gain))
+                else:
+                    # b) select the trajectory closest to the desired partial information gain (to obtain more demonstrations)
+                    # first find the max information gain
+                    for env_idx, info_gains_per_env in enumerate(info_gains_record):
+                        for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
+                            if info_gain_per_traj > 1:
+                                obj = info_gain_per_traj
+
+                                if np.isclose(obj, best_obj):
+                                    pass
+                                elif obj > best_obj:
+                                    best_obj = obj
+
+                                if info_gain_per_traj > max_info_gain:
+                                    max_info_gain = info_gain_per_traj
+                                    print("new max info: {}".format(max_info_gain))
+
+                    target_obj = obj_func_proportion * best_obj
+                    closest_obj_dist = float('inf')
+
+                    for env_idx, info_gains_per_env in enumerate(info_gains_record):
+                        for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
+                            if info_gain_per_traj > 1:
+
+                                obj = info_gain_per_traj
+
+                                if np.isclose(abs(target_obj - obj), closest_obj_dist):
+                                    best_env_idxs.append(env_idx)
+                                    best_traj_idxs.append(traj_idx)
+                                elif abs(target_obj - obj) < closest_obj_dist:
+                                    closest_obj_dist = abs(obj - target_obj)
+
+                                    best_env_idxs = [env_idx]
+                                    best_traj_idxs = [traj_idx]
+
                 if max_info_gain == 1:
                     no_info_flag = True
                 else:

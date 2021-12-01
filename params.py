@@ -4,12 +4,13 @@ import os
 # mdp_class = 'augmented_taxi'
 # mdp_class = 'two_goal'
 # mdp_class = 'skateboard'
-# mdp_class = 'augmented_taxi2'
 # mdp_class = 'two_goal2'
-# mdp_class = 'skateboard2'
-mdp_class = 'colored_tiles'
 # mdp_class = 'taxi'
 # mdp_class = 'cookie_crumb'
+
+mdp_class = 'augmented_taxi2'
+# mdp_class = 'skateboard2'
+# mdp_class = 'colored_tiles'
 
 w_norm_order = 2
 if mdp_class == 'augmented_taxi':
@@ -241,19 +242,23 @@ step_cost_flag = False
 
 # BEC parameters
 BEC = {
-    'summary_variant': 'proposed',            # [proposed, counterfactual_only, feature_only, baseline]
+    'summary_variant': 'counterfactual_only',            # [proposed, counterfactual_only, feature_only, baseline]
                                               # proposed: counterfactual (Y), feature scaffolding (Y)
                                               # feature_only: counterfactual (N), feature scaffolding (Y)
                                               # counterfactual_only: counterfactual (Y), feature scaffolding (N)
                                               # (Frontiers21) baseline: counterfactual (N), feature scaffolding (N)
 
-    'n_train_demos': 15,                       # number of desired training demonstrations
+    'n_train_demos': 15,                      # number of desired training demonstrations
 
-    'n_test_demos': 30,                        # number of desired test demonstration
+    'n_test_demos': 30,                       # number of desired test demonstration
 
-    'test_difficulty': 'medium',               # expected ease for human to correctly predict the agent's actions in this test environment (low, medium, high)
+    'test_difficulty': 'high',                # expected ease for human to correctly predict the agent's actions in this test environment (low, medium, high)
 
-    'n_human_models': 8
+    'n_human_models': 8,                      # expected ease for human to correctly predict the agent's actions in this test environment (low, medium, high)
+
+    'obj_func_proportion': 0.7                  # proportion of the max objective function (i.e. info gain) to aim for
+                                              # when selecting the next demonstration (range: 0 - 1). selecting a value
+                                              # less than 1 may yield a greater number of demonstrations
 }
 
 data_loc = {

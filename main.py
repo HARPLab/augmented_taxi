@@ -55,7 +55,7 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
         mdp_agent.reset()  # reset the current state to the initial state
         mdp_agent.visualize_interaction()
 
-def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, pool, n_train_demos, n_human_models, prior, hardcode_envs=False):
+def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, pool, n_train_demos, n_human_models, prior, obj_func_proportion, hardcode_envs=False):
     if hardcode_envs:
         # using 4 hardcoded environments
         ps_helpers.obtain_env_policies(mdp_class, data_loc, np.expand_dims(weights, axis=0), mdp_parameters, pool, hardcode_envs=True)
@@ -105,7 +105,7 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
         # SCOT_summary = BEC.obtain_SCOT_summaries(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag)
 
         if summary_variant == 'proposed' or summary_variant == 'counterfactual_only':
-            BEC_summary = BEC.obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count, n_train_demos=n_train_demos, prior=prior)
+            BEC_summary = BEC.obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count, n_train_demos=n_train_demos, prior=prior, obj_func_proportion=obj_func_proportion)
         elif summary_variant == 'feature_only' or summary_variant == 'baseline':
             BEC_summary = BEC.obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=5)
         else:
@@ -297,7 +297,7 @@ if __name__ == "__main__":
     # b) obtain a BEC summary of the agent's policy
     BEC_summary = obtain_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
                             params.step_cost_flag, params.BEC['summary_variant'], pool, params.BEC['n_train_demos'],
-                            params.BEC['n_human_models'], params.prior)
+                            params.BEC['n_human_models'], params.prior, params.BEC['obj_func_proportion'])
 
     # c) obtain test environments
     # obtain_test_environments(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,
