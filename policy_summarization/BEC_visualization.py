@@ -6,7 +6,7 @@ from scipy.spatial import geometric_slerp
 import matplotlib.tri as mtri
 from termcolor import colored
 
-def visualize_spherical_polygon(poly, fig=None, ax=None, alpha=0.2, color='y', plot_ref_sphere=True):
+def visualize_spherical_polygon(poly, fig=None, ax=None, alpha=1.0, color='y', plot_ref_sphere=True):
     '''
     Visualize the spherical polygon created by the intersection between the constraint polyhedron and a unit sphere
     '''
@@ -27,7 +27,7 @@ def visualize_spherical_polygon(poly, fig=None, ax=None, alpha=0.2, color='y', p
             vertex_normed = vertex / np.linalg.norm(vertex)
             spherical_polygon_vertices[vertex_idx] = vertex_normed
 
-            ax.scatter(vertex_normed[0], vertex_normed[1], vertex_normed[2], marker='o', c='g', s=50)
+            # ax.scatter(vertex_normed[0], vertex_normed[1], vertex_normed[2], marker='o', c='g', s=50)
 
     t_vals = np.linspace(0, 1, 50)
 
@@ -42,7 +42,7 @@ def visualize_spherical_polygon(poly, fig=None, ax=None, alpha=0.2, color='y', p
             if is_adj == 1 and (vertices[adj_vertex_idx] != np.array([0, 0, 0])).any() and (adj_vertex_idx in spherical_polygon_vertices.keys()):
                 adj_vertex_normed = spherical_polygon_vertices[adj_vertex_idx]
                 result = geometric_slerp(vertex_normed, adj_vertex_normed, t_vals)
-                ax.plot(result[:, 0], result[:, 1], result[:, 2], c='k')
+                # ax.plot(result[:, 0], result[:, 1], result[:, 2], c='k')
 
     if plot_ref_sphere:
         # plot full unit sphere for reference
@@ -51,7 +51,7 @@ def visualize_spherical_polygon(poly, fig=None, ax=None, alpha=0.2, color='y', p
         x = np.outer(np.cos(u), np.sin(v))
         y = np.outer(np.sin(u), np.sin(v))
         z = np.outer(np.ones(np.size(u)), np.cos(v))
-        ax.plot_surface(x, y, z, color='y', alpha=alpha)
+        ax.plot_surface(x, y, z, color='y', alpha=0.2)
 
     # plot only the potion of the sphere corresponding to the valid solid angle
     hrep = np.array(poly.Hrepresentation())
@@ -99,7 +99,7 @@ def visualize_spherical_polygon(poly, fig=None, ax=None, alpha=0.2, color='y', p
     tri.set_mask(second_or)
 
     # plot valid x, y, z coordinates on sphere as a mesh of valid triangles
-    ax.plot_trisurf(valid_sph_x, valid_sph_y, valid_sph_z, triangles=tri.triangles, mask=second_or, color=color, alpha=1)
+    ax.plot_trisurf(valid_sph_x, valid_sph_y, valid_sph_z, triangles=tri.triangles, mask=second_or, color=color, alpha=alpha)
 
     ax.set_xlim(-1, 1)
     ax.set_ylim(-1, 1)

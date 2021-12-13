@@ -135,7 +135,7 @@ def _draw_terminal_text(mdp_class, cur_state, scr_width, scr_height, title_font)
     else:
         if cur_state.is_goal():
             # Done! Agent found goal.
-            goal_text = "Success!"
+            goal_text = "Game completed!"
         else:
             # Done! Agent failed.
             goal_text = "Fail!"

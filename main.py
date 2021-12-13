@@ -31,6 +31,8 @@ import policy_summarization.BEC_helpers as BEC_helpers
 import policy_summarization.BEC_visualization as BEC_viz
 import matplotlib as mpl
 mpl.rcParams['figure.facecolor'] = '1.0'
+mpl.rcParams['axes.labelsize'] = 'x-large'
+mpl.rcParams['xtick.labelsize'] = 'large'
 
 
 def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
@@ -55,7 +57,7 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
         mdp_agent.reset()  # reset the current state to the initial state
         mdp_agent.visualize_interaction()
 
-def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, pool, n_train_demos, n_human_models, prior, obj_func_proportion, hardcode_envs=False):
+def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, pool, n_train_demos, n_human_models, prior, posterior, obj_func_proportion, hardcode_envs=False):
     if hardcode_envs:
         # using 4 hardcoded environments
         ps_helpers.obtain_env_policies(mdp_class, data_loc, np.expand_dims(weights, axis=0), mdp_parameters, pool, hardcode_envs=True)
@@ -116,15 +118,33 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
                 pickle.dump(BEC_summary, f)
 
     BEC.visualize_summary(BEC_summary, weights, step_cost_flag)
+    #
+    # for summary in BEC_summary:
+    #     best_mdp = summary[0]
+    #     best_traj = summary[1]
+    #
+    #     with open('models/augmented_taxi/info_gains_' + str(0) + '. pickle', 'rb') as f:
+    #         info_gains_record = pickle.load(f)
+    #
+    #     with open('models/' + data_loc + '/counterfactual_data_' + str(0) + '/model' + str(
+    #             select_model) + '/cf_data_env' + str(
+    #             best_env_idx).zfill(5) + '.pickle', 'rb') as f:
+    #         best_human_trajs_record_env, constraints_env = pickle.load(f)
+    #
 
-    # constraint  visualization
-    constraints_record = priors
+    # constraint visualization
+    constraints_record = prior
     for summary in BEC_summary:
-        print(summary[2])
-        constraints_record.extend(summary[2])
+        print(summary[3])
+        constraints_record.extend(summary[3])
+        # constraints_record = summary[3]
 
         fig = plt.figure()
         ax = fig.gca(projection='3d')
+        ax.set_facecolor('white')
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
 
         solid_angle = BEC_helpers.calc_solid_angles([constraints_record])[0]
         print(solid_angle)
@@ -138,19 +158,27 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
             BEC_viz.visualize_planes(constraints, fig=fig, ax=ax)
 
         # visualize spherical polygon
-        BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax, plot_ref_sphere=False)
+        BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax, plot_ref_sphere=False, alpha=0.75)
 
-        ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100)
-        if mdp_class == 'augmented_taxi':
-            ax.set_xlabel('X - Dropoff')
-            ax.set_ylabel('Y - Toll')
-        elif mdp_class == 'two_goal':
-            ax.set_xlabel('X - Goal 1 (grey)')
-            ax.set_ylabel('Y - Goal 2 (green)')
+        # ieqs_posterior = BEC_helpers.constraints_to_halfspace_matrix_sage(posterior)
+        # poly_posterior = Polyhedron.Polyhedron(ieqs=ieqs_posterior)  # automatically finds the minimal H-representation
+        # BEC_viz.visualize_spherical_polygon(poly_posterior, fig=fig, ax=ax, plot_ref_sphere=False, color='g')
+
+        # ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100)
+        if mdp_class == 'augmented_taxi2':
+            ax.set_xlabel('$\mathregular{w_0}$: Mud')
+            ax.set_ylabel('$\mathregular{w_1}$: Battery')
+        elif mdp_class == 'two_goal2':
+            ax.set_xlabel('X: Goal 1 (grey)')
+            ax.set_ylabel('Y: Goal 2 (green)')
         else:
-            ax.set_xlabel('X - Goal')
-            ax.set_ylabel('Y - Skateboard')
-        ax.set_zlabel('Z - Step Cost')
+            ax.set_xlabel('X: Goal')
+            ax.set_ylabel('Y: Skateboard')
+        ax.set_zlabel('$\mathregular{w_2}$: Action')
+
+        ax.set_xticks([-1.0, -0.5, 0.0, 0.5, 1.0])
+        ax.set_yticks([-1.0, -0.5, 0.0, 0.5, 1.0])
+        ax.set_zticks([-1.0, -0.5, 0.0, 0.5, 1.0])
 
         if matplotlib.get_backend() == 'TkAgg':
             mng = plt.get_current_fig_manager()
@@ -297,7 +325,7 @@ if __name__ == "__main__":
     # b) obtain a BEC summary of the agent's policy
     BEC_summary = obtain_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
                             params.step_cost_flag, params.BEC['summary_variant'], pool, params.BEC['n_train_demos'],
-                            params.BEC['n_human_models'], params.prior, params.BEC['obj_func_proportion'])
+                            params.BEC['n_human_models'], params.prior, params.posterior, params.BEC['obj_func_proportion'])
 
     # c) obtain test environments
     # obtain_test_environments(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,

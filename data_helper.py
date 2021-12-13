@@ -7,6 +7,7 @@ from sklearn.cluster import KMeans
 from policy_summarization import policy_summarization_helpers
 import json
 from collections import defaultdict
+from simple_rl.utils import mdp_helpers
 
 '''
 For managing data related to the user study 
@@ -88,39 +89,41 @@ def extract_test_demonstrations(data_loc):
     :param data_loc:
     :return:
     '''
-    test_difficulty = 'medium'
+    test_difficulty = 'high'
     data_loc_pull = data_loc
     data_loc_push = data_loc + '/testing/test_' + test_difficulty
 
-    with open('models/' + data_loc_pull + '/test_environments.pickle', 'rb') as f:
-        test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = pickle.load(f)
+    with open('models/' + data_loc_pull + '/test_environments_' + test_difficulty + '.pickle', 'rb') as f:
+        test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, selected_env_traj_tracers = pickle.load(f)
 
     # selected test demonstrations
-    # augment_taxi_low
-    # test_idxs = [21, 22, 49, 68, 76, 80]
-    # test_idxs = [21, 22, 44, 49, 68, 80] # this is likely the correct one
-    # augment_taxi_medium
-    # test_idxs = [20, 53, 75, 70, 74, 90]
-    # augment_taxi_high
-    # test_idxs = [12, 22, 28, 50, 51, 63]
+    if data_loc == 'augmented_taxi2':
+        if test_difficulty == 'low':
+            test_idxs = [1, 5, 13, 14, 18, 9]
+        elif test_difficulty == 'medium':
+            test_idxs = [5, 1, 26, 8, 2, 18]
+        else:
+            test_idxs = [0, 20, 8, 16, 1, 11]
 
-    # two goal low
-    # test_idxs = [0, 1, 11, 30, 46, 61]
-    # two goal medium
-    # test_idxs = [0, 6, 7, 8, 9, 23]
-    # two goal high
-    # test_idxs = [5, 9, 16, 19, 25, 39]
-
-    # skateboard low
-    # test_idxs = [0, 2, 8, 7, 8, 9]
-    # skateboard medium
-    test_idxs = [0, 1, 3, 16, 17, 40]
-    # skateboard high
-    # test_idxs = [2, 4, 26, 29, 34, 39]
+    elif data_loc == 'colored_tiles':
+        if test_difficulty == 'low':
+            test_idxs = [1, 4, 8, 11, 0, 7]
+        elif test_difficulty == 'medium':
+            test_idxs = [1, 6, 2, 7, 9, 14]
+        else:
+            test_idxs = [0, 7, 14, 20, 18, 15]
+    else:
+        if test_difficulty == 'low':
+            test_idxs = [8, 10, 9, 11, 12, 14]
+        elif test_difficulty == 'medium':
+            test_idxs = [0, 3, 5, 1, 11, 23]
+        else:
+            test_idxs = [6, 9, 3, 7, 8, 29]
 
     test_wt_vi_traj_tuples_subset = []
     test_BEC_lengths_subset = []
     test_BEC_constraints_subset = []
+    test_selected_env_traj_tracers_subset = []
 
     # debugging code
     # for j, test_wt_vi_traj_tuple in enumerate(test_wt_vi_traj_tuples):
@@ -133,92 +136,32 @@ def extract_test_demonstrations(data_loc):
         test_wt_vi_traj_tuples_subset.append(test_wt_vi_traj_tuples[idx])
         test_BEC_lengths_subset.append(test_BEC_lengths[idx])
         test_BEC_constraints_subset.append(test_BEC_constraints[idx])
+        test_selected_env_traj_tracers_subset.append(selected_env_traj_tracers[idx])
 
     with open('models/' + data_loc_push + '/test_environments.pickle', 'wb') as f:
-        pickle.dump((test_wt_vi_traj_tuples_subset, test_BEC_lengths_subset, test_BEC_constraints_subset), f)
+        pickle.dump((test_wt_vi_traj_tuples_subset, test_BEC_lengths_subset, test_BEC_constraints_subset, test_selected_env_traj_tracers_subset), f)
 
 
 def combine_summaries(data_loc):
     '''
     Simply combine three numbered summary files into one, nonnumbered master summary file
     '''
-    # with open('models/' + data_loc + '/BEC_summary1.pickle', 'rb') as f:
-    #     BEC_summary1 = pickle.load(f)
-    # with open('models/' + data_loc + '/BEC_summary2.pickle', 'rb') as f:
-    #     BEC_summary2 = pickle.load(f)
-    # with open('models/' + data_loc + '/BEC_summary3.pickle', 'rb') as f:
-    #     BEC_summary3 = pickle.load(f)
-
-    with open('models/' + data_loc + '/training/k7_k8_k2/BEC_summary1.pickle', 'rb') as f:
-        BEC_summary1_k7_k8_k2 = pickle.load(f)
-    with open('models/' + data_loc + '/training/k7_k8_k2//BEC_summary2.pickle', 'rb') as f:
-        BEC_summary2_k7_k8_k2 = pickle.load(f)
-    with open('models/' + data_loc + '/training/k7_k8_k2//BEC_summary3.pickle', 'rb') as f:
-        BEC_summary3_k7_k8_k2 = pickle.load(f)
-
-    with open('models/' + data_loc + '/training/k4_k5/BEC_summary1.pickle', 'rb') as f:
-        BEC_summary1_k4_k5 = pickle.load(f)
-    with open('models/' + data_loc + '/training/k4_k5/BEC_summary2.pickle', 'rb') as f:
-        BEC_summary2_k4_k5 = pickle.load(f)
-    with open('models/' + data_loc + '/training/k4_k5/BEC_summary3.pickle', 'rb') as f:
-        BEC_summary3_k4_k5 = pickle.load(f)
-
-    with open('models/' + data_loc + '/training/k3/BEC_summary1.pickle', 'rb') as f:
-        BEC_summary1_k3 = pickle.load(f)
-    with open('models/' + data_loc + '/training/k3/BEC_summary2.pickle', 'rb') as f:
-        BEC_summary2_k3 = pickle.load(f)
-    with open('models/' + data_loc + '/training/k3/BEC_summary3.pickle', 'rb') as f:
-        BEC_summary3_k3 = pickle.load(f)
-
-    with open('models/' + data_loc + '/training/k6/BEC_summary1.pickle', 'rb') as f:
-        BEC_summary1_k6 = pickle.load(f)
-    with open('models/' + data_loc + '/training/k6/BEC_summary2.pickle', 'rb') as f:
-        BEC_summary2_k6 = pickle.load(f)
-    with open('models/' + data_loc + '/training/k6/BEC_summary3.pickle', 'rb') as f:
-        BEC_summary3_k6 = pickle.load(f)
-
-    with open('models/' + data_loc + '/training/k0/BEC_summary1.pickle', 'rb') as f:
-        BEC_summary1_k0 = pickle.load(f)
-    with open('models/' + data_loc + '/training/k0/BEC_summary2.pickle', 'rb') as f:
-        BEC_summary2_k0 = pickle.load(f)
-    with open('models/' + data_loc + '/training/k0/BEC_summary3.pickle', 'rb') as f:
-        BEC_summary3_k0 = pickle.load(f)
-
-    with open('models/' + data_loc + '/training/k1/BEC_summary1.pickle', 'rb') as f:
-        BEC_summary1_k1 = pickle.load(f)
-    with open('models/' + data_loc + '/training/k1/BEC_summary2.pickle', 'rb') as f:
-        BEC_summary2_k1 = pickle.load(f)
-    with open('models/' + data_loc + '/training/k1/BEC_summary3.pickle', 'rb') as f:
-        BEC_summary3_k1 = pickle.load(f)
-
+    with open('models/' + data_loc + '/BEC_summary_baseline.pickle', 'rb') as f:
+        BEC_summary1 = pickle.load(f)
+    with open('models/' + data_loc + '/BEC_summary_counterfactual_only.pickle', 'rb') as f:
+        BEC_summary2 = pickle.load(f)
+    with open('models/' + data_loc + '/BEC_summary_feature_only.pickle', 'rb') as f:
+        BEC_summary3 = pickle.load(f)
+    with open('models/' + data_loc + '/BEC_summary_proposed.pickle', 'rb') as f:
+        BEC_summary4 = pickle.load(f)
 
     BEC_summary = []
-    # BEC_summary.extend(BEC_summary1)
-    # BEC_summary.extend(BEC_summary2)
-    # BEC_summary.extend(BEC_summary3)
+    BEC_summary.extend(BEC_summary1)
+    BEC_summary.extend(BEC_summary2)
+    BEC_summary.extend(BEC_summary3)
+    BEC_summary.extend(BEC_summary4)
 
-    BEC_summary.extend(BEC_summary1_k7_k8_k2)
-    BEC_summary.extend(BEC_summary1_k4_k5)
-    BEC_summary.extend(BEC_summary1_k3)
-    BEC_summary.extend(BEC_summary1_k6)
-    BEC_summary.extend(BEC_summary1_k0)
-    BEC_summary.extend(BEC_summary1_k1)
-
-    BEC_summary.extend(BEC_summary2_k7_k8_k2)
-    BEC_summary.extend(BEC_summary2_k4_k5)
-    BEC_summary.extend(BEC_summary2_k3)
-    BEC_summary.extend(BEC_summary2_k6)
-    BEC_summary.extend(BEC_summary2_k0)
-    BEC_summary.extend(BEC_summary2_k1)
-
-    BEC_summary.extend(BEC_summary3_k7_k8_k2)
-    BEC_summary.extend(BEC_summary3_k4_k5)
-    BEC_summary.extend(BEC_summary3_k3)
-    BEC_summary.extend(BEC_summary3_k6)
-    BEC_summary.extend(BEC_summary3_k0)
-    BEC_summary.extend(BEC_summary3_k1)
-
-    with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
+    with open('models/' + data_loc + '/BEC_summary_combined.pickle', 'wb') as f:
         pickle.dump(BEC_summary, f)
 
 def check_training_testing_overlap():
@@ -226,7 +169,7 @@ def check_training_testing_overlap():
     See if any of the training demonstrations overlaps with any of the testing demonstrations (if there's overlap, it
     will print 'True')
     '''
-    data_locs = ['augmented_taxi', 'two_goal', 'skateboard']
+    data_locs = ['augmented_taxi2', 'colored_tiles', 'skateboard2']
     test_difficulties = ['low', 'medium', 'high']
 
     for data_loc in data_locs:
@@ -248,6 +191,7 @@ def check_training_testing_overlap():
 def create_testing_dictionaries(test_env_dict, mapping):
     '''
     Translate the selected testing pickle files into dictionaries so that they can be uploaded and used in the web user study
+    The tests can be generated using these dictionaries.
     '''
 
     for data_loc in mapping.keys():
@@ -255,7 +199,7 @@ def create_testing_dictionaries(test_env_dict, mapping):
             data_loc_test = 'models/' + data_loc + '/testing/test_' + test_difficulty + '/test_environments.pickle'
 
             with open(data_loc_test, 'rb') as f:
-                test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = pickle.load(f)
+                test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, selected_env_traj_tracers = pickle.load(f)
 
             pairs = mapping[data_loc][test_difficulty]
 
@@ -266,66 +210,10 @@ def create_testing_dictionaries(test_env_dict, mapping):
                 for element in pair:
                     test_wt_vi_traj_tuple = test_wt_vi_traj_tuples[element]
 
+                    vi = test_wt_vi_traj_tuple[1]
                     mdp = test_wt_vi_traj_tuple[1].mdp
                     optimal_traj = test_wt_vi_traj_tuple[2]
                     test_mdp_dict = test_wt_vi_traj_tuple[3]
-
-                    # postprocessing because MDP wasn't originally saved correctly in policy_summarization_helpers.py
-                    # (the problem has now been fixed and the code below should be unnecessary)
-                    if data_loc == 'augmented_taxi':
-                        test_mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
-                        test_mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
-                        test_mdp_dict['agent']['has_passenger'] = mdp.init_state.get_objects_of_class("agent")[
-                            0].get_attribute('has_passenger')
-
-                        test_mdp_dict['walls'] = []
-                        for wall in mdp.walls:
-                            test_mdp_dict['walls'].append({'x': wall['x'], 'y': wall['y']})
-
-                        test_mdp_dict['tolls'] = []
-                        for toll in mdp.tolls:
-                            test_mdp_dict['tolls'].append({'x': toll['x'], 'y': toll['y']})
-
-                        test_mdp_dict['passengers'][0]['x'] = mdp.init_state.get_objects_of_class("passenger")[
-                            0].get_attribute('x')
-                        test_mdp_dict['passengers'][0]['y'] = mdp.init_state.get_objects_of_class("passenger")[
-                            0].get_attribute('y')
-                        test_mdp_dict['passengers'][0]['dest_x'] = mdp.init_state.get_objects_of_class("passenger")[
-                            0].get_attribute('dest_x')
-                        test_mdp_dict['passengers'][0]['dest_y'] = mdp.init_state.get_objects_of_class("passenger")[
-                            0].get_attribute('dest_y')
-                        test_mdp_dict['passengers'][0]['in_taxi'] = mdp.init_state.get_objects_of_class("passenger")[
-                            0].get_attribute('in_taxi')
-
-                        test_mdp_dict['env_code'] = mdp.env_code
-                    elif data_loc == 'two_goal':
-                        test_mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
-                        test_mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
-
-                        test_mdp_dict['walls'] = []
-                        for wall in mdp.walls:
-                            test_mdp_dict['walls'].append({'x': wall['x'], 'y': wall['y']})
-
-                        test_mdp_dict['env_code'] = mdp.env_code
-                    else:
-                        test_mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
-                        test_mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
-                        test_mdp_dict['agent']['has_skateboard'] = mdp.init_state.get_objects_of_class("agent")[
-                            0].get_attribute('has_skateboard')
-
-                        test_mdp_dict['walls'] = []
-                        for wall in mdp.walls:
-                            test_mdp_dict['walls'].append({'x': wall['x'], 'y': wall['y']})
-
-                        test_mdp_dict['skateboard'][0]['x'] = mdp.init_state.get_objects_of_class("skateboard")[
-                            0].get_attribute('x')
-                        test_mdp_dict['skateboard'][0]['y'] = mdp.init_state.get_objects_of_class("skateboard")[
-                            0].get_attribute('y')
-                        test_mdp_dict['skateboard'][0]['on_agent'] = mdp.init_state.get_objects_of_class("skateboard")[
-                            0].get_attribute('on_agent')
-
-                        test_mdp_dict['env_code'] = mdp.env_code
-
 
                     test_mdp_dict['opt_actions'] = [sas[1] for sas in optimal_traj]
                     test_mdp_dict['opt_traj_length'] = len(optimal_traj)
@@ -333,6 +221,14 @@ def create_testing_dictionaries(test_env_dict, mapping):
                     test_mdp_dict['test_difficulty'] = test_difficulty
                     # to be able to trace the particular environment (0-5)
                     test_mdp_dict['tag'] = element
+
+                    # also obtain all possible optimal trajectories
+                    all_opt_trajs = mdp_helpers.rollout_policy_recursive(mdp, vi, optimal_traj[0][0], [])
+                    # extract all of the actions
+                    all_opt_actions = []
+                    for opt_traj in all_opt_trajs:
+                        all_opt_actions.append([sas[1] for sas in opt_traj])
+                    test_mdp_dict['all_opt_actions'] = all_opt_actions
 
                     # delete unserializable numpy arrays that aren't necessary
                     try:
@@ -342,7 +238,7 @@ def create_testing_dictionaries(test_env_dict, mapping):
                     except:
                         pass
 
-                    print(test_mdp_dict)
+                    # print(test_mdp_dict)
                     # print(test_mdp_dict['env_code'])
 
                     pair_mdp_dict.append(test_mdp_dict)
@@ -506,28 +402,30 @@ def process_human_scores(test_env_dict, mapping):
 if __name__ == "__main__":
     data_loc = params.data_loc['BEC']
     test_env_dict = {
-        'augmented_taxi': {},
-        'two_goal': {},
-        'skateboard': {}
+        'augmented_taxi2': {},
+        'colored_tiles': {},
+        'skateboard2': {}
     }
 
+    # specify which potential pairs of demonstrations within each difficulty to use based on semantics (e.g. pair one
+    # high difficulty that detours to the right with another high difficulty one detours to the left)
     mapping = {
-        'augmented_taxi':
-            {
-                'low': [[0, 2], [1, 4], [3, 5]],
-                'medium': [[0, 3], [1, 4], [2, 5]],
-                'high': [[0, 1], [2, 3], [4, 5]],
-            },
-        'two_goal':
-            {
-                'low': [[0, 2], [3, 4], [1, 5]],
-                'medium': [[0, 2], [1, 5], [3, 4]],
-                'high': [[0, 4], [2, 5], [1, 3]],
-            },
-        'skateboard':
+        'augmented_taxi2':
             {
                 'low': [[0, 1], [2, 3], [4, 5]],
-                'medium': [[0, 3], [1, 4], [2, 5]],
+                'medium': [[0, 1], [2, 3], [4, 5]],
+                'high': [[0, 1], [2, 3], [4, 5]],
+            },
+        'colored_tiles':
+            {
+                'low': [[0, 1], [2, 3], [4, 5]],
+                'medium': [[0, 1], [2, 3], [4, 5]],
+                'high': [[0, 1], [2, 3], [4, 5]],
+            },
+        'skateboard2':
+            {
+                'low': [[0, 1], [2, 3], [4, 5]],
+                'medium': [[0, 1], [2, 3], [4, 5]],
                 'high': [[0, 1], [2, 3], [4, 5]],
             }
     }
@@ -537,23 +435,6 @@ if __name__ == "__main__":
     # extract_test_demonstrations(data_loc)
     # plot_BEC_histogram(data_loc, params.weights['val'], params.step_cost_flag)
     # check_training_testing_overlap()
-    # create_testing_dictionaries(test_env_dict, mapping)
+    create_testing_dictionaries(test_env_dict, mapping)
     # print_training_summary_lengths()
-    process_human_scores(test_env_dict, mapping)
-
-    # mdp_parameters = {
-    # 'agent': {'x': 4, 'y': 1, 'has_passenger': 0},
-    # 'walls': [{'x': 1, 'y': 3}, {'x': 1, 'y': 2}],
-    # 'passengers': [{'x': 4, 'y': 1, 'dest_x': 1, 'dest_y': 1, 'in_taxi': 0}],
-    # 'tolls': [{'x': 3, 'y': 1}],
-    # 'available_tolls': [{"x": 2, "y": 3}, {"x": 3, "y": 3}, {"x": 4, "y": 3},
-    # {"x": 2, "y": 2}, {"x": 3, "y": 2}, {"x": 4, "y": 2},
-    # {"x": 2, "y": 1}, {"x": 3, "y": 1}],
-    # 'traffic': [],  # probability that you're stuck
-    # 'fuel_station': [],
-    # 'width': 4,
-    # 'height': 3,
-    # 'gamma': 1,
-    # }
-
-
+    # process_human_scores(test_env_dict, mapping)

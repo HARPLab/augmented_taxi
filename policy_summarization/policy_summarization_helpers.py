@@ -369,7 +369,8 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
         summary_idxs[best_env_idx].append(best_traj_idx)
 
     for env_idx in summary_idxs.keys():
-        traj_idxs = summary_idxs[env_idx]
+        traj_idxs = summary_idxs[env_idx].copy()
+        traj_idxs = list(set(traj_idxs)) # remove redundant trajectory idxs
         for traj_idx in sorted(traj_idxs, reverse=True):
             del traj_record_filtered[env_idx][traj_idx]
             del min_subset_constraints_record_filtered[env_idx][traj_idx]

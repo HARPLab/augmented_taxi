@@ -9,8 +9,8 @@ import os
 # mdp_class = 'cookie_crumb'
 
 mdp_class = 'augmented_taxi2'
-# mdp_class = 'skateboard2'
 # mdp_class = 'colored_tiles'
+# mdp_class = 'skateboard2'
 
 w_norm_order = 2
 if mdp_class == 'augmented_taxi':
@@ -248,7 +248,7 @@ BEC = {
                                               # counterfactual_only: counterfactual (Y), feature scaffolding (N)
                                               # (Frontiers21) baseline: counterfactual (N), feature scaffolding (N)
 
-    'n_train_demos': 15,                      # number of desired training demonstrations
+    'n_train_demos': 5,                       # number of desired training demonstrations
 
     'n_test_demos': 30,                       # number of desired test demonstration
 
