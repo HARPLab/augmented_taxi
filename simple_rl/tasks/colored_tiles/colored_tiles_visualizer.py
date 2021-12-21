@@ -92,19 +92,26 @@ def _draw_state(screen,
                     colored_tiles_oomdp.height - p_y) + 5
             # Clear the space and redraw with correct transparency (instead of simply adding a new layer which would
             # affect the transparency
-            pygame.draw.rect(screen, (int(max(color_ls[-2][0] - 30, 0)), int(max(color_ls[-2][1] - 30, 0)),
-                        int(max(color_ls[-2][2] - 30, 0))), top_left_point + (cell_width - 10, cell_height - 10), 0)
+            pygame.draw.rect(screen, (int(max(color_ls[5][0] - 30, 0)), int(max(color_ls[5][1] - 30, 0)),
+                        int(max(color_ls[5][2] - 30, 0))), top_left_point + (cell_width - 10, cell_height - 10), 0)
 
         # Draw B tiles
-        for p in colored_tiles_oomdp.B_tiles:
-            p_x, p_y = p["x"], p["y"]
-            top_left_point = width_buffer + cell_width * (p_x - 1) + 5, height_buffer + cell_height * (
-                    colored_tiles_oomdp.height - p_y) + 5
-            # Clear the space and redraw with correct transparency (instead of simply adding a new layer which would
-            # affect the transparency
-            pygame.draw.rect(screen, (int(max(color_ls[0][0] - 30, 0)), int(max(color_ls[0][1] - 30, 0)),
-                        int(max(color_ls[0][2] - 30, 0))), top_left_point + (cell_width - 10, cell_height - 10), 0)
-
+        for g in colored_tiles_oomdp.B_tiles:
+            dest_x, dest_y = g["x"], g["y"]
+            top_left_point = int(width_buffer + cell_width * (dest_x - 1) + 75), int(
+                height_buffer + cell_height * (colored_tiles_oomdp.height - dest_y) + 65)
+            dest_col = (int(max(color_ls[0][0] - 30, 0)), int(max(color_ls[0][1] - 30, 0)),
+                        int(max(color_ls[0][2] - 30, 0)))
+            center = top_left_point + (cell_width / 2, cell_height / 2)
+            radius = 45
+            iterations = 150
+            for i in range(iterations):
+                ang = i * 3.14159 * 2 / iterations
+                dx = int(math.cos(ang) * radius)
+                dy = int(math.sin(ang) * radius)
+                x = center[0] + dx
+                y = center[1] + dy
+                pygame.draw.circle(screen, dest_col, (x, y), 5)
 
     # Draw the destination.
     dest_x, dest_y = colored_tiles_oomdp.goal["x"], colored_tiles_oomdp.goal["y"]
