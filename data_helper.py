@@ -215,6 +215,49 @@ def create_testing_dictionaries(test_env_dict, mapping):
                     optimal_traj = test_wt_vi_traj_tuple[2]
                     test_mdp_dict = test_wt_vi_traj_tuple[3]
 
+                    # update the MDP parameters to begin with the desired start state
+                    if data_loc == 'augmented_taxi2':
+                        test_mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
+                        test_mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
+                        test_mdp_dict['agent']['has_passenger'] = mdp.init_state.get_objects_of_class("agent")[
+                            0].get_attribute('has_passenger')
+
+                        test_mdp_dict['passengers'][0]['x'] = mdp.init_state.get_objects_of_class("passenger")[
+                            0].get_attribute('x')
+                        test_mdp_dict['passengers'][0]['y'] = mdp.init_state.get_objects_of_class("passenger")[
+                            0].get_attribute('y')
+                        test_mdp_dict['passengers'][0]['dest_x'] = mdp.init_state.get_objects_of_class("passenger")[
+                            0].get_attribute('dest_x')
+                        test_mdp_dict['passengers'][0]['dest_y'] = mdp.init_state.get_objects_of_class("passenger")[
+                            0].get_attribute('dest_y')
+                        test_mdp_dict['passengers'][0]['in_taxi'] = mdp.init_state.get_objects_of_class("passenger")[
+                            0].get_attribute('in_taxi')
+
+                        if (len(mdp.init_state.get_objects_of_class("hotswap_station")) > 0):
+                            test_mdp_dict['hotswap_station'][0]['x'] = mdp.init_state.get_objects_of_class("hotswap_station")[
+                                0].get_attribute('x')
+                            test_mdp_dict['hotswap_station'][0]['y'] = mdp.init_state.get_objects_of_class("hotswap_station")[
+                                0].get_attribute('y')
+                        else:
+                            test_mdp_dict['hotswap_station'] = []
+
+
+                    elif data_loc == 'colored_tiles':
+                        test_mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
+                        test_mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
+                    else:
+                        test_mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
+                        test_mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
+                        test_mdp_dict['agent']['has_skateboard'] = mdp.init_state.get_objects_of_class("agent")[
+                            0].get_attribute('has_skateboard')
+
+                        test_mdp_dict['skateboard'][0]['x'] = mdp.init_state.get_objects_of_class("skateboard")[
+                            0].get_attribute('x')
+                        test_mdp_dict['skateboard'][0]['y'] = mdp.init_state.get_objects_of_class("skateboard")[
+                            0].get_attribute('y')
+                        test_mdp_dict['skateboard'][0]['on_agent'] = mdp.init_state.get_objects_of_class("skateboard")[
+                            0].get_attribute('on_agent')
+
                     test_mdp_dict['opt_actions'] = [sas[1] for sas in optimal_traj]
                     test_mdp_dict['opt_traj_length'] = len(optimal_traj)
                     test_mdp_dict['opt_traj_reward'] = mdp.weights.dot(mdp.accumulate_reward_features(optimal_traj).T)[0][0]
@@ -329,18 +372,78 @@ def print_training_summary_lengths():
     with open('training_traj_lengths.json', 'w') as f:
         json.dump(training_traj_lengths, f)
 
-def process_human_scores(test_env_dict, mapping):
-    with open('dfs.pickle', 'rb') as f:
-        df_training_exp1, df_training_exp2, df_testing, df_testing_sandbox, df_training_survey_exp1, df_training_survey_exp2, df_post_survey = pickle.load(f)
+def obtain_outlier_human_scores(test_env_dict):
+    with open('dfs_full.pickle', 'rb') as f:
+        df_training, df_testing, df_testing_sandbox, df_training_survey, df_post_survey = pickle.load(f)
 
-    for data_loc in mapping.keys():
-        for test_difficulty in mapping[data_loc].keys():
+    df_testing_filtered = df_testing.copy()
+    flagged_ids = ['5efb33ad6ad15505fd008366', '5fbfe145e52a44000a9c2966', '60f6f802c0ede08f7cf69720', '61423a70286bdb2a2d226fa7']
+    for id in flagged_ids:
+        df_testing_filtered = df_testing_filtered[
+            df_testing_filtered.uniqueid != id]
 
-            data_loc_test = 'models/' + data_loc + '/testing/test_' + test_difficulty + '/test_environments.pickle'
+    test_demos_raw_human_scores = {
+        'augmented_taxi2':
+            {
+                'low': {'0': [], '1': [], '2': [], '3': [], '4': [], '5': []},
+                'medium': {'0': [], '1': [], '2': [], '3': [], '4': [], '5': []},
+                'high': {'0': [], '1': [], '2': [], '3': [], '4': [], '5': []},
+            },
+        'colored_tiles':
+            {
+                'low': {'0': [], '1': [], '2': [], '3': [], '4': [], '5': []},
+                'medium': {'0': [], '1': [], '2': [], '3': [], '4': [], '5': []},
+                'high': {'0': [], '1': [], '2': [], '3': [], '4': [], '5': []},
+            },
+        'skateboard2':
+            {
+                'low': {'0': [], '1': [], '2': [], '3': [], '4': [], '5': []},
+                'medium': {'0': [], '1': [], '2': [], '3': [], '4': [], '5': []},
+                'high': {'0': [], '1': [], '2': [], '3': [], '4': [], '5': []},
+            }
+    }
 
-            with open(data_loc_test, 'rb') as f:
-                test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints = pickle.load(f)
-                test_env_dict[data_loc][test_difficulty] = test_wt_vi_traj_tuples
+    test_demos_mean_human_scores = {
+        'augmented_taxi2':
+            {
+                'low': {'0': 0.0, '1': 0.0, '2': 0.0, '3': 0.0, '4': 0.0, '5': 0.0},
+                'medium': {'0': 0.0, '1': 0.0, '2': 0.0, '3': 0.0, '4': 0.0, '5': 0.0},
+                'high': {'0': 0.0, '1': 0.0, '2': 0.0, '3': 0.0, '4': 0.0, '5': 0.0},
+            },
+        'colored_tiles':
+            {
+                'low': {'0': 0.0, '1': 0.0, '2': 0.0, '3': 0.0, '4': 0.0, '5': 0.0},
+                'medium': {'0': 0.0, '1': 0.0, '2': 0.0, '3': 0.0, '4': 0.0, '5': 0.0},
+                'high': {'0': 0.0, '1': 0.0, '2': 0.0, '3': 0.0, '4': 0.0, '5': 0.0},
+            },
+        'skateboard2':
+            {
+                'low': {'0': 0.0, '1': 0.0, '2': 0.0, '3': 0.0, '4': 0.0, '5': 0.0},
+                'medium': {'0': 0.0, '1': 0.0, '2': 0.0, '3': 0.0, '4': 0.0, '5': 0.0},
+                'high': {'0': 0.0, '1': 0.0, '2': 0.0, '3': 0.0, '4': 0.0, '5': 0.0},
+            }
+    }
+
+    test_demos_std_human_scores = {
+        'augmented_taxi2':
+            {
+                'low': {'0': 0.0, '1': 0.0, '2': 0.0, '3': 0.0, '4': 0.0, '5': 0.0},
+                'medium': {'0': 0.0, '1': 0.0, '2': 0.0, '3': 0.0, '4': 0.0, '5': 0.0},
+                'high': {'0': 0.0, '1': 0.0, '2': 0.0, '3': 0.0, '4': 0.0, '5': 0.0},
+            },
+        'colored_tiles':
+            {
+                'low': {'0': 0.0, '1': 0.0, '2': 0.0, '3': 0.0, '4': 0.0, '5': 0.0},
+                'medium': {'0': 0.0, '1': 0.0, '2': 0.0, '3': 0.0, '4': 0.0, '5': 0.0},
+                'high': {'0': 0.0, '1': 0.0, '2': 0.0, '3': 0.0, '4': 0.0, '5': 0.0},
+            },
+        'skateboard2':
+            {
+                'low': {'0': 0.0, '1': 0.0, '2': 0.0, '3': 0.0, '4': 0.0, '5': 0.0},
+                'medium': {'0': 0.0, '1': 0.0, '2': 0.0, '3': 0.0, '4': 0.0, '5': 0.0},
+                'high': {'0': 0.0, '1': 0.0, '2': 0.0, '3': 0.0, '4': 0.0, '5': 0.0},
+            }
+    }
 
     for i in df_testing.index:
         domain = df_testing.at[i, 'domain']
@@ -363,30 +466,174 @@ def process_human_scores(test_env_dict, mapping):
 
         human_reward = mdp.weights.dot(mdp.accumulate_reward_features(trajectory).T)
 
-        # record binary reward
-        if human_reward == df_testing.test_mdp[i]['opt_traj_reward']:
-            df_testing.at[i, 'scaled_human_reward'] = 1
+        # test_demos_raw_human_scores[domain][test_difficulty][str(tag)].append(human_reward[0][0])
+        # not using the mean and std given by outliers 2.8 std dev away
+        if df_testing.at[i, 'uniqueid'] not in flagged_ids:
+            test_demos_raw_human_scores[domain][test_difficulty][str(tag)].append(human_reward[0][0])
+
+        df_testing.at[i, 'scaled_human_reward'] = human_reward[0][0]
+
+    for domain in test_demos_raw_human_scores.keys():
+        for test_difficulty in test_demos_raw_human_scores[domain].keys():
+            for tag in test_demos_raw_human_scores[domain][test_difficulty].keys():
+                test_demos_mean_human_scores[domain][test_difficulty][tag] = np.mean(test_demos_raw_human_scores[domain][test_difficulty][tag])
+                test_demos_std_human_scores[domain][test_difficulty][tag] = np.std(test_demos_raw_human_scores[domain][test_difficulty][tag])
+
+
+    outlier_uniqueids = {}
+    outlier_conditions = {}
+
+    sigma = 3
+
+    for i in df_testing.index:
+        domain = df_testing.at[i, 'domain']
+        test_difficulty = df_testing.test_mdp[i]['test_difficulty']
+        tag = df_testing.test_mdp[i]['tag']
+
+        if df_testing.at[i, 'scaled_human_reward'] < test_demos_mean_human_scores[domain][test_difficulty][
+            str(tag)] - sigma * test_demos_std_human_scores[domain][test_difficulty][str(tag)]:
+            if not df_testing.at[i, 'uniqueid'] in outlier_uniqueids.keys():
+                outlier_uniqueids[df_testing.at[i, 'uniqueid']] = 1
+                outlier_conditions[df_testing.at[i, 'uniqueid']] = df_testing.at[i, 'condition']
+            else:
+                outlier_uniqueids[df_testing.at[i, 'uniqueid']] += 1
+
+    outlier_count = np.array(list(outlier_uniqueids.values())).mean() + sigma * np.array(
+        list(outlier_uniqueids.values())).std()
+
+    for key in outlier_uniqueids.keys():
+        if outlier_uniqueids[key] > outlier_count:
+            print(key)
+            print(outlier_uniqueids[key])
+
+    print('==============')
+
+
+def obtain_test_demos_low_human_scores(df_testing, test_env_dict):
+    # if I want to try and scale by the worst possible human score (as the lowerbound) and the best possible score (as the upperbound)
+    test_demos_low_human_scores = {
+        'augmented_taxi2':
+            {
+                'low': {'0': float('inf'), '1': float('inf'), '2': float('inf'), '3': float('inf'),
+                        '4': float('inf'), '5': float('inf')},
+                'medium': {'0': float('inf'), '1': float('inf'), '2': float('inf'), '3': float('inf'),
+                           '4': float('inf'), '5': float('inf')},
+                'high': {'0': float('inf'), '1': float('inf'), '2': float('inf'), '3': float('inf'),
+                         '4': float('inf'), '5': float('inf')},
+            },
+        'colored_tiles':
+            {
+                'low': {'0': float('inf'), '1': float('inf'), '2': float('inf'), '3': float('inf'),
+                        '4': float('inf'), '5': float('inf')},
+                'medium': {'0': float('inf'), '1': float('inf'), '2': float('inf'), '3': float('inf'),
+                           '4': float('inf'), '5': float('inf')},
+                'high': {'0': float('inf'), '1': float('inf'), '2': float('inf'), '3': float('inf'),
+                         '4': float('inf'), '5': float('inf')},
+            },
+        'skateboard2':
+            {
+                'low': {'0': float('inf'), '1': float('inf'), '2': float('inf'), '3': float('inf'),
+                        '4': float('inf'), '5': float('inf')},
+                'medium': {'0': float('inf'), '1': float('inf'), '2': float('inf'), '3': float('inf'),
+                           '4': float('inf'), '5': float('inf')},
+                'high': {'0': float('inf'), '1': float('inf'), '2': float('inf'), '3': float('inf'),
+                         '4': float('inf'), '5': float('inf')},
+            }
+    }
+
+    for i in df_testing.index:
+        domain = df_testing.at[i, 'domain']
+        moves_list = df_testing.moves[i][1:-1].replace('\', ', '').split('\'')[1:-1]
+        test_difficulty = df_testing.test_mdp[i]['test_difficulty']
+        tag = df_testing.test_mdp[i]['tag']
+
+        mdp = test_env_dict[domain][test_difficulty][tag][1].mdp
+
+        mdp.reset()
+        trajectory = []
+        cur_state = mdp.get_init_state()
+
+        for idx in range(len(moves_list)):
+            reward, next_state = mdp.execute_agent_action(moves_list[idx])
+            trajectory.append((cur_state, moves_list[idx], next_state))
+
+            # deepcopy occurs within transition function
+            cur_state = next_state
+
+        human_reward = mdp.weights.dot(mdp.accumulate_reward_features(trajectory).T)
+
+        if human_reward < test_demos_low_human_scores[domain][test_difficulty][str(tag)]:
+            test_demos_low_human_scores[domain][test_difficulty][str(tag)] = human_reward[0][0]
+
+    return test_demos_low_human_scores
+
+def process_human_scores(test_env_dict, type='binary'):
+    with open('dfs.pickle', 'rb') as f:
+        df_training, df_testing, df_testing_sandbox, df_training_survey, df_post_survey = pickle.load(f)
+
+    if type == 'scaled' or type == 'scale-truncated':
+        test_demos_low_human_scores = obtain_test_demos_low_human_scores(df_testing, test_env_dict)
+
+    for i in df_testing.index:
+        domain = df_testing.at[i, 'domain']
+        moves_list = df_testing.moves[i][1:-1].replace('\', ', '').split('\'')[1:-1]
+        test_difficulty = df_testing.test_mdp[i]['test_difficulty']
+        tag = df_testing.test_mdp[i]['tag']
+
+        mdp = test_env_dict[domain][test_difficulty][tag][1].mdp
+
+        mdp.reset()
+        trajectory = []
+        cur_state = mdp.get_init_state()
+
+        for idx in range(len(moves_list)):
+            reward, next_state = mdp.execute_agent_action(moves_list[idx])
+            trajectory.append((cur_state, moves_list[idx], next_state))
+
+            # deepcopy occurs within transition function
+            cur_state = next_state
+
+        human_reward = mdp.weights.dot(mdp.accumulate_reward_features(trajectory).T)
+
+        if type == 'binary':
+            # record binary reward
+            # if human_reward == df_testing.test_mdp[i]['opt_traj_reward']:
+            #     if test_difficulty == 'high':
+            #         df_testing.at[i, 'scaled_human_reward'] = 3
+            #     elif test_difficulty == 'medium':
+            #         df_testing.at[i, 'scaled_human_reward'] = 2
+            #     else:
+            #         df_testing.at[i, 'scaled_human_reward'] = 1
+            # else:
+            #     df_testing.at[i, 'scaled_human_reward'] = 0
+            if human_reward == df_testing.test_mdp[i]['opt_traj_reward']:
+                df_testing.at[i, 'scaled_human_reward'] = 1
+            else:
+                df_testing.at[i, 'scaled_human_reward'] = 0
+        elif type == 'raw':
+            # record raw data
+            df_testing.at[i, 'scaled_human_reward'] = human_reward[0][0]
+            # print(human_reward)
+            # print(df_testing.test_mdp[i]['opt_traj_reward'])
+            # print('\n')
+        elif type == 'scaled':
+            if df_testing.test_mdp[i]['opt_traj_reward'] == test_demos_low_human_scores[domain][test_difficulty][str(tag)]:
+                df_testing.at[i, 'scaled_human_reward'] = 1.0
+            else:
+                df_testing.at[i, 'scaled_human_reward'] = (human_reward[0][0] - test_demos_low_human_scores[domain][test_difficulty][str(tag)]) / (df_testing.test_mdp[i]['opt_traj_reward'] - test_demos_low_human_scores[domain][test_difficulty][str(tag)])
+        elif type == 'scale-trunacted':
+            # record scale-truncated binary data
+            test_demos_low_human_scores = obtain_test_demos_low_human_scores(df_testing, test_env_dict)
+            if df_testing.test_mdp[i]['opt_traj_reward'] == test_demos_low_human_scores[domain][test_difficulty][str(tag)]:
+                df_testing.at[i, 'scaled_human_reward'] = 1.0
+            elif (human_reward[0][0] - test_demos_low_human_scores[domain][test_difficulty][str(tag)]) / (df_testing.test_mdp[i]['opt_traj_reward'] - test_demos_low_human_scores[domain][test_difficulty][str(tag)]) >= 0.95:
+                df_testing.at[i, 'scaled_human_reward'] = 1.0
+            else:
+                df_testing.at[i, 'scaled_human_reward'] = 0.0
+                # df_testing.at[i, 'scaled_human_reward'] = (human_reward[0][0] - test_demos_low_human_scores[domain][test_difficulty][str(tag)]) / (
+                #             df_testing.test_mdp[i]['opt_traj_reward'] - test_demos_low_human_scores[dCopy of Study feedbackomain][test_difficulty][str(tag)])
         else:
-            df_testing.at[i, 'scaled_human_reward'] = 0
-
-        # record raw data
-        # df_testing.at[i, 'scaled_human_reward'] = human_reward
-
-        # # record scaled data
-        # df_testing.at[i, 'scaled_human_reward'] = human_reward / df_testing.test_mdp[i]['opt_traj_reward']
-
-        # # record truncated scaled data
-        # scaled_reward = human_reward / df_testing.test_mdp[i]['opt_traj_reward']
-        # if scaled_reward < 0:
-        #     df_testing.at[i, 'scaled_human_reward'] = 0
-        # else:
-        #     df_testing.at[i, 'scaled_human_reward'] = scaled_reward
-
-        # # record truncated binary reward
-        # if human_reward / df_testing.test_mdp[i]['opt_traj_reward'] >= 0.95:
-        #     df_testing.at[i, 'scaled_human_reward'] = 1
-        # else:
-        #     df_testing.at[i, 'scaled_human_reward'] = 0
+            raise Exception("Unknown score processing type.")
 
         # record corresponding test difficulty
         if test_difficulty == 'low':
@@ -397,15 +644,9 @@ def process_human_scores(test_env_dict, mapping):
             df_testing.at[i, 'test_difficulty'] = 2
 
     with open('dfs_processed.pickle', 'wb') as f:
-        pickle.dump((df_training_exp1, df_training_exp2, df_testing, df_testing_sandbox, df_training_survey_exp1, df_training_survey_exp2, df_post_survey), f)
-
+        pickle.dump((df_training, df_testing, df_testing_sandbox, df_training_survey, df_post_survey), f)
 if __name__ == "__main__":
     data_loc = params.data_loc['BEC']
-    test_env_dict = {
-        'augmented_taxi2': {},
-        'colored_tiles': {},
-        'skateboard2': {}
-    }
 
     # specify which potential pairs of demonstrations within each difficulty to use based on semantics (e.g. pair one
     # high difficulty that detours to the right with another high difficulty one detours to the left)
@@ -430,11 +671,32 @@ if __name__ == "__main__":
             }
     }
 
+    try:
+        with open('test_env_dict.pickle', 'rb') as f:
+            test_env_dict = pickle.load(f)
+    except:
+        test_env_dict = {
+            'augmented_taxi2': {},
+            'colored_tiles': {},
+            'skateboard2': {}
+        }
+        for data_loc in mapping.keys():
+            for test_difficulty in mapping[data_loc].keys():
+                data_loc_test = 'models/' + data_loc + '/testing/test_' + test_difficulty + '/test_environments.pickle'
+
+                with open(data_loc_test, 'rb') as f:
+                    test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, selected_env_traj_tracers = pickle.load(
+                        f)
+                    test_env_dict[data_loc][test_difficulty] = test_wt_vi_traj_tuples
+
+        with open('test_env_dict.pickle', 'wb') as f:
+            pickle.dump(test_env_dict, f)
 
     # combine_summaries(data_loc)
     # extract_test_demonstrations(data_loc)
     # plot_BEC_histogram(data_loc, params.weights['val'], params.step_cost_flag)
     # check_training_testing_overlap()
-    create_testing_dictionaries(test_env_dict, mapping)
+    # create_testing_dictionaries(test_env_dict, mapping)
     # print_training_summary_lengths()
-    # process_human_scores(test_env_dict, mapping)
+    # process_human_scores(test_env_dict, type='binary')  # binary, raw, scaled, or scale-truncated
+    obtain_outlier_human_scores(test_env_dict)
