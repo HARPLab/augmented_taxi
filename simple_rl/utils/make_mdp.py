@@ -7,7 +7,7 @@ Utility for making MDP instances
 # Python imports.
 
 # Other imports.
-from simple_rl.tasks import AugmentedTaxiOOMDP, TwoGoalOOMDP, SkateboardOOMDP, TaxiOOMDP, CookieCrumbOOMDP, AugmentedTaxi2OOMDP, TwoGoal2OOMDP, Skateboard2OOMDP, ColoredTilesOOMDP
+from simple_rl.tasks import AugmentedTaxiOOMDP, TwoGoalOOMDP, SkateboardOOMDP, TaxiOOMDP, CookieCrumbOOMDP, AugmentedTaxi2OOMDP, TwoGoal2OOMDP, Skateboard2OOMDP, ColoredTilesOOMDP, AugmentedNavigationOODMP
 
 def make_custom_mdp(mdp_class, mdp_parameters):
     if mdp_class == 'augmented_taxi':
@@ -46,6 +46,11 @@ def make_custom_mdp(mdp_class, mdp_parameters):
     elif mdp_class == 'colored_tiles':
         mdp_candidate = ColoredTilesOOMDP(width=mdp_parameters['width'], height=mdp_parameters['height'], agent=mdp_parameters['agent'],
                                            walls=mdp_parameters['walls'], A_tiles=mdp_parameters['A_tiles'], B_tiles=mdp_parameters['B_tiles'], goal=mdp_parameters['goal'], gamma=mdp_parameters['gamma'],
+                                           weights=mdp_parameters['weights'], env_code=mdp_parameters['env_code'], sample_rate=1)
+    elif mdp_class == 'augmented_navigation':
+        mdp_candidate = AugmentedNavigationOODMP(width=mdp_parameters['width'], height=mdp_parameters['height'], agent=mdp_parameters['agent'],
+                                           walls=mdp_parameters['walls'], gravel=mdp_parameters['gravel'], grass=mdp_parameters['grass'], roads=mdp_parameters['roads'], hotswap_stations=mdp_parameters['hotswap_station'],
+                                                 skateboard=mdp_parameters['skateboard'], cars=mdp_parameters['cars'], goal=mdp_parameters['goal'], gamma=mdp_parameters['gamma'],
                                            weights=mdp_parameters['weights'], env_code=mdp_parameters['env_code'], sample_rate=1)
     else:
         raise Exception("Unknown MDP class.")
@@ -163,6 +168,29 @@ def make_mdp_obj(mdp_class, mdp_code, mdp_parameters):
                 requested_B_tiles.append(available_B_tiles[x - len(available_A_tiles)])
 
         return requested_A_tiles, requested_B_tiles, mdp_code
+    elif mdp_class == 'augmented_navigation':
+        requested_gravel = []
+        requested_grass = []
+        requested_road = []
+        requested_hotswap_stations = []
+        requested_skateboard = []
+        requested_car = []
+
+        if mdp_code[0]:
+            requested_gravel.extend(mdp_parameters['available_gravel'])
+        if mdp_code[1]:
+            requested_grass.extend(mdp_parameters['available_grass'])
+        if mdp_code[2]:
+            requested_road.extend(mdp_parameters['available_roads'])
+        # assume that there are only one of hotswap_station, skateboard, and cars
+        if mdp_code[3]:
+            requested_hotswap_stations.append(mdp_parameters['available_hotswap_stations'][0])
+        if mdp_code[4]:
+            requested_skateboard.append(mdp_parameters['skateboard'][0])
+        if mdp_code[5]:
+            requested_car.append(mdp_parameters['cars'][0])
+
+        return requested_gravel, requested_grass, requested_road, requested_hotswap_stations, requested_skateboard, requested_car, mdp_code
     else:
         raise Exception("Unknown MDP class.")
 

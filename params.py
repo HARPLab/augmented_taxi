@@ -1,16 +1,22 @@
 import numpy as np
 import os
 
+# Frontiers21 environments (allows exits)
 # mdp_class = 'augmented_taxi'
 # mdp_class = 'two_goal'
 # mdp_class = 'skateboard'
+
+# S22/IJCAI22 environments (doesn't allow exits)
+# mdp_class = 'augmented_taxi2'
+# mdp_class = 'colored_tiles'
+# mdp_class = 'skateboard2'
 # mdp_class = 'two_goal2'
+
+# misc (allows exits)
 # mdp_class = 'taxi'
 # mdp_class = 'cookie_crumb'
 
-mdp_class = 'augmented_taxi2'
-# mdp_class = 'colored_tiles'
-# mdp_class = 'skateboard2'
+mdp_class = 'augmented_navigation'
 
 w_norm_order = 2
 if mdp_class == 'augmented_taxi':
@@ -178,6 +184,39 @@ elif mdp_class == 'colored_tiles':
 
     prior = [np.array([[0, 0, -1]])]
     posterior = [np.array([[-1, 0, 0]]), np.array([[0, -1, 0]]), np.array([[0, 0, -1]])]
+elif mdp_class == 'augmented_navigation':
+    w = np.array([[-3, -7, 0.7, 3.5, 0.5, 0.8, -1]]) # gravel, grass, road, recharge, skateboard, car, step
+    w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order)
+
+    mdp_parameters = {
+        'agent': {'x': 1, 'y': 3, 'has_skateboard': 0, 'has_car': 0},
+        'skateboard': [{'x': 1, 'y': 5, 'on_agent': 0}],
+        'cars': [{'x': 1, 'y': 4, 'on_agent': 0}],
+        'goal': {'x': 5, 'y': 1},
+        'walls': [{'x': 1, 'y': 2}, {'x': 1, 'y': 3}],
+        'available_roads': [{'x': 1, 'y': 1}, {'x': 2, 'y': 1}, {'x': 3, 'y': 1}, {'x': 3, 'y': 5}, {'x': 4, 'y': 5},
+                            {'x': 5, 'y': 5}],
+        'roads': [{'x': 1, 'y': 1}, {'x': 2, 'y': 1}, {'x': 3, 'y': 1}, {'x': 3, 'y': 5}, {'x': 4, 'y': 5},
+                            {'x': 5, 'y': 5}],
+        'available_gravel': [{'x': 2, 'y': 2}, {'x': 2, 'y': 3}, {'x': 2, 'y': 4}, {'x': 2, 'y': 5}],
+        'gravel': [{'x': 2, 'y': 2}, {'x': 2, 'y': 3}, {'x': 2, 'y': 4}, {'x': 2, 'y': 5}],
+        'available_grass': [{'x': 4, 'y': 1}, {'x': 4, 'y': 2}, {'x': 4, 'y': 3}, {'x': 4, 'y': 4}],
+        'grass': [{'x': 4, 'y': 1}, {'x': 4, 'y': 2}, {'x': 4, 'y': 3}, {'x': 4, 'y': 4}],
+        'hotswap_station': [{'x': 3, 'y': 3}],
+        'available_hotswap_stations': [{'x': 3, 'y': 3}],
+        'width': 5,
+        'height': 5,
+        'gamma': 1,
+        'env_code': [],
+        'weights': w_normalized,
+        'weights_lb': w_normalized,
+        'weights_ub': w_normalized
+    }
+
+    prior = [np.array([[0, 0, 0, 0, 0, 0, -1]])]
+    posterior = [np.array([[-1, 0, 0, 0, 0, 0, 0]]), np.array([[0, -1, 0, 0, 0, 0, 0]]), np.array([[0, 0, 1, 0, 0, 0, 0]]),
+                 np.array([[0, 0, 0, 1, 0, 0, 0]]), np.array([[0, 0, 0, 0, 1, 0, 0]]), np.array([[0, 0, 0, 0, 0, 1, 0]]),
+                 np.array([[0, 0, 0, 0, 0, 0, -1]])]
 elif mdp_class == 'cookie_crumb':
     w = np.array([[2.5, 1.7, -1]])
     w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order),
@@ -242,7 +281,7 @@ step_cost_flag = False
 
 # BEC parameters
 BEC = {
-    'summary_variant': 'proposed',            # [proposed, counterfactual_only, feature_only, baseline]
+    'summary_variant': 'counterfactual_only',            # [proposed, counterfactual_only, feature_only, baseline]
                                               # proposed: counterfactual (Y), feature scaffolding (Y)
                                               # feature_only: counterfactual (N), feature scaffolding (Y)
                                               # counterfactual_only: counterfactual (Y), feature scaffolding (N)
