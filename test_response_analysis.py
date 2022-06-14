@@ -12,6 +12,7 @@ import sage.all
 import sage.geometry.polyhedron.base as Polyhedron
 import sage.geometry.polyhedron.library as plib
 from scipy.spatial import geometric_slerp
+from tqdm import tqdm
 
 from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import proj3d
@@ -34,6 +35,35 @@ from pypoman import compute_polygon_hull, indicate_violating_constraints
 import polytope as pc
 import policy_summarization.BEC_visualization as BEC_viz
 
+def solve_policy(args):
+    mdp_parameters_human, sample_human_model, mdp_class, mu_sa, vi_agent_human, trajectory_human = args
+
+    min_subset_constraints_record = []
+
+    mdp_parameters_subopt = mdp_parameters_human.copy()
+    mdp_parameters_subopt['weights'] = sample_human_model
+    mdp_agent_subopt = make_mdp.make_custom_mdp(mdp_class, mdp_parameters_subopt)
+    vi_agent_subopt = ValueIteration(mdp_agent_subopt, sample_rate=1)
+    vi_agent_subopt.run_vi()
+
+    if vi_agent_subopt.stabilized:
+        trajectory_subopt = mdp_helpers.rollout_policy(mdp_agent_subopt, vi_agent_subopt)
+
+        traj_hyp_list = []
+        for a in trajectory_subopt:
+            traj_hyp_list.append(a[1])
+        print(traj_hyp_list)
+
+        mu_sb = mdp_agent_subopt.accumulate_reward_features(trajectory_subopt, discount=True)
+
+        min_subset_constraints_record.append(mu_sa - mu_sb)
+
+        # also consider constraints from one-step deviation
+        _, traj_record, _, min_subset_constraints_record_one_step, _ = BEC.extract_constraints_demonstration((1, vi_agent_human, trajectory_human, step_cost_flag))
+
+        min_subset_constraints_record.extend(min_subset_constraints_record_one_step[0][0])
+
+    return min_subset_constraints_record
 
 def toll_weight(pool, data_loc, step_cost_flag, weights):
     mdp_class = 'augmented_taxi2'
@@ -60,8 +90,8 @@ def toll_weight(pool, data_loc, step_cost_flag, weights):
         'weights_ub': w_normalized
     }
 
-    w_human = np.array([[-3, 1, -1]])  # incorrect #1 (still maintains the correct sign of each variable)
-    # w_human = np.array([[-0.5, 3.5, -1]])  # incorrect #2 (still maintains the correct sign of each variable)
+    # w_human = np.array([[-3, 1, -1]])  # incorrect #1 (still maintains the correct sign of each variable)
+    w_human = np.array([[-0.5, 3.5, -1]])  # incorrect #2 (still maintains the correct sign of each variable)
     w_normalized_human = w_human / np.linalg.norm(w_human[0, :], ord=2)
     print(w_normalized_human)
 
@@ -87,77 +117,47 @@ def toll_weight(pool, data_loc, step_cost_flag, weights):
 
     # prior = []
     # prior = [np.array([[-1, 0, 0]]), np.array([[0, 1, 0]]), np.array([[0, 0, -1]])]     # knowing the right signs
-    prior = [np.array([[-1,  0,  0]]), np.array([[-1,  0,  2]])]
-    posterior = [np.array([[1, 1, 0]]), np.array([[-1,  0,  2]]), np.array([[0, -1, -4]])]
+    prior = [np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]])] # knowing to detour around one toll
+    posterior = [np.array([[1, 1, 0]]), np.array([[-1,  0,  2]]), np.array([[0, -1, -4]])] # after seeing all 5 proposed demos
 
-    # mdp_agent.visualize_trajectory(trajectory_human)
-
+    # this is the pretend human
     mdp_agent_human = make_mdp.make_custom_mdp(mdp_class, mdp_parameters_human)
     vi_agent_human = ValueIteration(mdp_agent_human, sample_rate=1)
     vi_agent_human.run_vi()
     trajectory_human = mdp_helpers.rollout_policy(mdp_agent_human, vi_agent_human)
 
-    # a) obtain constraints through one-step deviation from a human's response
-    _, min_subset_constraints_record, env_record, traj_record, _, _ = BEC.extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=[
-        (1, vi_agent_human, trajectory_human)])
-
-    min_subset_constraints_record = min_subset_constraints_record[0][0]
-
-    min_subset_constraints_record_one_step = min_subset_constraints_record.copy()
-
-    # b) obtain constraints through sampling potential weights
+    # obtain constraints through sampling potential weights
     # (approximately) uniformly divide up the valid BEC area along 2-sphere
-    sample_human_models = BEC_helpers.sample_human_models_uniform(prior, 8)
+    sample_human_models = BEC_helpers.sample_human_models_uniform(prior, 8) # could normalize if needed
     min_subset_constraints_record = prior.copy()
-    min_subset_constraints_record_sample = []
 
-    # mdp_agent = make_mdp.make_custom_mdp(mdp_class, mdp_parameters)
-    # vi_agent = ValueIteration(mdp_agent, sample_rate=1)
-    # vi_agent.run_vi()
-    # trajectory = mdp_helpers.rollout_policy(mdp_agent, vi_agent)
-
-    # mdp_agent.visualize_trajectory(trajectory)
+    mdp_agent = make_mdp.make_custom_mdp(mdp_class, mdp_parameters)
+    vi_agent = ValueIteration(mdp_agent, sample_rate=1)
+    vi_agent.run_vi()
+    trajectory_agent = mdp_helpers.rollout_policy(mdp_agent, vi_agent)
+    mu_agent = mdp_agent.accumulate_reward_features(trajectory_agent, discount=True)
+    # mdp_agent.visualize_trajectory(trajectory_agent)
 
     mu_sa = mdp_agent_human.accumulate_reward_features(trajectory_human, discount=True)
 
-    for j, sample_human_model in enumerate(sample_human_models):
-        sample_human_model = sample_human_model / np.linalg.norm(sample_human_model[0, :], ord=2)
+    args = [(mdp_parameters_human, sample_human_models[i], mdp_class, mu_sa, vi_agent_human, trajectory_human) for i in range(len(sample_human_models))]
 
-        print('{}: {}'.format(j, sample_human_model))
-        mdp_parameters_subopt = mdp_parameters_human.copy()
-        mdp_parameters_subopt['weights'] = sample_human_model
-        mdp_agent_subopt = make_mdp.make_custom_mdp(mdp_class, mdp_parameters_subopt)
-        vi_agent_subopt = ValueIteration(mdp_agent_subopt, sample_rate=1)
-        vi_agent_subopt.run_vi()
+    # calculate the solid angle between the minimum constraints for each demonstration
+    pool.restart()
+    results = list(tqdm(pool.imap(solve_policy, args), total=len(sample_human_models)))
+    pool.close()
+    pool.join()
+    pool.terminate()
 
-        if vi_agent_subopt.stabilized:
-            trajectory_subopt = mdp_helpers.rollout_policy(mdp_agent_subopt, vi_agent_subopt)
+    for result in results:
+        min_subset_constraints_record.extend(result)
 
-            traj_hyp_list = []
-            for a in trajectory_subopt:
-                traj_hyp_list.append(a[1])
-            print(traj_hyp_list)
-
-            mu_sb = mdp_agent_subopt.accumulate_reward_features(trajectory_subopt, discount=True)
-
-            min_subset_constraints_record.append(mu_sa - mu_sb)
-            min_subset_constraints_record_sample.append(mu_sa - mu_sb)
-
-
-    # combine the two
-    min_subset_constraints_record.extend(min_subset_constraints_record_one_step)
+    # add the constraint from comparing against the agent's true trajectory
+    min_subset_constraints_record.append(mu_sa - mu_agent)
 
     print(min_subset_constraints_record)
     min_subset_constraints_record = BEC_helpers.remove_redundant_constraints(min_subset_constraints_record, weights, step_cost_flag)
     print(min_subset_constraints_record)
-
-    # incorrect - correct (for general environment), #1
-    min_subset_constraints_record.extend([np.array([[0, 0, 9]]) - np.array([[0, 1, 11]])])
-    # min_subset_constraints_record = [np.array([[0, 0, 9]]) - np.array([[0, 1, 11]])]
-
-    # incorrect - correct (for general environment), #2
-    # min_subset_constraints_record.extend([np.array([[1, 1, 9]]) - np.array([[0, 1, 11]])])
-
 
     fig = plt.figure()
     ax = fig.gca(projection='3d')
@@ -200,7 +200,7 @@ def toll_weight(pool, data_loc, step_cost_flag, weights):
     plt.show()
 
 if __name__ == "__main__":
-    pool = Pool(1)
+    pool = Pool(min(params.n_cpu, 60))
     data_loc = params.data_loc['BEC']
     step_cost_flag = params.step_cost_flag
     weights = params.weights['val']
