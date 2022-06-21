@@ -56,11 +56,11 @@ def solve_policy(args):
 
         mu_sb = mdp_agent_subopt.accumulate_reward_features(trajectory_subopt, discount=True)
 
+        # consider constraints from full trajectory
         min_subset_constraints_record.append(mu_sa - mu_sb)
 
         # also consider constraints from one-step deviation
         _, traj_record, _, min_subset_constraints_record_one_step, _ = BEC.extract_constraints_demonstration((1, vi_agent_human, trajectory_human, step_cost_flag))
-
         min_subset_constraints_record.extend(min_subset_constraints_record_one_step[0][0])
 
     return min_subset_constraints_record
@@ -116,8 +116,8 @@ def toll_weight(pool, data_loc, step_cost_flag, weights):
 
 
     # prior = []
-    # prior = [np.array([[-1, 0, 0]]), np.array([[0, 1, 0]]), np.array([[0, 0, -1]])]     # knowing the right signs
-    prior = [np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]])] # knowing to detour around one toll
+    prior = [np.array([[-1, 0, 0]]), np.array([[0, 1, 0]]), np.array([[0, 0, -1]])]     # knowing the right signs
+    # prior = [np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]])] # knowing to detour around one toll
     posterior = [np.array([[1, 1, 0]]), np.array([[-1,  0,  2]]), np.array([[0, -1, -4]])] # after seeing all 5 proposed demos
 
     # this is the pretend human
@@ -142,7 +142,6 @@ def toll_weight(pool, data_loc, step_cost_flag, weights):
 
     args = [(mdp_parameters_human, sample_human_models[i], mdp_class, mu_sa, vi_agent_human, trajectory_human) for i in range(len(sample_human_models))]
 
-    # calculate the solid angle between the minimum constraints for each demonstration
     pool.restart()
     results = list(tqdm(pool.imap(solve_policy, args), total=len(sample_human_models)))
     pool.close()
@@ -153,7 +152,7 @@ def toll_weight(pool, data_loc, step_cost_flag, weights):
         min_subset_constraints_record.extend(result)
 
     # add the constraint from comparing against the agent's true trajectory
-    min_subset_constraints_record.append(mu_sa - mu_agent)
+    # min_subset_constraints_record.append(mu_sa - mu_agent)
 
     print(min_subset_constraints_record)
     min_subset_constraints_record = BEC_helpers.remove_redundant_constraints(min_subset_constraints_record, weights, step_cost_flag)
