@@ -26,5 +26,5 @@ dfs_processed.pickle
 *.png
 sandbox.py
 cysignals_crash_logs/
-tests/
 demo_gen_log.txt
+aat_data/*
