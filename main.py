@@ -117,6 +117,9 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
             with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
                 pickle.dump(BEC_summary, f)
 
+    # todo: trying to obtain test demos
+    preliminary_tests = BEC.obtain_preliminary_tests(data_loc, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag)
+    BEC.visualize_summary(preliminary_tests, weights, step_cost_flag)
     BEC.visualize_summary(BEC_summary, weights, step_cost_flag)
     #
     # for summary in BEC_summary:
@@ -157,6 +160,11 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
         for constraints in [min_constraints]:
             BEC_viz.visualize_planes(constraints, fig=fig, ax=ax)
 
+        # visualizing uninformed prior
+        # ieqs2 = BEC_helpers.constraints_to_halfspace_matrix_sage([[]])
+        # poly2 = Polyhedron.Polyhedron(ieqs=ieqs2)
+        # BEC_viz.visualize_spherical_polygon(poly2, fig=fig, ax=ax, plot_ref_sphere=False, alpha=0.75)
+        #
         # visualize spherical polygon
         BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax, plot_ref_sphere=False, alpha=0.75)
 

@@ -5,7 +5,7 @@ import sage.all
 import sage.geometry.polyhedron.base as Polyhedron
 from termcolor import colored
 import difflib
-import sklearn
+from sklearn import metrics
 import itertools
 import pickle
 
@@ -167,9 +167,10 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
 
     return list(nonredundant_constraints)
 
-def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_record):
+def perform_BEC_constraint_bookkeeping_flattened(BEC_constraints, min_subset_constraints_record):
     '''
     Summary: For each constraint in min_subset_constraints_record, see if it matches one of the BEC_constraints
+    (assumes a flattened list of min_subset_constraints_record with no division across environments, which is deprecated)
     '''
     BEC_constraint_bookkeeping = []
 
@@ -189,6 +190,26 @@ def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_r
         BEC_constraint_bookkeeping.append(covers)
 
     BEC_constraint_bookkeeping = np.array(BEC_constraint_bookkeeping)
+
+    return BEC_constraint_bookkeeping
+
+def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_record):
+    '''
+    Summary: For each constraint in min_subset_constraints_record, see if it matches one of the BEC_constraints
+    '''
+    BEC_constraint_bookkeeping = [[] for i in range(len(BEC_constraints))]
+
+    # keep track of which demo conveys which of the BEC constraints
+    for env_idx, constraints_env in enumerate(min_subset_constraints_record):
+        for traj_idx, constraints_traj in enumerate(constraints_env):
+            covers = []
+            for BEC_constraint_idx in range(len(BEC_constraints)):
+                contains_BEC_constraint = False
+                for constraint in constraints_traj:
+                    if equal_constraints(constraint, BEC_constraints[BEC_constraint_idx]):
+                        contains_BEC_constraint = True
+                if contains_BEC_constraint:
+                    BEC_constraint_bookkeeping[BEC_constraint_idx].append((env_idx, traj_idx))
 
     return BEC_constraint_bookkeeping
 
@@ -637,10 +658,11 @@ def sample_human_models_uniform(constraints, n_models):
         v_low = (1 - np.cos(min_ele)) / 2
         v_high = (1 - np.cos(max_ele)) / 2
 
-        density_factor = 5
+        n_discrete_samples = 100
         while len(sample_human_models) < n_models:
-            theta = 2 * np.pi * np.linspace(u_low, u_high, density_factor * n_models)
-            phi = np.arccos(1 - 2 * np.linspace(v_low, v_high, density_factor * n_models))
+            n_discrete_samples += 20
+            theta = 2 * np.pi * np.linspace(u_low, u_high, n_discrete_samples)
+            phi = np.arccos(1 - 2 * np.linspace(v_low, v_high, n_discrete_samples))
 
             # reject points that fall outside of the desired area
 
@@ -657,12 +679,10 @@ def sample_human_models_uniform(constraints, n_models):
             # greedily select k 'centers' such that the maximum distance from any point to a center is minimized
             # solution is never worse than twice the optimal solution (2-approximation greedy algorithm)
             # https://www.geeksforgeeks.org/k-centers-problem-set-1-greedy-approximate-algorithm/
-            if len(valid_sph_points) < n_models:
-                density_factor += 1
-            elif len(valid_sph_points) == n_models:
+            if len(valid_sph_points) == n_models:
                 sample_human_models.extend(valid_sph_points)
             else:
-                pairwise = sklearn.metrics.pairwise.euclidean_distances(valid_sph_points)
+                pairwise = metrics.pairwise.euclidean_distances(valid_sph_points)
                 select_idxs = selectKcities(pairwise.shape[0], pairwise, n_models)
                 select_sph_points = valid_sph_points[select_idxs]
                 # reshape so that each element is a valid weight vector

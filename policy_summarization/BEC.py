@@ -895,6 +895,107 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
 
     return summary
 
+def obtain_preliminary_tests(data_loc, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag,downsample_threshold=float("inf")):
+    preliminary_test_info = []
+
+    # if you're looking for demonstrations that will convey the most constraining BEC region or will be employing scaffolding,
+    # obtain the demos needed to convey the most constraining BEC region
+    BEC_constraints = min_BEC_constraints
+    BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(BEC_constraints,
+                                                                                min_subset_constraints_record)
+
+    # todo: remove any environments or trajectories conveyed by an earlier summary
+
+    # downsampling strategy 1: randomly cull sets with too many members for computational feasibility
+    # for j, set in enumerate(sets):
+    #     if len(set) > downsample_threshold:
+    #         sets[j] = random.sample(set, downsample_threshold)
+
+    # downsampling strategy 2: if there are any env_traj pairs that cover more than one constraint, use it and remove all
+    # env_traj pairs that would've conveyed the same constraints
+    # initialize all env_traj tuples with covering the first min BEC constraint
+    env_constraint_mapping = {}
+    for key in BEC_constraint_bookkeeping[0]:
+        env_constraint_mapping[key] = [0]
+    max_constraint_count = 1
+    max_env_traj_tuples = [key]
+
+    # for all other env_traj tuples,
+    for constraint_idx, env_traj_tuples in enumerate(BEC_constraint_bookkeeping[1:]):
+        for env_traj_tuple in env_traj_tuples:
+            # if this env_traj tuple has already been seen previously
+            if env_traj_tuple in env_constraint_mapping.keys():
+                env_constraint_mapping[env_traj_tuple].append(constraint_idx)
+                # and adding another constraint to this tuple increases the highest constraint coverage by a single tuple
+                if len(env_constraint_mapping[env_traj_tuple]) > max_constraint_count:
+                    # update the max values, replacing the max tuple
+                    max_constraint_count = len(env_constraint_mapping[env_traj_tuple])
+                    max_env_traj_tuples = [env_traj_tuple]
+                # otherwise, if it simply equals the highest constraint coverage, add this tuple to the contending list
+                elif len(env_constraint_mapping[env_traj_tuple]) == max_constraint_count:
+                    max_env_traj_tuples.append(env_traj_tuple)
+            else:
+                env_constraint_mapping[env_traj_tuple] = [constraint_idx]
+
+    if max_constraint_count == 1:
+        # no one demo covers multiple constraints. so greedily select demos from base list that is mot visually complex
+        # filter for the most visually complex environment
+        for constraint_idx, env_traj_tuples in enumerate(BEC_constraint_bookkeeping):
+            old_env = -1
+            max_complexity = -1
+            max_complexity_env_traj_tuple = -1
+
+            for env_traj_tuple in env_traj_tuples:
+                env, traj = env_traj_tuple
+                if env != old_env:
+                    filename = mp_helpers.lookup_env_filename(data_loc, env)
+                    with open(filename, 'rb') as f:
+                        wt_vi_traj_env = pickle.load(f)
+
+                    complexity = wt_vi_traj_env[0][1].mdp.measure_env_complexity()
+                    if complexity > max_complexity:
+                        max_complexity = complexity
+                        max_complexity_env_traj_tuple = env_traj_tuple
+                else:
+                    continue
+            preliminary_test_info.append((max_complexity_env_traj_tuple, BEC_constraints[constraint_idx]))
+    else:
+        # # filter for the most visually complex environment
+        # old_env = -1
+        # max_complexity = -1
+        # max_complexity_env_traj_tuple = -1
+        # for env_traj_tuple in max_env_traj_tuples:
+        #     env, traj = env_traj_tuple
+        #     if env != old_env:
+        #         filename = mp_helpers.lookup_env_filename(data_loc, env)
+        #         with open(filename, 'rb') as f:
+        #             wt_vi_traj_env = pickle.load(f)
+        #
+        #         complexity = wt_vi_traj_env[0][1].mdp.measure_env_complexity()
+        #         if complexity > max_complexity:
+        #             max_complexity = complexity
+        #             max_complexity_env_traj_tuple = env_traj_tuple
+        #     else:
+        #         continue
+
+        raise Exception('Down-select from env_traj that covers the most constraints (not yet implemented).')
+
+    preliminary_tests = []
+    for info in preliminary_test_info:
+        env_idx, traj_idx = info[0]
+        traj = traj_record[env_idx][traj_idx]
+        constraints = info[1]
+        filename = mp_helpers.lookup_env_filename(data_loc, env_idx)
+        with open(filename, 'rb') as f:
+            wt_vi_traj_env = pickle.load(f)
+        best_mdp = wt_vi_traj_env[0][1].mdp
+        best_mdp.set_init_state(traj[0][0])  # for completeness
+        preliminary_tests.append([best_mdp, traj, constraints])
+
+    # todo: keep track of env and traj shown during training and testing and standardize how training and testing demos are stored
+
+    return preliminary_tests
+
 def obtain_SCOT_summaries(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag,downsample_threshold=float("inf")):
     min_BEC_summary = []
 
@@ -1085,6 +1186,8 @@ def obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_r
         del traj_record[best_idx]
         del BEC_lengths_record[best_idx]
         del env_traj_tracer[best_idx]
+
+    print('# SCOT demos: {}'.format(len(min_BEC_summary)))
 
     # fill out the rest of the vacant demo slots
     included_demo_idxs = []
