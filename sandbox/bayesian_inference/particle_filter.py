@@ -101,6 +101,17 @@ def improve_centroid(c, ps):
     norm = np.sqrt(ans @ ans)
     return ans / norm
 
+# def improve_centroid_explicit(c, ps):
+#     ans = np.zeros(3)
+#     for dim in range(ps.shape[0]):
+#         sum = 0
+#         for point_idx in range(ps.shape[1]):
+#             sum += ps[dim, point_idx] / np.sqrt(1 - (c @ ps[:, point_idx].T) ** 2)
+#         ans[dim] = sum
+#
+#     norm = np.sqrt(ans @ ans)
+#     return ans / norm
+#
 def fixpoint(f, x0, eps=1e-5, maxiter=1000, **kwargs):
     for _ in range(maxiter):
         x = f(x0, **kwargs)
@@ -149,8 +160,17 @@ if __name__ == "__main__":
     constraints_list.extend([[np.array([[-1,  0,  0]]), np.array([[-1,  0,  2]])], [np.array([[ 1,  0, -4]])], [np.array([[0, 1, 2]])],
                    [np.array([[  0,  -1, -10]]), np.array([[ 0, -1, -4]])], [np.array([[1, 1, 0]])]])
 
+    # todo: for playing around with what happens if you get a constraint wrong repeatedly
+    # constraints_list.extend([[np.array([[0,  1,  2]]), np.array([[-1,  0,  2]])], [np.array([[0, -1, -2]])], [np.array([[0, -1, -2]])], [np.array([[0, -1, -2]])]
+    #                          , [np.array([[0, -1, -2]])], [np.array([[0, -1, -2]])], [np.array([[0, -1, -2]])]])
+
     constraints_running = []
-    for constraints in constraints_list:
+    for j, constraints in enumerate(constraints_list):
+        print(j)
+
+        # todo: for playing around with what happens if you get a constraint wrong repeatedly
+        # if j == 2:
+        #     del constraints_running[2]
         constraints_running.extend(constraints)
         constraints_running = BEC_helpers.remove_redundant_constraints(constraints_running, None, False)
 
@@ -187,5 +207,10 @@ if __name__ == "__main__":
         ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints_running)
         poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
         BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax, plot_ref_sphere=False, alpha=0.75)
+
+        # visualize the ground truth constraint
+        w = np.array([[-3, 3.5, -1]])  # toll, hotswap station, step cost
+        w_normalized = w / np.linalg.norm(w[0, :], ord=2)
+        ax.scatter(w_normalized[0, 0], w_normalized[0, 1], w_normalized[0, 2], marker='o', c='b', s=100)
 
         plt.show()

@@ -393,46 +393,51 @@ if __name__ == "__main__":
     # plt.show()
 
     # c) VMF distribution that mocks a constraint
-    # Nsim = 1000
-    # mu_constraint = [0, 1, 0]
-    # mu_constraint = mu_constraint / np.linalg.norm(mu_constraint)
-    # kappa_constraint = 4   # 4 or 5 seems reasonable as a constraint approximation
-    # data_constraint = rand_von_mises_fisher(mu_constraint, kappa=kappa_constraint, N=Nsim)
-    #
-    # fig = plt.figure(figsize=(10,10))
-    # ax = plt.axes(projection='3d')
-    # plot_3d_scatter(data_constraint,ax)
-    # plot_arrow(mu_constraint,ax,colour="red")
-    # ax.view_init(0, 0)
-    # plt.show()
-
-    # d) multiple constraints multiplied together
-    def multiply_VMF(mu_1, kappa_1, mu_2, kappa_2):
-        weighted_sum = kappa_1 * mu_1 + kappa_2 * mu_2
-        weighted_sum_norm = np.linalg.norm(weighted_sum)
-        new_mu = weighted_sum / weighted_sum_norm
-        new_kappa = weighted_sum_norm
-
-        return new_mu, new_kappa
-
-    n_iter = 5
-
-    mu = [0, 1, 0]
-    mu = mu / np.linalg.norm(mu)
-    kappa = 4
-
+    Nsim = 1000
     mu_constraint = [0, 1, 0]
     mu_constraint = mu_constraint / np.linalg.norm(mu_constraint)
-    kappa_constraint = 4
-
-    for x in range(n_iter):
-        mu, kappa = multiply_VMF(mu, kappa, mu_constraint, kappa_constraint)
-
-    data = rand_von_mises_fisher(mu, kappa=kappa, N=Nsim)
+    kappa_constraint = 2   # 4 or 5 seems reasonable as a constraint approximation
+    data_constraint = rand_von_mises_fisher(mu_constraint, kappa=kappa_constraint, N=Nsim)
 
     fig = plt.figure(figsize=(10,10))
     ax = plt.axes(projection='3d')
-    plot_3d_scatter(data,ax)
-    plot_arrow(mu,ax,colour="red")
+    plot_3d_scatter(data_constraint,ax)
+    plot_arrow(mu_constraint,ax,colour="red")
     ax.view_init(0, 0)
+
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+
     plt.show()
+
+    # # d) multiple constraints multiplied together
+    # def multiply_VMF(mu_1, kappa_1, mu_2, kappa_2):
+    #     weighted_sum = kappa_1 * mu_1 + kappa_2 * mu_2
+    #     weighted_sum_norm = np.linalg.norm(weighted_sum)
+    #     new_mu = weighted_sum / weighted_sum_norm
+    #     new_kappa = weighted_sum_norm
+    #
+    #     return new_mu, new_kappa
+    #
+    # n_iter = 5
+    #
+    # mu = [0, 1, 0]
+    # mu = mu / np.linalg.norm(mu)
+    # kappa = 4
+    #
+    # mu_constraint = [0, 1, 0]
+    # mu_constraint = mu_constraint / np.linalg.norm(mu_constraint)
+    # kappa_constraint = 4
+    #
+    # for x in range(n_iter):
+    #     mu, kappa = multiply_VMF(mu, kappa, mu_constraint, kappa_constraint)
+    #
+    # data = rand_von_mises_fisher(mu, kappa=kappa, N=Nsim)
+    #
+    # fig = plt.figure(figsize=(10,10))
+    # ax = plt.axes(projection='3d')
+    # plot_3d_scatter(data,ax)
+    # plot_arrow(mu,ax,colour="red")
+    # ax.view_init(0, 0)
+    # plt.show()

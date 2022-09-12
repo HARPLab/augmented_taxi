@@ -10,7 +10,10 @@ from pymc.distributions import Interpolated
 from scipy import stats
 
 def from_posterior(param, samples):
-    smin, smax = np.min(samples), np.max(samples)
+    # smin, smax = np.min(samples), np.max(samples)
+    # todo fixing the range for now so that the full width of the distribution is multipled
+    smin = -15
+    smax = 10
     width = smax - smin
     x = np.linspace(smin, smax, 100)
     y = stats.gaussian_kde(samples)(x)
@@ -96,7 +99,7 @@ with model:
 traces = [trace]
 
 locs = [-7.5, -10]
-for j in range(1):
+for j in range(2):
     model = pm.Model()
     with model:
         rv_x = from_posterior("rv_x", trace.posterior.rv_x.values.flatten())
@@ -133,7 +136,9 @@ for param in ["rv_x"]:
     plt.figure(figsize=(8, 2))
     for update_i, trace in enumerate(traces):
         samples = trace.posterior[param].values.flatten()
-        smin, smax = np.min(samples), np.max(samples)
+        # smin, smax = np.min(samples), np.max(samples)
+        smin = -15 # todo fixing the range for now so that the full width of the distribution is multipled
+        smax = 10
         x = np.linspace(smin, smax, 100)
         y = stats.gaussian_kde(samples)(x)
         plt.plot(x, y, color=cmap(1 - update_i / len(traces)))
