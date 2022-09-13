@@ -895,7 +895,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
 
     return summary
 
-def obtain_preliminary_tests(data_loc, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag,downsample_threshold=float("inf")):
+def obtain_preliminary_tests(data_loc, min_BEC_constraints, min_subset_constraints_record, traj_record, downsample_threshold=float("inf")):
     preliminary_test_info = []
 
     # if you're looking for demonstrations that will convey the most constraining BEC region or will be employing scaffolding,
@@ -937,6 +937,7 @@ def obtain_preliminary_tests(data_loc, min_BEC_constraints, BEC_lengths_record, 
             else:
                 env_constraint_mapping[env_traj_tuple] = [constraint_idx]
 
+    env_complexity_mapping = {} # helps prevent reopening the pickle file of the same environment multiple times. could parallelize this
     if max_constraint_count == 1:
         # no one demo covers multiple constraints. so greedily select demos from base list that is mot visually complex
         # filter for the most visually complex environment
@@ -947,12 +948,17 @@ def obtain_preliminary_tests(data_loc, min_BEC_constraints, BEC_lengths_record, 
 
             for env_traj_tuple in env_traj_tuples:
                 env, traj = env_traj_tuple
+                # assuming that the tuples are stored in order of environment indices
                 if env != old_env:
-                    filename = mp_helpers.lookup_env_filename(data_loc, env)
-                    with open(filename, 'rb') as f:
-                        wt_vi_traj_env = pickle.load(f)
+                    if env not in env_complexity_mapping.keys():
+                        filename = mp_helpers.lookup_env_filename(data_loc, env)
+                        with open(filename, 'rb') as f:
+                            wt_vi_traj_env = pickle.load(f)
 
-                    complexity = wt_vi_traj_env[0][1].mdp.measure_env_complexity()
+                        complexity = wt_vi_traj_env[0][1].mdp.measure_env_complexity()
+                        env_complexity_mapping[env] = complexity
+                    else:
+                        complexity = env_complexity_mapping[env]
                     if complexity > max_complexity:
                         max_complexity = complexity
                         max_complexity_env_traj_tuple = env_traj_tuple
@@ -990,7 +996,7 @@ def obtain_preliminary_tests(data_loc, min_BEC_constraints, BEC_lengths_record, 
             wt_vi_traj_env = pickle.load(f)
         best_mdp = wt_vi_traj_env[0][1].mdp
         best_mdp.set_init_state(traj[0][0])  # for completeness
-        preliminary_tests.append([best_mdp, traj, constraints])
+        preliminary_tests.append([best_mdp, traj, (env_idx, traj_idx), constraints])
 
     # todo: keep track of env and traj shown during training and testing and standardize how training and testing demos are stored
 

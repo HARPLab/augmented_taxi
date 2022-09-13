@@ -117,10 +117,7 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
             with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
                 pickle.dump(BEC_summary, f)
 
-    # todo: trying to obtain test demos
-    preliminary_tests = BEC.obtain_preliminary_tests(data_loc, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag)
-    BEC.visualize_summary(preliminary_tests, weights, step_cost_flag)
-    BEC.visualize_summary(BEC_summary, weights, step_cost_flag)
+    # BEC.visualize_summary(BEC_summary, weights, step_cost_flag)
     #
     # for summary in BEC_summary:
     #     best_mdp = summary[0]
@@ -135,64 +132,64 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
     #         best_human_trajs_record_env, constraints_env = pickle.load(f)
     #
 
-    # constraint visualization
-    constraints_record = prior
-    for summary in BEC_summary:
-        print(summary[3])
-        constraints_record.extend(summary[3])
-        # constraints_record = summary[3]
-
-        fig = plt.figure()
-        ax = fig.gca(projection='3d')
-        ax.set_facecolor('white')
-        ax.xaxis.pane.fill = False
-        ax.yaxis.pane.fill = False
-        ax.zaxis.pane.fill = False
-
-        solid_angle = BEC_helpers.calc_solid_angles([constraints_record])[0]
-        print(solid_angle)
-
-        ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints_record)
-        poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
-
-        min_constraints = BEC_helpers.remove_redundant_constraints(constraints_record, weights, step_cost_flag)
-        print(min_constraints)
-        for constraints in [min_constraints]:
-            BEC_viz.visualize_planes(constraints, fig=fig, ax=ax)
-
-        # visualizing uninformed prior
-        # ieqs2 = BEC_helpers.constraints_to_halfspace_matrix_sage([[]])
-        # poly2 = Polyhedron.Polyhedron(ieqs=ieqs2)
-        # BEC_viz.visualize_spherical_polygon(poly2, fig=fig, ax=ax, plot_ref_sphere=False, alpha=0.75)
-        #
-        # visualize spherical polygon
-        BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax, plot_ref_sphere=False, alpha=0.75)
-
-        # ieqs_posterior = BEC_helpers.constraints_to_halfspace_matrix_sage(posterior)
-        # poly_posterior = Polyhedron.Polyhedron(ieqs=ieqs_posterior)  # automatically finds the minimal H-representation
-        # BEC_viz.visualize_spherical_polygon(poly_posterior, fig=fig, ax=ax, plot_ref_sphere=False, color='g')
-
-        # ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100)
-        if mdp_class == 'augmented_taxi2':
-            ax.set_xlabel('$\mathregular{w_0}$: Mud')
-            ax.set_ylabel('$\mathregular{w_1}$: Recharge')
-        elif mdp_class == 'two_goal2':
-            ax.set_xlabel('X: Goal 1 (grey)')
-            ax.set_ylabel('Y: Goal 2 (green)')
-        else:
-            ax.set_xlabel('X: Goal')
-            ax.set_ylabel('Y: Skateboard')
-        ax.set_zlabel('$\mathregular{w_2}$: Action')
-
-        ax.set_xticks([-1.0, -0.5, 0.0, 0.5, 1.0])
-        ax.set_yticks([-1.0, -0.5, 0.0, 0.5, 1.0])
-        ax.set_zticks([-1.0, -0.5, 0.0, 0.5, 1.0])
-
-        if matplotlib.get_backend() == 'TkAgg':
-            mng = plt.get_current_fig_manager()
-            mng.resize(*mng.window.maxsize())
-
-        plt.show()
+    # # constraint visualization
+    # constraints_record = prior
+    # for summary in BEC_summary:
+    #     print(summary[3])
+    #     constraints_record.extend(summary[3])
+    #     # constraints_record = summary[3]
+    #
+    #     fig = plt.figure()
+    #     ax = fig.gca(projection='3d')
+    #     ax.set_facecolor('white')
+    #     ax.xaxis.pane.fill = False
+    #     ax.yaxis.pane.fill = False
+    #     ax.zaxis.pane.fill = False
+    #
+    #     solid_angle = BEC_helpers.calc_solid_angles([constraints_record])[0]
+    #     print(solid_angle)
+    #
+    #     ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints_record)
+    #     poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
+    #
+    #     min_constraints = BEC_helpers.remove_redundant_constraints(constraints_record, weights, step_cost_flag)
+    #     print(min_constraints)
+    #     for constraints in [min_constraints]:
+    #         BEC_viz.visualize_planes(constraints, fig=fig, ax=ax)
+    #
+    #     # visualizing uninformed prior
+    #     # ieqs2 = BEC_helpers.constraints_to_halfspace_matrix_sage([[]])
+    #     # poly2 = Polyhedron.Polyhedron(ieqs=ieqs2)
+    #     # BEC_viz.visualize_spherical_polygon(poly2, fig=fig, ax=ax, plot_ref_sphere=False, alpha=0.75)
+    #     #
+    #     # visualize spherical polygon
+    #     BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax, plot_ref_sphere=False, alpha=0.75)
+    #
+    #     # ieqs_posterior = BEC_helpers.constraints_to_halfspace_matrix_sage(posterior)
+    #     # poly_posterior = Polyhedron.Polyhedron(ieqs=ieqs_posterior)  # automatically finds the minimal H-representation
+    #     # BEC_viz.visualize_spherical_polygon(poly_posterior, fig=fig, ax=ax, plot_ref_sphere=False, color='g')
+    #
+    #     # ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100)
+    #     if mdp_class == 'augmented_taxi2':
+    #         ax.set_xlabel('$\mathregular{w_0}$: Mud')
+    #         ax.set_ylabel('$\mathregular{w_1}$: Recharge')
+    #     elif mdp_class == 'two_goal2':
+    #         ax.set_xlabel('X: Goal 1 (grey)')
+    #         ax.set_ylabel('Y: Goal 2 (green)')
+    #     else:
+    #         ax.set_xlabel('X: Goal')
+    #         ax.set_ylabel('Y: Skateboard')
+    #     ax.set_zlabel('$\mathregular{w_2}$: Action')
+    #
+    #     ax.set_xticks([-1.0, -0.5, 0.0, 0.5, 1.0])
+    #     ax.set_yticks([-1.0, -0.5, 0.0, 0.5, 1.0])
+    #     ax.set_zticks([-1.0, -0.5, 0.0, 0.5, 1.0])
+    #
+    #     if matplotlib.get_backend() == 'TkAgg':
+    #         mng = plt.get_current_fig_manager()
+    #         mng.resize(*mng.window.maxsize())
+    #
+    #     plt.show()
 
     return BEC_summary
 
@@ -319,6 +316,51 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
                                 step_cost_flag)
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints
 
+def obtain_unit_tests(BEC_summary, data_loc, weights, step_cost_flag):
+    summary_constraints = []
+    for summary in BEC_summary:
+        summary_constraints.extend(summary[3])
+
+    min_constraints = BEC_helpers.remove_redundant_constraints(summary_constraints, weights, step_cost_flag)
+
+    # todo: maybe pass in some of these objects later
+    # with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
+    #     policy_constraints, min_subset_constraints_record, env_record, traj_record, reward_record, consistent_state_count = pickle.load(f)
+    #
+    # preliminary_tests = BEC.obtain_preliminary_tests(data_loc, min_constraints, min_subset_constraints_record, traj_record)
+    # with open('models/' + data_loc + '/preliminary_tests.pickle', 'wb') as f:
+    #     pickle.dump(preliminary_tests, f)
+
+    with open('models/' + data_loc + '/preliminary_tests.pickle', 'rb') as f:
+        preliminary_tests = pickle.load(f)
+
+    for test in preliminary_tests:
+        test_mdp = test[0]
+        opt_traj = test[1]
+
+        human_traj, human_history = test_mdp.visualize_interaction() # the latter is simply the gridworld locations of the agent
+        # with open('models/' + data_loc + '/human_traj.pickle', 'wb') as f:
+        #     pickle.dump((human_traj, human_history), f)
+        # with open('models/' + data_loc + '/human_traj.pickle', 'rb') as f:
+        #     human_traj, human_history = pickle.load(f)
+
+        human_feature_count = test_mdp.accumulate_reward_features(human_traj, discount=True)
+        opt_feature_count = test_mdp.accumulate_reward_features(opt_traj, discount=True)
+
+        print(human_feature_count)
+        print(opt_feature_count)
+
+        if (human_feature_count == opt_feature_count).all():
+            print("you got it right")
+        else:
+            print("you got it wrong")
+            test_mdp.visualize_trajectory(opt_traj, counterfactual_traj=human_history)
+            # BEC.visualize_summary(opt_traj, weights, step_cost_flag, coun)
+
+    BEC.visualize_summary(preliminary_tests, weights, step_cost_flag)
+
+    return preliminary_tests
+
 if __name__ == "__main__":
     pool = Pool(min(params.n_cpu, 60))
     os.makedirs('models/' + params.data_loc['base'], exist_ok=True)
@@ -334,6 +376,8 @@ if __name__ == "__main__":
     BEC_summary = obtain_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
                             params.step_cost_flag, params.BEC['summary_variant'], pool, params.BEC['n_train_demos'],
                             params.BEC['n_human_models'], params.prior, params.posterior, params.BEC['obj_func_proportion'])
+
+    unit_tests = obtain_unit_tests(BEC_summary, params.data_loc['BEC'], params.weights['val'], params.step_cost_flag)
 
     # c) obtain test environments
     # obtain_test_environments(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,

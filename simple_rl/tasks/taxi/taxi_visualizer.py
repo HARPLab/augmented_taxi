@@ -24,7 +24,8 @@ def _draw_augmented_state(screen,
                 agent=None,
                 draw_statics=True,
                 agent_shape=None,
-                agent_history=[]):
+                agent_history=[],
+                counterfactual_traj=None):
     '''
     Args:
         screen (pygame.Surface)
@@ -170,6 +171,24 @@ def _draw_augmented_state(screen,
                 top_left_point = int(width_buffer + cell_width * (position[0] - 0.5)), int(
                     height_buffer + cell_height * (taxi_oomdp.height - position[1] + 0.5))
                 pygame.draw.circle(screen, (103, 115, 135), top_left_point, int(min(cell_width, cell_height) / 15))
+
+    if counterfactual_traj is not None:
+        for i, position in enumerate(counterfactual_traj):
+            if i == 0:
+                try:
+                    top_left_point = int(width_buffer + cell_width * (position[0] - 0.5)), int(
+                        height_buffer + cell_height * (taxi_oomdp.height - position[1] + 0.5))
+                except:
+                    a = 2
+                pygame.draw.circle(screen, (255, 0, 0), top_left_point, int(min(cell_width, cell_height) / 15))
+                top_left_point_rect = int(width_buffer + cell_width * (position[0] - 0.5) - cell_width/8), int(
+                    height_buffer + cell_height * (taxi_oomdp.height - position[1] + 0.5) - 2)
+                pygame.draw.rect(screen, (255, 0, 0), top_left_point_rect + (cell_width / 4, cell_height / 20), 0)
+            else:
+                top_left_point = int(width_buffer + cell_width * (position[0] - 0.5)), int(
+                    height_buffer + cell_height * (taxi_oomdp.height - position[1] + 0.5))
+                pygame.draw.circle(screen, (255, 0, 0), top_left_point, int(min(cell_width, cell_height) / 15))
+
     agent_history.append((agent_x, agent_y))
 
     # Draw new agent.

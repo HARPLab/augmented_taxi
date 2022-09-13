@@ -280,11 +280,11 @@ class AugmentedTaxi2OOMDP(OOMDP):
 
         visualize_state(self, _draw_augmented_state, cur_state=cur_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
 
-    def visualize_trajectory(self, trajectory, marked_state_importances=None, width_scr_scale=180, height_scr_scale=180):
+    def visualize_trajectory(self, trajectory, marked_state_importances=None, width_scr_scale=180, height_scr_scale=180, counterfactual_traj=None):
         from simple_rl.utils.mdp_visualizer import visualize_trajectory
         from .taxi_visualizer import _draw_augmented_state
 
-        visualize_trajectory(self, trajectory, _draw_augmented_state, marked_state_importances=marked_state_importances, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='augmented_taxi2')
+        visualize_trajectory(self, trajectory, _draw_augmented_state, marked_state_importances=marked_state_importances, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='augmented_taxi2', counterfactual_traj=counterfactual_traj)
 
     # ----------------------------
     # -- Action Implementations --

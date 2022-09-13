@@ -388,7 +388,7 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
                 pygame.display.quit()
                 return
 
-def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=None, cur_state=None, scr_width=720, scr_height=720, mdp_class=None):
+def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=None, cur_state=None, scr_width=720, scr_height=720, mdp_class=None, counterfactual_traj=None):
     '''
     Args:
         mdp (MDP)
@@ -435,7 +435,7 @@ def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=N
                         # clear the text
                         _draw_lower_right_text('       ', screen)
 
-                agent_shape, agent_history = draw_state(screen, mdp, cur_state, agent_shape=agent_shape, agent_history=agent_history)
+                agent_shape, agent_history = draw_state(screen, mdp, cur_state, agent_shape=agent_shape, agent_history=agent_history, counterfactual_traj=counterfactual_traj)
                 # print("A: " + str(action))
 
                 # Update state text.
@@ -546,7 +546,7 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
     # Setup and draw initial state.
     cur_state = mdp.get_init_state() if cur_state is None else cur_state
     mdp.set_curr_state(cur_state)
-    agent_shape, _ = _vis_init(screen, mdp, draw_state, cur_state)
+    agent_shape, agent_history = _vis_init(screen, mdp, draw_state, cur_state)
     pygame.event.clear()
     cumulative_reward = 0
     gamma = mdp.gamma
@@ -573,13 +573,13 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
             if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
                 # Quit.
                 pygame.display.quit()
-                return trajectory
+                return trajectory, agent_history
             if event.type == KEYDOWN and event.key in keys:
                 prev_state = cur_state
                 action = actions[keys.index(event.key)]
                 reward, cur_state = mdp.execute_agent_action(action=action)
                 cumulative_reward += reward * gamma ** step
-                agent_shape, _ = draw_state(screen, mdp, cur_state, agent_shape=agent_shape)
+                agent_shape, agent_history = draw_state(screen, mdp, cur_state, agent_shape=agent_shape, agent_history=agent_history)
                 trajectory.append((prev_state, action, cur_state))
                 if interaction_callback is not None:
                     interaction_callback(action)
@@ -604,7 +604,7 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
             if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
                 # Quit.
                 pygame.display.quit()
-                return trajectory
+                return trajectory, agent_history
 
 def _vis_init(screen, mdp, draw_state, cur_state, agent=None, value=False, score=-1):
     # Pygame setup.
