@@ -23,9 +23,9 @@ def _draw_augmented_state(screen,
                 show_value=False,
                 agent=None,
                 draw_statics=True,
-                agent_shape=None,
                 agent_history=[],
-                counterfactual_traj=None):
+                counterfactual_traj=None,
+                alpha=255, offset_direction=0, visualize_history=True):
     '''
     Args:
         screen (pygame.Surface)
@@ -92,9 +92,15 @@ def _draw_augmented_state(screen,
     reg_font = pygame.font.SysFont("CMU Serif", font_size)
     cc_font = pygame.font.SysFont("Courier", font_size * 2 + 2)
 
-    if agent_shape is not None:
-        # Clear the old shape.
-        pygame.draw.rect(screen, (255,255,255), agent_shape)
+    # for visualizing two agents/paths at once
+    offset_magnitude = cell_width / 8.0
+    if offset_direction != 0:
+        offset_counterfactual = offset_magnitude * offset_direction
+    else:
+        offset_counterfactual = 0
+
+    # for clearing dynamic shapes (e.g. agent)
+    dynamic_shapes_list = []
 
     # Statics
     if draw_statics:
@@ -132,33 +138,34 @@ def _draw_augmented_state(screen,
                     taxi_oomdp.height - f_y) + 5
             pygame.draw.rect(screen, (144, 0, 255), top_left_point + (cell_width - 10, cell_height - 10), 0)
 
-    # Draw the destination.
-    for i, p in enumerate(objects["passenger"]):
-        # Dest.
-        dest_x, dest_y = p["dest_x"], p["dest_y"]
-        top_left_point = int(width_buffer + cell_width*(dest_x - 1) + 27), int(height_buffer + cell_height*(taxi_oomdp.height - dest_y) + 14)
-        dest_col = (int(max(color_ls[-i-1][0]-30, 0)), int(max(color_ls[-i-1][1]-30, 0)), int(max(color_ls[-i-1][2]-30, 0)))
-        pygame.draw.rect(screen, dest_col, top_left_point + (cell_width / 6, cell_height / 6), 0)
+        # Draw the destination.
+        for i, p in enumerate(objects["passenger"]):
+            # Dest.
+            dest_x, dest_y = p["dest_x"], p["dest_y"]
+            top_left_point = int(width_buffer + cell_width*(dest_x - 1) + 27), int(height_buffer + cell_height*(taxi_oomdp.height - dest_y) + 14)
+            dest_col = (int(max(color_ls[-i-1][0]-30, 0)), int(max(color_ls[-i-1][1]-30, 0)), int(max(color_ls[-i-1][2]-30, 0)))
+            pygame.draw.rect(screen, dest_col, top_left_point + (cell_width / 6, cell_height / 6), 0)
 
     # Draw hotswap stations.
     if "hotswap_station" in objects.keys():
         for f in objects["hotswap_station"]:
             x, y = f["x"], f["y"]
-            top_left_point = int(width_buffer + cell_width * (x - 1) + 70), int(
+            top_left_point = int(width_buffer + cell_width * (x - 1) + 70 + offset_counterfactual), int(
                 height_buffer + cell_height * (taxi_oomdp.height - y) + 65)
             dest_col = (
-            int(max(color_ls[0][0] - 30, 0)), int(max(color_ls[0][1] - 30, 0)), int(max(color_ls[0][2] - 30, 0)))
+            int(max(color_ls[0][0] - 30, 0)), int(max(color_ls[0][1] - 30, 0)), int(max(color_ls[0][2] - 30, 0)), alpha)
 
             n, r = 6, cell_width / 8
             x, y = top_left_point[0], top_left_point[1]
             color = dest_col
-            pygame.draw.polygon(screen, color, [
+            hotswap_station_shape = mdpv._draw_polygon_alpha(screen, color, [
                 (x + r * math.cos(2 * math.pi * i / n), y + r * math.sin(2 * math.pi * i / n))
                 for i in range(n)
             ])
+            dynamic_shapes_list.append(hotswap_station_shape)
 
     # Draw history of past agent locations if applicable
-    if len(agent_history) > 0:
+    if len(agent_history) > 0 and visualize_history:
         for i, position in enumerate(agent_history):
             if i == 0:
                 top_left_point = int(width_buffer + cell_width * (position[0] - 0.5)), int(
@@ -172,14 +179,12 @@ def _draw_augmented_state(screen,
                     height_buffer + cell_height * (taxi_oomdp.height - position[1] + 0.5))
                 pygame.draw.circle(screen, (103, 115, 135), top_left_point, int(min(cell_width, cell_height) / 15))
 
+    # Draw history of past counterfactual agent locations if applicable
     if counterfactual_traj is not None:
         for i, position in enumerate(counterfactual_traj):
             if i == 0:
-                try:
-                    top_left_point = int(width_buffer + cell_width * (position[0] - 0.5)), int(
-                        height_buffer + cell_height * (taxi_oomdp.height - position[1] + 0.5))
-                except:
-                    a = 2
+                top_left_point = int(width_buffer + cell_width * (position[0] - 0.5)), int(
+                    height_buffer + cell_height * (taxi_oomdp.height - position[1] + 0.5))
                 pygame.draw.circle(screen, (255, 0, 0), top_left_point, int(min(cell_width, cell_height) / 15))
                 top_left_point_rect = int(width_buffer + cell_width * (position[0] - 0.5) - cell_width/8), int(
                     height_buffer + cell_height * (taxi_oomdp.height - position[1] + 0.5) - 2)
@@ -189,13 +194,13 @@ def _draw_augmented_state(screen,
                     height_buffer + cell_height * (taxi_oomdp.height - position[1] + 0.5))
                 pygame.draw.circle(screen, (255, 0, 0), top_left_point, int(min(cell_width, cell_height) / 15))
 
-    agent_history.append((agent_x, agent_y))
 
     # Draw new agent.
     top_left_point = width_buffer + cell_width * (agent_x - 1), height_buffer + cell_height * (
                 taxi_oomdp.height - agent_y)
-    agent_center = int(top_left_point[0] + cell_width / 2.0), int(top_left_point[1] + cell_height / 2.0)
-    agent_shape = _draw_agent(agent_center, screen, base_size=min(cell_width, cell_height) / 2.5 - 4)
+    agent_center = int(top_left_point[0] + cell_width / 2.0 + offset_counterfactual), int(top_left_point[1] + cell_height / 2.0)
+    agent_shape = _draw_agent(agent_center, screen, base_size=min(cell_width, cell_height) / 2.5 - 4, alpha=alpha)
+    agent_history.append((agent_x, agent_y))
 
     # Draw the passengers.
     for i, p in enumerate(objects["passenger"]):
@@ -203,13 +208,13 @@ def _draw_augmented_state(screen,
         pass_x, pass_y = p["x"], p["y"]
         taxi_size = int(min(cell_width, cell_height) / 9.0)
         if p["in_taxi"]:
-            top_left_point = int(width_buffer + cell_width * (pass_x - 1) + taxi_size + 58), int(
+            top_left_point = int(width_buffer + cell_width * (pass_x - 1) + taxi_size + 58 + offset_counterfactual), int(
                 height_buffer + cell_height * (taxi_oomdp.height - pass_y) + taxi_size + 16)
         else:
-            top_left_point = int(width_buffer + cell_width * (pass_x - 1) + taxi_size + 26), int(
+            top_left_point = int(width_buffer + cell_width * (pass_x - 1) + taxi_size + 26 + offset_counterfactual), int(
                 height_buffer + cell_height * (taxi_oomdp.height - pass_y) + taxi_size + 38)
-        dest_col = (max(color_ls[-i-1][0]-30, 0), max(color_ls[-i-1][1]-30, 0), max(color_ls[-i-1][2]-30, 0))
-        pygame.draw.circle(screen, dest_col, top_left_point, taxi_size)
+        dest_col = (max(color_ls[-i-1][0]-30, 0), max(color_ls[-i-1][1]-30, 0), max(color_ls[-i-1][2]-30, 0), alpha)
+        mdpv._draw_circle_alpha(screen, dest_col, top_left_point, taxi_size)
 
     if draw_statics:
         # For each row:
@@ -274,7 +279,9 @@ def _draw_augmented_state(screen,
 
     pygame.display.flip()
 
-    return agent_shape, agent_history
+    dynamic_shapes_list.append(agent_shape)
+
+    return dynamic_shapes_list, agent_history
 
 def _draw_state(screen,
                 taxi_oomdp,
@@ -425,7 +432,7 @@ def _draw_state(screen,
 
     return agent_shape
 
-def _draw_agent(center_point, screen, base_size=30):
+def _draw_agent(center_point, screen, base_size=30, alpha=255):
     '''
     Args:
         center_point (tuple): (x,y)
@@ -438,6 +445,8 @@ def _draw_agent(center_point, screen, base_size=30):
     tri_bot_right = center_point[0] + base_size, center_point[1] + base_size
     tri_top = center_point[0], center_point[1] - base_size
     tri = [tri_bot_left, tri_top, tri_bot_right]
-    tri_color = (98, 140, 190)
-
-    return pygame.draw.polygon(screen, tri_color, tri)
+    tri_color = (98, 140, 190, alpha)
+    if alpha < 255:
+        return mdpv._draw_polygon_alpha(screen, tri_color, tri)
+    else:
+        return pygame.draw.polygon(screen, tri_color, tri)

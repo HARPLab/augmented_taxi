@@ -145,6 +145,20 @@ def _draw_terminal_text(mdp_class, cur_state, scr_width, scr_height, title_font)
 
     return goal_text_rendered, goal_text_point
 
+def _draw_polygon_alpha(surface, color, points):
+    lx, ly = zip(*points)
+    min_x, min_y, max_x, max_y = min(lx), min(ly), max(lx), max(ly)
+    target_rect = pygame.Rect(min_x, min_y, max_x - min_x, max_y - min_y)
+    shape_surf = pygame.Surface(target_rect.size, pygame.SRCALPHA)
+    pygame.draw.polygon(shape_surf, color, [(x - min_x, y - min_y) for x, y in points])
+    surface.blit(shape_surf, target_rect)
+    return target_rect
+
+def _draw_circle_alpha(surface, color, center, radius):
+    target_rect = pygame.Rect(center, (0, 0)).inflate((radius * 2, radius * 2))
+    shape_surf = pygame.Surface(target_rect.size, pygame.SRCALPHA)
+    pygame.draw.circle(shape_surf, color, (radius, radius), radius)
+    surface.blit(shape_surf, target_rect)
 
 def visualize_state(mdp, draw_state, cur_state=None, scr_width=720, scr_height=720):
     '''
@@ -163,7 +177,7 @@ def visualize_state(mdp, draw_state, cur_state=None, scr_width=720, scr_height=7
     # Setup and draw initial state.
     cur_state = mdp.get_init_state() if cur_state is None else cur_state
 
-    agent_shape, _ = _vis_init(screen, mdp, draw_state, cur_state, value=True)
+    dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, value=True)
     draw_state(screen, mdp, cur_state, show_value=False, draw_statics=True)
     _draw_lower_left_text(cur_state, screen)
     pygame.display.flip()
@@ -199,7 +213,7 @@ def visualize_policy(mdp, policy, draw_state, action_char_dict, cur_state=None, 
     # Setup and draw initial state.
     cur_state = mdp.get_init_state() if cur_state is None else cur_state
 
-    agent_shape, _ = _vis_init(screen, mdp, draw_state, cur_state, value=True)
+    dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, value=True)
     draw_state(screen, mdp, cur_state, policy=policy, action_char_dict=action_char_dict, show_value=False, draw_statics=True)
     pygame.display.flip()
     while True:
@@ -229,7 +243,7 @@ def visualize_value(mdp, draw_state, agent=None, cur_state=None, scr_width=720, 
     # Setup and draw initial state.
     cur_state = mdp.get_init_state() if cur_state is None else cur_state
 
-    agent_shape, _ = _vis_init(screen, mdp, draw_state, cur_state, value=True)
+    dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, value=True)
     draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True)
     pygame.display.flip()
 
@@ -276,7 +290,7 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
     rpl = 0
     score = 0
     default_goal_x, default_goal_y = mdp.width, mdp.height
-    agent_shape, _ = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
+    dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
 
     pygame.display.update()
     done = False
@@ -323,11 +337,11 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
                 cur_state = mdp.get_init_state()
                 mdp.reset()
                 agent.end_of_episode()
-                agent_shape, _ = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
+                dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
 
 
             reward, cur_state = mdp.execute_agent_action(action)
-            agent_shape, _ = draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True,agent_shape=agent_shape)
+            dynamic_shapes, _ = draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True)
 
             score += int(reward)
 
@@ -356,7 +370,7 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
                 # Move agent.
                 action = agent.act(cur_state, reward)
                 reward, cur_state = mdp.execute_agent_action(action)
-                agent_shape, _ = draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True,agent_shape=agent_shape)
+                dynamic_shapes, _ = draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True)
 
                 score = round(rpl)
                 rpl += reward
@@ -369,13 +383,13 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
                 if cur_state.is_terminal():
                     cur_state = mdp.get_init_state()
                     mdp.reset()
-                    agent_shape, _ = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
+                    dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
                     break
 
             i+=1
             cur_state = mdp.get_init_state()
             mdp.reset()
-            agent_shape, _ = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
+            dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
 
     pygame.display.flip()
 
@@ -406,7 +420,7 @@ def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=N
     cur_state = trajectory[0][0]
 
     # Setup and draw initial state.
-    agent_shape, agent_history = _vis_init(screen, mdp, draw_state, cur_state)
+    dynamic_shapes, agent_history = _vis_init(screen, mdp, draw_state, cur_state, counterfactual_traj=counterfactual_traj)
     pygame.event.clear()
     step = 0
 
@@ -424,6 +438,10 @@ def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=N
                 pygame.display.quit()
                 return
             if event.type == KEYDOWN and event.key == K_SPACE:
+                # clear the old shapes
+                for shape in dynamic_shapes:
+                    pygame.draw.rect(screen, (255,255,255), shape)
+
                 action = trajectory[step][1]
                 cur_state = trajectory[step][2]
 
@@ -435,11 +453,87 @@ def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=N
                         # clear the text
                         _draw_lower_right_text('       ', screen)
 
-                agent_shape, agent_history = draw_state(screen, mdp, cur_state, agent_shape=agent_shape, agent_history=agent_history, counterfactual_traj=counterfactual_traj)
+                dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, agent_history=agent_history, counterfactual_traj=counterfactual_traj)
                 # print("A: " + str(action))
 
                 # Update state text.
                 _draw_lower_left_text(cur_state, screen)
+
+                step += 1
+
+        pygame.display.flip()
+
+    if cur_state.is_terminal():
+        goal_text_rendered, goal_text_point = _draw_terminal_text(mdp_class, cur_state, scr_width, scr_height, title_font)
+        screen.blit(goal_text_rendered, goal_text_point)
+
+    pygame.display.flip()
+
+    print("Press ESC to quit")
+    while True:
+        # Check for key presses.
+        for event in pygame.event.get():
+            if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
+                # Quit.
+                pygame.display.quit()
+                return
+
+
+def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, draw_state, marked_state_importances=None, cur_state=None, scr_width=720, scr_height=720, mdp_class=None):
+    '''
+    Args:
+        mdp (MDP)
+        trajectory (list of states and actions)
+        draw_state (lambda: State --> pygame.Rect)
+        marked_state_importances (list of state importances)
+        cur_state (State)
+        scr_width (int)
+        scr_height (int)
+
+    Summary:
+        Visualizes the sequence of states and actions stored in the trajectory.
+    '''
+    screen = pygame.display.set_mode((scr_width, scr_height))
+    cur_state = trajectory[0][0]
+    cur_state_counterfactual = trajectory_counterfactual[0][0]
+
+    # Setup and draw initial state.
+    dynamic_shapes, agent_history = _vis_init(screen, mdp, draw_state, cur_state, offset_direction=1)
+    dynamic_shapes_counterfactual, agent_history_counterfactual = draw_state(screen, mdp, cur_state_counterfactual, draw_statics=False, agent_history=[], offset_direction=-1, alpha=150)
+
+    pygame.event.clear()
+    step = 0
+
+    while True and (step < len(trajectory) or step < len(trajectory_counterfactual)):
+
+        # Check for key presses.
+        for event in pygame.event.get():
+            if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
+                # Quit.
+                pygame.display.quit()
+                return
+            if event.type == KEYDOWN and event.key == K_SPACE:
+                # clear the old dynamic shapes
+                for shape in dynamic_shapes:
+                    pygame.draw.rect(screen, (255, 255, 255), shape)
+                for shape in dynamic_shapes_counterfactual:
+                    pygame.draw.rect(screen, (255, 255, 255), shape)
+
+                if step < len(trajectory):
+                    cur_state = trajectory[step][2]
+                else:
+                    cur_state = trajectory[-1][2]
+
+                dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state,
+                                                           agent_history=agent_history, offset_direction=1, visualize_history=False)
+
+                if step < len(trajectory_counterfactual):
+                    cur_state = trajectory_counterfactual[step][2]
+                else:
+                    cur_state = trajectory_counterfactual[-1][2]
+
+                dynamic_shapes_counterfactual, agent_history_counterfactual = draw_state(screen, mdp, cur_state,agent_history=agent_history_counterfactual,
+                                                                                    draw_statics=False, offset_direction=-1, alpha=150, visualize_history=False)
 
                 step += 1
 
@@ -486,7 +580,7 @@ def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_h
     cumulative_reward = 0
     step = 0
     gamma = mdp.gamma
-    agent_shape, _ = _vis_init(screen, mdp, draw_state, cur_state, agent)
+    dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, agent)
     pygame.event.clear()
 
     done = False
@@ -499,12 +593,16 @@ def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_h
                 pygame.display.quit()
                 return
             if event.type == KEYDOWN and event.key == K_SPACE:
+                # clear the old shapes
+                for shape in dynamic_shapes:
+                    pygame.draw.rect(screen, (255,255,255), shape)
+
                 # Move agent.
                 action = agent.act(cur_state, reward)
                 print("A: " + str(action))
                 reward, cur_state = mdp.execute_agent_action(action)
                 cumulative_reward += reward * gamma ** step
-                agent_shape, _ = draw_state(screen, mdp, cur_state, agent_shape=agent_shape)
+                dynamic_shapes, _ = draw_state(screen, mdp, cur_state)
 
                 # Update state text.
                 _draw_lower_left_text(cur_state, screen)
@@ -546,7 +644,7 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
     # Setup and draw initial state.
     cur_state = mdp.get_init_state() if cur_state is None else cur_state
     mdp.set_curr_state(cur_state)
-    agent_shape, agent_history = _vis_init(screen, mdp, draw_state, cur_state)
+    dynamic_shapes, agent_history = _vis_init(screen, mdp, draw_state, cur_state)
     pygame.event.clear()
     cumulative_reward = 0
     gamma = mdp.gamma
@@ -575,11 +673,16 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
                 pygame.display.quit()
                 return trajectory, agent_history
             if event.type == KEYDOWN and event.key in keys:
+                # clear the old shapes
+                for shape in dynamic_shapes:
+                    pygame.draw.rect(screen, (255,255,255), shape)
+
+
                 prev_state = cur_state
                 action = actions[keys.index(event.key)]
                 reward, cur_state = mdp.execute_agent_action(action=action)
                 cumulative_reward += reward * gamma ** step
-                agent_shape, agent_history = draw_state(screen, mdp, cur_state, agent_shape=agent_shape, agent_history=agent_history)
+                dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, agent_history=agent_history)
                 trajectory.append((prev_state, action, cur_state))
                 if interaction_callback is not None:
                     interaction_callback(action)
@@ -606,7 +709,7 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
                 pygame.display.quit()
                 return trajectory, agent_history
 
-def _vis_init(screen, mdp, draw_state, cur_state, agent=None, value=False, score=-1):
+def _vis_init(screen, mdp, draw_state, cur_state, agent=None, value=False, score=-1, counterfactual_traj=None, offset_direction=0):
     # Pygame setup.
     pygame.init()
     screen.fill((255, 255, 255))
@@ -618,9 +721,9 @@ def _vis_init(screen, mdp, draw_state, cur_state, agent=None, value=False, score
     else:
         _draw_lower_left_text(cur_state, screen)
 
-    agent_shape, agent_history = draw_state(screen, mdp, cur_state, agent=agent, draw_statics=True, agent_history=[])
+    dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, agent=agent, draw_statics=True, agent_history=[], counterfactual_traj=counterfactual_traj, offset_direction=offset_direction)
 
-    return agent_shape, agent_history
+    return dynamic_shapes, agent_history
 
 def convert_x_y_to_grid_cell(x, y, scr_width, scr_height, mdp_width, mdp_height):
     '''

@@ -354,7 +354,8 @@ def obtain_unit_tests(BEC_summary, data_loc, weights, step_cost_flag):
             print("you got it right")
         else:
             print("you got it wrong")
-            test_mdp.visualize_trajectory(opt_traj, counterfactual_traj=human_history)
+            # test_mdp.visualize_trajectory(opt_traj, counterfactual_traj=human_history)
+            test_mdp.visualize_trajectory_comparison(opt_traj, human_traj)
             # BEC.visualize_summary(opt_traj, weights, step_cost_flag, coun)
 
     BEC.visualize_summary(preliminary_tests, weights, step_cost_flag)
