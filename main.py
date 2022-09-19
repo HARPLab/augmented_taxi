@@ -324,9 +324,9 @@ def obtain_unit_tests(BEC_summary, data_loc, weights, step_cost_flag):
     min_constraints = BEC_helpers.remove_redundant_constraints(summary_constraints, weights, step_cost_flag)
 
     # todo: maybe pass in some of these objects later
-    # with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
-    #     policy_constraints, min_subset_constraints_record, env_record, traj_record, reward_record, consistent_state_count = pickle.load(f)
-    #
+    with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
+        policy_constraints, min_subset_constraints_record, env_record, traj_record, reward_record, consistent_state_count = pickle.load(f)
+
     # preliminary_tests = BEC.obtain_preliminary_tests(data_loc, min_constraints, min_subset_constraints_record, traj_record)
     # with open('models/' + data_loc + '/preliminary_tests.pickle', 'wb') as f:
     #     pickle.dump(preliminary_tests, f)
@@ -354,9 +354,11 @@ def obtain_unit_tests(BEC_summary, data_loc, weights, step_cost_flag):
             print("you got it right")
         else:
             print("you got it wrong")
-            # test_mdp.visualize_trajectory(opt_traj, counterfactual_traj=human_history)
             test_mdp.visualize_trajectory_comparison(opt_traj, human_traj)
-            # BEC.visualize_summary(opt_traj, weights, step_cost_flag, coun)
+            print("here is another example that might be helpful")
+            remedial_instruction = BEC.obtain_remedial_demonstrations(data_loc, test[-1], min_subset_constraints_record, traj_record, [[test_mdp, opt_traj]])
+            remedial_mdp, remedial_traj, _, _ = remedial_instruction[0]
+            remedial_mdp.visualize_trajectory(remedial_traj)
 
     BEC.visualize_summary(preliminary_tests, weights, step_cost_flag)
 

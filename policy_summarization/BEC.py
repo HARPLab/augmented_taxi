@@ -895,7 +895,36 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
 
     return summary
 
-def obtain_preliminary_tests(data_loc, min_BEC_constraints, min_subset_constraints_record, traj_record, downsample_threshold=float("inf")):
+def obtain_remedial_demonstrations(data_loc, min_BEC_constraints, min_subset_constraints_record, traj_record, prev_test, downsample_threshold=float("inf")):
+    remedial_demonstrations = []
+
+    # if you're looking for demonstrations that will convey the most constraining BEC region or will be employing scaffolding,
+    # obtain the demos needed to convey the most constraining BEC region
+    BEC_constraints = min_BEC_constraints
+    BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(BEC_constraints,
+                                                                                min_subset_constraints_record)
+
+    # todo: remove any environments or trajectories conveyed by an earlier summary
+
+    best_env_idxs, best_traj_idxs = list(zip(*BEC_constraint_bookkeeping[0]))
+
+    best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, prev_test)
+
+    traj = traj_record[best_env_idx][best_traj_idx]
+    constraints = min_BEC_constraints[0]
+    filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
+    with open(filename, 'rb') as f:
+        wt_vi_traj_env = pickle.load(f)
+    best_mdp = wt_vi_traj_env[0][1].mdp
+    best_mdp.set_init_state(traj[0][0])  # for completeness
+    remedial_demonstrations.append([best_mdp, traj, (best_env_idx, best_traj_idx), constraints])
+
+    # todo: keep track of env and traj shown during training and testing and standardize how training and testing demos are stored
+
+    return remedial_demonstrations
+
+
+def obtain_preliminary_tests(data_loc, min_BEC_constraints, min_subset_constraints_record, traj_record, downsample_threshold=float("inf"), visual_opt=''):
     preliminary_test_info = []
 
     # if you're looking for demonstrations that will convey the most constraining BEC region or will be employing scaffolding,
