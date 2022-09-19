@@ -198,19 +198,27 @@ def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_r
     Summary: For each constraint in min_subset_constraints_record, see if it matches one of the BEC_constraints
     '''
     BEC_constraint_bookkeeping = [[] for i in range(len(BEC_constraints))]
+    BEC_constraint_bookkeeping_redundant = [[] for i in range(len(BEC_constraints))]
 
     # keep track of which demo conveys which of the BEC constraints
     for env_idx, constraints_env in enumerate(min_subset_constraints_record):
         for traj_idx, constraints_traj in enumerate(constraints_env):
-            # only consider demonstrations that haven't already been shown
-            if (env_idx, traj_idx) not in visited_env_traj_idxs:
-                for BEC_constraint_idx in range(len(BEC_constraints)):
-                    contains_BEC_constraint = False
-                    for constraint in constraints_traj:
-                        if equal_constraints(constraint, BEC_constraints[BEC_constraint_idx]):
-                            contains_BEC_constraint = True
-                    if contains_BEC_constraint:
+            for BEC_constraint_idx in range(len(BEC_constraints)):
+                contains_BEC_constraint = False
+                for constraint in constraints_traj:
+                    if equal_constraints(constraint, BEC_constraints[BEC_constraint_idx]):
+                        contains_BEC_constraint = True
+                if contains_BEC_constraint:
+                    if (env_idx, traj_idx) not in visited_env_traj_idxs:
+                        # demonstrations that haven't already been shown
                         BEC_constraint_bookkeeping[BEC_constraint_idx].append((env_idx, traj_idx))
+                    else:
+                        BEC_constraint_bookkeeping_redundant[BEC_constraint_idx].append((env_idx, traj_idx))
+
+    # if any of the BEC constraints fails to find a new environment and trajectory match, simply recycle old ones
+    for BEC_constraint_idx, bookkeeping in enumerate(BEC_constraint_bookkeeping):
+        if len(bookkeeping) == 0:
+            BEC_constraint_bookkeeping[BEC_constraint_idx] = BEC_constraint_bookkeeping_redundant[BEC_constraint_idx]
 
     return BEC_constraint_bookkeeping
 
