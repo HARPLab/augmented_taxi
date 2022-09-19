@@ -258,7 +258,7 @@ else:
     raise Exception("Unknown MDP class.")
 
 # Based on Pygame's key constants
-keys_map = ['K_UP', 'K_DOWN', 'K_LEFT', 'K_RIGHT', 'K_p', 'K_d', 'K_7', 'K_8', 'K_9', 'K_0']
+keys_map = ['K_UP', 'K_DOWN', 'K_LEFT', 'K_RIGHT', 'K_p', 'K_d', 'K_r', 'K_u', 'K_9', 'K_0']
 
 # reward weight parameters (on the goal with the passenger, on a toll, step cost).
 # assume the L1 norm of the weights is equal 1. WLOG

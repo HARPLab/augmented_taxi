@@ -641,25 +641,29 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
     '''
     screen = pygame.display.set_mode((scr_width, scr_height))
 
-    # Setup and draw initial state.
-    cur_state = mdp.get_init_state() if cur_state is None else cur_state
-    mdp.set_curr_state(cur_state)
-    dynamic_shapes, agent_history = _vis_init(screen, mdp, draw_state, cur_state)
-    pygame.event.clear()
-    cumulative_reward = 0
-    gamma = mdp.gamma
-    step = 0
+    def interaction_reset(mdp, cur_state):
+        # Setup and draw initial state.
+        cur_state = mdp.get_init_state() if cur_state is None else cur_state
+        mdp.set_curr_state(cur_state)
+        dynamic_shapes, agent_history = _vis_init(screen, mdp, draw_state, cur_state)
+        pygame.event.clear()
+        cumulative_reward = 0
+        step = 0
 
+        return mdp, cur_state, dynamic_shapes, agent_history, cumulative_reward, step
+
+    gamma = mdp.gamma
     actions = mdp.get_actions()
+    mdp, cur_state, dynamic_shapes, agent_history, cumulative_reward, step = interaction_reset(mdp, cur_state)
 
     if keys_map is None:
         keys = [K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, K_9, K_0]
-        keys = keys[:len(actions)]
+        keys = keys[:len(actions) + 2]
     else:
         keys = []
         for key in keys_map:
             keys.append(eval(key))
-        keys = keys[:len(actions)]
+        keys = keys[:len(actions) + 2]
 
     trajectory = []
 
@@ -673,15 +677,38 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
                 pygame.display.quit()
                 return trajectory, agent_history
             if event.type == KEYDOWN and event.key in keys:
+                if event.key == eval('K_r'):
+                    # 'r' == reset
+                    mdp, cur_state, dynamic_shapes, agent_history, cumulative_reward, step = interaction_reset(mdp, None)
+                    current_reward = 0
+                    trajectory = []
+                    continue
+                elif event.key == eval('K_u'):
+                    # 'u' == undo
+                    if len(trajectory) > 0:
+                        # clear the old shapes
+                        for shape in dynamic_shapes:
+                            pygame.draw.rect(screen, (255, 255, 255), shape)
+
+                        prev_sequence = trajectory.pop()
+                        agent_history = agent_history[:-2] # remove two items since draw_state will add the current state back in
+                        cur_state = prev_sequence[0]
+                        mdp.set_curr_state(cur_state)
+                        cumulative_reward -= current_reward
+                        dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, agent_history=agent_history)
+                        continue
+                    else:
+                        continue
+
                 # clear the old shapes
                 for shape in dynamic_shapes:
                     pygame.draw.rect(screen, (255,255,255), shape)
 
-
                 prev_state = cur_state
                 action = actions[keys.index(event.key)]
                 reward, cur_state = mdp.execute_agent_action(action=action)
-                cumulative_reward += reward * gamma ** step
+                current_reward = reward * gamma ** step
+                cumulative_reward += current_reward
                 dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, agent_history=agent_history)
                 trajectory.append((prev_state, action, cur_state))
                 if interaction_callback is not None:
