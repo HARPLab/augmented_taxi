@@ -193,7 +193,7 @@ def perform_BEC_constraint_bookkeeping_flattened(BEC_constraints, min_subset_con
 
     return BEC_constraint_bookkeeping
 
-def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_record):
+def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_record, visited_env_traj_idxs):
     '''
     Summary: For each constraint in min_subset_constraints_record, see if it matches one of the BEC_constraints
     '''
@@ -202,14 +202,15 @@ def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_r
     # keep track of which demo conveys which of the BEC constraints
     for env_idx, constraints_env in enumerate(min_subset_constraints_record):
         for traj_idx, constraints_traj in enumerate(constraints_env):
-            covers = []
-            for BEC_constraint_idx in range(len(BEC_constraints)):
-                contains_BEC_constraint = False
-                for constraint in constraints_traj:
-                    if equal_constraints(constraint, BEC_constraints[BEC_constraint_idx]):
-                        contains_BEC_constraint = True
-                if contains_BEC_constraint:
-                    BEC_constraint_bookkeeping[BEC_constraint_idx].append((env_idx, traj_idx))
+            # only consider demonstrations that haven't already been shown
+            if (env_idx, traj_idx) not in visited_env_traj_idxs:
+                for BEC_constraint_idx in range(len(BEC_constraints)):
+                    contains_BEC_constraint = False
+                    for constraint in constraints_traj:
+                        if equal_constraints(constraint, BEC_constraints[BEC_constraint_idx]):
+                            contains_BEC_constraint = True
+                    if contains_BEC_constraint:
+                        BEC_constraint_bookkeeping[BEC_constraint_idx].append((env_idx, traj_idx))
 
     return BEC_constraint_bookkeeping
 

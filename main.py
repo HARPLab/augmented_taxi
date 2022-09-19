@@ -102,12 +102,12 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
 
     try:
         with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
-            BEC_summary = pickle.load(f)
+            BEC_summary, visited_env_traj_idxs = pickle.load(f)
     except:
         # SCOT_summary = BEC.obtain_SCOT_summaries(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag)
 
         if summary_variant == 'proposed' or summary_variant == 'counterfactual_only':
-            BEC_summary = BEC.obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count, n_train_demos=n_train_demos, prior=prior, obj_func_proportion=obj_func_proportion)
+            BEC_summary, visited_env_traj_idxs = BEC.obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count, n_train_demos=n_train_demos, prior=prior, obj_func_proportion=obj_func_proportion)
         elif summary_variant == 'feature_only' or summary_variant == 'baseline':
             BEC_summary = BEC.obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=n_train_demos)
         else:
@@ -115,7 +115,7 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
 
         if len(BEC_summary) > 0:
             with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
-                pickle.dump(BEC_summary, f)
+                pickle.dump((BEC_summary, visited_env_traj_idxs), f)
 
     # BEC.visualize_summary(BEC_summary, weights, step_cost_flag)
     #
@@ -191,7 +191,7 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
     #
     #     plt.show()
 
-    return BEC_summary
+    return BEC_summary, visited_env_traj_idxs
 
 def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_params, step_cost_flag, n_human_models, prior, posterior, summary=None, use_counterfactual=True, visualize_test_env=False):
     '''
@@ -316,7 +316,7 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
                                 step_cost_flag)
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints
 
-def obtain_unit_tests(BEC_summary, data_loc, weights, step_cost_flag):
+def obtain_unit_tests(BEC_summary, visited_env_traj_idxs, data_loc, weights, step_cost_flag):
     summary_constraints = []
     for summary in BEC_summary:
         summary_constraints.extend(summary[3])
@@ -327,22 +327,22 @@ def obtain_unit_tests(BEC_summary, data_loc, weights, step_cost_flag):
     with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
         policy_constraints, min_subset_constraints_record, env_record, traj_record, reward_record, consistent_state_count = pickle.load(f)
 
-    # preliminary_tests = BEC.obtain_preliminary_tests(data_loc, min_constraints, min_subset_constraints_record, traj_record)
+    # preliminary_tests, visited_env_traj_idxs = BEC.obtain_preliminary_tests(data_loc, visited_env_traj_idxs, min_constraints, min_subset_constraints_record, traj_record)
     # with open('models/' + data_loc + '/preliminary_tests.pickle', 'wb') as f:
-    #     pickle.dump(preliminary_tests, f)
-
+    #     pickle.dump((preliminary_tests, visited_env_traj_idxs), f)
     with open('models/' + data_loc + '/preliminary_tests.pickle', 'rb') as f:
-        preliminary_tests = pickle.load(f)
+        preliminary_tests, visited_env_traj_idxs = pickle.load(f)
 
     for test in preliminary_tests:
         test_mdp = test[0]
         opt_traj = test[1]
+        test_constraint = test[-1]
 
-        human_traj, human_history = test_mdp.visualize_interaction() # the latter is simply the gridworld locations of the agent
+        # human_traj, human_history = test_mdp.visualize_interaction(keys_map=params.keys_map) # the latter is simply the gridworld locations of the agent
         # with open('models/' + data_loc + '/human_traj.pickle', 'wb') as f:
         #     pickle.dump((human_traj, human_history), f)
-        # with open('models/' + data_loc + '/human_traj.pickle', 'rb') as f:
-        #     human_traj, human_history = pickle.load(f)
+        with open('models/' + data_loc + '/human_traj.pickle', 'rb') as f:
+            human_traj, human_history = pickle.load(f)
 
         human_feature_count = test_mdp.accumulate_reward_features(human_traj, discount=True)
         opt_feature_count = test_mdp.accumulate_reward_features(opt_traj, discount=True)
@@ -356,13 +356,13 @@ def obtain_unit_tests(BEC_summary, data_loc, weights, step_cost_flag):
             print("you got it wrong")
             test_mdp.visualize_trajectory_comparison(opt_traj, human_traj)
             print("here is another example that might be helpful")
-            remedial_instruction = BEC.obtain_remedial_demonstrations(data_loc, test[-1], min_subset_constraints_record, traj_record, [[test_mdp, opt_traj]])
+            remedial_instruction, visited_env_traj_idxs = BEC.obtain_remedial_demonstrations(data_loc, test_constraint, min_subset_constraints_record, traj_record, [[test_mdp, opt_traj]], visited_env_traj_idxs)
             remedial_mdp, remedial_traj, _, _ = remedial_instruction[0]
             remedial_mdp.visualize_trajectory(remedial_traj)
 
     BEC.visualize_summary(preliminary_tests, weights, step_cost_flag)
 
-    return preliminary_tests
+    return preliminary_tests, visited_env_traj_idxs
 
 if __name__ == "__main__":
     pool = Pool(min(params.n_cpu, 60))
@@ -376,11 +376,11 @@ if __name__ == "__main__":
     # generate_agent(params.mdp_class, params.data_loc['base'], params.mdp_parameters, visualize=True)
 
     # b) obtain a BEC summary of the agent's policy
-    BEC_summary = obtain_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
+    BEC_summary, visited_env_traj_idxs = obtain_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
                             params.step_cost_flag, params.BEC['summary_variant'], pool, params.BEC['n_train_demos'],
                             params.BEC['n_human_models'], params.prior, params.posterior, params.BEC['obj_func_proportion'])
 
-    unit_tests = obtain_unit_tests(BEC_summary, params.data_loc['BEC'], params.weights['val'], params.step_cost_flag)
+    unit_tests = obtain_unit_tests(BEC_summary, visited_env_traj_idxs, params.data_loc['BEC'], params.weights['val'], params.step_cost_flag)
 
     # c) obtain test environments
     # obtain_test_environments(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,

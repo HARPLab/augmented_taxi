@@ -563,6 +563,7 @@ def overlap_demo_BEC_and_human_posterior(args):
 def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
                        n_train_demos=3, prior=[], downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=1):
     summary = []
+    visited_env_traj_idxs = []
 
     # impose prior
     min_BEC_constraints_running = prior.copy()
@@ -807,6 +808,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
             min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
             summary.append([best_mdp, best_traj, (best_env_idx, best_traj_idx), min_env_constraints_record[best_env_idx][best_traj_idx],
                             sample_human_models])
+            visited_env_traj_idxs.append((best_env_idx, best_traj_idx))
         else:
             # b) consider each human model separately
             if consistent_state_count:
@@ -883,6 +885,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
             min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
             summary.append([best_mdp, best_traj, (best_env_idx, best_traj_idx), constraints_env[best_traj_idx],
                             sample_human_models, select_model])
+            visited_env_traj_idxs.append((best_env_idx, best_traj_idx))
 
         print(colored('Max infogain: {}'.format(max_info_gain), 'blue'))
         with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
@@ -893,18 +896,16 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
         with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
             pickle.dump(summary, f)
 
-    return summary
+    return summary, visited_env_traj_idxs
 
-def obtain_remedial_demonstrations(data_loc, min_BEC_constraints, min_subset_constraints_record, traj_record, prev_test, downsample_threshold=float("inf")):
+def obtain_remedial_demonstrations(data_loc, min_BEC_constraints, min_subset_constraints_record, traj_record, prev_test, visited_env_traj_idxs, downsample_threshold=float("inf")):
     remedial_demonstrations = []
 
     # if you're looking for demonstrations that will convey the most constraining BEC region or will be employing scaffolding,
     # obtain the demos needed to convey the most constraining BEC region
     BEC_constraints = min_BEC_constraints
     BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(BEC_constraints,
-                                                                                min_subset_constraints_record)
-
-    # todo: remove any environments or trajectories conveyed by an earlier summary
+                                                                                min_subset_constraints_record, visited_env_traj_idxs)
 
     best_env_idxs, best_traj_idxs = list(zip(*BEC_constraint_bookkeeping[0]))
 
@@ -918,22 +919,18 @@ def obtain_remedial_demonstrations(data_loc, min_BEC_constraints, min_subset_con
     best_mdp = wt_vi_traj_env[0][1].mdp
     best_mdp.set_init_state(traj[0][0])  # for completeness
     remedial_demonstrations.append([best_mdp, traj, (best_env_idx, best_traj_idx), constraints])
+    visited_env_traj_idxs.append((best_env_idx, best_traj_idx))
 
-    # todo: keep track of env and traj shown during training and testing and standardize how training and testing demos are stored
+    return remedial_demonstrations, visited_env_traj_idxs
 
-    return remedial_demonstrations
-
-
-def obtain_preliminary_tests(data_loc, min_BEC_constraints, min_subset_constraints_record, traj_record, downsample_threshold=float("inf"), visual_opt=''):
+def obtain_preliminary_tests(data_loc, visited_env_traj_idxs, min_BEC_constraints, min_subset_constraints_record, traj_record, downsample_threshold=float("inf"), visual_opt=''):
     preliminary_test_info = []
 
     # if you're looking for demonstrations that will convey the most constraining BEC region or will be employing scaffolding,
     # obtain the demos needed to convey the most constraining BEC region
     BEC_constraints = min_BEC_constraints
     BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(BEC_constraints,
-                                                                                min_subset_constraints_record)
-
-    # todo: remove any environments or trajectories conveyed by an earlier summary
+                                                                                min_subset_constraints_record, visited_env_traj_idxs)
 
     # downsampling strategy 1: randomly cull sets with too many members for computational feasibility
     # for j, set in enumerate(sets):
@@ -1026,10 +1023,9 @@ def obtain_preliminary_tests(data_loc, min_BEC_constraints, min_subset_constrain
         best_mdp = wt_vi_traj_env[0][1].mdp
         best_mdp.set_init_state(traj[0][0])  # for completeness
         preliminary_tests.append([best_mdp, traj, (env_idx, traj_idx), constraints])
+        visited_env_traj_idxs.append((env_idx, traj_idx))
 
-    # todo: keep track of env and traj shown during training and testing and standardize how training and testing demos are stored
-
-    return preliminary_tests
+    return preliminary_tests, visited_env_traj_idxs
 
 def obtain_SCOT_summaries(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag,downsample_threshold=float("inf")):
     min_BEC_summary = []
