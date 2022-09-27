@@ -8,6 +8,7 @@ import sage.geometry.polyhedron.base as Polyhedron
 from filterpy.monte_carlo import systematic_resample
 from termcolor import colored
 from spherical_geometry import great_circle_arc as gca
+from scipy.stats import truncexpon as truncexpon
 
 import policy_summarization.BEC_helpers as BEC_helpers
 import policy_summarization.BEC_visualization as BEC_viz
@@ -16,30 +17,35 @@ class Particles():
     def __init__(self, positions):
         self.positions = np.array(positions)
         self.weights = np.ones(len(positions)) / len(positions)
+        # copy over
+        self.positions_prev = self.positions.copy()
+        self.weights_prev = self.weights.copy()
 
-def reweight_particles(particles, mu, k=4):
+def observation_probability(x, mu, k=4):
+    p = x.shape[1]
+    dot = mu.dot(x.T)
+
+    if dot >= 0:
+        # use the uniform dist
+        prob = 0.12779
+    else:
+        # use the VMF dist
+        prob = (k ** (p / 2 - 1)) / (special.iv((p / 2 - 1), k) * (2 * np.pi) ** (p / 2)) * np.exp(k * dot)
+        prob = prob[0][0]
+
+    return prob
+
+def reweight_particles(particles, mu):
     '''
     :param particles: particles
     :param mu: normal of constraints / mean direction of VMF
     :param k: concentration parameter of VMF
     :return: probability of x under this composite distribution (uniform + VMF)
     '''
-    p = particles.positions[0].shape[1]
-    mu = mu / np.linalg.norm(mu[0, :], ord=2)
+    particles.weights_prev = particles.weights
 
     for j, x in enumerate(particles.positions):
-        # normalize vectors to lie on the 2-sphere
-        x = x / np.linalg.norm(x[0, :], ord=2)
-        dot = mu.dot(x.T)
-
-        if dot >= 0:
-            # use the uniform dist
-            prob = 0.12779
-        else:
-            # use the VMF dist
-            prob = (k ** (p/2 - 1)) / (special.iv((p/2 - 1), k) * (2 * np.pi) ** (p/2)) * np.exp(k * dot)
-
-        particles.weights[j] = particles.weights[j] * prob
+        particles.weights[j] = particles.weights[j] * observation_probability(x, mu)
 
     # normalize weights and update particles
     particles.weights /= sum(particles.weights)
@@ -67,6 +73,9 @@ def calc_n_eff(weights):
     return 1. / np.sum(np.square(weights))
 
 def resample_from_index(particles, indexes, noise=0.1):
+    particles.weights_prev = particles.weights
+    particles.positions_prev = particles.positions
+
     particles.positions[:] = particles.positions[indexes]
     for j, position in enumerate(particles.positions):
         perturbed_position = position + np.random.random(position.shape) * noise
@@ -101,17 +110,6 @@ def improve_centroid(c, ps):
     norm = np.sqrt(ans @ ans)
     return ans / norm
 
-# def improve_centroid_explicit(c, ps):
-#     ans = np.zeros(3)
-#     for dim in range(ps.shape[0]):
-#         sum = 0
-#         for point_idx in range(ps.shape[1]):
-#             sum += ps[dim, point_idx] / np.sqrt(1 - (c @ ps[:, point_idx].T) ** 2)
-#         ans[dim] = sum
-#
-#     norm = np.sqrt(ans @ ans)
-#     return ans / norm
-#
 def fixpoint(f, x0, eps=1e-5, maxiter=1000, **kwargs):
     for _ in range(maxiter):
         x = f(x0, **kwargs)
@@ -144,6 +142,45 @@ def normalized_weighted_variance(particles, spherical_centroid=None):
 
     return weighted_var
 
+def entropy(particles, constraint=None):
+    '''
+    Implement entropy measure for particle filter as described in Particle Filter Based Entropy (boers_mandal_ICIF2010)
+    '''
+    if constraint is None:
+        raise Exception('Down-select from env_traj that covers the most constraints (not yet implemented).')
+
+    # option 1 (described in paper)
+    term1 = 0
+    for particle_idx, particle_pos in enumerate(particles.positions):
+        inner_term = 0
+        for particle_idx_prev, particle_pos_prev in enumerate(particles.positions_prev):
+            inner_term += truncexpon.pdf(geodist(particle_pos[0], particle_pos_prev[0]), np.pi) * particles.weights_prev[particle_idx_prev]
+        term1 += -np.log(observation_probability(particle_pos, constraint) * inner_term) * particles.weights[particle_idx]
+    term2 = 0
+    for particle_idx, particle_pos in enumerate(particles.positions):
+        term2 += observation_probability(particle_pos, constraint) * particles.weights_prev[particle_idx]
+    term2 = np.log(term2)
+
+    entropy = term1 + term2
+
+    # option 2 (my derived version)
+    # entropy = 0
+    # for particle_idx, particle_pos in enumerate(particles.positions):
+    #     inner_term = 0
+    #     for particle_idx_prev, particle_pos_prev in enumerate(particles.positions_prev):
+    #         inner_term += truncexpon.pdf(geodist(particle_pos[0], particle_pos_prev[0]), np.pi) * particles.weights_prev[particle_idx_prev]
+    #     term1 = np.log(observation_probability(particle_pos, constraint) * inner_term)
+    #
+    #     inner_term2 = 0
+    #     for particle_idx2, particle_pos2 in enumerate(particles.positions):
+    #         inner_term2 += observation_probability(particle_pos2, constraint) * particles.weights_prev[particle_idx2]
+    #     inner_term2 = np.log(inner_term2)
+    #
+    #     entropy += (term1 - inner_term2) * particles.weights[particle_idx]
+    #
+    # entropy = -entropy
+
+    return entropy
 
 if __name__ == "__main__":
     from numpy.random import seed
@@ -188,6 +225,9 @@ if __name__ == "__main__":
         normed_var = normalized_weighted_variance(particles, spherical_centroid=centroid)
         print('weighted variance: {}'.format(normed_var))
         print('weighted variance: {}'.format(np.sum(normed_var)))
+
+        H = entropy(particles, constraint=constraint)
+        print(colored('entropy: {}'.format(H), 'blue'))
 
         fig = plt.figure()
         ax = fig.gca(projection='3d')
