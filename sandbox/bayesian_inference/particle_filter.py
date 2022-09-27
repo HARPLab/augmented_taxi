@@ -149,7 +149,6 @@ def entropy(particles, constraint=None):
     if constraint is None:
         raise Exception('Down-select from env_traj that covers the most constraints (not yet implemented).')
 
-    # option 1 (described in paper)
     term1 = 0
     for particle_idx, particle_pos in enumerate(particles.positions):
         inner_term = 0
@@ -162,23 +161,6 @@ def entropy(particles, constraint=None):
     term2 = np.log(term2)
 
     entropy = term1 + term2
-
-    # option 2 (my derived version)
-    # entropy = 0
-    # for particle_idx, particle_pos in enumerate(particles.positions):
-    #     inner_term = 0
-    #     for particle_idx_prev, particle_pos_prev in enumerate(particles.positions_prev):
-    #         inner_term += truncexpon.pdf(geodist(particle_pos[0], particle_pos_prev[0]), np.pi) * particles.weights_prev[particle_idx_prev]
-    #     term1 = np.log(observation_probability(particle_pos, constraint) * inner_term)
-    #
-    #     inner_term2 = 0
-    #     for particle_idx2, particle_pos2 in enumerate(particles.positions):
-    #         inner_term2 += observation_probability(particle_pos2, constraint) * particles.weights_prev[particle_idx2]
-    #     inner_term2 = np.log(inner_term2)
-    #
-    #     entropy += (term1 - inner_term2) * particles.weights[particle_idx]
-    #
-    # entropy = -entropy
 
     return entropy
 
