@@ -29,6 +29,7 @@ import policy_summarization.multiprocessing_helpers as mp_helpers
 from simple_rl.utils import mdp_helpers
 import policy_summarization.BEC_helpers as BEC_helpers
 import policy_summarization.BEC_visualization as BEC_viz
+from policy_summarization import particle_filter as pf
 import matplotlib as mpl
 mpl.rcParams['figure.facecolor'] = '1.0'
 mpl.rcParams['axes.labelsize'] = 'x-large'
@@ -100,13 +101,27 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
         with open('models/' + data_loc + '/BEC_constraints.pickle', 'wb') as f:
             pickle.dump((min_BEC_constraints, BEC_lengths_record), f)
 
+    # todo: I should also save and pull up a pf human model as well
     try:
         with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
             BEC_summary, visited_env_traj_idxs = pickle.load(f)
     except:
         # SCOT_summary = BEC.obtain_SCOT_summaries(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag)
 
-        if summary_variant == 'proposed' or summary_variant == 'counterfactual_only':
+        if summary_variant == 'particle_filter':
+            print('PF summary')
+            # initialize particle filter
+            n_particles = 50
+            particle_positions = BEC_helpers.sample_human_models_uniform([], n_particles)
+            particles = pf.Particles(particle_positions)
+            particles = pf.update_particle_filter(particles, prior)
+            print(colored('entropy: {}'.format(particles.entropy), 'blue'))
+
+            BEC_summary, visited_env_traj_idxs = BEC.obtain_summary_particle_filter(data_loc, particles, summary_variant, min_subset_constraints_record,
+                                           min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool,
+                                           n_human_models, consistent_state_count)
+
+        elif summary_variant == 'proposed' or summary_variant == 'counterfactual_only':
             BEC_summary, visited_env_traj_idxs = BEC.obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count, n_train_demos=n_train_demos, prior=prior, obj_func_proportion=obj_func_proportion)
         elif summary_variant == 'feature_only' or summary_variant == 'baseline':
             BEC_summary = BEC.obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=n_train_demos)
@@ -154,8 +169,8 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
     #
     #     min_constraints = BEC_helpers.remove_redundant_constraints(constraints_record, weights, step_cost_flag)
     #     print(min_constraints)
-    #     for constraints in [min_constraints]:
-    #         BEC_viz.visualize_planes(constraints, fig=fig, ax=ax)
+    #     # for constraints in [min_constraints]:
+    #     #     BEC_viz.visualize_planes(constraints, fig=fig, ax=ax)
     #
     #     # visualizing uninformed prior
     #     # ieqs2 = BEC_helpers.constraints_to_halfspace_matrix_sage([[]])
@@ -169,7 +184,7 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
     #     # poly_posterior = Polyhedron.Polyhedron(ieqs=ieqs_posterior)  # automatically finds the minimal H-representation
     #     # BEC_viz.visualize_spherical_polygon(poly_posterior, fig=fig, ax=ax, plot_ref_sphere=False, color='g')
     #
-    #     # ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100)
+    #     ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100)
     #     if mdp_class == 'augmented_taxi2':
     #         ax.set_xlabel('$\mathregular{w_0}$: Mud')
     #         ax.set_ylabel('$\mathregular{w_1}$: Recharge')
@@ -188,6 +203,84 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
     #     if matplotlib.get_backend() == 'TkAgg':
     #         mng = plt.get_current_fig_manager()
     #         mng.resize(*mng.window.maxsize())
+    #
+    #     plt.show()
+
+    # # particle filter visualization
+    # from numpy.random import seed
+    # seed(1)
+    #
+    # n_particles = 50
+    # particle_positions = BEC_helpers.sample_human_models_uniform([], n_particles)
+    # particles = pf.Particles(particle_positions)
+    #
+    #
+    # constraints_running = prior
+    #
+    # print(pf.calc_info_gain(particles, prior))
+    # particles = pf.update_particle_filter(particles, prior)
+    #
+    # # fig = plt.figure()
+    # # ax = fig.gca(projection='3d')
+    # # ax.set_facecolor('white')
+    # # ax.xaxis.pane.fill = False
+    # # ax.yaxis.pane.fill = False
+    # # ax.zaxis.pane.fill = False
+    # #
+    # # ax.set_xlabel('x')
+    # # ax.set_ylabel('y')
+    # # ax.set_zlabel('z')
+    # #
+    # # pf.plot_particles(particles, fig=fig, ax=ax)
+    # # BEC_viz.visualize_planes(constraints_running, fig=fig, ax=ax)
+    # #
+    # # # visualize spherical polygon
+    # # ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints_running)
+    # # poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
+    # # BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax, plot_ref_sphere=False, alpha=0.75)
+    # #
+    # # # visualize the ground truth constraint
+    # # w = np.array([[-3, 3.5, -1]])  # toll, hotswap station, step cost
+    # # w_normalized = w / np.linalg.norm(w[0, :], ord=2)
+    # # ax.scatter(w_normalized[0, 0], w_normalized[0, 1], w_normalized[0, 2], marker='o', c='b', s=100)
+    # #
+    # # plt.show()
+    #
+    # for j, summary in enumerate(BEC_summary):
+    #     print(j)
+    #
+    #     constraints = summary[3]
+    #
+    #     constraints_running.extend(constraints)
+    #     constraints_running = BEC_helpers.remove_redundant_constraints(constraints_running, None, False)
+    #
+    #     # print(pf.calc_info_gain(particles, constraints))
+    #
+    #     particles = pf.update_particle_filter(particles, constraints)
+    #
+    #     fig = plt.figure()
+    #     ax = fig.gca(projection='3d')
+    #     ax.set_facecolor('white')
+    #     ax.xaxis.pane.fill = False
+    #     ax.yaxis.pane.fill = False
+    #     ax.zaxis.pane.fill = False
+    #
+    #     ax.set_xlabel('x')
+    #     ax.set_ylabel('y')
+    #     ax.set_zlabel('z')
+    #
+    #     pf.plot_particles(particles, fig=fig, ax=ax)
+    #     BEC_viz.visualize_planes(constraints_running, fig=fig, ax=ax)
+    #
+    #     # visualize spherical polygon
+    #     ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints_running)
+    #     poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
+    #     BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax, plot_ref_sphere=False, alpha=0.75)
+    #
+    #     # visualize the ground truth constraint
+    #     w = np.array([[-3, 3.5, -1]])  # toll, hotswap station, step cost
+    #     w_normalized = w / np.linalg.norm(w[0, :], ord=2)
+    #     ax.scatter(w_normalized[0, 0], w_normalized[0, 1], w_normalized[0, 2], marker='o', c='b', s=100)
     #
     #     plt.show()
 
@@ -338,11 +431,11 @@ def obtain_unit_tests(BEC_summary, visited_env_traj_idxs, data_loc, weights, ste
         opt_traj = test[1]
         test_constraint = test[-1]
 
-        # human_traj, human_history = test_mdp.visualize_interaction(keys_map=params.keys_map) # the latter is simply the gridworld locations of the agent
+        human_traj, human_history = test_mdp.visualize_interaction(keys_map=params.keys_map) # the latter is simply the gridworld locations of the agent
         # with open('models/' + data_loc + '/human_traj.pickle', 'wb') as f:
         #     pickle.dump((human_traj, human_history), f)
-        with open('models/' + data_loc + '/human_traj.pickle', 'rb') as f:
-            human_traj, human_history = pickle.load(f)
+        # with open('models/' + data_loc + '/human_traj.pickle', 'rb') as f:
+        #     human_traj, human_history = pickle.load(f)
 
         human_feature_count = test_mdp.accumulate_reward_features(human_traj, discount=True)
         opt_feature_count = test_mdp.accumulate_reward_features(opt_traj, discount=True)

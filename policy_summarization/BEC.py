@@ -20,6 +20,7 @@ import sage.geometry.polyhedron.base as Polyhedron
 from spherical_geometry import polygon as sph_polygon
 import policy_summarization.BEC_visualization as BEC_viz
 from policy_summarization import computational_geometry as cg
+from policy_summarization import particle_filter as pf
 
 def extract_constraints_policy(args):
     env_idx, data_loc, step_cost_flag = args
@@ -282,7 +283,7 @@ def obtain_potential_summary_demos(BEC_lengths_record, n_demos, n_clusters, type
     return covering_demos_idxs
 
 def compute_counterfactuals(args):
-    data_loc, model_idx, env_idx, w_human_normalized, env_filename, trajs_opt, min_BEC_constraints_running, step_cost_flag, summary_len, variable_filter, consider_human_models_jointly = args
+    data_loc, model_idx, env_idx, w_human_normalized, env_filename, trajs_opt, particles, min_BEC_constraints_running, step_cost_flag, summary_len, variable_filter, consider_human_models_jointly = args
 
     with open(env_filename, 'rb') as f:
         wt_vi_traj_env = pickle.load(f)
@@ -356,7 +357,11 @@ def compute_counterfactuals(args):
                         skip_demo = True
 
             if not skip_demo:
-                info_gain = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, constraints, weights, step_cost_flag)
+                if particles is not None:
+                    info_gain = pf.calc_info_gain(particles, constraints)
+                else:
+                    info_gain = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, constraints,
+                                                                       weights, step_cost_flag)
             else:
                 info_gain = 0
 
@@ -395,7 +400,7 @@ def combine_limiting_constraints_IG(args):
     Summary: combine the most limiting constraints across all potential human models for each potential demonstration
     '''
     env_idx, n_sample_human_models, data_loc, curr_summary_len, weights, step_cost_flag, variable_filter,\
-    trajs_opt, min_BEC_constraints_running = args
+    trajs_opt, min_BEC_constraints_running, particles = args
 
     info_gains_record = []
     min_env_constraints_record = []
@@ -430,7 +435,10 @@ def combine_limiting_constraints_IG(args):
                     skip_demo = True
 
         if not skip_demo:
-            ig = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, min_env_constraints, weights, step_cost_flag)
+            if particles is not None:
+                ig = pf.calc_info_gain(particles, min_env_constraints)
+            else:
+                ig = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, min_env_constraints, weights, step_cost_flag)
             info_gains_record.append(ig)
         else:
             info_gains_record.append(0)
@@ -895,6 +903,280 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
         # this method doesn't always finish, so save the summary along the way
         with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
             pickle.dump(summary, f)
+
+    return summary, visited_env_traj_idxs
+
+def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
+                       n_train_demos=3, prior=[], downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=1):
+    summary = []
+    visited_env_traj_idxs = []
+
+    # impose prior
+    min_BEC_constraints_running = prior.copy()
+
+    # fig = plt.figure()
+    # ax = fig.gca(projection='3d')
+    # ax.set_facecolor('white')
+    # ax.xaxis.pane.fill = False
+    # ax.yaxis.pane.fill = False
+    # ax.zaxis.pane.fill = False
+    # ax.set_xlabel('x')
+    # ax.set_ylabel('y')
+    # ax.set_zlabel('z')
+    # pf.plot_particles(particles, fig=fig, ax=ax)
+    # # visualize the ground truth constraint
+    # w = np.array([[-3, 3.5, -1]])  # toll, hotswap station, step cost
+    # w_normalized = w / np.linalg.norm(w[0, :], ord=2)
+    # ax.scatter(w_normalized[0, 0], w_normalized[0, 1], w_normalized[0, 2], marker='o', c='b', s=100)
+    # plt.show()
+
+    # count how many nonzero constraints are present for each reward weight (i.e. variable) in the minimum BEC constraints
+    # (which are obtained using one-step deviations). mask variables in order of fewest nonzero constraints for variable scaffolding
+    # rationale: the variable with the most nonzero constraints, often the step cost, serves as a good reference/ratio variable
+    min_subset_constraints_record_flattened = [item for sublist in min_subset_constraints_record for item in sublist]
+    min_subset_constraints_record_flattened = [item for sublist in min_subset_constraints_record_flattened for item in sublist]
+    min_subset_constraints_record_array = np.array(min_subset_constraints_record_flattened)
+
+    # for variable scaffolding
+    nonzero_counter = (min_subset_constraints_record_array != 0).astype(float)
+    nonzero_counter = np.sum(nonzero_counter, axis=0)
+    nonzero_counter = nonzero_counter.flatten()
+
+    variable_filter, nonzero_counter = BEC_helpers.update_variable_filter(nonzero_counter)
+    print('variable filter: {}'.format(variable_filter))
+
+    # clear the demonstration generation log
+    open('models/' + data_loc + '/demo_gen_log.txt', 'w').close()
+
+    while len(summary) < n_train_demos:
+        # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(len(summary)) + '.png', just_save=True)
+
+        sample_human_models = BEC_helpers.sample_human_models_pf(particles, n_human_models)
+
+        if len(sample_human_models) == 0:
+            print(colored("Likely cannot reduce the BEC further through additional demonstrations. Returning.", 'red'))
+            return summary
+
+        info_gains_record = []
+        overlap_in_opt_and_counterfactual_traj_record = []
+
+        print("Length of summary: {}".format(len(summary)))
+        with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
+            myfile.write('Length of summary: {}\n'.format(len(summary)))
+
+        for model_idx, human_model in enumerate(sample_human_models):
+            print(colored('Model #: {}'.format(model_idx), 'red'))
+            print(colored('Model val: {}'.format(human_model), 'red'))
+
+            with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
+                myfile.write('Model #: {}\n'.format(model_idx))
+                myfile.write('Model val: {}\n'.format(human_model))
+
+            # based on the human's current model, obtain the information gain generated when comparing to the agent's
+            # optimal trajectories in each environment (human's corresponding optimal trajectories and constraints
+            # are saved for reference later)
+            print("Obtaining counterfactual information gains:")
+
+            cf_data_dir = 'models/' + data_loc + '/counterfactual_data_' + str(len(summary)) + '/model' + str(model_idx)
+            os.makedirs(cf_data_dir, exist_ok=True)
+            if consider_human_models_jointly:
+                pool.restart()
+                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], particles, min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter, consider_human_models_jointly) for i in range(len(traj_record))]
+                # here2
+                info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals, args), total=len(args)))
+                pool.close()
+                pool.join()
+                pool.terminate()
+
+                info_gains_record.append(info_gain_envs)
+            else:
+                pool.restart()
+                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], particles, min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter, consider_human_models_jointly) for i in range(len(traj_record))]
+                info_gain_envs, overlap_in_opt_and_counterfactual_traj_env = zip(*pool.imap(compute_counterfactuals, tqdm(args), total=len(args)))
+                pool.close()
+                pool.join()
+                pool.terminate()
+
+                info_gains_record.append(info_gain_envs)
+                overlap_in_opt_and_counterfactual_traj_record.append(overlap_in_opt_and_counterfactual_traj_env)
+
+        with open('models/' + data_loc + '/info_gains_' + str(len(summary)) + '.pickle', 'wb') as f:
+            pickle.dump(info_gains_record, f)
+
+        # do a quick check of whether there's any information to be gained from any of the trajectories
+        no_info_flag = False
+        max_info_gain = -np.inf
+        if consistent_state_count:
+            info_gains = np.array(info_gains_record)
+            if np.sum(info_gains > 0) == 0:
+                no_info_flag = True
+        else:
+            info_gains_flattened_across_models = list(itertools.chain.from_iterable(info_gains_record))
+            info_gains_flattened_across_envs = list(itertools.chain.from_iterable(info_gains_flattened_across_models))
+            if sum(np.array(info_gains_flattened_across_envs) > 0) == 0:
+                no_info_flag = True
+
+        # no need to continue search for demonstrations if none of them will improve the human's understanding
+        if no_info_flag:
+            # sample up two more set of human models to try and find a demonstration that will improve the human's
+            # understanding before concluding that there is no more information to be conveyed
+            if variable_filter is None:
+                break
+            else:
+                # no more informative demonstrations with this variable filter, so update it
+                variable_filter, nonzero_counter = BEC_helpers.update_variable_filter(nonzero_counter)
+                print(colored('Did not find any informative demonstrations.', 'red'))
+                print('variable filter: {}'.format(variable_filter))
+
+                continue
+
+        print("Combining the most limiting constraints across human models:")
+        pool.restart()
+        args = [(i, len(sample_human_models), data_loc, len(summary), weights, step_cost_flag, variable_filter,
+                 traj_record[i], min_BEC_constraints_running, particles) for
+                i in range(len(traj_record))]
+        info_gains_record, min_env_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(
+            *pool.imap(combine_limiting_constraints_IG, tqdm(args)))
+        pool.close()
+        pool.join()
+        pool.terminate()
+
+        # the possibility that no demonstration provides information gain must be checked for again,
+        # in case all limiting constraints involve a masked variable and shouldn't be considered for demonstration yet
+        if consistent_state_count:
+            info_gains = np.array(info_gains_record)
+            traj_overlap_pcts = np.array(overlap_in_opt_and_counterfactual_traj_avg)
+
+            # obj_function = info_gains * (traj_overlap_pcts + c)  # objective 2: scaled
+            obj_function = info_gains
+
+            # not considering demos where there is no info gain helps ensure that the final demonstration
+            # provides the maximum info gain (in conjuction with previously shown demonstrations)
+            obj_function[info_gains <= 0] = 0
+
+            max_info_gain = np.max(info_gains)
+            # here3
+            if max_info_gain == -np.inf:
+                no_info_flag = True
+            else:
+                # if visuals aren't considered, then you can simply return one of the demos that maximizes the obj function
+                # best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
+
+                if obj_func_proportion == 1:
+                    # a) select the trajectory with the maximal information gain
+                    best_env_idxs, best_traj_idxs = np.where(obj_function == max(obj_function.flatten()))
+                else:
+                    # b) select the trajectory closest to the desired partial information gain (to obtain more demonstrations0
+                    obj_function_flat = obj_function.flatten()
+                    obj_function_flat.sort()
+
+                    best_obj = obj_function_flat[-1]
+                    target_obj = obj_func_proportion * best_obj
+                    target_idx = np.argmin(abs(obj_function_flat - target_obj))
+                    closest_obj = obj_function_flat[target_idx]
+                    best_env_idxs, best_traj_idxs = np.where(obj_function == obj_function_flat[closest_obj])
+
+                best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
+        else:
+            best_obj = float('-inf')
+            best_env_idxs = []
+            best_traj_idxs = []
+
+            if obj_func_proportion == 1:
+                # a) select the trajectory with the maximal information gain
+                for env_idx, info_gains_per_env in enumerate(info_gains_record):
+                    for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
+                        if info_gain_per_traj > 0:
+
+                            # obj = info_gain_per_traj * (
+                            #             overlap_in_opt_and_counterfactual_traj_avg[env_idx][traj_idx] + c)  # objective 2: scaled
+                            obj = info_gain_per_traj
+
+                            if np.isclose(obj, best_obj):
+                                best_env_idxs.append(env_idx)
+                                best_traj_idxs.append(traj_idx)
+                            elif obj > best_obj:
+                                best_obj = obj
+
+                                best_env_idxs = [env_idx]
+                                best_traj_idxs = [traj_idx]
+                            if info_gain_per_traj > max_info_gain:
+                                max_info_gain = info_gain_per_traj
+                                print("new max info: {}".format(max_info_gain))
+            else:
+                # b) select the trajectory closest to the desired partial information gain (to obtain more demonstrations)
+                # first find the max information gain
+                for env_idx, info_gains_per_env in enumerate(info_gains_record):
+                    for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
+                        if info_gain_per_traj > 0:
+                            obj = info_gain_per_traj
+
+                            if np.isclose(obj, best_obj):
+                                pass
+                            elif obj > best_obj:
+                                best_obj = obj
+
+                            if info_gain_per_traj > max_info_gain:
+                                max_info_gain = info_gain_per_traj
+                                print("new max info: {}".format(max_info_gain))
+
+                target_obj = obj_func_proportion * best_obj
+                closest_obj_dist = float('inf')
+
+                for env_idx, info_gains_per_env in enumerate(info_gains_record):
+                    for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
+                        if info_gain_per_traj > 0:
+
+                            obj = info_gain_per_traj
+
+                            if np.isclose(abs(target_obj - obj), closest_obj_dist):
+                                best_env_idxs.append(env_idx)
+                                best_traj_idxs.append(traj_idx)
+                            elif abs(target_obj - obj) < closest_obj_dist:
+                                closest_obj_dist = abs(obj - target_obj)
+
+                                best_env_idxs = [env_idx]
+                                best_traj_idxs = [traj_idx]
+
+            if max_info_gain == -np.inf:
+                no_info_flag = True
+            else:
+                best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
+
+        print("current max info: {}".format(max_info_gain))
+        if no_info_flag:
+            if variable_filter is None:
+                break
+            else:
+                # no more informative demonstrations with this variable filter, so update it
+                variable_filter, nonzero_counter = BEC_helpers.update_variable_filter(nonzero_counter)
+                print(colored('Did not find any informative demonstrations.', 'red'))
+                print('variable filter: {}'.format(variable_filter))
+                continue
+
+        best_traj = traj_record[best_env_idx][best_traj_idx]
+
+        filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
+        with open(filename, 'rb') as f:
+            wt_vi_traj_env = pickle.load(f)
+        best_mdp = wt_vi_traj_env[0][1].mdp
+        best_mdp.set_init_state(best_traj[0][0]) # for completeness
+        min_BEC_constraints_running.extend(min_env_constraints_record[best_env_idx][best_traj_idx])
+        min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
+        summary.append([best_mdp, best_traj, (best_env_idx, best_traj_idx), min_env_constraints_record[best_env_idx][best_traj_idx],
+                        sample_human_models])
+        visited_env_traj_idxs.append((best_env_idx, best_traj_idx))
+
+        particles = pf.update_particle_filter(particles, min_env_constraints_record[best_env_idx][best_traj_idx])
+
+        print(colored('Max infogain: {}'.format(max_info_gain), 'blue'))
+        with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
+            myfile.write('Max infogain: {}\n'.format(max_info_gain))
+            myfile.write('\n')
+
+        # this method doesn't always finish, so save the summary along the way
+        with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
+            pickle.dump((summary, visited_env_traj_idxs), f)
 
     return summary, visited_env_traj_idxs
 

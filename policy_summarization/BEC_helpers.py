@@ -8,6 +8,7 @@ import difflib
 from sklearn import metrics
 import itertools
 import pickle
+from filterpy.monte_carlo import systematic_resample
 
 from policy_summarization import computational_geometry as cg
 
@@ -627,6 +628,30 @@ def sample_average_model(constraints, sample_rate=1000):
         sample_human_models.append(valid_sph_points)
 
     return sample_human_models
+
+def sample_human_models_pf(particles, n_models):
+    sampled_human_model_idxs = []
+
+    while len(sampled_human_model_idxs) < n_models:
+        # sample indexes of particles via systematic resampling
+        indexes = systematic_resample(particles.weights)
+        unique_idxs, counts = np.unique(indexes, return_counts=True)
+
+        # order the unique indexes via their frequency
+        unique_idxs_sorted = [x for _, x in sorted(zip(counts, unique_idxs), reverse=True)]
+
+        for idx in unique_idxs_sorted:
+            # add new unique indexes to the human models that will be considered for counterfactual reasoning
+            if idx not in sampled_human_model_idxs:
+                sampled_human_model_idxs.append(idx)
+
+            if len(sampled_human_model_idxs) == n_models:
+                break
+
+    # obtain the particles corresponding to the sampled indices
+    sampled_human_model_idxs = particles.positions[sampled_human_model_idxs]
+
+    return sampled_human_model_idxs
 
 def sample_human_models_uniform(constraints, n_models):
     '''

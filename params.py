@@ -8,7 +8,7 @@ import os
 
 # S22/IJCAI22 environments (doesn't allow exits)
 mdp_class = 'augmented_taxi2'
-# mdp_class = 'colored_tiles'
+# mdp_class = 'colored_tiles
 # mdp_class = 'skateboard2'
 # mdp_class = 'two_goal2'
 
@@ -281,7 +281,7 @@ step_cost_flag = False
 
 # BEC parameters
 BEC = {
-    'summary_variant': 'counterfactual_only',            # [proposed, counterfactual_only, feature_only, baseline]
+    'summary_variant': 'particle_filter',            # [proposed, counterfactual_only, feature_only, baseline]
                                               # proposed: counterfactual (Y), feature scaffolding (Y)
                                               # feature_only: counterfactual (N), feature scaffolding (Y)
                                               # counterfactual_only: counterfactual (Y), feature scaffolding (N)
@@ -293,7 +293,7 @@ BEC = {
 
     'test_difficulty': 'high',                # expected ease for human to correctly predict the agent's actions in this test environment (low, medium, high)
 
-    'n_human_models': 8,                      # expected ease for human to correctly predict the agent's actions in this test environment (low, medium, high)
+    'n_human_models': 8,                      # number of human beliefs to consider
 
     'obj_func_proportion': 1                  # proportion of the max objective function (i.e. info gain) to aim for
                                               # when selecting the next demonstration (range: 0 - 1). selecting a value
