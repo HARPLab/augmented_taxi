@@ -58,7 +58,7 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
         mdp_agent.reset()  # reset the current state to the initial state
         mdp_agent.visualize_interaction()
 
-def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, pool, n_train_demos, n_human_models, prior, posterior, obj_func_proportion, hardcode_envs=False):
+def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, pool, n_train_demos, n_human_models, n_particles, prior, posterior, obj_func_proportion, hardcode_envs=False):
     if hardcode_envs:
         # using 4 hardcoded environments
         ps_helpers.obtain_env_policies(mdp_class, data_loc, np.expand_dims(weights, axis=0), mdp_parameters, pool, hardcode_envs=True)
@@ -111,7 +111,6 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
         if summary_variant == 'particle_filter':
             print('PF summary')
             # initialize particle filter
-            n_particles = 50
             particle_positions = BEC_helpers.sample_human_models_uniform([], n_particles)
             particles = pf.Particles(particle_positions)
             particles = pf.update_particle_filter(particles, prior)
@@ -471,7 +470,7 @@ if __name__ == "__main__":
     # b) obtain a BEC summary of the agent's policy
     BEC_summary, visited_env_traj_idxs = obtain_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
                             params.step_cost_flag, params.BEC['summary_variant'], pool, params.BEC['n_train_demos'],
-                            params.BEC['n_human_models'], params.prior, params.posterior, params.BEC['obj_func_proportion'])
+                            params.BEC['n_human_models'], params.BEC['n_particles'], params.prior, params.posterior, params.BEC['obj_func_proportion'])
 
     unit_tests = obtain_unit_tests(BEC_summary, visited_env_traj_idxs, params.data_loc['BEC'], params.weights['val'], params.step_cost_flag)
 

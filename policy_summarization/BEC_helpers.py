@@ -1,3 +1,5 @@
+import random
+
 import numpy as np
 from pypoman import compute_polygon_hull, indicate_violating_constraints
 from scipy.optimize import linprog
@@ -637,16 +639,29 @@ def sample_human_models_pf(particles, n_models):
         indexes = systematic_resample(particles.weights)
         unique_idxs, counts = np.unique(indexes, return_counts=True)
 
-        # order the unique indexes via their frequency
-        unique_idxs_sorted = [x for _, x in sorted(zip(counts, unique_idxs), reverse=True)]
+        # # a) sample the top n most frequently counted indexes returned by resampling
+        # # order the unique indexes via their frequency
+        # unique_idxs_sorted = [x for _, x in sorted(zip(counts, unique_idxs), reverse=True)]
+        #
+        # for idx in unique_idxs_sorted:
+        #     # add new unique indexes to the human models that will be considered for counterfactual reasoning
+        #     if idx not in sampled_human_model_idxs:
+        #         sampled_human_model_idxs.append(idx)
+        #
+        #     if len(sampled_human_model_idxs) == n_models:
+        #         break
 
-        for idx in unique_idxs_sorted:
-            # add new unique indexes to the human models that will be considered for counterfactual reasoning
+        # b) sample indexes according to how frequently they were counted via resampling
+        expanded_idx_list = []
+        for j, idx in enumerate(unique_idxs):
+            expanded_idx_list.extend([idx] * counts[j])
+
+        # generate unique samples from a sequence without repetition or replacement
+        selected_idxs = random.sample(expanded_idx_list, n_models)
+
+        for idx in selected_idxs:
             if idx not in sampled_human_model_idxs:
                 sampled_human_model_idxs.append(idx)
-
-            if len(sampled_human_model_idxs) == n_models:
-                break
 
     # obtain the particles corresponding to the sampled indices
     sampled_human_model_idxs = particles.positions[sampled_human_model_idxs]
@@ -739,6 +754,10 @@ def sample_human_models_uniform(constraints, n_models):
     return sample_human_models
 
 def selectKcities(n, weights, k):
+    '''
+    Based off of the solution provided below for the K Centers Problem
+    https://www.geeksforgeeks.org/k-centers-problem-set-1-greedy-approximate-algorithm/
+    '''
     dist = [float('inf')] * n
     centers = []
 

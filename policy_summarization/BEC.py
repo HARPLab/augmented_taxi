@@ -907,7 +907,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
     return summary, visited_env_traj_idxs
 
 def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
-                       n_train_demos=3, prior=[], downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=1):
+                       n_train_demos=np.inf, prior=[], downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=1, min_info_gain=0.01):
     summary = []
     visited_env_traj_idxs = []
 
@@ -982,7 +982,7 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
             if consider_human_models_jointly:
                 pool.restart()
                 args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], particles, min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter, consider_human_models_jointly) for i in range(len(traj_record))]
-                # here2
+
                 info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals, args), total=len(args)))
                 pool.close()
                 pool.join()
@@ -1055,8 +1055,8 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
             obj_function[info_gains <= 0] = 0
 
             max_info_gain = np.max(info_gains)
-            # here3
-            if max_info_gain == -np.inf:
+
+            if max_info_gain <= min_info_gain:
                 no_info_flag = True
             else:
                 # if visuals aren't considered, then you can simply return one of the demos that maximizes the obj function
@@ -1138,7 +1138,7 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
                                 best_env_idxs = [env_idx]
                                 best_traj_idxs = [traj_idx]
 
-            if max_info_gain == -np.inf:
+            if max_info_gain < min_info_gain:
                 no_info_flag = True
             else:
                 best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
@@ -1173,6 +1173,8 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
         with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
             myfile.write('Max infogain: {}\n'.format(max_info_gain))
             myfile.write('\n')
+
+        print(colored('entropy: {}'.format(particles.entropy), 'blue'))
 
         # this method doesn't always finish, so save the summary along the way
         with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:

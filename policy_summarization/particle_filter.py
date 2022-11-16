@@ -165,6 +165,9 @@ def normalized_weighted_variance(particles, spherical_centroid=None):
 def calc_entropy(particles, constraints):
     '''
     Implement entropy measure for particle filter as described in Particle Filter Based Entropy (boers_mandal_ICIF2010)
+
+    Spherical discretization taken from : A new method to subdivide a spherical surface into equal-area cells,
+    Malkin 2019 https://arxiv.org/pdf/1612.03467.pdf
     '''
 
     # sort particles into bins
