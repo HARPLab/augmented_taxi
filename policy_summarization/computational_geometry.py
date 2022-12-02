@@ -5,6 +5,48 @@ from spherical_geometry import great_circle_arc
 '''
 2-sphere geometry
 '''
+# following code from https://skeptric.com/calculate-centroid-on-sphere/#Attempting-to-Implement-Algorithm-A1
+def distance(x, y, axis=0):
+    return np.sqrt((np.power(x - y, 2)).sum(axis=axis))
+
+def geodist(x, y, eps=1e-6):
+    dotprod = y.T @ x
+    assert ((-1 - eps) <= dotprod).all() and (dotprod <= (1 + eps)).all()
+    dotprod = dotprod.clip(-1, 1)
+    return np.arccos(dotprod)
+
+def avg_distance(ps, m):
+    # Allow m to be a vector *or* a matrix
+    if len(m.shape) == 1:
+        m = m[:, None]
+    return geodist(ps, m).mean(axis=1)
+
+def improve_centroid(c, ps, weights):
+    '''
+    :param c: old centroid
+    :param ps: points
+    :return: new centroid
+    '''
+    # weight every particle equally
+    # ans = (ps / np.sqrt(1 - np.power(c@ps, 2))).sum(axis=-1)
+
+    # weight different particles differently
+    ans = (ps / np.sqrt(1 - np.power(c@ps, 2))) * np.tile(weights, (3, 1))
+    ans = ans.sum(axis=-1)
+    norm = np.sqrt(ans @ ans)
+    return ans / norm
+
+def fixpoint(f, x0, eps=1e-5, maxiter=1000, **kwargs):
+    for _ in range(maxiter):
+        x = f(x0, **kwargs)
+        if geodist(x, x0) < eps:
+            return x
+        x0 = x
+    raise Exception("Did not converge")
+
+def spherical_centroid(ps, weights, eps=1e-5, maxiter=10000):
+    return fixpoint(improve_centroid, np.zeros((3,)), ps=ps, weights=weights, eps=eps, maxiter=maxiter)
+
 def sph2cat(azi, ele):
     x = np.cos(azi) * np.sin(ele)
     y = np.sin(azi) * np.sin(ele)
