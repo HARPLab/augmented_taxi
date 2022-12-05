@@ -4,13 +4,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sage.all
 import sage.geometry.polyhedron.base as Polyhedron
-from filterpy.monte_carlo import systematic_resample, residual_resample
 from termcolor import colored
 from spherical_geometry import great_circle_arc as gca
 import copy
 from numpy.random import uniform
 from MeanShift import mean_shift as ms
-import probability_utils as p_utils
+from policy_summarization import probability_utils as p_utils
 
 import policy_summarization.BEC_helpers as BEC_helpers
 import policy_summarization.BEC_visualization as BEC_viz
@@ -28,6 +27,23 @@ class Particles():
         self.weights_prev = self.weights.copy()
 
         self.entropy = calc_entropy(self, [])
+
+        self.cluster_centers = None
+        self.cluster_weights = None
+        self.cluster_assignments = None
+
+    def cluster(self):
+        # cluster particles using mean-shift and store the cluster centers
+        mean_shifter = ms.MeanShift()
+        mean_shift_result = mean_shifter.cluster(self.positions.squeeze(), self.weights)
+        self.cluster_centers = mean_shift_result.cluster_centers
+        self.cluster_assignments = mean_shift_result.cluster_assignments
+
+        # assign weights to cluster centers by summing up the weights of constituent particles
+        cluster_weights = []
+        for j, cluster_center in enumerate(self.cluster_centers):
+            cluster_weights.append(sum(self.weights[np.where(mean_shift_result.cluster_assignments == j)[0]]))
+        self.cluster_weights = cluster_weights
 
 def observation_probability(x, constraints, k=4):
     prob = 1
@@ -61,28 +77,29 @@ def reweight_particles(particles, constraints):
     particles.weights /= sum(particles.weights)
 
 
-def plot_particles(particles, centroid=None, fig=None, ax=None, cluster_centers=None, cluster_assignments=None, vis_scale_factor=1000):
+def plot_particles(particles, centroid=None, fig=None, ax=None, cluster_centers=None, cluster_weights=None, cluster_assignments=None, vis_scale_factor=1000):
     if fig == None:
         fig = plt.figure()
     if ax == None:
         ax = fig.gca(projection='3d')
 
     if cluster_centers is not None:
-        for i, j, k in cluster_centers:
-            ax.scatter(i, j, k, s=50, c='red', marker='+')
+        for cluster_id, cluster_center in enumerate(cluster_centers):
+            ax.scatter(cluster_center[0][0], cluster_center[0][1], cluster_center[0][2], s=500 * cluster_weights[cluster_id], c='red', marker='+')
 
         print("# of clusters: {}".format(len(np.unique(cluster_assignments))))
 
     if cluster_assignments is not None:
+        # color the particles according to their cluster assignments if provided
         plt.set_cmap("gist_rainbow")
         ax.scatter(particles.positions[:, 0, 0], particles.positions[:, 0, 1], particles.positions[:, 0, 2], s=particles.weights * vis_scale_factor, c=cluster_assignments)
     else:
         ax.scatter(particles.positions[:, 0, 0], particles.positions[:, 0, 1], particles.positions[:, 0, 2],
                    s=particles.weights * vis_scale_factor, color='tab:blue')
 
-    if centroid == None:
-        centroid = cg.spherical_centroid(particles.positions.squeeze().T, particles.weights)
-    ax.scatter(centroid[0], centroid[1], centroid[2], marker='o', c='r', s=100)
+    # if centroid == None:
+    #     centroid = cg.spherical_centroid(particles.positions.squeeze().T, particles.weights)
+    # ax.scatter(centroid[0], centroid[1], centroid[2], marker='o', c='r', s=100)
 
     if matplotlib.get_backend() == 'TkAgg':
         mng = plt.get_current_fig_manager()
@@ -282,7 +299,7 @@ def update_particle_filter(particles, constraints, c=0.5):
     n_eff = calc_n_eff(particles.weights)
     # print('n_eff: {}'.format(n_eff))
     if n_eff < c * len(particles.weights):
-        indexes = systematic_resample(particles.weights)
+        indexes = p_utils.systematic_resample(particles.weights)
         resample_from_index(particles, indexes)
         # print(np.unique(indexes, return_counts=True))
         # print(colored('Resampled', 'red'))
@@ -344,10 +361,9 @@ def IROS_demonstrations():
         ax.set_ylabel('y')
         ax.set_zlabel('z')
 
-        mean_shifter = ms.MeanShift()
-        mean_shift_result = mean_shifter.cluster(particles.positions.squeeze())
+        particles.cluster()
 
-        plot_particles(particles, fig=fig, ax=ax, cluster_centers=mean_shift_result.shifted_points, cluster_assignments=mean_shift_result.cluster_ids)
+        plot_particles(particles, fig=fig, ax=ax, cluster_centers=particles.cluster_centers, cluster_weights=particles.cluster_weights, cluster_assignments=particles.cluster_assignments)
         # plot_particles(particles, fig=fig, ax=ax)
         BEC_viz.visualize_planes(constraints_running, fig=fig, ax=ax)
 
@@ -360,6 +376,12 @@ def IROS_demonstrations():
         # w = np.array([[-3, 3.5, -1]])  # toll, hotswap station, step cost
         # w_normalized = w / np.linalg.norm(w[0, :], ord=2)
         # ax.scatter(w_normalized[0, 0], w_normalized[0, 1], w_normalized[0, 2], marker='o', c='r', s=100)
+
+        # for test visualization of sample human models
+        models = BEC_helpers.sample_human_models_pf(particles, 8)
+        models = np.array(models)
+        ax.scatter(models[:, 0, 0], models[:, 0, 1], models[:, 0, 2],
+                   s=100, color='black')
 
         plt.show()
 

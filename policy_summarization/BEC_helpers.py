@@ -10,7 +10,7 @@ import difflib
 from sklearn import metrics
 import itertools
 import pickle
-from filterpy.monte_carlo import systematic_resample
+from policy_summarization import probability_utils as p_utils
 
 from policy_summarization import computational_geometry as cg
 
@@ -634,39 +634,75 @@ def sample_average_model(constraints, sample_rate=1000):
 def sample_human_models_pf(particles, n_models):
     sampled_human_model_idxs = []
 
-    while len(sampled_human_model_idxs) < n_models:
-        # sample indexes of particles via systematic resampling
-        indexes = systematic_resample(particles.weights)
+    # while len(sampled_human_model_idxs) < n_models:
+    #     # sample indexes of particles via systematic resampling
+    #     indexes = p_utils.systematic_resample(particles.weights)
+    #     unique_idxs, counts = np.unique(indexes, return_counts=True)
+    #
+    #     # a) sample the top n most frequently counted indexes returned by resampling
+    #     # order the unique indexes via their frequency
+    #     unique_idxs_sorted = [x for _, x in sorted(zip(counts, unique_idxs), reverse=True)]
+    #
+    #     for idx in unique_idxs_sorted:
+    #         # add new unique indexes to the human models that will be considered for counterfactual reasoning
+    #         if idx not in sampled_human_model_idxs:
+    #             sampled_human_model_idxs.append(idx)
+    #
+    #         if len(sampled_human_model_idxs) == n_models:
+    #             break
+    #
+    #     # b) sample indexes according to how frequently they were counted via resampling
+    #     expanded_idx_list = []
+    #     for j, idx in enumerate(unique_idxs):
+    #         expanded_idx_list.extend([idx] * counts[j])
+    #
+    #     # generate unique samples from a sequence without repetition or replacement
+    #     selected_idxs = random.sample(expanded_idx_list, n_models)
+    #
+    #     for idx in selected_idxs:
+    #         if idx not in sampled_human_model_idxs:
+    #             sampled_human_model_idxs.append(idx)
+    #
+    # # obtain the particles corresponding to the sampled indices
+    # sampled_human_models = particles.positions[sampled_human_model_idxs]
+
+    # c) use mean-shift clustering to sample human models
+    particles.cluster()
+    if len(particles.cluster_centers) > n_models:
+        # if there are more clusters than number of sought human models, return the spherical centroids of the top n
+        # most frequently counted cluster indexes selected by systematic resampling
+        while len(sampled_human_model_idxs) < n_models:
+            indexes = p_utils.systematic_resample(particles.cluster_weights)
+            unique_idxs, counts = np.unique(indexes, return_counts=True)
+            # order the unique indexes via their frequency
+            unique_idxs_sorted = [x for _, x in sorted(zip(counts, unique_idxs), reverse=True)]
+
+            for idx in unique_idxs_sorted:
+                # add new unique indexes to the human models that will be considered for counterfactual reasoning
+                if idx not in sampled_human_model_idxs:
+                    sampled_human_model_idxs.append(idx)
+
+                if len(sampled_human_model_idxs) == n_models:
+                    break
+
+        sampled_human_models = [particles.cluster_centers[i] for i in sampled_human_model_idxs]
+    else:
+        # if there are fewer clusters than number of sought human models, use systematic sampling to determine how many
+        # particles from each cluster to return (using the k-cities algorithm to ensure that they are diverse)
+        indexes = p_utils.systematic_resample(particles.cluster_weights, N=n_models)
         unique_idxs, counts = np.unique(indexes, return_counts=True)
 
-        # # a) sample the top n most frequently counted indexes returned by resampling
-        # # order the unique indexes via their frequency
-        # unique_idxs_sorted = [x for _, x in sorted(zip(counts, unique_idxs), reverse=True)]
-        #
-        # for idx in unique_idxs_sorted:
-        #     # add new unique indexes to the human models that will be considered for counterfactual reasoning
-        #     if idx not in sampled_human_model_idxs:
-        #         sampled_human_model_idxs.append(idx)
-        #
-        #     if len(sampled_human_model_idxs) == n_models:
-        #         break
+        sampled_human_models = []
+        for j, unique_idx in enumerate(unique_idxs):
+            # particles of this cluster
+            clustered_particles = particles.positions[np.where(particles.cluster_assignments == unique_idx)]
 
-        # b) sample indexes according to how frequently they were counted via resampling
-        expanded_idx_list = []
-        for j, idx in enumerate(unique_idxs):
-            expanded_idx_list.extend([idx] * counts[j])
+            # use the k-cities algorithm to obtain a diverse sample of weights from this cluster
+            pairwise = metrics.pairwise.euclidean_distances(clustered_particles.reshape(-1, 3))
+            select_idxs = selectKcities(pairwise.shape[0], pairwise, counts[j])
+            sampled_human_models.extend(clustered_particles[select_idxs])
 
-        # generate unique samples from a sequence without repetition or replacement
-        selected_idxs = random.sample(expanded_idx_list, n_models)
-
-        for idx in selected_idxs:
-            if idx not in sampled_human_model_idxs:
-                sampled_human_model_idxs.append(idx)
-
-    # obtain the particles corresponding to the sampled indices
-    sampled_human_model_idxs = particles.positions[sampled_human_model_idxs]
-
-    return sampled_human_model_idxs
+    return sampled_human_models
 
 def sample_human_models_uniform(constraints, n_models):
     '''

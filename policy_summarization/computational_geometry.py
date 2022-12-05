@@ -33,6 +33,7 @@ def improve_centroid(c, ps, weights):
     # weight different particles differently
     ans = (ps / np.sqrt(1 - np.power(c@ps, 2))) * np.tile(weights, (3, 1))
     ans = ans.sum(axis=-1)
+
     norm = np.sqrt(ans @ ans)
     return ans / norm
 

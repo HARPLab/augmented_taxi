@@ -20,7 +20,12 @@ class PointGrouper(object):
             else:
                 group_assignment.append(nearest_group_index)
                 groups[nearest_group_index].append(point)
-        return np.array(group_assignment)
+
+        # note the spherical centroid of each cluster
+        spherical_centroids = []
+        for group in groups:
+            spherical_centroids.append(np.array(group[0]).reshape(1, -1))
+        return spherical_centroids, np.array(group_assignment)
 
     def _determine_nearest_group(self, point, groups):
         nearest_group_index = None
