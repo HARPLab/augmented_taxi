@@ -113,7 +113,7 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
             # initialize particle filter
             particle_positions = BEC_helpers.sample_human_models_uniform([], n_particles)
             particles = pf.Particles(particle_positions)
-            particles = pf.update_particle_filter(particles, prior)
+            particles.update(prior)
             print(colored('entropy: {}'.format(particles.entropy), 'blue'))
 
             BEC_summary, visited_env_traj_idxs = BEC.obtain_summary_particle_filter(data_loc, particles, summary_variant, min_subset_constraints_record,

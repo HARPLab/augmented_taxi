@@ -358,7 +358,7 @@ def compute_counterfactuals(args):
 
             if not skip_demo:
                 if particles is not None:
-                    info_gain = pf.calc_info_gain(particles, constraints)
+                    info_gain = particles.calc_info_gain(constraints)
                 else:
                     info_gain = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, constraints,
                                                                        weights, step_cost_flag)
@@ -436,7 +436,7 @@ def combine_limiting_constraints_IG(args):
 
         if not skip_demo:
             if particles is not None:
-                ig = pf.calc_info_gain(particles, min_env_constraints)
+                ig = particles.calc_info_gain(min_env_constraints)
             else:
                 ig = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, min_env_constraints, weights, step_cost_flag)
             info_gains_record.append(ig)
@@ -923,11 +923,11 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
     # ax.set_xlabel('x')
     # ax.set_ylabel('y')
     # ax.set_zlabel('z')
-    # pf.plot_particles(particles, fig=fig, ax=ax)
+    # particles.plot(fig=fig, ax=ax)
     # # visualize the ground truth constraint
     # w = np.array([[-3, 3.5, -1]])  # toll, hotswap station, step cost
     # w_normalized = w / np.linalg.norm(w[0, :], ord=2)
-    # ax.scatter(w_normalized[0, 0], w_normalized[0, 1], w_normalized[0, 2], marker='o', c='b', s=100)
+    # ax.scatter(w_normalized[0, 0], w_normalized[0, 1], w_normalized[0, 2], marker='o', c='r', s=100)
     # plt.show()
 
     # count how many nonzero constraints are present for each reward weight (i.e. variable) in the minimum BEC constraints
@@ -1167,7 +1167,7 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
                         sample_human_models])
         visited_env_traj_idxs.append((best_env_idx, best_traj_idx))
 
-        particles = pf.update_particle_filter(particles, min_env_constraints_record[best_env_idx][best_traj_idx])
+        particles.update(min_env_constraints_record[best_env_idx][best_traj_idx])
 
         print(colored('Max infogain: {}'.format(max_info_gain), 'blue'))
         with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
