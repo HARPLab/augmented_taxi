@@ -686,6 +686,8 @@ def sample_human_models_pf(particles, n_models):
                     break
 
         sampled_human_models = [particles.cluster_centers[i] for i in sampled_human_model_idxs]
+    elif len(particles.cluster_centers) == n_models:
+        sampled_human_models = particles.cluster_centers
     else:
         # if there are fewer clusters than number of sought human models, use systematic sampling to determine how many
         # particles from each cluster to return (using the k-cities algorithm to ensure that they are diverse)
