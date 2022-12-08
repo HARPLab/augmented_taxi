@@ -20,7 +20,6 @@ import sage.geometry.polyhedron.base as Polyhedron
 from spherical_geometry import polygon as sph_polygon
 import policy_summarization.BEC_visualization as BEC_viz
 from policy_summarization import computational_geometry as cg
-from policy_summarization import particle_filter as pf
 
 def extract_constraints_policy(args):
     env_idx, data_loc, step_cost_flag = args
@@ -386,9 +385,10 @@ def compute_counterfactuals(args):
             overlap_in_opt_and_counterfactual_traj_env = [float('inf') for i in range(len(trajs_opt))]
         human_rewards_env = [np.array([[0]]) for i in range(len(trajs_opt))]
 
-    with open('models/' + data_loc + '/counterfactual_data_' + str(summary_len) + '/model' + str(model_idx) +
-              '/cf_data_env' + str(env_idx).zfill(5) + '.pickle', 'wb') as f:
-        pickle.dump((best_human_trajs_record_env, constraints_env, human_rewards_env), f)
+    if summary_len is not None:
+        with open('models/' + data_loc + '/counterfactual_data_' + str(summary_len) + '/model' + str(model_idx) +
+                  '/cf_data_env' + str(env_idx).zfill(5) + '.pickle', 'wb') as f:
+            pickle.dump((best_human_trajs_record_env, constraints_env, human_rewards_env), f)
 
     if consider_human_models_jointly:
         return info_gain_env
@@ -1030,6 +1030,9 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
 
                 continue
 
+        # todo: now that we're utilizing a probabilistic human model, we should account for the probability of having
+        #  selected each human model in the information gain calculation (e.g. by taking an expectation over the information
+        #  gain), rather than simply combine all of the constraints that could've been generated (which is currently done)
         print("Combining the most limiting constraints across human models:")
         pool.restart()
         args = [(i, len(sample_human_models), data_loc, len(summary), weights, step_cost_flag, variable_filter,
@@ -1180,9 +1183,9 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
         with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
             pickle.dump((summary, visited_env_traj_idxs), f)
 
-    return summary, visited_env_traj_idxs
+    return summary, visited_env_traj_idxs, particles
 
-def obtain_remedial_demonstrations(data_loc, min_BEC_constraints, min_subset_constraints_record, traj_record, prev_test, visited_env_traj_idxs, downsample_threshold=float("inf")):
+def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, min_BEC_constraints, min_subset_constraints_record, traj_record, prev_test, visited_env_traj_idxs, step_cost_flag, info_gain_tolerance=0.01, consider_human_models_jointly=True):
     remedial_demonstrations = []
 
     # if you're looking for demonstrations that will convey the most constraining BEC region or will be employing scaffolding,
@@ -1190,10 +1193,52 @@ def obtain_remedial_demonstrations(data_loc, min_BEC_constraints, min_subset_con
     BEC_constraints = min_BEC_constraints
     BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(BEC_constraints,
                                                                                 min_subset_constraints_record, visited_env_traj_idxs)
-
     best_env_idxs, best_traj_idxs = list(zip(*BEC_constraint_bookkeeping[0]))
 
-    best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, prev_test)
+    sample_human_models, model_weights = BEC_helpers.sample_human_models_pf(particles, n_human_models)
+
+    # a) optimize for both information gain and visuals
+    info_gains_record = []
+
+    for model_idx, human_model in enumerate(sample_human_models):
+        print(colored('Model #: {}'.format(model_idx), 'red'))
+        print(colored('Model val: {}'.format(human_model), 'red'))
+
+        # based on the human's current model, obtain the information gain generated when comparing to the agent's
+        # optimal trajectories in each environment (human's corresponding optimal trajectories and constraints
+        # are saved for reference later)
+        print("Obtaining counterfactual information gains:")
+
+        cf_data_dir = 'models/' + data_loc + '/counterfactual_data_remedial_demo/model' + str(model_idx)
+        os.makedirs(cf_data_dir, exist_ok=True)
+
+        pool.restart()
+        args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, best_env_idxs[i]),
+                 [traj_record[best_env_idxs[i]][best_traj_idxs[i]]], particles, [], step_cost_flag, None,
+                 None, consider_human_models_jointly) for i in range(len(best_env_idxs))]
+
+        info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals, args), total=len(args)))
+        pool.close()
+        pool.join()
+        pool.terminate()
+
+        info_gains_record.append(info_gain_envs)
+
+    # compute weighted information gain (weighted by the probability of that human model / particle representing the
+    # human's true beliefs
+    info_gains_record = np.array(info_gains_record)
+    weighted_info_gains = [model_weights.dot(info_gains_record[:, j]) for j in range(len(best_env_idxs))]
+
+    # note that these correspond to the positions of the (env, traj) pair that yields the high information gain
+    best_info_gain_idxs = np.where(abs(weighted_info_gains - max(weighted_info_gains)) < info_gain_tolerance)[0]
+
+    best_env_idxs_filtered = [best_env_idxs[i] for i in best_info_gain_idxs]
+    best_traj_idxs_filtered = [best_traj_idxs[i] for i in best_info_gain_idxs]
+
+    best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs_filtered, best_traj_idxs_filtered, traj_record, prev_test)
+
+    # b) simply optimize for visuals
+    # best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, prev_test)
 
     traj = traj_record[best_env_idx][best_traj_idx]
     constraints = min_BEC_constraints[0]

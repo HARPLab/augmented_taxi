@@ -281,7 +281,7 @@ step_cost_flag = False
 
 # BEC parameters
 BEC = {
-    'summary_variant': 'particle_filter',            # [proposed, counterfactual_only, feature_only, baseline]
+    'summary_variant': 'proposed',            # [proposed, counterfactual_only, feature_only, baseline]
                                               # proposed: counterfactual (Y), feature scaffolding (Y)
                                               # feature_only: counterfactual (N), feature scaffolding (Y)
                                               # counterfactual_only: counterfactual (Y), feature scaffolding (N)
@@ -295,7 +295,7 @@ BEC = {
 
     'n_human_models': 8,                      # number of human beliefs to consider
 
-    'n_particles': 2000,                      # number of particles in particle filter
+    'n_particles': 50,                      # number of particles in particle filter
 
     'obj_func_proportion': 1                  # proportion of the max objective function (i.e. info gain) to aim for
                                               # when selecting the next demonstration (range: 0 - 1). selecting a value

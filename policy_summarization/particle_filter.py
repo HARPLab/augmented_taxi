@@ -384,11 +384,12 @@ def IROS_demonstrations():
         # ax.scatter(w_normalized[0, 0], w_normalized[0, 1], w_normalized[0, 2], marker='o', c='r', s=100)
 
         # for test visualization of sample human models
-        models = BEC_helpers.sample_human_models_pf(particles, 8)
+        models, model_weights = BEC_helpers.sample_human_models_pf(particles, 4)
         models = np.array(models)
         ax.scatter(models[:, 0, 0], models[:, 0, 1], models[:, 0, 2],
                    s=100, color='black')
 
+        print(particles.entropy)
         plt.show()
 
 if __name__ == "__main__":

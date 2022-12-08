@@ -686,8 +686,11 @@ def sample_human_models_pf(particles, n_models):
                     break
 
         sampled_human_models = [particles.cluster_centers[i] for i in sampled_human_model_idxs]
+        sampled_human_model_weights = np.array([particles.cluster_weights[i] for i in sampled_human_model_idxs])
+        sampled_human_model_weights /= np.sum(sampled_human_model_weights)  # normalize
     elif len(particles.cluster_centers) == n_models:
         sampled_human_models = particles.cluster_centers
+        sampled_human_model_weights = np.array(particles.cluster_weights) # should already be normalized
     else:
         # if there are fewer clusters than number of sought human models, use systematic sampling to determine how many
         # particles from each cluster to return (using the k-cities algorithm to ensure that they are diverse)
@@ -695,16 +698,22 @@ def sample_human_models_pf(particles, n_models):
         unique_idxs, counts = np.unique(indexes, return_counts=True)
 
         sampled_human_models = []
+        sampled_human_model_weights = []
         for j, unique_idx in enumerate(unique_idxs):
             # particles of this cluster
             clustered_particles = particles.positions[np.where(particles.cluster_assignments == unique_idx)]
+            clustered_particles_weights = particles.weights[np.where(particles.cluster_assignments == unique_idx)]
 
             # use the k-cities algorithm to obtain a diverse sample of weights from this cluster
             pairwise = metrics.pairwise.euclidean_distances(clustered_particles.reshape(-1, 3))
             select_idxs = selectKcities(pairwise.shape[0], pairwise, counts[j])
             sampled_human_models.extend(clustered_particles[select_idxs])
+            sampled_human_model_weights.extend(clustered_particles_weights[select_idxs])
 
-    return sampled_human_models
+        sampled_human_model_weights = np.array(sampled_human_model_weights)
+        sampled_human_model_weights /= np.sum(sampled_human_model_weights)
+
+    return sampled_human_models, sampled_human_model_weights
 
 def sample_human_models_uniform(constraints, n_models):
     '''
