@@ -259,6 +259,7 @@ def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_recor
     prev_env_idx = None
     for j, best_env_idx in enumerate(best_env_idxs):
 
+        # assuming that environments are provided in order of monotonically increasing indexes
         if prev_env_idx != best_env_idx:
             # reset the visual dissimilarity dictionary for a new MDP
             average_dissimilarity_dict = {}
@@ -277,11 +278,12 @@ def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_recor
         else:
             first_state = chunked_traj_record[best_env_idx][best_traj_idxs[j]][0][0]
 
+            # compare visual dissimilarity of this state to other states in this MDP, trying to minimize dissimilarity.
+            # the rationale behind this is that you want to have a starting demonstration that can be easily followed
+            # up by visually similar demonstrations
             if first_state in average_dissimilarity_dict:
-                # compare visual dissimilarity of this state to other states in this MDP, trying to minimize dissimilarity
                 visual_dissimilarities[j] = average_dissimilarity_dict[first_state]
             else:
-                # measure and store how dissimilar this first state is to other states in this MDP
                 average_dissimilarity = 0
                 for other_state_idx, other_state in enumerate(best_mdp.states):
                     if first_state != other_state:

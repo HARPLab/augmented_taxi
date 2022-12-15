@@ -412,7 +412,7 @@ class AugmentedTaxi2OOMDP(OOMDP):
         overlap = min(len(start_state_hash), len(other_start_state_hash))
 
         dissimilarity += np.sum(np.abs(np.array([int(x) for x in start_state_hash[0:overlap]]) - np.array(
-            [int(x) for x in other_start_state[0:overlap]]))) * start_state_weight
+            [int(x) for x in other_start_state_hash[0:overlap]]))) * start_state_weight
 
         # tolls and hotswap station
         dissimilarity += np.sum(np.abs(np.array(self.env_code) - np.array(other_mdp.env_code)))
