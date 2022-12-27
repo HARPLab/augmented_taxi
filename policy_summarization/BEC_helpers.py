@@ -785,10 +785,10 @@ def sample_human_models_uniform(constraints, n_models):
                 select_sph_points = select_sph_points.reshape(select_sph_points.shape[0], 1, select_sph_points.shape[1])
                 sample_human_models.extend(select_sph_points)
     else:
-        theta = 2 * np.pi * np.linspace(0, 1, int(np.ceil(np.sqrt(n_models))))
+        theta = 2 * np.pi * np.linspace(0, 1, int(np.ceil(np.sqrt(n_models / 2) * 2))) # the range of theta is twice the range of phi, so account for that
 
         # remove the first and last phi's later to prevent clumps at poles
-        phi = np.arccos(1 - 2 * np.linspace(0, 1, int(np.ceil(np.sqrt(n_models))) + 2))
+        phi = np.arccos(1 - 2 * np.linspace(0, 1, int(np.ceil(np.sqrt(n_models / 2))) + 2))
         theta_grid, phi_grid = np.meshgrid(theta, phi[1:-1])
 
         valid_sph_points = np.array(cg.sph2cat(theta_grid.flatten(), phi_grid.flatten())).T

@@ -453,6 +453,10 @@ class Particles():
         return bin_particle_mapping, bin_weight_mapping
 
     def meanshift_plusplus_neighbors(self, query_point, points, weights):
+        '''
+        Implement "MeanShift++: Extremely Fast Mode-Seeking With Applications to Segmentation and Object Tracking" by
+        Jang et al. from CVPR 2021 on 2-sphere
+        '''
         # bin this point
         azimuth, elevation = cg.cart2sph(*query_point)
         query_elevation_bin = np.digitize(elevation, self.ele_bin_edges_20)
@@ -552,9 +556,8 @@ class Particles():
 
         self.positions[:] = self.positions[indexes]
         for j, position in enumerate(self.positions):
-            perturbed_position = position + np.random.random(position.shape) * noise
-            self.positions[j] = perturbed_position / np.linalg.norm(perturbed_position, ord=2)
-
+            # add half as much noise for elevation since its range is half that of azimuth's
+            self.positions[j] = np.array(cg.sph2cat(*cg.cart2sph(*position[0]) + np.array((np.random.random() * noise, np.random.random() * noise * .5)))).reshape(1, -2)
         self.weights = np.ones(len(self.positions)) / len(self.positions)
 
     # http://seismo.berkeley.edu/~kirchner/Toolkits/Toolkit_12.pdf
