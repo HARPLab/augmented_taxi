@@ -21,7 +21,7 @@ def avg_distance(ps, m):
         m = m[:, None]
     return geodist(ps, m).mean(axis=1)
 
-def improve_centroid(c, ps, weights):
+def improve_centroid(c, ps, weights, eps=1e-10):
     '''
     :param c: old centroid
     :param ps: points
@@ -31,7 +31,7 @@ def improve_centroid(c, ps, weights):
     # ans = (ps / np.sqrt(1 - np.power(c@ps, 2))).sum(axis=-1)
 
     # weight different particles differently
-    ans = (ps / np.sqrt(1 - np.power(c@ps, 2))) * np.tile(weights, (3, 1))
+    ans = (ps / np.sqrt(1 - np.power(c @ ps, 2) + eps)) * np.tile(weights, (3, 1)) # add a little noise to prevent a degenerate sqrt
     ans = ans.sum(axis=-1)
 
     norm = np.sqrt(ans @ ans)
@@ -58,11 +58,12 @@ def sph2cat(azi, ele):
 def cart2sph(x, y, z):
     '''
     Return corresponding spherical coordinates (azimuth, elevation) of a Cartesian point (x, y, z)
+    Azimuth (range: 0, 2pi) and elevation (range: 0, pi) axes align with x and z axes respectively
     '''
     azi = np.arctan2(y, x)
     ele = np.arccos(z/np.sqrt(x**2 + y**2 + z**2))
 
-    return azi, ele
+    return azi % (2 * np.pi), ele % np.pi
 
 def sample_valid_region(constraints, min_azi, max_azi, min_ele, max_ele, n_azi, n_ele):
     # sample along the sphere

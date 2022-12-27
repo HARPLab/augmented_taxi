@@ -2,6 +2,9 @@ import numpy as np
 from . import point_grouper as pg
 from policy_summarization import computational_geometry as cg
 from policy_summarization import probability_utils as p_utils
+import matplotlib
+import matplotlib.pyplot as plt
+from termcolor import colored
 
 MIN_DISTANCE = 0.00001
 
@@ -11,7 +14,7 @@ class MeanShift(object):
     def __init__(self, kernel=p_utils.VMF_pdf):
         self.kernel = kernel
 
-    def cluster(self, points, weights=None, kernel_bandwidth=16, iteration_callback=None):
+    def cluster(self, points, weights=None, kernel_bandwidth=16, iteration_callback=None, downselect_points=None):
         '''
         :param points:
         :param weights: weights corresponding to points (such that points can be unevenly weighted during clustering)
@@ -36,7 +39,14 @@ class MeanShift(object):
                     continue
                 p_new = shift_points[i]
                 p_new_start = p_new
-                p_new = self._shift_point(p_new, points, weights, kernel_bandwidth)
+
+                if downselect_points is not None:
+                    # if a method to downselect neighboring points is provided, use it when shifting to the mean
+                    downselected_points, downselect_weights = downselect_points(p_new, points, weights)
+                    p_new = self._shift_point(p_new, downselected_points, downselect_weights, kernel_bandwidth)
+                else:
+                    p_new = self._shift_point(p_new, points, weights, kernel_bandwidth)
+
                 dist = cg.geodist(p_new, p_new_start)
                 if dist > max_min_dist:
                     max_min_dist = dist
@@ -45,19 +55,29 @@ class MeanShift(object):
                 shift_points[i] = p_new
             if iteration_callback:
                 iteration_callback(shift_points, iteration_number)
+            print(max_min_dist)
         point_grouper = pg.PointGrouper()
         cluster_centers, group_assignments = point_grouper.group_points(shift_points.tolist())
         return MeanShiftResult(points, cluster_centers, group_assignments, shift_points)
 
-    def _shift_point(self, point, points, weights, kernel_bandwidth):
-        points = np.array(points)
+    def _shift_point(self, query_point, neighboring_points, neighboring_point_weights, kernel_bandwidth):
+        if len(neighboring_points) > 0:
+            neighboring_points = np.array(neighboring_points)
 
-        point_weights = self.kernel(point, kernel_bandwidth, point.shape[0], points)
+            # weight neighboring points by distance from query point
+            point_weights = self.kernel(query_point, kernel_bandwidth, query_point.shape[0], neighboring_points)
 
-        if weights is not None:
-            point_weights *= weights
+            # also account for the original weights assigned to the neighboring points
+            if neighboring_point_weights is not None:
+                point_weights *= neighboring_point_weights
 
-        shifted_point = cg.spherical_centroid(points.T, point_weights)
+            # shift the query point to the weighted spherical centroid of its neighboring points
+            shifted_point = cg.spherical_centroid(neighboring_points.T, point_weights)
+        else:
+            # if there is only one other point in the vicinity, simply shift to that point
+            print(colored('shifting to one other point'), 'red')
+            shifted_point = query_point.squeeze()
+
         return shifted_point
 
 class MeanShiftResult:

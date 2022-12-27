@@ -786,16 +786,24 @@ def sample_human_models_uniform(constraints, n_models):
                 sample_human_models.extend(select_sph_points)
     else:
         theta = 2 * np.pi * np.linspace(0, 1, int(np.ceil(np.sqrt(n_models))))
-        phi = np.arccos(1 - 2 * np.linspace(0, 1, int(np.ceil(np.sqrt(n_models)))))
 
-        theta_grid, phi_grid = np.meshgrid(theta, phi)
+        # remove the first and last phi's later to prevent clumps at poles
+        phi = np.arccos(1 - 2 * np.linspace(0, 1, int(np.ceil(np.sqrt(n_models))) + 2))
+        theta_grid, phi_grid = np.meshgrid(theta, phi[1:-1])
 
         valid_sph_points = np.array(cg.sph2cat(theta_grid.flatten(), phi_grid.flatten())).T
-
         # reshape so that each element is a valid weight vector
         valid_sph_points = valid_sph_points.reshape(valid_sph_points.shape[0], 1, valid_sph_points.shape[1])
-        valid_sph_points = valid_sph_points[:n_models]
 
+        # downsize the number of points to the number requested by pulling evenly from the full list
+        skip_idxs = np.linspace(0, len(valid_sph_points) - 1, len(valid_sph_points) - n_models).astype(int)
+        mask = np.ones(len(valid_sph_points), dtype=bool)
+        mask[skip_idxs] = False
+        valid_sph_points = valid_sph_points[mask]
+
+        # add in the points at the poles (that were removed earlier)
+        valid_sph_points[0] = np.array([[0, 0, 1]])
+        valid_sph_points[-1] = np.array([[0, 0, -1]])
         sample_human_models.extend(valid_sph_points)
 
     return sample_human_models

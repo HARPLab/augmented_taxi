@@ -18,7 +18,7 @@ import policy_summarization.computational_geometry as cg
 fs = 16
 
 class Particles():
-    def __init__(self, positions):
+    def __init__(self, positions, eps=1e-5):
         self.positions = np.array(positions)
         self.weights = np.ones(len(positions)) / len(positions)
 
@@ -28,7 +28,7 @@ class Particles():
 
         # Spherical discretization taken from : A new method to subdivide a spherical surface into equal-area cells,
         # Malkin 2019 https://arxiv.org/pdf/1612.03467.pdf
-        self.ele_bin_edges = np.array([0.1721331, 0.34555774, 0.52165622, 0.69434434, 0.86288729,
+        self.ele_bin_edges = np.array([0, 0.1721331, 0.34555774, 0.52165622, 0.69434434, 0.86288729,
                                   1.04435092, 1.20822512, 1.39251443, 1.57079633, 1.74907822,
                                   1.93336753, 2.09724173, 2.27870536, 2.44724832, 2.61993643,
                                   2.79603491, 2.96945956, 3.1416])
@@ -128,16 +128,370 @@ class Particles():
                            3.4906585, 4.1887902, 4.88692191, 5.58505361, 6.28318531]),
              17: np.array([0., 2.0943951, 4.1887902, 6.28318531])}
 
-        self.entropy = self.calc_entropy()
+        self.ele_bin_edges_20 = np.array([0, np.pi/4, np.pi/2, 3 * np.pi/4, np.pi + eps])
+
+        self.azi_bin_edges_20 = \
+            {0: np.array([0, 2 * np.pi/3, 4 * np.pi/3, 2 * np.pi + eps]),
+             1: np.array([0, 2 * np.pi/7, 4 * np.pi/7, 6 * np.pi/7, 8 * np.pi/7, 10 * np.pi/7, 12 * np.pi/7, 2 * np.pi + eps]),
+             2: np.array([0, 2 * np.pi/7, 4 * np.pi/7, 6 * np.pi/7, 8 * np.pi/7, 10 * np.pi/7, 12 * np.pi/7, 2 * np.pi + eps]),
+             3: np.array([0, 2 * np.pi/3, 4 * np.pi/3, 2 * np.pi + eps])}
+
+        self.binned = False
 
         self.cluster_centers = None
         self.cluster_weights = None
         self.cluster_assignments = None
 
+        self.bin_neighbor_mapping = self.initialize_bin_neighbor_mapping()
+        self.bin_neighbor_mapping_20 = self.initialize_bin_neighbor_mapping_20()
+        self.bin_particle_mapping = None
+        self.bin_weight_mapping = None
+
+    def initialize_bin_neighbor_mapping(self):
+        '''
+        Calculate and store the neighboring bins in a 406-cell discretization of the 2-sphere
+        Discretization provided by A new method to subdivide a spherical surface into equal-area cells
+        https://arxiv.org/pdf/1612.03467.pdf
+        '''
+        # elements are (elevation_bin, azimuth_bin) pairs
+        bin_neighbor_mapping = {0: [[] for _ in range(3)], 1: [[] for _ in range(9)], 2: [[] for _ in range(15)], 3: [[] for _ in range(20)], 4: [[] for _ in range(24)],
+                       5: [[] for _ in range(30)],
+                       6: [[] for _ in range(30)], 7: [[] for _ in range(36)], 8: [[] for _ in range(36)], 9: [[] for _ in range(36)], 10: [[] for _ in range(36)],
+                       11: [[] for _ in range(30)], 12: [[] for _ in range(30)], 13: [[] for _ in range(24)], 14: [[] for _ in range(20)], 15: [[] for _ in range(15)],
+                       16: [[] for _ in range(9)], 17: [[] for _ in range(3)]}
+
+        eps = 1e-5
+        for elevation_bin_idx in bin_neighbor_mapping.keys():
+            if elevation_bin_idx == 0 or elevation_bin_idx == 17:
+                continue
+
+            n_azimuth_bins = len(bin_neighbor_mapping[elevation_bin_idx])
+            for azimuth_bin_idx, _ in enumerate(bin_neighbor_mapping[elevation_bin_idx]):
+                if azimuth_bin_idx == 0:
+                    # left & right
+                    bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                        [(elevation_bin_idx, n_azimuth_bins - 1), (elevation_bin_idx, azimuth_bin_idx + 1)])
+                    # top left & bottom left
+                    bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                        [(elevation_bin_idx - 1, len(bin_neighbor_mapping[elevation_bin_idx - 1]) - 1), (elevation_bin_idx + 1, len(bin_neighbor_mapping[elevation_bin_idx + 1]) - 1)])
+
+                    # considering top & top right
+                    if self.azi_bin_edges[elevation_bin_idx][azimuth_bin_idx + 1] + eps < self.azi_bin_edges[elevation_bin_idx - 1][azimuth_bin_idx + 1]:
+                        # simply add the top
+                        bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend([(elevation_bin_idx - 1, 0)])
+                    else:
+                        # else add the top and top right
+                        bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend([(elevation_bin_idx - 1, 0), (elevation_bin_idx - 1, 1)])
+
+                    # considering bottom & bottom right
+                    if self.azi_bin_edges[elevation_bin_idx][azimuth_bin_idx + 1] + eps < self.azi_bin_edges[elevation_bin_idx + 1][azimuth_bin_idx + 1]:
+                        # simply add the bottom
+                        bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend([(elevation_bin_idx + 1, 0)])
+                    else:
+                        # else add the bottom and bottom right
+                        bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                            [(elevation_bin_idx + 1, 0), (elevation_bin_idx + 1, 1)])
+                elif azimuth_bin_idx == n_azimuth_bins - 1:
+                    # left & right
+                    bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                        [(elevation_bin_idx, azimuth_bin_idx - 1), (elevation_bin_idx, 0)])
+
+                    # top right & bottom right
+                    bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend([(elevation_bin_idx - 1, 0), (elevation_bin_idx + 1, 0)])
+
+                    # considering top left & top left
+                    if self.azi_bin_edges[elevation_bin_idx][azimuth_bin_idx] - eps > self.azi_bin_edges[elevation_bin_idx - 1][-2]:
+                        # simply add the top
+                        bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend([(elevation_bin_idx - 1, len(bin_neighbor_mapping[elevation_bin_idx - 1]) - 1)])
+                    else:
+                        # else add the top and top left
+                        bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend([(elevation_bin_idx - 1, len(bin_neighbor_mapping[elevation_bin_idx - 1]) - 1), (elevation_bin_idx - 1, len(bin_neighbor_mapping[elevation_bin_idx - 1]) - 2)])
+
+                    # considering bottom & bottom left
+                    if self.azi_bin_edges[elevation_bin_idx][azimuth_bin_idx] - eps > self.azi_bin_edges[elevation_bin_idx + 1][-2]:
+                        # simply add the bottom
+                        bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend([(elevation_bin_idx + 1, len(bin_neighbor_mapping[elevation_bin_idx + 1]) - 1)])
+                    else:
+                        # else add the bottom and bottom left
+                        bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                            [(elevation_bin_idx + 1, len(bin_neighbor_mapping[elevation_bin_idx + 1]) - 1), (elevation_bin_idx + 1, len(bin_neighbor_mapping[elevation_bin_idx + 1]) - 2)])
+                else:
+                    # left and right
+                    bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                        [(elevation_bin_idx, azimuth_bin_idx - 1), (elevation_bin_idx, azimuth_bin_idx + 1)])
+
+                    left_edge = self.azi_bin_edges[elevation_bin_idx][azimuth_bin_idx]
+                    right_edge = self.azi_bin_edges[elevation_bin_idx][azimuth_bin_idx + 1]
+                    # top
+                    top_bin_left_edge = np.digitize(left_edge - eps, self.azi_bin_edges[elevation_bin_idx - 1])
+                    top_bin_right_edge = np.digitize(right_edge + eps, self.azi_bin_edges[elevation_bin_idx - 1])
+                    if top_bin_left_edge == top_bin_right_edge:
+                        # the edge is right skewed, so substract 1
+                        bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                            [(elevation_bin_idx - 1, top_bin_right_edge - 1)])
+                    else:
+                        for x in range(top_bin_left_edge, top_bin_right_edge + 1):
+                            bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                                [(elevation_bin_idx - 1, x - 1)])
+                    # bottom
+                    bottom_bin_left_edge = np.digitize(left_edge - eps,
+                                self.azi_bin_edges[elevation_bin_idx + 1])
+                    bottom_bin_right_edge = np.digitize(right_edge + eps,
+                                      self.azi_bin_edges[elevation_bin_idx + 1])
+                    if bottom_bin_left_edge == bottom_bin_right_edge:
+                        # the edge is right skewed, so substract 1
+                        bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                            [(elevation_bin_idx + 1, bottom_bin_right_edge - 1)])
+                    else:
+                        for x in range(bottom_bin_left_edge, bottom_bin_right_edge + 1):
+                            bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                                [(elevation_bin_idx + 1, x - 1)])
+
+        # handle corner cases
+        bin_neighbor_mapping[0][0].extend([(1, 0), (1, 1), (1, 2), (0, 1), (0, 2), (1, 3), (1, 8)])
+        bin_neighbor_mapping[0][1].extend([(1, 3), (1, 4), (1, 5), (0, 0), (0, 2), (1, 2), (1, 6)])
+        bin_neighbor_mapping[0][2].extend([(1, 6), (1, 7), (1, 8), (0, 0), (0, 1), (1, 5), (1, 0)])
+
+        bin_neighbor_mapping[17][0].extend([(16, 0), (16, 1), (16, 2), (17, 1), (17, 2), (16, 8), (16, 3)])
+        bin_neighbor_mapping[17][1].extend([(16, 3), (16, 4), (16, 5), (17, 0), (17, 2), (16, 2), (16, 6)])
+        bin_neighbor_mapping[17][2].extend([(16, 6), (16, 7), (16, 8), (17, 0), (17, 1), (16, 5), (16, 0)])
+
+        return bin_neighbor_mapping
+
+    def initialize_bin_neighbor_mapping_20(self):
+        '''
+        Calculate and store the neighboring bins in a 20-cell discretization of the 2-sphere
+        Discretization provided by A New Equal-area Isolatitudinal Grid on a Spherical Surface
+        https://iopscience.iop.org/article/10.3847/1538-3881/ab3a44/pdf
+        '''
+
+        # elements are (elevation_bin, azimuth_bin) pairs
+        bin_neighbor_mapping = {0: [[] for _ in range(3)], 1: [[] for _ in range(7)], 2: [[] for _ in range(7)],
+                                3: [[] for _ in range(3)]}
+
+        eps = 1e-5
+        for elevation_bin_idx in bin_neighbor_mapping.keys():
+            if elevation_bin_idx == 0 or elevation_bin_idx == 3:
+                continue
+
+            n_azimuth_bins = len(bin_neighbor_mapping[elevation_bin_idx])
+            for azimuth_bin_idx, _ in enumerate(bin_neighbor_mapping[elevation_bin_idx]):
+                if azimuth_bin_idx == 0:
+                    # left & right
+                    bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                        [(elevation_bin_idx, n_azimuth_bins - 1), (elevation_bin_idx, azimuth_bin_idx + 1)])
+                    # top left & bottom left
+                    bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                        [(elevation_bin_idx - 1, len(bin_neighbor_mapping[elevation_bin_idx - 1]) - 1),
+                         (elevation_bin_idx + 1, len(bin_neighbor_mapping[elevation_bin_idx + 1]) - 1)])
+
+                    # considering top & top right
+                    if self.azi_bin_edges_20[elevation_bin_idx][azimuth_bin_idx + 1] + eps < \
+                            self.azi_bin_edges_20[elevation_bin_idx - 1][azimuth_bin_idx + 1]:
+                        # simply add the top
+                        bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend([(elevation_bin_idx - 1, 0)])
+                    else:
+                        # else add the top and top right
+                        bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                            [(elevation_bin_idx - 1, 0), (elevation_bin_idx - 1, 1)])
+
+                    # considering bottom & bottom right
+                    if self.azi_bin_edges_20[elevation_bin_idx][azimuth_bin_idx + 1] + eps < \
+                            self.azi_bin_edges_20[elevation_bin_idx + 1][azimuth_bin_idx + 1]:
+                        # simply add the bottom
+                        bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend([(elevation_bin_idx + 1, 0)])
+                    else:
+                        # else add the bottom and bottom right
+                        bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                            [(elevation_bin_idx + 1, 0), (elevation_bin_idx + 1, 1)])
+                elif azimuth_bin_idx == n_azimuth_bins - 1:
+                    # left & right
+                    bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                        [(elevation_bin_idx, azimuth_bin_idx - 1), (elevation_bin_idx, 0)])
+
+                    # top right & bottom right
+                    bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                        [(elevation_bin_idx - 1, 0), (elevation_bin_idx + 1, 0)])
+
+                    # considering top left & top left
+                    if self.azi_bin_edges_20[elevation_bin_idx][azimuth_bin_idx] - eps > \
+                            self.azi_bin_edges_20[elevation_bin_idx - 1][-2]:
+                        # simply add the top
+                        bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                            [(elevation_bin_idx - 1, len(bin_neighbor_mapping[elevation_bin_idx - 1]) - 1)])
+                    else:
+                        # else add the top and top left
+                        bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                            [(elevation_bin_idx - 1, len(bin_neighbor_mapping[elevation_bin_idx - 1]) - 1),
+                             (elevation_bin_idx - 1, len(bin_neighbor_mapping[elevation_bin_idx - 1]) - 2)])
+
+                    # considering bottom & bottom left
+                    if self.azi_bin_edges_20[elevation_bin_idx][azimuth_bin_idx] - eps > \
+                            self.azi_bin_edges_20[elevation_bin_idx + 1][-2]:
+                        # simply add the bottom
+                        bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                            [(elevation_bin_idx + 1, len(bin_neighbor_mapping[elevation_bin_idx + 1]) - 1)])
+                    else:
+                        # else add the bottom and bottom left
+                        bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                            [(elevation_bin_idx + 1, len(bin_neighbor_mapping[elevation_bin_idx + 1]) - 1),
+                             (elevation_bin_idx + 1, len(bin_neighbor_mapping[elevation_bin_idx + 1]) - 2)])
+                else:
+                    # left and right
+                    bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                        [(elevation_bin_idx, azimuth_bin_idx - 1), (elevation_bin_idx, azimuth_bin_idx + 1)])
+
+                    left_edge = self.azi_bin_edges_20[elevation_bin_idx][azimuth_bin_idx]
+                    right_edge = self.azi_bin_edges_20[elevation_bin_idx][azimuth_bin_idx + 1]
+                    # top
+                    top_bin_left_edge = np.digitize(left_edge - eps, self.azi_bin_edges_20[elevation_bin_idx - 1])
+                    top_bin_right_edge = np.digitize(right_edge + eps, self.azi_bin_edges_20[elevation_bin_idx - 1])
+                    if top_bin_left_edge == top_bin_right_edge:
+                        # the edge is right skewed, so substract 1
+                        bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                            [(elevation_bin_idx - 1, top_bin_right_edge - 1)])
+                    else:
+                        for x in range(top_bin_left_edge, top_bin_right_edge + 1):
+                            bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                                [(elevation_bin_idx - 1, x - 1)])
+                    # bottom
+                    bottom_bin_left_edge = np.digitize(left_edge - eps,
+                                                       self.azi_bin_edges_20[elevation_bin_idx + 1])
+                    bottom_bin_right_edge = np.digitize(right_edge + eps,
+                                                        self.azi_bin_edges_20[elevation_bin_idx + 1])
+                    if bottom_bin_left_edge == bottom_bin_right_edge:
+                        # the edge is right skewed, so substract 1
+                        bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                            [(elevation_bin_idx + 1, bottom_bin_right_edge - 1)])
+                    else:
+                        for x in range(bottom_bin_left_edge, bottom_bin_right_edge + 1):
+                            bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
+                                [(elevation_bin_idx + 1, x - 1)])
+
+        # handle corner cases
+        bin_neighbor_mapping[0][0].extend([(1, 0), (1, 1), (1, 2), (0, 1), (0, 2), (1, 6)])
+        bin_neighbor_mapping[0][1].extend([(1, 2), (1, 3), (1, 4), (0, 0), (0, 2)])
+        bin_neighbor_mapping[0][2].extend([(1, 4), (1, 5), (1, 6), (1, 0), (0, 1), (0, 0)])
+
+        bin_neighbor_mapping[3][0].extend([(2, 0), (2, 1), (2, 2), (3, 1), (3, 2), (2, 6)])
+        bin_neighbor_mapping[3][1].extend([(2, 2), (2, 3), (2, 4), (3, 0), (3, 2)])
+        bin_neighbor_mapping[3][2].extend([(2, 4), (2, 5), (2, 6), (3, 0), (3, 1), (2, 0)])
+
+        return bin_neighbor_mapping
+
+    def bin_particles(self):
+        '''
+        Bin a particle into one of the 406-cell discretization of the 2-sphere
+        Discretization provided by A new method to subdivide a spherical surface into equal-area cells
+        https://arxiv.org/pdf/1612.03467.pdf
+        '''
+
+        # sort particles into bins
+        positions_spherical = []  # azi (-pi, pi), ele (0, pi)
+        for position in self.positions:
+            positions_spherical.append((cg.cart2sph(*position[0])))
+
+        # dictionary with keys based on elevation, and values based on associated number of azimuth bins
+        bin_weight_mapping = {0: np.zeros(3), 1: np.zeros(9), 2: np.zeros(15), 3: np.zeros(20), 4: np.zeros(24),
+                       5: np.zeros(30),
+                       6: np.zeros(30), 7: np.zeros(36), 8: np.zeros(36), 9: np.zeros(36), 10: np.zeros(36),
+                       11: np.zeros(30), 12: np.zeros(30), 13: np.zeros(24), 14: np.zeros(20), 15: np.zeros(15),
+                       16: np.zeros(9), 17: np.zeros(3)}
+
+        # contains the indices of points contained within each bin
+        bin_particle_mapping = {0: [[] for _ in range(3)], 1: [[] for _ in range(9)], 2: [[] for _ in range(15)], 3: [[] for _ in range(20)], 4: [[] for _ in range(24)],
+                       5: [[] for _ in range(30)],
+                       6: [[] for _ in range(30)], 7: [[] for _ in range(36)], 8: [[] for _ in range(36)], 9: [[] for _ in range(36)], 10: [[] for _ in range(36)],
+                       11: [[] for _ in range(30)], 12: [[] for _ in range(30)], 13: [[] for _ in range(24)], 14: [[] for _ in range(20)], 15: [[] for _ in range(15)],
+                       16: [[] for _ in range(9)], 17: [[] for _ in range(3)]}
+
+        azimuths, elevations = zip(*positions_spherical)
+
+        # sort the points into elevation bins
+        elevation_bins = np.digitize(elevations, self.ele_bin_edges)
+
+        # for each point, sort into the correct azimuth bin
+        for j, elevation_bin in enumerate(elevation_bins):
+            azimuth_bin = np.digitize(azimuths[j], self.azi_bin_edges[elevation_bin - 1])
+            bin_weight_mapping[elevation_bin - 1][azimuth_bin - 1] += self.weights[j]
+
+            bin_particle_mapping[elevation_bin - 1][azimuth_bin - 1].append(j)
+
+        return bin_particle_mapping, bin_weight_mapping
+
+    def bin_particles_20(self):
+        '''
+        Bin a particle into one of the 20-cell discretization of the 2-sphere
+        Discretization provided by A New Equal-area Isolatitudinal Grid on a Spherical Surface
+        https://iopscience.iop.org/article/10.3847/1538-3881/ab3a44/pdf
+        '''
+
+        # sort particles into bins
+        positions_spherical = []  # azi range is (0, 2pi), ele range is (0, pi)
+        for position in self.positions:
+            positions_spherical.append((cg.cart2sph(*position[0])))
+
+        # dictionary with keys based on elevation, and values based on associated number of azimuth bins
+        bin_weight_mapping = {0: np.zeros(3), 1: np.zeros(7), 2: np.zeros(7), 3: np.zeros(3)}
+
+        # contains the indices of points contained within each bin
+        bin_particle_mapping = {0: [[] for _ in range(3)], 1: [[] for _ in range(7)], 2: [[] for _ in range(7)], 3: [[] for _ in range(3)]}
+
+        azimuths, elevations = zip(*positions_spherical)
+
+        # sort the points into elevation bins
+        elevation_bins = np.digitize(elevations, self.ele_bin_edges_20)
+
+        # for each point, sort into the correct azimuth bin
+        for j, elevation_bin in enumerate(elevation_bins):
+            azimuth_bin = np.digitize(azimuths[j], self.azi_bin_edges_20[elevation_bin - 1])
+            bin_weight_mapping[elevation_bin - 1][azimuth_bin - 1] += self.weights[j]
+
+            # record indices of points belonging to each bin
+            bin_particle_mapping[elevation_bin - 1][azimuth_bin - 1].append(j)
+
+        return bin_particle_mapping, bin_weight_mapping
+
+    def meanshift_plusplus_neighbors(self, query_point, points, weights):
+        # bin this point
+        azimuth, elevation = cg.cart2sph(*query_point)
+        query_elevation_bin = np.digitize(elevation, self.ele_bin_edges_20)
+        query_azimuth_bin = np.digitize(azimuth, self.azi_bin_edges_20[query_elevation_bin - 1])
+
+        # find neighbors
+        neighbor_bins = self.bin_neighbor_mapping_20[query_elevation_bin - 1][query_azimuth_bin - 1]
+
+        # obtain points of neighbors
+        neighboring_particles = []
+        neighboring_weights = []
+        for neighbor_bin in neighbor_bins:
+            elevation_bin, azimuth_bin = neighbor_bin
+            particle_idxs = self.bin_particle_mapping[elevation_bin][azimuth_bin]
+            for idx in particle_idxs:
+                neighboring_particles.append(points[idx])
+                neighboring_weights.append(weights[idx])
+
+        # obtain points in this bin as well
+        particle_idxs = self.bin_particle_mapping[query_elevation_bin - 1][query_azimuth_bin - 1]
+        for idx in particle_idxs:
+            neighboring_particles.append(points[idx])
+            neighboring_weights.append(weights[idx])
+
+        return np.array(neighboring_particles), np.array(neighboring_weights)
+
     def cluster(self):
+        if self.binned == False:
+            bin_particle_mapping, bin_weight_mapping = self.bin_particles_20()
+            self.bin_particle_mapping = bin_particle_mapping
+            self.bin_weight_mapping = bin_weight_mapping
+            self.binned = True
+
         # cluster particles using mean-shift and store the cluster centers
         mean_shifter = ms.MeanShift()
-        mean_shift_result = mean_shifter.cluster(self.positions.squeeze(), self.weights)
+        # only use a subset of neighboring points to perform meanshift clustering
+        mean_shift_result = mean_shifter.cluster(self.positions.squeeze(), self.weights, downselect_points=self.meanshift_plusplus_neighbors)
+        # use all points to perform meanshift clustering
+        # mean_shift_result = mean_shifter.cluster(self.positions.squeeze(), self.weights)
         self.cluster_centers = mean_shift_result.cluster_centers
         self.cluster_assignments = mean_shift_result.cluster_assignments
 
@@ -166,7 +520,7 @@ class Particles():
         if fig == None:
             fig = plt.figure()
         if ax == None:
-            ax = fig.gca(projection='3d')
+            ax = fig.add_subplot(projection='3d')
 
         if cluster_centers is not None:
             for cluster_id, cluster_center in enumerate(cluster_centers):
@@ -233,38 +587,24 @@ class Particles():
         Malkin 2019 https://arxiv.org/pdf/1612.03467.pdf
         '''
 
-        # sort particles into bins
-        positions_spherical = []  # azi (-pi, pi), ele (0, pi)
-        for position in self.positions:
-            positions_spherical.append((cg.cart2sph(*position[0])))
-
-        # dictionary with keys based on elevation, and values based on associated number of azimuth bins
-        weight_dict = {0: np.zeros(3), 1: np.zeros(9), 2: np.zeros(15), 3: np.zeros(20), 4: np.zeros(24),
-                       5: np.zeros(30),
-                       6: np.zeros(30), 7: np.zeros(36), 8: np.zeros(36), 9: np.zeros(36), 10: np.zeros(36),
-                       11: np.zeros(30), 12: np.zeros(30), 13: np.zeros(24), 14: np.zeros(20), 15: np.zeros(15),
-                       16: np.zeros(9), 17: np.zeros(3)}
-
-        azimuths, elevations = zip(*positions_spherical)
-
-        # sort the points into elevation bins
-        elevation_bins = np.digitize(elevations, self.ele_bin_edges)
-
-        # for each point, sort into the correct azimuth bin
-        for j, elevation_bin in enumerate(elevation_bins):
-            azimuth_bin = np.digitize(azimuths[j], self.azi_bin_edges[elevation_bin])
-            weight_dict[elevation_bin][azimuth_bin] += self.weights[j]
+        if self.binned == False:
+            bin_particle_mapping, bin_weight_mapping = self.bin_particles()
+            self.bin_particle_mapping = bin_particle_mapping
+            self.bin_weight_mapping = bin_weight_mapping
+            self.binned = True
+        else:
+            bin_weight_mapping = self.bin_weight_mapping
 
         entropy = 0
-        for ele_bin in weight_dict.keys():
-            for azi_prob in weight_dict[ele_bin]:
+        for ele_bin in bin_weight_mapping.keys():
+            for azi_prob in bin_weight_mapping[ele_bin]:
                 if azi_prob > 0:
                     entropy += azi_prob * np.log(azi_prob)
         entropy = entropy * -1
 
         # perform some basic checks (e.g. that the weights of the particles sum to one)
         sum = 0
-        for item in list(weight_dict.values()):
+        for item in list(bin_weight_mapping.values()):
             sum += np.sum(np.array(item))
         assert np.isclose(sum, 1)
 
@@ -276,11 +616,10 @@ class Particles():
         new_particles = copy.deepcopy(self)
         new_particles.update(new_constraints)
 
-        return self.entropy - new_particles.entropy
+        return self.calc_entropy() - new_particles.calc_entropy()
 
     def update(self, constraints, c=0.5):
         self.reweight(constraints)
-        # print('prior entropy: {}'.format(self.entropy))
 
         n_eff = self.calc_n_eff(self.weights)
         # print('n_eff: {}'.format(n_eff))
@@ -294,8 +633,7 @@ class Particles():
         # normed_var = normalized_weighted_variance(particles, spherical_centroid=centroid)
         # print('weighted variance: {}'.format(normed_var))
 
-        self.entropy = self.calc_entropy()
-        # print('entropy: {}'.format(self.entropy))
+        self.binned = False
 
     @staticmethod
     def observation_probability(x, constraints, k=4):
@@ -325,6 +663,20 @@ def IROS_demonstrations():
 
     particle_positions = BEC_helpers.sample_human_models_uniform([], n_particles)
     particles = Particles(particle_positions)
+
+    # for visualizing the initial set of particles
+    # fig = plt.figure()
+    # ax = fig.add_subplot(projection='3d')
+    # ax.set_facecolor('white')
+    # ax.xaxis.pane.fill = False
+    # ax.yaxis.pane.fill = False
+    # ax.zaxis.pane.fill = False
+    #
+    # ax.set_xlabel('x')
+    # ax.set_ylabel('y')
+    # ax.set_zlabel('z')
+    # particles.plot(particles)
+    # plt.show()
 
     constraints_list = [prior]
     constraints_list.extend([[np.array([[-1,  0,  0]]), np.array([[-1,  0,  2]])], [np.array([[ 1,  0, -4]])], [np.array([[0, 1, 2]])],
@@ -356,8 +708,10 @@ def IROS_demonstrations():
             else:
                 seen_dict[x] += 1
 
+        particles.cluster()
+
         fig = plt.figure()
-        ax = fig.gca(projection='3d')
+        ax = fig.add_subplot(projection='3d')
         ax.set_facecolor('white')
         ax.xaxis.pane.fill = False
         ax.yaxis.pane.fill = False
@@ -366,8 +720,6 @@ def IROS_demonstrations():
         ax.set_xlabel('x')
         ax.set_ylabel('y')
         ax.set_zlabel('z')
-
-        particles.cluster()
 
         particles.plot(particles, fig=fig, ax=ax, cluster_centers=particles.cluster_centers, cluster_weights=particles.cluster_weights, cluster_assignments=particles.cluster_assignments)
         # particles.plot(particles, fig=fig, ax=ax)
@@ -384,12 +736,12 @@ def IROS_demonstrations():
         # ax.scatter(w_normalized[0, 0], w_normalized[0, 1], w_normalized[0, 2], marker='o', c='r', s=100)
 
         # for test visualization of sample human models
-        models, model_weights = BEC_helpers.sample_human_models_pf(particles, 4)
-        models = np.array(models)
-        ax.scatter(models[:, 0, 0], models[:, 0, 1], models[:, 0, 2],
-                   s=100, color='black')
-
-        print(particles.entropy)
+        # models, model_weights = BEC_helpers.sample_human_models_pf(particles, 8)
+        # models = np.array(models)
+        # ax.scatter(models[:, 0, 0], models[:, 0, 1], models[:, 0, 2],
+        #            s=100, color='black')
+        #
+        # print(particles.calc_entropy())
         plt.show()
 
 if __name__ == "__main__":
