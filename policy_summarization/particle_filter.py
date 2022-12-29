@@ -9,11 +9,11 @@ from spherical_geometry import great_circle_arc as gca
 import copy
 from numpy.random import uniform
 from MeanShift import mean_shift as ms
-from policy_summarization import probability_utils as p_utils
 
 import policy_summarization.BEC_helpers as BEC_helpers
 import policy_summarization.BEC_visualization as BEC_viz
 import policy_summarization.computational_geometry as cg
+from policy_summarization import probability_utils as p_utils
 
 fs = 16
 
@@ -459,11 +459,11 @@ class Particles():
         '''
         # bin this point
         azimuth, elevation = cg.cart2sph(*query_point)
-        query_elevation_bin = np.digitize(elevation, self.ele_bin_edges_20)
-        query_azimuth_bin = np.digitize(azimuth, self.azi_bin_edges_20[query_elevation_bin - 1])
+        query_elevation_bin = np.digitize(elevation, self.ele_bin_edges)
+        query_azimuth_bin = np.digitize(azimuth, self.azi_bin_edges[query_elevation_bin - 1])
 
         # find neighbors
-        neighbor_bins = self.bin_neighbor_mapping_20[query_elevation_bin - 1][query_azimuth_bin - 1]
+        neighbor_bins = self.bin_neighbor_mapping[query_elevation_bin - 1][query_azimuth_bin - 1]
 
         # obtain points of neighbors
         neighboring_particles = []
@@ -485,7 +485,7 @@ class Particles():
 
     def cluster(self):
         if self.binned == False:
-            bin_particle_mapping, bin_weight_mapping = self.bin_particles_20()
+            bin_particle_mapping, bin_weight_mapping = self.bin_particles()
             self.bin_particle_mapping = bin_particle_mapping
             self.bin_weight_mapping = bin_weight_mapping
             self.binned = True
@@ -550,14 +550,44 @@ class Particles():
             mng = plt.get_current_fig_manager()
             mng.resize(*mng.window.maxsize())
 
-    def resample_from_index(self, indexes, noise=0.1):
+    def resample_from_index(self, indexes, K=1):
         self.weights_prev = self.weights.copy()
         self.positions_prev = self.positions.copy()
 
+        # resample
         self.positions[:] = self.positions[indexes]
-        for j, position in enumerate(self.positions):
-            # add half as much noise for elevation since its range is half that of azimuth's
-            self.positions[j] = np.array(cg.sph2cat(*cg.cart2sph(*position[0]) + np.array((np.random.random() * noise, np.random.random() * noise * .5)))).reshape(1, -2)
+
+        # sort particles into bins
+        positions_spherical = []  # azi (-pi, pi), ele (0, pi)
+        for position in self.positions:
+            positions_spherical.append((cg.cart2sph(*position[0])))
+
+        positions_spherical = np.array(positions_spherical)
+        azimuths = positions_spherical[:, 0]
+        elevations = positions_spherical[:, 1]
+
+        max_ele_dist = max(elevations) - min(elevations)
+
+        azimuths_sorted = np.sort(azimuths)
+        azi_dists = np.empty(len(azimuths))
+        azi_dists[0:-1] = np.diff(azimuths_sorted)
+        azi_dists[-1] = min(2 * np.pi - (max(azimuths_sorted) - min(azimuths_sorted)), max(azimuths_sorted) - min(azimuths_sorted))
+        max_azi_dist = max(azi_dists)
+
+        # noise suggested by "Novel approach to nonlinear/non-Gaussian Bayesian state estimation" by Gordon et al.
+        noise = np.array([np.random.normal(scale=max_azi_dist, size=len(positions_spherical)),
+                          np.random.normal(scale=max_ele_dist, size=len(positions_spherical))]).T
+        noise *= K * positions_spherical.shape[0] ** (-1/positions_spherical.shape[1])
+
+        print('Max ele dist: {}'.format(max_ele_dist))
+        print('Max azi dist: {}'.format(max_azi_dist))
+
+        positions_spherical += noise
+
+        for j in range(0, len(positions_spherical)):
+            self.positions[j, :] = np.array(cg.sph2cat(*positions_spherical[j, :])).reshape(1, -1)
+
+        # reset the weights
         self.weights = np.ones(len(self.positions)) / len(self.positions)
 
     # http://seismo.berkeley.edu/~kirchner/Toolkits/Toolkit_12.pdf
@@ -662,7 +692,7 @@ class Particles():
 
 def IROS_demonstrations():
     prior = [np.array([[0, 0, -1]])]
-    n_particles = 50
+    n_particles = 500
 
     particle_positions = BEC_helpers.sample_human_models_uniform([], n_particles)
     particles = Particles(particle_positions)
@@ -711,6 +741,7 @@ def IROS_demonstrations():
             else:
                 seen_dict[x] += 1
 
+        print("Clustering particles ... ")
         particles.cluster()
 
         fig = plt.figure()

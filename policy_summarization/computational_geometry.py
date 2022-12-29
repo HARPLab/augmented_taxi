@@ -49,6 +49,10 @@ def spherical_centroid(ps, weights, eps=1e-5, maxiter=10000):
     return fixpoint(improve_centroid, np.zeros((3,)), ps=ps, weights=weights, eps=eps, maxiter=maxiter)
 
 def sph2cat(azi, ele):
+    '''
+    Return corresponding Cartesian point (x, y, z) of spherical coordinates (azimuth, elevation)
+    Azimuth (range: 0, 2pi) and elevation (range: 0, pi) axes align with x and z axes respectively
+    '''
     x = np.cos(azi) * np.sin(ele)
     y = np.sin(azi) * np.sin(ele)
     z = np.cos(ele)
