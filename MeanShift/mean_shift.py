@@ -55,9 +55,9 @@ class MeanShift(object):
                 shift_points[i] = p_new
             if iteration_callback:
                 iteration_callback(shift_points, iteration_number)
-            print(max_min_dist)
+            # print(max_min_dist)
         point_grouper = pg.PointGrouper()
-        cluster_centers, group_assignments = point_grouper.group_points(shift_points.tolist())
+        cluster_centers, group_assignments = point_grouper.group_points(shift_points.tolist(), points, weights)
         return MeanShiftResult(points, cluster_centers, group_assignments, shift_points)
 
     def _shift_point(self, query_point, neighboring_points, neighboring_point_weights, kernel_bandwidth):
