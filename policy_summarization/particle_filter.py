@@ -387,9 +387,7 @@ class Particles():
         '''
 
         # sort particles into bins
-        positions_spherical = []  # azi (-pi, pi), ele (0, pi)
-        for position in self.positions:
-            positions_spherical.append((cg.cart2sph(*position[0])))
+        positions_spherical = cg.cart2sph(self.positions.squeeze())
 
         # dictionary with keys based on elevation, and values based on associated number of azimuth bins
         bin_weight_mapping = {0: np.zeros(3), 1: np.zeros(9), 2: np.zeros(15), 3: np.zeros(20), 4: np.zeros(24),
@@ -405,7 +403,7 @@ class Particles():
                        11: [[] for _ in range(30)], 12: [[] for _ in range(30)], 13: [[] for _ in range(24)], 14: [[] for _ in range(20)], 15: [[] for _ in range(15)],
                        16: [[] for _ in range(9)], 17: [[] for _ in range(3)]}
 
-        azimuths, elevations = zip(*positions_spherical)
+        elevations, azimuths = zip(*positions_spherical)
 
         # sort the points into elevation bins
         elevation_bins = np.digitize(elevations, self.ele_bin_edges)
@@ -427,9 +425,7 @@ class Particles():
         '''
 
         # sort particles into bins
-        positions_spherical = []  # azi range is (0, 2pi), ele range is (0, pi)
-        for position in self.positions:
-            positions_spherical.append((cg.cart2sph(*position[0])))
+        positions_spherical = cg.cart2sph(self.positions.squeeze())
 
         # dictionary with keys based on elevation, and values based on associated number of azimuth bins
         bin_weight_mapping = {0: np.zeros(3), 1: np.zeros(7), 2: np.zeros(7), 3: np.zeros(3)}
@@ -437,7 +433,7 @@ class Particles():
         # contains the indices of points contained within each bin
         bin_particle_mapping = {0: [[] for _ in range(3)], 1: [[] for _ in range(7)], 2: [[] for _ in range(7)], 3: [[] for _ in range(3)]}
 
-        azimuths, elevations = zip(*positions_spherical)
+        elevations, azimuths = zip(*positions_spherical)
 
         # sort the points into elevation bins
         elevation_bins = np.digitize(elevations, self.ele_bin_edges_20)
@@ -458,9 +454,9 @@ class Particles():
         Jang et al. from CVPR 2021 on 2-sphere
         '''
         # bin this point
-        azimuth, elevation = cg.cart2sph(*query_point)
-        query_elevation_bin = np.digitize(elevation, self.ele_bin_edges)
-        query_azimuth_bin = np.digitize(azimuth, self.azi_bin_edges[query_elevation_bin - 1])
+        query_point_sph = cg.cart2sph(query_point)
+        query_elevation_bin = np.digitize(query_point_sph[0][0], self.ele_bin_edges)
+        query_azimuth_bin = np.digitize(query_point_sph[0][1], self.azi_bin_edges[query_elevation_bin - 1])
 
         # find neighbors
         neighbor_bins = self.bin_neighbor_mapping[query_elevation_bin - 1][query_azimuth_bin - 1]
@@ -558,13 +554,9 @@ class Particles():
         self.positions[:] = self.positions[indexes]
 
         # sort particles into bins
-        positions_spherical = []  # azi (-pi, pi), ele (0, pi)
-        for position in self.positions:
-            positions_spherical.append((cg.cart2sph(*position[0])))
-
-        positions_spherical = np.array(positions_spherical)
-        azimuths = positions_spherical[:, 0]
-        elevations = positions_spherical[:, 1]
+        positions_spherical = cg.cart2sph(self.positions.squeeze())
+        elevations = positions_spherical[:, 0]
+        azimuths = positions_spherical[:, 1]
 
         max_ele_dist = max(elevations) - min(elevations)
 
@@ -575,8 +567,8 @@ class Particles():
         max_azi_dist = max(azi_dists)
 
         # noise suggested by "Novel approach to nonlinear/non-Gaussian Bayesian state estimation" by Gordon et al.
-        noise = np.array([np.random.normal(scale=max_azi_dist, size=len(positions_spherical)),
-                          np.random.normal(scale=max_ele_dist, size=len(positions_spherical))]).T
+        noise = np.array([np.random.normal(scale=max_ele_dist, size=len(positions_spherical)),
+                          np.random.normal(scale=max_azi_dist, size=len(positions_spherical))]).T
         noise *= K * positions_spherical.shape[0] ** (-1/positions_spherical.shape[1])
 
         print('Max ele dist: {}'.format(max_ele_dist))
@@ -585,7 +577,7 @@ class Particles():
         positions_spherical += noise
 
         for j in range(0, len(positions_spherical)):
-            self.positions[j, :] = np.array(cg.sph2cat(*positions_spherical[j, :])).reshape(1, -1)
+            self.positions[j, :] = np.array(cg.sph2cart(positions_spherical[j, :])).reshape(1, -1)
 
         # reset the weights
         self.weights = np.ones(len(self.positions)) / len(self.positions)

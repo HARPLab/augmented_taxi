@@ -48,26 +48,38 @@ def fixpoint(f, x0, eps=1e-5, maxiter=1000, **kwargs):
 def spherical_centroid(ps, weights, eps=1e-5, maxiter=10000):
     return fixpoint(improve_centroid, np.zeros((3,)), ps=ps, weights=weights, eps=eps, maxiter=maxiter)
 
-def sph2cat(azi, ele):
+def cart2sph(cartesian):
+    '''
+    Return corresponding spherical coordinates (elevation, azimuth) of a Cartesian point (x, y, z)
+    Azimuth (range: 0, 2pi) and elevation (range: 0, pi) axes align with x and z axes respectively
+    '''
+    if len(cartesian.shape) == 1:
+        cartesian = cartesian.reshape(1, -1)
+
+    spherical = np.empty((cartesian.shape[0], 2))
+    xy = cartesian[:, 0] ** 2 + cartesian[:, 1] ** 2
+    spherical[:, 0] = np.arctan2(np.sqrt(xy), cartesian[:, 2])  # for elevation angle defined from Z-axis down
+    spherical[:, 1] = np.arctan2(cartesian[:, 1], cartesian[:, 0]) % (2 * np.pi)  # azimuth
+
+    return spherical
+
+def sph2cart(spherical):
     '''
     Return corresponding Cartesian point (x, y, z) of spherical coordinates (azimuth, elevation)
     Azimuth (range: 0, 2pi) and elevation (range: 0, pi) axes align with x and z axes respectively
     '''
-    x = np.cos(azi) * np.sin(ele)
-    y = np.sin(azi) * np.sin(ele)
-    z = np.cos(ele)
+    if len(spherical.shape) == 1:
+        spherical = spherical.reshape(1, -1)
 
-    return x, y, z
+    elevations, azimuths = spherical[:, 0], spherical[:, 1]
 
-def cart2sph(x, y, z):
-    '''
-    Return corresponding spherical coordinates (azimuth, elevation) of a Cartesian point (x, y, z)
-    Azimuth (range: 0, 2pi) and elevation (range: 0, pi) axes align with x and z axes respectively
-    '''
-    azi = np.arctan2(y, x)
-    ele = np.arccos(z/np.sqrt(x**2 + y**2 + z**2))
+    cartesian = np.empty((spherical.shape[0], 3))
 
-    return azi % (2 * np.pi), ele % np.pi
+    cartesian[:, 0] = np.cos(azimuths) * np.sin(elevations)  # x
+    cartesian[:, 1] = np.sin(azimuths) * np.sin(elevations)  # y
+    cartesian[:, 2] = np.cos(elevations)  # z
+
+    return cartesian
 
 def sample_valid_region(constraints, min_azi, max_azi, min_ele, max_ele, n_azi, n_ele):
     # sample along the sphere

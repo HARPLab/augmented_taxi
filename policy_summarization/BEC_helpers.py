@@ -506,13 +506,9 @@ def sample_human_models_random(constraints, n_models):
             return sample_human_models
 
         # resample coordinates on the sphere within the valid region (for higher density)
-        sph_polygon_azi = []
-        sph_polygon_ele = []
-
-        for x in range(len(valid_sph_x)):
-            azi, ele = cg.cart2sph(valid_sph_x[x], valid_sph_y[x], valid_sph_z[x])
-            sph_polygon_azi.append(azi)
-            sph_polygon_ele.append(ele)
+        sph_polygon = cg.cart2sph(np.array([valid_sph_x, valid_sph_y, valid_sph_z]).T)
+        sph_polygon_ele = sph_polygon[:, 0]
+        sph_polygon_azi = sph_polygon[:, 1]
 
         min_azi = min(sph_polygon_azi)
         max_azi = max(sph_polygon_azi)
@@ -533,7 +529,7 @@ def sample_human_models_random(constraints, n_models):
 
             # see which points on the sphere obey all constraints
             theta_grid, phi_grid = np.meshgrid(theta, phi)
-            sph_points = np.array(cg.sph2cat(theta_grid.flatten(), phi_grid.flatten())).T
+            sph_points = np.array(cg.sph2cart(np.array([phi_grid.flatten(), theta_grid.flatten()]).T))
             dist_to_plane = constraints_matrix.dot(sph_points.T)
             n_constraints_satisfied = np.sum(dist_to_plane >= 0, axis=0)
             n_min_constraints = constraints_matrix.shape[0]
@@ -553,7 +549,7 @@ def sample_human_models_random(constraints, n_models):
         theta = 2 * np.pi * np.random.uniform(low=0, high=1, size=n_models)
         phi = np.arccos(1 - 2 * np.random.uniform(low=0, high=1, size=n_models))
 
-        valid_sph_points = np.array(list(map(cg.sph2cat, theta, phi)))
+        valid_sph_points = cg.sph2cart(np.array([phi, theta]).T)
         # reshape so that each element is a valid weight vector
         valid_sph_points = valid_sph_points.reshape(valid_sph_points.shape[0], 1, valid_sph_points.shape[1])
 
@@ -575,13 +571,9 @@ def sample_average_model(constraints, sample_rate=1000):
         valid_sph_x, valid_sph_y, valid_sph_z = cg.sample_valid_region(constraints_matrix, 0, 2 * np.pi, 0, np.pi, sample_rate, sample_rate)
 
         # resample coordinates on the sphere within the valid region (for higher density)
-        sph_polygon_azi = []
-        sph_polygon_ele = []
-
-        for x in range(len(valid_sph_x)):
-            azi, ele = cg.cart2sph(valid_sph_x[x], valid_sph_y[x], valid_sph_z[x])
-            sph_polygon_azi.append(azi)
-            sph_polygon_ele.append(ele)
+        sph_polygon = cg.cart2sph(np.array([valid_sph_x, valid_sph_y, valid_sph_z]).T)
+        sph_polygon_ele = sph_polygon[:, 0]
+        sph_polygon_azi = sph_polygon[:, 1]
 
         min_azi = min(sph_polygon_azi)
         max_azi = max(sph_polygon_azi)
@@ -601,7 +593,7 @@ def sample_average_model(constraints, sample_rate=1000):
 
         # see which points on the sphere obey all constraints
         theta_grid, phi_grid = np.meshgrid(theta, phi)
-        sph_points = np.array(cg.sph2cat(theta_grid.flatten(), phi_grid.flatten())).T
+        sph_points = np.array(cg.sph2cart(np.array([phi_grid.flatten(), theta_grid.flatten()]).T))
         dist_to_plane = constraints_matrix.dot(sph_points.T)
         n_constraints_satisfied = np.sum(dist_to_plane >= 0, axis=0)
         n_min_constraints = constraints_matrix.shape[0]
@@ -623,7 +615,7 @@ def sample_average_model(constraints, sample_rate=1000):
         theta = 2 * np.pi * np.random.uniform(low=0, high=1, size=1)
         phi = np.arccos(1 - 2 * np.random.uniform(low=0, high=1, size=1))
 
-        valid_sph_points = np.array(cg.sph2cat(theta, phi))
+        valid_sph_points = cg.sph2cart(np.array([phi, theta]).T)
         # reshape so that each element is a valid weight vector
         valid_sph_points = valid_sph_points.reshape(1, -1)
 
@@ -735,13 +727,9 @@ def sample_human_models_uniform(constraints, n_models):
             return sample_human_models
 
         # resample coordinates on the sphere within the valid region (for higher density)
-        sph_polygon_azi = []
-        sph_polygon_ele = []
-
-        for x in range(len(valid_sph_x)):
-            azi, ele = cg.cart2sph(valid_sph_x[x], valid_sph_y[x], valid_sph_z[x])
-            sph_polygon_azi.append(azi)
-            sph_polygon_ele.append(ele)
+        sph_polygon = cg.cart2sph(np.array([valid_sph_x, valid_sph_y, valid_sph_z]).T)
+        sph_polygon_ele = sph_polygon[:, 0]
+        sph_polygon_azi = sph_polygon[:, 1]
 
         min_azi = min(sph_polygon_azi)
         max_azi = max(sph_polygon_azi)
@@ -764,7 +752,7 @@ def sample_human_models_uniform(constraints, n_models):
 
             # see which points on the sphere obey all constraints
             theta_grid, phi_grid = np.meshgrid(theta, phi)
-            sph_points = np.array(cg.sph2cat(theta_grid.flatten(), phi_grid.flatten())).T
+            sph_points = np.array(cg.sph2cart(np.array([phi_grid.flatten(), theta_grid.flatten()]).T))
             dist_to_plane = constraints_matrix.dot(sph_points.T)
             n_constraints_satisfied = np.sum(dist_to_plane >= 0, axis=0)
             n_min_constraints = constraints_matrix.shape[0]
@@ -791,7 +779,7 @@ def sample_human_models_uniform(constraints, n_models):
         phi = np.arccos(1 - 2 * np.linspace(0, 1, int(np.ceil(np.sqrt(n_models / 2))) + 2))
         theta_grid, phi_grid = np.meshgrid(theta, phi[1:-1])
 
-        valid_sph_points = np.array(cg.sph2cat(theta_grid.flatten(), phi_grid.flatten())).T
+        valid_sph_points = np.array(cg.sph2cart(np.array([phi_grid.flatten(), theta_grid.flatten()]).T))
         # reshape so that each element is a valid weight vector
         valid_sph_points = valid_sph_points.reshape(valid_sph_points.shape[0], 1, valid_sph_points.shape[1])
 

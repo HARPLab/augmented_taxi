@@ -69,25 +69,19 @@ def visualize_spherical_polygon(poly, fig=None, ax=None, alpha=1.0, color='y', p
         return
 
     # resample coordinates on the sphere within the valid region (for higher density)
-    sph_polygon_azi = []
-    sph_polygon_ele = []
-
-    for x in range(len(valid_sph_x)):
-        azi, ele = cg.cart2sph(valid_sph_x[x], valid_sph_y[x], valid_sph_z[x])
-        sph_polygon_azi.append(azi)
-        sph_polygon_ele.append(ele)
+    sph_polygon = cg.cart2sph(np.array([valid_sph_x, valid_sph_y, valid_sph_z]).T)
+    sph_polygon_ele = sph_polygon[:, 0]
+    sph_polygon_azi = sph_polygon[:, 1]
 
     # obtain (the higher density of) x, y, z coordinates on the sphere that obey the constraints
     valid_sph_x, valid_sph_y, valid_sph_z = \
         cg.sample_valid_region(min_constraints, min(sph_polygon_azi), max(sph_polygon_azi), min(sph_polygon_ele), max(sph_polygon_ele), 50, 50)
 
     # create a triangulation mesh on which to interpolate using spherical coordinates
-    valid_azi = []
-    valid_ele = []
-    for x in range(len(valid_sph_x)):
-        azi, ele = cg.cart2sph(valid_sph_x[x], valid_sph_y[x], valid_sph_z[x])
-        valid_azi.append(azi)
-        valid_ele.append(ele)
+    sph_polygon = cg.cart2sph(np.array([valid_sph_x, valid_sph_y, valid_sph_z]).T)
+    valid_ele = sph_polygon[:, 0]
+    valid_azi = sph_polygon[:, 1]
+
     tri = mtri.Triangulation(valid_azi, valid_ele)
 
     # reject triangles that are too large (which often result from connecting non-neighboring vertices) w/ a corresp mask
