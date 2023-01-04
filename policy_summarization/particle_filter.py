@@ -21,6 +21,7 @@ class Particles():
     def __init__(self, positions, eps=1e-5):
         self.positions = np.array(positions)
         self.weights = np.ones(len(positions)) / len(positions)
+        self.eps = eps
 
         # copy over
         self.positions_prev = self.positions.copy()
@@ -160,7 +161,6 @@ class Particles():
                        11: [[] for _ in range(30)], 12: [[] for _ in range(30)], 13: [[] for _ in range(24)], 14: [[] for _ in range(20)], 15: [[] for _ in range(15)],
                        16: [[] for _ in range(9)], 17: [[] for _ in range(3)]}
 
-        eps = 1e-5
         for elevation_bin_idx in bin_neighbor_mapping.keys():
             if elevation_bin_idx == 0 or elevation_bin_idx == 17:
                 continue
@@ -176,7 +176,7 @@ class Particles():
                         [(elevation_bin_idx - 1, len(bin_neighbor_mapping[elevation_bin_idx - 1]) - 1), (elevation_bin_idx + 1, len(bin_neighbor_mapping[elevation_bin_idx + 1]) - 1)])
 
                     # considering top & top right
-                    if self.azi_bin_edges[elevation_bin_idx][azimuth_bin_idx + 1] + eps < self.azi_bin_edges[elevation_bin_idx - 1][azimuth_bin_idx + 1]:
+                    if self.azi_bin_edges[elevation_bin_idx][azimuth_bin_idx + 1] + self.eps < self.azi_bin_edges[elevation_bin_idx - 1][azimuth_bin_idx + 1]:
                         # simply add the top
                         bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend([(elevation_bin_idx - 1, 0)])
                     else:
@@ -184,7 +184,7 @@ class Particles():
                         bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend([(elevation_bin_idx - 1, 0), (elevation_bin_idx - 1, 1)])
 
                     # considering bottom & bottom right
-                    if self.azi_bin_edges[elevation_bin_idx][azimuth_bin_idx + 1] + eps < self.azi_bin_edges[elevation_bin_idx + 1][azimuth_bin_idx + 1]:
+                    if self.azi_bin_edges[elevation_bin_idx][azimuth_bin_idx + 1] + self.eps < self.azi_bin_edges[elevation_bin_idx + 1][azimuth_bin_idx + 1]:
                         # simply add the bottom
                         bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend([(elevation_bin_idx + 1, 0)])
                     else:
@@ -200,7 +200,7 @@ class Particles():
                     bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend([(elevation_bin_idx - 1, 0), (elevation_bin_idx + 1, 0)])
 
                     # considering top left & top left
-                    if self.azi_bin_edges[elevation_bin_idx][azimuth_bin_idx] - eps > self.azi_bin_edges[elevation_bin_idx - 1][-2]:
+                    if self.azi_bin_edges[elevation_bin_idx][azimuth_bin_idx] - self.eps > self.azi_bin_edges[elevation_bin_idx - 1][-2]:
                         # simply add the top
                         bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend([(elevation_bin_idx - 1, len(bin_neighbor_mapping[elevation_bin_idx - 1]) - 1)])
                     else:
@@ -208,7 +208,7 @@ class Particles():
                         bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend([(elevation_bin_idx - 1, len(bin_neighbor_mapping[elevation_bin_idx - 1]) - 1), (elevation_bin_idx - 1, len(bin_neighbor_mapping[elevation_bin_idx - 1]) - 2)])
 
                     # considering bottom & bottom left
-                    if self.azi_bin_edges[elevation_bin_idx][azimuth_bin_idx] - eps > self.azi_bin_edges[elevation_bin_idx + 1][-2]:
+                    if self.azi_bin_edges[elevation_bin_idx][azimuth_bin_idx] - self.eps > self.azi_bin_edges[elevation_bin_idx + 1][-2]:
                         # simply add the bottom
                         bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend([(elevation_bin_idx + 1, len(bin_neighbor_mapping[elevation_bin_idx + 1]) - 1)])
                     else:
@@ -223,8 +223,8 @@ class Particles():
                     left_edge = self.azi_bin_edges[elevation_bin_idx][azimuth_bin_idx]
                     right_edge = self.azi_bin_edges[elevation_bin_idx][azimuth_bin_idx + 1]
                     # top
-                    top_bin_left_edge = np.digitize(left_edge - eps, self.azi_bin_edges[elevation_bin_idx - 1])
-                    top_bin_right_edge = np.digitize(right_edge + eps, self.azi_bin_edges[elevation_bin_idx - 1])
+                    top_bin_left_edge = np.digitize(left_edge - self.eps, self.azi_bin_edges[elevation_bin_idx - 1])
+                    top_bin_right_edge = np.digitize(right_edge + self.eps, self.azi_bin_edges[elevation_bin_idx - 1])
                     if top_bin_left_edge == top_bin_right_edge:
                         # the edge is right skewed, so substract 1
                         bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
@@ -234,9 +234,9 @@ class Particles():
                             bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
                                 [(elevation_bin_idx - 1, x - 1)])
                     # bottom
-                    bottom_bin_left_edge = np.digitize(left_edge - eps,
+                    bottom_bin_left_edge = np.digitize(left_edge - self.eps,
                                 self.azi_bin_edges[elevation_bin_idx + 1])
-                    bottom_bin_right_edge = np.digitize(right_edge + eps,
+                    bottom_bin_right_edge = np.digitize(right_edge + self.eps,
                                       self.azi_bin_edges[elevation_bin_idx + 1])
                     if bottom_bin_left_edge == bottom_bin_right_edge:
                         # the edge is right skewed, so substract 1
@@ -269,7 +269,6 @@ class Particles():
         bin_neighbor_mapping = {0: [[] for _ in range(3)], 1: [[] for _ in range(7)], 2: [[] for _ in range(7)],
                                 3: [[] for _ in range(3)]}
 
-        eps = 1e-5
         for elevation_bin_idx in bin_neighbor_mapping.keys():
             if elevation_bin_idx == 0 or elevation_bin_idx == 3:
                 continue
@@ -286,7 +285,7 @@ class Particles():
                          (elevation_bin_idx + 1, len(bin_neighbor_mapping[elevation_bin_idx + 1]) - 1)])
 
                     # considering top & top right
-                    if self.azi_bin_edges_20[elevation_bin_idx][azimuth_bin_idx + 1] + eps < \
+                    if self.azi_bin_edges_20[elevation_bin_idx][azimuth_bin_idx + 1] + self.eps < \
                             self.azi_bin_edges_20[elevation_bin_idx - 1][azimuth_bin_idx + 1]:
                         # simply add the top
                         bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend([(elevation_bin_idx - 1, 0)])
@@ -296,7 +295,7 @@ class Particles():
                             [(elevation_bin_idx - 1, 0), (elevation_bin_idx - 1, 1)])
 
                     # considering bottom & bottom right
-                    if self.azi_bin_edges_20[elevation_bin_idx][azimuth_bin_idx + 1] + eps < \
+                    if self.azi_bin_edges_20[elevation_bin_idx][azimuth_bin_idx + 1] + self.eps < \
                             self.azi_bin_edges_20[elevation_bin_idx + 1][azimuth_bin_idx + 1]:
                         # simply add the bottom
                         bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend([(elevation_bin_idx + 1, 0)])
@@ -314,7 +313,7 @@ class Particles():
                         [(elevation_bin_idx - 1, 0), (elevation_bin_idx + 1, 0)])
 
                     # considering top left & top left
-                    if self.azi_bin_edges_20[elevation_bin_idx][azimuth_bin_idx] - eps > \
+                    if self.azi_bin_edges_20[elevation_bin_idx][azimuth_bin_idx] - self.eps > \
                             self.azi_bin_edges_20[elevation_bin_idx - 1][-2]:
                         # simply add the top
                         bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
@@ -326,7 +325,7 @@ class Particles():
                              (elevation_bin_idx - 1, len(bin_neighbor_mapping[elevation_bin_idx - 1]) - 2)])
 
                     # considering bottom & bottom left
-                    if self.azi_bin_edges_20[elevation_bin_idx][azimuth_bin_idx] - eps > \
+                    if self.azi_bin_edges_20[elevation_bin_idx][azimuth_bin_idx] - self.eps > \
                             self.azi_bin_edges_20[elevation_bin_idx + 1][-2]:
                         # simply add the bottom
                         bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
@@ -344,8 +343,8 @@ class Particles():
                     left_edge = self.azi_bin_edges_20[elevation_bin_idx][azimuth_bin_idx]
                     right_edge = self.azi_bin_edges_20[elevation_bin_idx][azimuth_bin_idx + 1]
                     # top
-                    top_bin_left_edge = np.digitize(left_edge - eps, self.azi_bin_edges_20[elevation_bin_idx - 1])
-                    top_bin_right_edge = np.digitize(right_edge + eps, self.azi_bin_edges_20[elevation_bin_idx - 1])
+                    top_bin_left_edge = np.digitize(left_edge - self.eps, self.azi_bin_edges_20[elevation_bin_idx - 1])
+                    top_bin_right_edge = np.digitize(right_edge + self.eps, self.azi_bin_edges_20[elevation_bin_idx - 1])
                     if top_bin_left_edge == top_bin_right_edge:
                         # the edge is right skewed, so substract 1
                         bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
@@ -355,9 +354,9 @@ class Particles():
                             bin_neighbor_mapping[elevation_bin_idx][azimuth_bin_idx].extend(
                                 [(elevation_bin_idx - 1, x - 1)])
                     # bottom
-                    bottom_bin_left_edge = np.digitize(left_edge - eps,
+                    bottom_bin_left_edge = np.digitize(left_edge - self.eps,
                                                        self.azi_bin_edges_20[elevation_bin_idx + 1])
-                    bottom_bin_right_edge = np.digitize(right_edge + eps,
+                    bottom_bin_right_edge = np.digitize(right_edge + self.eps,
                                                         self.azi_bin_edges_20[elevation_bin_idx + 1])
                     if bottom_bin_left_edge == bottom_bin_right_edge:
                         # the edge is right skewed, so substract 1
@@ -564,7 +563,13 @@ class Particles():
         azi_dists = np.empty(len(azimuths))
         azi_dists[0:-1] = np.diff(azimuths_sorted)
         azi_dists[-1] = min(2 * np.pi - (max(azimuths_sorted) - min(azimuths_sorted)), max(azimuths_sorted) - min(azimuths_sorted))
-        max_azi_dist = max(azi_dists)
+
+        if np.std(azi_dists[azi_dists > self.eps]) < 0.01 and np.std(azimuths_sorted) > 1:
+            # the particles are relatively evenly spaced out across the full range of azimuth
+            max_azi_dist = 2 * np.pi
+        else:
+            # take the largest gap/azimuth distance between two consecutive particles
+            max_azi_dist = max(azi_dists)
 
         # noise suggested by "Novel approach to nonlinear/non-Gaussian Bayesian state estimation" by Gordon et al.
         noise = np.array([np.random.normal(scale=max_ele_dist, size=len(positions_spherical)),
@@ -767,7 +772,7 @@ def IROS_demonstrations():
         # ax.scatter(models[:, 0, 0], models[:, 0, 1], models[:, 0, 2],
         #            s=100, color='black')
         #
-        # print(particles.calc_entropy())
+        print('Entropy: {}'.format(particles.calc_entropy()))
         plt.show()
 
 if __name__ == "__main__":
