@@ -9,6 +9,7 @@ from spherical_geometry import great_circle_arc as gca
 import copy
 from numpy.random import uniform
 from MeanShift import mean_shift as ms
+from scipy.stats import norm
 
 import policy_summarization.BEC_helpers as BEC_helpers
 import policy_summarization.BEC_visualization as BEC_viz
@@ -550,7 +551,7 @@ class Particles():
         self.positions_prev = self.positions.copy()
 
         # resample
-        self.positions[:] = self.positions[indexes]
+        self.positions = self.positions[indexes]
 
         # sort particles into bins
         positions_spherical = cg.cart2sph(self.positions.squeeze())
@@ -575,9 +576,6 @@ class Particles():
         noise = np.array([np.random.normal(scale=max_ele_dist, size=len(positions_spherical)),
                           np.random.normal(scale=max_azi_dist, size=len(positions_spherical))]).T
         noise *= K * positions_spherical.shape[0] ** (-1/positions_spherical.shape[1])
-
-        print('Max ele dist: {}'.format(max_ele_dist))
-        print('Max azi dist: {}'.format(max_azi_dist))
 
         positions_spherical += noise
 
@@ -648,14 +646,69 @@ class Particles():
 
         return self.calc_entropy() - new_particles.calc_entropy()
 
+    def KLD_resampling(self, k=0, epsilon=.15, N_min=20, N_max=1000, delta=0.01):
+        '''
+        An implementation of 'Adapting sample size in particle filters through KLD-resampling' (2013) by Li et al.
+        :return: A list of particle indexes to resample
+        '''
+
+        z = norm.ppf(1 - delta)
+        candidate_indexes = []
+        resample_indexes = []
+        N = N_min
+
+        # todo: I should probably move this somewhere else and get rid of the _20 versions
+        # dictionary with keys based on elevation, and values based on associated number of azimuth bins
+        bin_occupancy = {0: np.zeros(3), 1: np.zeros(9), 2: np.zeros(15), 3: np.zeros(20), 4: np.zeros(24),
+                         5: np.zeros(30),
+                         6: np.zeros(30), 7: np.zeros(36), 8: np.zeros(36), 9: np.zeros(36), 10: np.zeros(36),
+                         11: np.zeros(30), 12: np.zeros(30), 13: np.zeros(24), 14: np.zeros(20),
+                         15: np.zeros(15),
+                         16: np.zeros(9), 17: np.zeros(3)}
+
+        while len(resample_indexes) <= N and len(resample_indexes) <= N_max or len(resample_indexes) < N_min:
+            if len(candidate_indexes) > 1:
+                index = candidate_indexes.pop()
+            else:
+                # get another set of candidate indexes using systematic resampling
+                candidate_indexes = p_utils.systematic_resample(self.weights)
+                np.random.shuffle(candidate_indexes)
+                candidate_indexes = list(candidate_indexes)
+                index = candidate_indexes.pop()
+
+            resample_indexes.append(index)
+
+            position_spherical = cg.cart2sph(self.positions[index])
+            elevation = position_spherical[0][0]
+            azimuth = position_spherical[0][1]
+
+            elevation_bin = np.digitize(elevation, self.ele_bin_edges)
+            azimuth_bin = np.digitize(azimuth, self.azi_bin_edges[elevation_bin - 1])
+
+            if bin_occupancy[elevation_bin - 1][azimuth_bin - 1] == 0:
+                k += 1
+                bin_occupancy[elevation_bin - 1][azimuth_bin - 1] = 1
+                if k > 1:
+                    N = (k - 1) / (2 * epsilon) * (1 - 2 / (9 * (k - 1)) + np.sqrt(2 / (9 * (k - 1))) * z) ** 3
+
+        return np.array(resample_indexes)
+
     def update(self, constraints, c=0.5):
         self.reweight(constraints)
 
         n_eff = self.calc_n_eff(self.weights)
         # print('n_eff: {}'.format(n_eff))
         if n_eff < c * len(self.weights):
-            indexes = p_utils.systematic_resample(self.weights)
-            self.resample_from_index(indexes)
+            # a) use systematic resampling
+            # indexes = p_utils.systematic_resample(self.weights)
+            # self.resample_from_index(indexes)
+
+            # b) use KLD resampling
+            resample_indexes = self.KLD_resampling()
+            self.resample_from_index(np.array(resample_indexes))
+
+            print('Number of particles: {}'.format(len(resample_indexes)))
+
             # print(np.unique(indexes, return_counts=True))
             # print(colored('Resampled', 'red'))
 
