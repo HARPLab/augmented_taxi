@@ -196,7 +196,7 @@ def perform_BEC_constraint_bookkeeping_flattened(BEC_constraints, min_subset_con
 
     return BEC_constraint_bookkeeping
 
-def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_record, visited_env_traj_idxs):
+def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_record, visited_env_traj_idxs, traj_record, variable_filter=None):
     '''
     Summary: For each constraint in min_subset_constraints_record, see if it matches one of the BEC_constraints
     '''
@@ -208,11 +208,25 @@ def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_r
         for traj_idx, constraints_traj in enumerate(constraints_env):
             for BEC_constraint_idx in range(len(BEC_constraints)):
                 contains_BEC_constraint = False
+                contains_filtered_variable = False
                 for constraint in constraints_traj:
                     if equal_constraints(constraint, BEC_constraints[BEC_constraint_idx]):
                         contains_BEC_constraint = True
-                if contains_BEC_constraint:
-                    if (env_idx, traj_idx) not in visited_env_traj_idxs:
+                    if variable_filter is not None:
+                        if abs(variable_filter.dot(constraint.T)[0, 0]) > 0:
+                            # conveys information about variable designated to be filtered out, so skip this demonstration
+                            contains_filtered_variable = True
+                if contains_BEC_constraint and not contains_filtered_variable:
+                    # different MDPs can lead to the same trajectory and demonstration (e.g. if the battery disappears)
+                    # thus, you want to also compare trajectories directly instead of relying solely on a history of
+                    # shown (env, traj) pairs
+                    same_trajectory = False
+                    for env_traj_tuple in visited_env_traj_idxs:
+                        env, traj = env_traj_tuple
+                        if traj_record[env][traj] == traj_record[env_idx][traj_idx]:
+                            same_trajectory = True
+                            break
+                    if (env_idx, traj_idx) not in visited_env_traj_idxs and not same_trajectory:
                         # demonstrations that haven't already been shown
                         BEC_constraint_bookkeeping[BEC_constraint_idx].append((env_idx, traj_idx))
                     else:

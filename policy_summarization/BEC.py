@@ -891,7 +891,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
             best_mdp.set_init_state(best_traj[0][0]) # for completeness
             min_BEC_constraints_running.extend(constraints_env[best_traj_idx])
             min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
-            summary.append([best_mdp, best_traj, (best_env_idx, best_traj_idx), constraints_env[best_traj_idx],
+            summary.append([best_mdp, best_traj, (best_env_idx, best_traj_idx), constraints_env[best_traj_idx], variable_filter,
                             sample_human_models, select_model])
             visited_env_traj_idxs.append((best_env_idx, best_traj_idx))
 
@@ -1185,123 +1185,189 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
 
     return summary, visited_env_traj_idxs, particles
 
-def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, min_BEC_constraints, min_subset_constraints_record, traj_record, prev_test, visited_env_traj_idxs, step_cost_flag, info_gain_tolerance=0.01, consider_human_models_jointly=True):
+def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, human_response_constraint, min_subset_constraints_record, env_record, traj_record, prev_test, visited_env_traj_idxs, variable_filter, consistent_state_count, step_cost_flag, info_gain_tolerance=0.01, consider_human_models_jointly=True):
     remedial_demonstrations = []
 
     # if you're looking for demonstrations that will convey the most constraining BEC region or will be employing scaffolding,
     # obtain the demos needed to convey the most constraining BEC region
-    BEC_constraints = min_BEC_constraints
+    BEC_constraints = -human_response_constraint # take the negative as you want to correct for the human's mistakes
     BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(BEC_constraints,
-                                                                                min_subset_constraints_record, visited_env_traj_idxs)
-    best_env_idxs, best_traj_idxs = list(zip(*BEC_constraint_bookkeeping[0]))
+                                                                                min_subset_constraints_record, visited_env_traj_idxs, traj_record)
+    if len(BEC_constraint_bookkeeping[0]) > 0:
+        # the human's incorrect response can be corrected with a direct counterexample
+        best_env_idxs, best_traj_idxs = list(zip(*BEC_constraint_bookkeeping[0]))
 
-    sample_human_models, model_weights = BEC_helpers.sample_human_models_pf(particles, n_human_models)
+        # simply optimize for the visuals of the direct counterexample
+        best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record,
+                                                                  prev_test)
 
-    # a) optimize for both information gain and visuals
-    info_gains_record = []
+    else:
+        # the human's incorrect response does not have a direct counterexample, and thus you need to use information gain to obtain the next example
+        sample_human_models, model_weights = BEC_helpers.sample_human_models_pf(particles, n_human_models)
+        info_gains_record = []
 
-    for model_idx, human_model in enumerate(sample_human_models):
-        print(colored('Model #: {}'.format(model_idx), 'red'))
-        print(colored('Model val: {}'.format(human_model), 'red'))
+        for model_idx, human_model in enumerate(sample_human_models):
+            print(colored('Model #: {}'.format(model_idx), 'red'))
+            print(colored('Model val: {}'.format(human_model), 'red'))
 
-        # based on the human's current model, obtain the information gain generated when comparing to the agent's
-        # optimal trajectories in each environment (human's corresponding optimal trajectories and constraints
-        # are saved for reference later)
-        print("Obtaining counterfactual information gains:")
+            # based on the human's current model, obtain the information gain generated when comparing to the agent's
+            # optimal trajectories in each environment (human's corresponding optimal trajectories and constraints
+            # are saved for reference later)
+            print("Obtaining counterfactual information gains:")
 
-        cf_data_dir = 'models/' + data_loc + '/counterfactual_data_remedial_demo/model' + str(model_idx)
-        os.makedirs(cf_data_dir, exist_ok=True)
+            cf_data_dir = 'models/' + data_loc + '/counterfactual_data_remedial_demo/model' + str(model_idx)
+            os.makedirs(cf_data_dir, exist_ok=True)
 
-        pool.restart()
-        args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, best_env_idxs[i]),
-                 [traj_record[best_env_idxs[i]][best_traj_idxs[i]]], particles, [], step_cost_flag, None,
-                 None, consider_human_models_jointly) for i in range(len(best_env_idxs))]
+            pool.restart()
+            args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]),
+                     traj_record[i], particles, [], step_cost_flag, None,
+                     variable_filter, consider_human_models_jointly) for i in range(len(traj_record[0:2]))]
 
-        info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals, args), total=len(args)))
-        pool.close()
-        pool.join()
-        pool.terminate()
+            info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals, args), total=len(args)))
+            pool.close()
+            pool.join()
+            pool.terminate()
 
-        info_gains_record.append(info_gain_envs)
+            # [# of human models][# of environments]
+            info_gains_record.append(info_gain_envs)
 
-    # compute weighted information gain (weighted by the probability of that human model / particle representing the
-    # human's true beliefs
-    info_gains_record = np.array(info_gains_record)
-    weighted_info_gains = [model_weights.dot(info_gains_record[:, j]) for j in range(len(best_env_idxs))]
+        # make an entry for each environment (averaging over the human models)
+        expected_info_gain_envs = []
+        for human_model_idx in range(len(info_gains_record)):
+            for env_idx, info_gain_env in enumerate(info_gains_record[human_model_idx]):
+                if human_model_idx == 0:
+                    expected_info_gain_envs.append(model_weights[human_model_idx] * np.array(info_gain_env))
+                else:
+                    expected_info_gain_envs[env_idx] += model_weights[human_model_idx] * np.array(info_gain_env)
 
-    # note that these correspond to the positions of the (env, traj) pair that yields the high information gain
-    best_info_gain_idxs = np.where(abs(weighted_info_gains - max(weighted_info_gains)) < info_gain_tolerance)[0]
+        if consistent_state_count:
+            # todo: implement. the commented out code below may or may not be useful
+            raise Exception('Not yet implemented.')
+            # # compute weighted information gain (weighted by the probability of that human model / particle representing the
+            # # human's true beliefs
+            # info_gains_record = np.array(info_gains_record)
+            # weighted_info_gains = [model_weights.dot(info_gains_record[:, j]) for j in range(len(env_record))]
+            #
+            # # note that these correspond to the positions of the (env, traj) pair that yields the high information gain
+            # best_info_gain_idxs = np.where(abs(weighted_info_gains - max(weighted_info_gains)) < info_gain_tolerance)[0]
+            #
+            # best_env_idxs_filtered = [best_env_idxs[i] for i in best_info_gain_idxs]
+            # best_traj_idxs_filtered = [best_traj_idxs[i] for i in best_info_gain_idxs]
+        else:
+            best_obj = float('-inf')
+            best_env_idxs = []
+            best_traj_idxs = []
 
-    best_env_idxs_filtered = [best_env_idxs[i] for i in best_info_gain_idxs]
-    best_traj_idxs_filtered = [best_traj_idxs[i] for i in best_info_gain_idxs]
+            # select the trajectories with the maximal information gain
+            for env_idx, info_gains_per_env in enumerate(expected_info_gain_envs):
+                for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
+                    if info_gain_per_traj > 0:
+                        obj = info_gain_per_traj
 
-    best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs_filtered, best_traj_idxs_filtered, traj_record, prev_test)
+                        if np.isclose(obj, best_obj):
+                            best_env_idxs.append(env_idx)
+                            best_traj_idxs.append(traj_idx)
+                        elif obj > best_obj:
+                            best_obj = obj
 
-    # b) simply optimize for visuals
-    # best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, prev_test)
+                            best_env_idxs = [env_idx]
+                            best_traj_idxs = [traj_idx]
+
+        best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, prev_test)
 
     traj = traj_record[best_env_idx][best_traj_idx]
-    constraints = min_BEC_constraints[0]
     filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
     with open(filename, 'rb') as f:
         wt_vi_traj_env = pickle.load(f)
     best_mdp = wt_vi_traj_env[0][1].mdp
     best_mdp.set_init_state(traj[0][0])  # for completeness
-    remedial_demonstrations.append([best_mdp, traj, (best_env_idx, best_traj_idx), constraints])
+    remedial_demonstrations.append([best_mdp, traj, (best_env_idx, best_traj_idx), BEC_constraints])
     visited_env_traj_idxs.append((best_env_idx, best_traj_idx))
 
     return remedial_demonstrations, visited_env_traj_idxs
 
-def obtain_preliminary_tests(data_loc, visited_env_traj_idxs, min_BEC_constraints, min_subset_constraints_record, traj_record, downsample_threshold=float("inf"), visual_opt=''):
+def obtain_diagnostic_tests(data_loc, visited_env_traj_idxs, min_BEC_constraints, min_subset_constraints_record, traj_record, variable_filter, downsample_threshold=float("inf"), opt_simplicity=True, opt_similarity=True):
     preliminary_test_info = []
 
     # if you're looking for demonstrations that will convey the most constraining BEC region or will be employing scaffolding,
     # obtain the demos needed to convey the most constraining BEC region
-    BEC_constraints = min_BEC_constraints
+    BEC_constraints = min_BEC_constraints.copy()
     BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(BEC_constraints,
-                                                                                min_subset_constraints_record, visited_env_traj_idxs)
+                                                                                min_subset_constraints_record, visited_env_traj_idxs, traj_record, variable_filter=variable_filter)
+    while len(BEC_constraints) > 0:
+        # downsampling strategy 1: randomly cull sets with too many members for computational feasibility
+        # for j, set in enumerate(sets):
+        #     if len(set) > downsample_threshold:
+        #         sets[j] = random.sample(set, downsample_threshold)
 
-    # downsampling strategy 1: randomly cull sets with too many members for computational feasibility
-    # for j, set in enumerate(sets):
-    #     if len(set) > downsample_threshold:
-    #         sets[j] = random.sample(set, downsample_threshold)
+        # downsampling strategy 2: if there are any env_traj pairs that cover more than one constraint, use it and remove all
+        # env_traj pairs that would've conveyed the same constraints
+        # initialize all env_traj tuples with covering the first min BEC constraint
+        env_constraint_mapping = {}
+        for key in BEC_constraint_bookkeeping[0]:
+            env_constraint_mapping[key] = [0]
+        max_constraint_count = 1  # what is the max number of desired constraints that one env / demo can convey
+        max_env_traj_tuples = [key]
 
-    # downsampling strategy 2: if there are any env_traj pairs that cover more than one constraint, use it and remove all
-    # env_traj pairs that would've conveyed the same constraints
-    # initialize all env_traj tuples with covering the first min BEC constraint
-    env_constraint_mapping = {}
-    for key in BEC_constraint_bookkeeping[0]:
-        env_constraint_mapping[key] = [0]
-    max_constraint_count = 1
-    max_env_traj_tuples = [key]
+        # for all other env_traj tuples,
+        for constraint_idx, env_traj_tuples in enumerate(BEC_constraint_bookkeeping[1:]):
+            for env_traj_tuple in env_traj_tuples:
+                # if this env_traj tuple has already been seen previously
+                if env_traj_tuple in env_constraint_mapping.keys():
+                    env_constraint_mapping[env_traj_tuple].append(constraint_idx + 1)
+                    # and adding another constraint to this tuple increases the highest constraint coverage by a single tuple
+                    if len(env_constraint_mapping[env_traj_tuple]) > max_constraint_count:
+                        # update the max values, replacing the max tuple
+                        max_constraint_count = len(env_constraint_mapping[env_traj_tuple])
+                        max_env_traj_tuples = [env_traj_tuple]
+                    # otherwise, if it simply equals the highest constraint coverage, add this tuple to the contending list
+                    elif len(env_constraint_mapping[env_traj_tuple]) == max_constraint_count:
+                        max_env_traj_tuples.append(env_traj_tuple)
+                else:
+                    env_constraint_mapping[env_traj_tuple] = [constraint_idx + 1]
 
-    # for all other env_traj tuples,
-    for constraint_idx, env_traj_tuples in enumerate(BEC_constraint_bookkeeping[1:]):
-        for env_traj_tuple in env_traj_tuples:
-            # if this env_traj tuple has already been seen previously
-            if env_traj_tuple in env_constraint_mapping.keys():
-                env_constraint_mapping[env_traj_tuple].append(constraint_idx)
-                # and adding another constraint to this tuple increases the highest constraint coverage by a single tuple
-                if len(env_constraint_mapping[env_traj_tuple]) > max_constraint_count:
-                    # update the max values, replacing the max tuple
-                    max_constraint_count = len(env_constraint_mapping[env_traj_tuple])
-                    max_env_traj_tuples = [env_traj_tuple]
-                # otherwise, if it simply equals the highest constraint coverage, add this tuple to the contending list
-                elif len(env_constraint_mapping[env_traj_tuple]) == max_constraint_count:
-                    max_env_traj_tuples.append(env_traj_tuple)
-            else:
-                env_constraint_mapping[env_traj_tuple] = [constraint_idx]
+        env_complexity_mapping = {} # helps prevent reopening the pickle file of the same environment multiple times. could parallelize this
 
-    env_complexity_mapping = {} # helps prevent reopening the pickle file of the same environment multiple times. could parallelize this
-    if max_constraint_count == 1:
-        # no one demo covers multiple constraints. so greedily select demos from base list that is mot visually complex
-        # filter for the most visually complex environment
-        for constraint_idx, env_traj_tuples in enumerate(BEC_constraint_bookkeeping):
+        # todo: trying to see if I can replace the code below with optimize_visuals()
+        # ps_helpers.optimize_visuals(data_loc, best)
+        # best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
+
+        if max_constraint_count == 1:
+            # no one demo covers multiple constraints. so greedily select demos from base list that is mot visually complex
+            # filter for the most visually complex environment
+            for env_traj_tuples in BEC_constraint_bookkeeping[::-1]:
+                old_env = -1
+                max_complexity = -1
+                max_complexity_env_traj_tuple = -1
+
+                for env_traj_tuple in env_traj_tuples:
+                    env, traj = env_traj_tuple
+                    # assuming that the tuples are stored in order of environment indices
+                    if env != old_env:
+                        if env not in env_complexity_mapping.keys():
+                            filename = mp_helpers.lookup_env_filename(data_loc, env)
+                            with open(filename, 'rb') as f:
+                                wt_vi_traj_env = pickle.load(f)
+
+                            complexity = wt_vi_traj_env[0][1].mdp.measure_env_complexity()
+                            env_complexity_mapping[env] = complexity
+                        else:
+                            complexity = env_complexity_mapping[env]
+                        if complexity > max_complexity:
+                            max_complexity = complexity
+                            max_complexity_env_traj_tuple = env_traj_tuple
+                    else:
+                        continue
+
+                preliminary_test_info.append((max_complexity_env_traj_tuple, BEC_constraints.pop()))
+
+        else:
+            # filter for the most visually complex environment that can cover multiple constraints
             old_env = -1
             max_complexity = -1
             max_complexity_env_traj_tuple = -1
 
-            for env_traj_tuple in env_traj_tuples:
+            for env_traj_tuple in max_env_traj_tuples:
                 env, traj = env_traj_tuple
                 # assuming that the tuples are stored in order of environment indices
                 if env != old_env:
@@ -1319,27 +1385,15 @@ def obtain_preliminary_tests(data_loc, visited_env_traj_idxs, min_BEC_constraint
                         max_complexity_env_traj_tuple = env_traj_tuple
                 else:
                     continue
-            preliminary_test_info.append((max_complexity_env_traj_tuple, BEC_constraints[constraint_idx]))
-    else:
-        # # filter for the most visually complex environment
-        # old_env = -1
-        # max_complexity = -1
-        # max_complexity_env_traj_tuple = -1
-        # for env_traj_tuple in max_env_traj_tuples:
-        #     env, traj = env_traj_tuple
-        #     if env != old_env:
-        #         filename = mp_helpers.lookup_env_filename(data_loc, env)
-        #         with open(filename, 'rb') as f:
-        #             wt_vi_traj_env = pickle.load(f)
-        #
-        #         complexity = wt_vi_traj_env[0][1].mdp.measure_env_complexity()
-        #         if complexity > max_complexity:
-        #             max_complexity = complexity
-        #             max_complexity_env_traj_tuple = env_traj_tuple
-        #     else:
-        #         continue
 
-        raise Exception('Down-select from env_traj that covers the most constraints (not yet implemented).')
+            constituent_constraints = []
+            for idx in env_constraint_mapping[max_complexity_env_traj_tuple]:
+                constituent_constraints.append(BEC_constraints[idx])
+
+            preliminary_test_info.append((max_complexity_env_traj_tuple, constituent_constraints))
+
+            for constraint_idx in sorted(env_constraint_mapping[max_complexity_env_traj_tuple], reverse=True):
+                del BEC_constraints[constraint_idx]
 
     preliminary_tests = []
     for info in preliminary_test_info:
@@ -1363,7 +1417,7 @@ def obtain_SCOT_summaries(data_loc, summary_variant, min_BEC_constraints, BEC_le
     # obtain the demos needed to convey the most constraining BEC region
     BEC_constraints = min_BEC_constraints
     BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(BEC_constraints,
-                                                                                min_subset_constraints_record)
+                                                                                min_subset_constraints_record, traj_record)
 
     # extract sets of demos+environments pairs that can cover each BEC constraint
     sets = []
@@ -1451,7 +1505,7 @@ def obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_r
     # obtain SCOT demos
     BEC_constraints = min_BEC_constraints
     BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(BEC_constraints,
-                                                                                min_subset_constraints_record)
+                                                                                min_subset_constraints_record, traj_record)
 
     # extract sets of demos+environments pairs that can cover each BEC constraint
     sets = []

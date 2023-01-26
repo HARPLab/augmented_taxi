@@ -252,7 +252,7 @@ def _in_summary(mdp, summary, initial_state):
             return True
     return False
 
-def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_record, summary):
+def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_record, summary, opt_simplicity=True, opt_similarity=True):
     visual_dissimilarities = np.zeros(len(best_env_idxs))
     complexities = np.zeros(len(best_env_idxs))
 
@@ -302,6 +302,11 @@ def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_recor
     tie_breaker = np.arange(len(best_env_idxs))
     np.random.shuffle(tie_breaker)
     # sorts from small to large values
+
+    if not opt_simplicity:
+        complexities *= -1
+    if not opt_similarity:
+        visual_dissimilarities *= -1
 
     # sort first for visual simplicity, then visual similarity
     sorted_zipped = sorted(zip(complexities, visual_dissimilarities, tie_breaker, best_env_idxs, best_traj_idxs))

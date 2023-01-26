@@ -106,12 +106,11 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
             BEC_summary, visited_env_traj_idxs, particles = pickle.load(f)
     except:
         # SCOT_summary = BEC.obtain_SCOT_summaries(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag)
-
         # initialize particle filter
         particle_positions = BEC_helpers.sample_human_models_uniform([], n_particles)
         particles = pf.Particles(particle_positions)
         particles.update(prior)
-        print(colored('entropy: {}'.format(particles.entropy), 'blue'))
+        print(colored('entropy: {}'.format(particles.calc_entropy()), 'blue'))
 
         if summary_variant == 'particle_filter':
             BEC_summary, visited_env_traj_idxs, particles = BEC.obtain_summary_particle_filter(data_loc, particles, summary_variant, min_subset_constraints_record,
@@ -157,7 +156,7 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
     #     # constraints_record = summary[3]
     #
     #     fig = plt.figure()
-    #     ax = fig.gca(projection='3d')
+    #     ax = fig.add_subplot(projection='3d')
     #     ax.set_facecolor('white')
     #     ax.xaxis.pane.fill = False
     #     ax.yaxis.pane.fill = False
@@ -171,8 +170,8 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
     #
     #     min_constraints = BEC_helpers.remove_redundant_constraints(constraints_record, weights, step_cost_flag)
     #     print(min_constraints)
-    #     # for constraints in [min_constraints]:
-    #     #     BEC_viz.visualize_planes(constraints, fig=fig, ax=ax)
+    #     for constraints in [min_constraints]:
+    #         BEC_viz.visualize_planes(constraints, fig=fig, ax=ax)
     #
     #     # visualizing uninformed prior
     #     # ieqs2 = BEC_helpers.constraints_to_halfspace_matrix_sage([[]])
@@ -210,43 +209,41 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
 
     # # particle filter visualization
     # from numpy.random import seed
-    # seed(1)
+    # seed(2)
     #
-    # n_particles = 50
     # particle_positions = BEC_helpers.sample_human_models_uniform([], n_particles)
     # particles = pf.Particles(particle_positions)
     #
-    #
     # constraints_running = prior
     #
-    # print(pf.calc_info_gain(particles, prior))
-    # particles = pf.update_particle_filter(particles, prior)
+    # # print(particles.calc_info_gain(prior))
+    # particles.update(prior)
     #
-    # # fig = plt.figure()
-    # # ax = fig.gca(projection='3d')
-    # # ax.set_facecolor('white')
-    # # ax.xaxis.pane.fill = False
-    # # ax.yaxis.pane.fill = False
-    # # ax.zaxis.pane.fill = False
-    # #
-    # # ax.set_xlabel('x')
-    # # ax.set_ylabel('y')
-    # # ax.set_zlabel('z')
-    # #
-    # # pf.plot_particles(particles, fig=fig, ax=ax)
-    # # BEC_viz.visualize_planes(constraints_running, fig=fig, ax=ax)
-    # #
-    # # # visualize spherical polygon
-    # # ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints_running)
-    # # poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
-    # # BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax, plot_ref_sphere=False, alpha=0.75)
-    # #
-    # # # visualize the ground truth constraint
-    # # w = np.array([[-3, 3.5, -1]])  # toll, hotswap station, step cost
-    # # w_normalized = w / np.linalg.norm(w[0, :], ord=2)
-    # # ax.scatter(w_normalized[0, 0], w_normalized[0, 1], w_normalized[0, 2], marker='o', c='b', s=100)
-    # #
-    # # plt.show()
+    # fig = plt.figure()
+    # ax = fig.add_subplot(projection='3d')
+    # ax.set_facecolor('white')
+    # ax.xaxis.pane.fill = False
+    # ax.yaxis.pane.fill = False
+    # ax.zaxis.pane.fill = False
+    #
+    # ax.set_xlabel('x')
+    # ax.set_ylabel('y')
+    # ax.set_zlabel('z')
+    #
+    # particles.plot(fig=fig, ax=ax)
+    # BEC_viz.visualize_planes(constraints_running, fig=fig, ax=ax)
+    #
+    # # visualize spherical polygon
+    # ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints_running)
+    # poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
+    # BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax, plot_ref_sphere=False, alpha=0.75)
+    #
+    # # visualize the ground truth weight
+    # w = np.array([[-3, 3.5, -1]])  # toll, hotswap station, step cost
+    # w_normalized = w / np.linalg.norm(w[0, :], ord=2)
+    # ax.scatter(w_normalized[0, 0], w_normalized[0, 1], w_normalized[0, 2], marker='o', c='r', s=100)
+    #
+    # plt.show()
     #
     # for j, summary in enumerate(BEC_summary):
     #     print(j)
@@ -256,12 +253,11 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
     #     constraints_running.extend(constraints)
     #     constraints_running = BEC_helpers.remove_redundant_constraints(constraints_running, None, False)
     #
-    #     # print(pf.calc_info_gain(particles, constraints))
-    #
-    #     particles = pf.update_particle_filter(particles, constraints)
+    #     particles.update(constraints)
+    #     print('Entropy: {}'.format(particles.calc_entropy()))
     #
     #     fig = plt.figure()
-    #     ax = fig.gca(projection='3d')
+    #     ax = fig.add_subplot(projection='3d')
     #     ax.set_facecolor('white')
     #     ax.xaxis.pane.fill = False
     #     ax.yaxis.pane.fill = False
@@ -271,20 +267,20 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
     #     ax.set_ylabel('y')
     #     ax.set_zlabel('z')
     #
-    #     # pf.plot_particles(particles, fig=fig, ax=ax)
-    #     # BEC_viz.visualize_planes(constraints_running, fig=fig, ax=ax)
-    #     #
-    #     # # visualize spherical polygon
-    #     # ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints_running)
-    #     # poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
-    #     # BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax, plot_ref_sphere=False, alpha=0.75)
-    #     #
-    #     # # visualize the ground truth weight
-    #     # w = np.array([[-3, 3.5, -1]])  # toll, hotswap station, step cost
-    #     # w_normalized = w / np.linalg.norm(w[0, :], ord=2)
-    #     # ax.scatter(w_normalized[0, 0], w_normalized[0, 1], w_normalized[0, 2], marker='o', c='b', s=100)
-    #     #
-    #     # plt.show()
+    #     particles.plot(fig=fig, ax=ax)
+    #     BEC_viz.visualize_planes(constraints_running, fig=fig, ax=ax)
+    #
+    #     # visualize spherical polygon
+    #     ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints_running)
+    #     poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
+    #     BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax, plot_ref_sphere=False, alpha=0.75)
+    #
+    #     # visualize the ground truth weight
+    #     w = np.array([[-3, 3.5, -1]])  # toll, hotswap station, step cost
+    #     w_normalized = w / np.linalg.norm(w[0, :], ord=2)
+    #     ax.scatter(w_normalized[0, 0], w_normalized[0, 1], w_normalized[0, 2], marker='o', c='b', s=100)
+    #
+    #     plt.show()
 
     return BEC_summary, visited_env_traj_idxs, particles
 
@@ -412,50 +408,88 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints
 
 def obtain_unit_tests(BEC_summary, visited_env_traj_idxs, particles, pool, n_human_models, data_loc, weights, step_cost_flag):
-    summary_constraints = []
-    for summary in BEC_summary:
-        summary_constraints.extend(summary[3])
-
-    min_constraints = BEC_helpers.remove_redundant_constraints(summary_constraints, weights, step_cost_flag)
-
     # todo: maybe pass in some of these objects later
     with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
-        policy_constraints, min_subset_constraints_record, env_record, traj_record, reward_record, consistent_state_count = pickle.load(f)
+        policy_constraints, min_subset_constraints_record, env_record, traj_record, reward_record, consistent_state_count = pickle.load(
+            f)
 
-    # preliminary_tests, visited_env_traj_idxs = BEC.obtain_preliminary_tests(data_loc, visited_env_traj_idxs, min_constraints, min_subset_constraints_record, traj_record)
-    # with open('models/' + data_loc + '/preliminary_tests.pickle', 'wb') as f:
-    #     pickle.dump((preliminary_tests, visited_env_traj_idxs), f)
-    with open('models/' + data_loc + '/preliminary_tests.pickle', 'rb') as f:
-        preliminary_tests, visited_env_traj_idxs = pickle.load(f)
+    unit_demos = [BEC_summary[0]]
+    unit_tests = []
+    unit_constraints = BEC_summary[0][3]
+    running_variable_filter = BEC_summary[0][4]  # use the variable filter utilized when selecting demonstrations to delineate units
 
-    for test in preliminary_tests:
-        test_mdp = test[0]
-        opt_traj = test[1]
-        test_constraint = test[-1]
+    for summary_idx, summary in enumerate(BEC_summary[1:]):
+        variable_filter = summary[4]
 
-        human_traj, human_history = test_mdp.visualize_interaction(keys_map=params.keys_map) # the latter is simply the gridworld locations of the agent
-        # with open('models/' + data_loc + '/human_traj.pickle', 'wb') as f:
-        #     pickle.dump((human_traj, human_history), f)
-        # with open('models/' + data_loc + '/human_traj.pickle', 'rb') as f:
-        #     human_traj, human_history = pickle.load(f)
-
-        human_feature_count = test_mdp.accumulate_reward_features(human_traj, discount=True)
-        opt_feature_count = test_mdp.accumulate_reward_features(opt_traj, discount=True)
-
-        print(human_feature_count)
-        print(opt_feature_count)
-
-        if (human_feature_count == opt_feature_count).all():
-            print("you got it right")
+        # if the current variable filter matches the previous variable filter, then this demonstration belongs in the same unit
+        if (running_variable_filter == variable_filter).all():
+            unit_demos.append(summary)
+            unit_constraints.extend(summary[3])
         else:
-            print("you got it wrong")
-            test_mdp.visualize_trajectory_comparison(opt_traj, human_traj)
-            print("here is another example that might be helpful")
-            remedial_instruction, visited_env_traj_idxs = BEC.obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, test_constraint, min_subset_constraints_record, traj_record, [[test_mdp, opt_traj]], visited_env_traj_idxs, step_cost_flag)
-            remedial_mdp, remedial_traj, _, _ = remedial_instruction[0]
-            remedial_mdp.visualize_trajectory(remedial_traj)
+            BEC.visualize_summary(unit_demos, weights, step_cost_flag)
 
-    BEC.visualize_summary(preliminary_tests, weights, step_cost_flag)
+            min_constraints = BEC_helpers.remove_redundant_constraints(unit_constraints, weights, step_cost_flag)
+
+            print(min_constraints)
+
+            preliminary_tests, visited_env_traj_idxs = BEC.obtain_diagnostic_tests(data_loc, visited_env_traj_idxs, min_constraints, min_subset_constraints_record, traj_record, running_variable_filter)
+            unit_tests.append(preliminary_tests)
+            # with open('models/' + data_loc + '/preliminary_tests.pickle', 'wb') as f:
+            #     pickle.dump((preliminary_tests, visited_env_traj_idxs), f)
+            # with open('models/' + data_loc + '/preliminary_tests.pickle', 'rb') as f:
+            #     preliminary_tests, visited_env_traj_idxs = pickle.load(f)
+
+            for test in preliminary_tests:
+                test_mdp = test[0]
+                opt_traj = test[1]
+                test_constraint = test[-1]
+
+                human_traj, human_history = test_mdp.visualize_interaction(keys_map=params.keys_map) # the latter is simply the gridworld locations of the agent
+                # with open('models/' + data_loc + '/human_traj.pickle', 'wb') as f:
+                #     pickle.dump((human_traj, human_history), f)
+                # with open('models/' + data_loc + '/human_traj.pickle', 'rb') as f:
+                #     human_traj, human_history = pickle.load(f)
+
+                human_feature_count = test_mdp.accumulate_reward_features(human_traj, discount=True)
+                opt_feature_count = test_mdp.accumulate_reward_features(opt_traj, discount=True)
+
+                print(human_feature_count)
+                print(opt_feature_count)
+
+                if (human_feature_count == opt_feature_count).all():
+                    print("you got it right")
+                else:
+                    print("you got it wrong")
+                    human_response_constraint = human_feature_count - opt_feature_count
+                    # todo: think about how I want to standardize how I store the human / failed BEC constraint. it'll be easy to mix up the negatives
+                    #  I think I'll mostly be comparing to the BEC (correct) version so perhaps that's what I should store
+                    print("Failed BEC constraint: {}".format(-human_response_constraint))
+
+                    test_mdp.visualize_trajectory_comparison(opt_traj, human_traj)
+                    print("here is another example that might be helpful")
+
+                    # todo: you need a remedial demonstration for each constraint. you also don't need the complexity of obtain_remedial_demonstrations if you're not going to be using the particle filter to select demonstrations
+                    # todo: you also need to a test for
+                    # remedial_instruction, visited_env_traj_idxs  = BEC.obtain_diagnostic_tests(data_loc, visited_env_traj_idxs, test_constraint,
+                    #                              min_subset_constraints_record, traj_record)
+
+
+                    remedial_instruction, visited_env_traj_idxs = BEC.obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, human_response_constraint, min_subset_constraints_record, env_record, traj_record, [[test_mdp, opt_traj]], visited_env_traj_idxs, running_variable_filter, consistent_state_count, step_cost_flag)
+                    remedial_mdp, remedial_traj, _, _ = remedial_instruction[0]
+                    remedial_mdp.visualize_trajectory(remedial_traj)
+
+                    with open('models/' + data_loc + '/remedial_instruction.pickle', 'wb') as f:
+                        pickle.dump(remedial_instruction, f)
+                    print(colored('len: {}'.format(len(remedial_instruction)), 'blue'))
+
+                    # todo: implement remedial test
+
+            # reset unit constraints and running_variable_filter
+            unit_demos = [summary]
+            unit_constraints = summary[3]
+            running_variable_filter = variable_filter
+
+    # BEC.visualize_summary(preliminary_tests, weights, step_cost_flag)
 
     return preliminary_tests, visited_env_traj_idxs
 

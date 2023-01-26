@@ -516,7 +516,8 @@ class Particles():
         self.weights /= sum(self.weights)
 
     def plot(self, centroid=None, fig=None, ax=None, cluster_centers=None, cluster_weights=None,
-                       cluster_assignments=None, vis_scale_factor=1000):
+                       cluster_assignments=None):
+        vis_scale_factor = 10 * len(self.positions)
         if fig == None:
             fig = plt.figure()
         if ax == None:

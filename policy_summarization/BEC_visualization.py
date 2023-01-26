@@ -13,7 +13,7 @@ def visualize_spherical_polygon(poly, fig=None, ax=None, alpha=1.0, color='y', p
     if fig == None:
         fig = plt.figure()
     if ax == None:
-        ax = fig.gca(projection='3d')
+        ax = fig.add_subplot(projection='3d')
 
     vertices = np.array(poly.vertices())
     vertex_adj = poly.vertex_adjacency_matrix()
@@ -106,7 +106,7 @@ def visualize_planes(constraints, fig=None, ax=None, alpha=0.5):
     if fig == None:
         fig = plt.figure()
     if ax == None:
-        ax = fig.gca(projection='3d')
+        ax = fig.add_subplot(projection='3d')
 
     x = np.linspace(-1, 1, 10)
     y = np.linspace(-1, 1, 10)
