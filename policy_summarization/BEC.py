@@ -571,7 +571,9 @@ def overlap_demo_BEC_and_human_posterior(args):
 def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
                        n_train_demos=3, prior=[], downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=1):
     summary = []
+    unit = []
     visited_env_traj_idxs = []
+    summary_count = 0
 
     # impose prior
     min_BEC_constraints_running = prior.copy()
@@ -593,13 +595,14 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
         nonzero_counter = nonzero_counter.flatten()
 
     variable_filter, nonzero_counter = BEC_helpers.update_variable_filter(nonzero_counter)
+    running_variable_filter = variable_filter.copy()
     print('variable filter: {}'.format(variable_filter))
 
     # clear the demonstration generation log
     open('models/' + data_loc + '/demo_gen_log.txt', 'w').close()
 
-    while len(summary) < n_train_demos:
-        # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(len(summary)) + '.png', just_save=True)
+    while summary_count < n_train_demos:
+        # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(summary_count) + '.png', just_save=True)
 
         # (approximately) uniformly divide up the valid BEC area along 2-sphere
         sample_human_models = BEC_helpers.sample_human_models_uniform(min_BEC_constraints_running, n_human_models)
@@ -611,9 +614,9 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
         info_gains_record = []
         overlap_in_opt_and_counterfactual_traj_record = []
 
-        print("Length of summary: {}".format(len(summary)))
+        print("Length of summary: {}".format(summary_count))
         with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
-            myfile.write('Length of summary: {}\n'.format(len(summary)))
+            myfile.write('Length of summary: {}\n'.format(summary_count))
 
         for model_idx, human_model in enumerate(sample_human_models):
             print(colored('Model #: {}'.format(model_idx), 'red'))
@@ -628,11 +631,11 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
             # are saved for reference later)
             print("Obtaining counterfactual information gains:")
 
-            cf_data_dir = 'models/' + data_loc + '/counterfactual_data_' + str(len(summary)) + '/model' + str(model_idx)
+            cf_data_dir = 'models/' + data_loc + '/counterfactual_data_' + str(summary_count) + '/model' + str(model_idx)
             os.makedirs(cf_data_dir, exist_ok=True)
             if consider_human_models_jointly:
                 pool.restart()
-                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter, consider_human_models_jointly) for i in range(len(traj_record))]
+                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], None, min_BEC_constraints_running, step_cost_flag, summary_count, variable_filter, consider_human_models_jointly) for i in range(len(traj_record))]
                 info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals, args), total=len(args)))
                 pool.close()
                 pool.join()
@@ -641,7 +644,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
                 info_gains_record.append(info_gain_envs)
             else:
                 pool.restart()
-                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter, consider_human_models_jointly) for i in range(len(traj_record))]
+                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], None, min_BEC_constraints_running, step_cost_flag, summary_count, variable_filter, consider_human_models_jointly) for i in range(len(traj_record))]
                 info_gain_envs, overlap_in_opt_and_counterfactual_traj_env = zip(*pool.imap(compute_counterfactuals, tqdm(args), total=len(args)))
                 pool.close()
                 pool.join()
@@ -650,7 +653,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
                 info_gains_record.append(info_gain_envs)
                 overlap_in_opt_and_counterfactual_traj_record.append(overlap_in_opt_and_counterfactual_traj_env)
 
-        with open('models/' + data_loc + '/info_gains_' + str(len(summary)) + '.pickle', 'wb') as f:
+        with open('models/' + data_loc + '/info_gains_' + str(summary_count) + '.pickle', 'wb') as f:
             pickle.dump(info_gains_record, f)
 
 
@@ -684,8 +687,8 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
         if consider_human_models_jointly:
             print("Combining the most limiting constraints across human models:")
             pool.restart()
-            args = [(i, len(sample_human_models), data_loc, len(summary), weights, step_cost_flag, variable_filter,
-                     traj_record[i], min_BEC_constraints_running) for
+            args = [(i, len(sample_human_models), data_loc, summary_count, weights, step_cost_flag, variable_filter,
+                     traj_record[i], min_BEC_constraints_running, None) for
                     i in range(len(traj_record))]
             info_gains_record, min_env_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(
                 *pool.imap(combine_limiting_constraints_IG, tqdm(args)))
@@ -814,8 +817,15 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
             best_mdp.set_init_state(best_traj[0][0]) # for completeness
             min_BEC_constraints_running.extend(min_env_constraints_record[best_env_idx][best_traj_idx])
             min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
-            summary.append([best_mdp, best_traj, (best_env_idx, best_traj_idx), min_env_constraints_record[best_env_idx][best_traj_idx],
-                            sample_human_models])
+            if (running_variable_filter == variable_filter).all():
+                unit.append([best_mdp, best_traj, (best_env_idx, best_traj_idx), min_env_constraints_record[best_env_idx][best_traj_idx], variable_filter, sample_human_models])
+                summary_count += 1
+            else:
+                summary.append(unit)
+
+                unit = [[best_mdp, best_traj, (best_env_idx, best_traj_idx), min_env_constraints_record[best_env_idx][best_traj_idx], variable_filter, sample_human_models]]
+                running_variable_filter = variable_filter.copy()
+                summary_count += 1
             visited_env_traj_idxs.append((best_env_idx, best_traj_idx))
         else:
             # b) consider each human model separately
@@ -857,6 +867,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
 
                                     best_env_idxs = [env_idx]
                                     best_traj_idxs = [traj_idx]
+                                    select_model = model_idx
 
                                 if info_gain_per_traj > max_info_gain:
                                     max_info_gain = info_gain_per_traj
@@ -876,7 +887,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
                     print('variable filter: {}'.format(variable_filter))
                     continue
 
-            with open('models/' + data_loc + '/counterfactual_data_' + str(len(summary)) + '/model' + str(
+            with open('models/' + data_loc + '/counterfactual_data_' + str(summary_count) + '/model' + str(
                     select_model) + '/cf_data_env' + str(
                     best_env_idx).zfill(5) + '.pickle', 'rb') as f:
                 best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
@@ -891,8 +902,18 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
             best_mdp.set_init_state(best_traj[0][0]) # for completeness
             min_BEC_constraints_running.extend(constraints_env[best_traj_idx])
             min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
-            summary.append([best_mdp, best_traj, (best_env_idx, best_traj_idx), constraints_env[best_traj_idx], variable_filter,
+            if (running_variable_filter == variable_filter).all():
+                unit.append([best_mdp, best_traj, (best_env_idx, best_traj_idx), constraints_env[best_traj_idx], variable_filter,
                             sample_human_models, select_model])
+                summary_count += 1
+            else:
+                summary.append(unit)
+
+                unit = [[best_mdp, best_traj, (best_env_idx, best_traj_idx), constraints_env[best_traj_idx], variable_filter,
+                            sample_human_models, select_model]]
+                running_variable_filter = variable_filter.copy()
+                summary_count += 1
+
             visited_env_traj_idxs.append((best_env_idx, best_traj_idx))
 
         print(colored('Max infogain: {}'.format(max_info_gain), 'blue'))
@@ -903,6 +924,9 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
         # this method doesn't always finish, so save the summary along the way
         with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
             pickle.dump(summary, f)
+
+    # add any remaining demonstrations
+    summary.append(unit)
 
     return summary, visited_env_traj_idxs
 
@@ -1286,7 +1310,7 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, hu
 
     return remedial_demonstrations, visited_env_traj_idxs
 
-def obtain_diagnostic_tests(data_loc, visited_env_traj_idxs, min_BEC_constraints, min_subset_constraints_record, traj_record, variable_filter, downsample_threshold=float("inf"), opt_simplicity=True, opt_similarity=True):
+def obtain_diagnostic_tests(data_loc, previous_demos, visited_env_traj_idxs, min_BEC_constraints, min_subset_constraints_record, traj_record, variable_filter, downsample_threshold=float("inf"), opt_simplicity=True, opt_similarity=True):
     preliminary_test_info = []
 
     # if you're looking for demonstrations that will convey the most constraining BEC region or will be employing scaffolding,
@@ -1326,65 +1350,23 @@ def obtain_diagnostic_tests(data_loc, visited_env_traj_idxs, min_BEC_constraints
                 else:
                     env_constraint_mapping[env_traj_tuple] = [constraint_idx + 1]
 
-        env_complexity_mapping = {} # helps prevent reopening the pickle file of the same environment multiple times. could parallelize this
-
-        # todo: trying to see if I can replace the code below with optimize_visuals()
-        # ps_helpers.optimize_visuals(data_loc, best)
-        # best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
-
         if max_constraint_count == 1:
             # no one demo covers multiple constraints. so greedily select demos from base list that is mot visually complex
             # filter for the most visually complex environment
             for env_traj_tuples in BEC_constraint_bookkeeping[::-1]:
-                old_env = -1
-                max_complexity = -1
-                max_complexity_env_traj_tuple = -1
-
-                for env_traj_tuple in env_traj_tuples:
-                    env, traj = env_traj_tuple
-                    # assuming that the tuples are stored in order of environment indices
-                    if env != old_env:
-                        if env not in env_complexity_mapping.keys():
-                            filename = mp_helpers.lookup_env_filename(data_loc, env)
-                            with open(filename, 'rb') as f:
-                                wt_vi_traj_env = pickle.load(f)
-
-                            complexity = wt_vi_traj_env[0][1].mdp.measure_env_complexity()
-                            env_complexity_mapping[env] = complexity
-                        else:
-                            complexity = env_complexity_mapping[env]
-                        if complexity > max_complexity:
-                            max_complexity = complexity
-                            max_complexity_env_traj_tuple = env_traj_tuple
-                    else:
-                        continue
-
+                best_env_idxs, best_traj_idxs = zip(*env_traj_tuples)
+                best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs,
+                                                                          traj_record, previous_demos, type='testing',
+                                                                          opt_simplicity=False, opt_similarity=False)
+                max_complexity_env_traj_tuple = (best_env_idx, best_traj_idx)
                 preliminary_test_info.append((max_complexity_env_traj_tuple, BEC_constraints.pop()))
 
         else:
             # filter for the most visually complex environment that can cover multiple constraints
-            old_env = -1
-            max_complexity = -1
-            max_complexity_env_traj_tuple = -1
-
-            for env_traj_tuple in max_env_traj_tuples:
-                env, traj = env_traj_tuple
-                # assuming that the tuples are stored in order of environment indices
-                if env != old_env:
-                    if env not in env_complexity_mapping.keys():
-                        filename = mp_helpers.lookup_env_filename(data_loc, env)
-                        with open(filename, 'rb') as f:
-                            wt_vi_traj_env = pickle.load(f)
-
-                        complexity = wt_vi_traj_env[0][1].mdp.measure_env_complexity()
-                        env_complexity_mapping[env] = complexity
-                    else:
-                        complexity = env_complexity_mapping[env]
-                    if complexity > max_complexity:
-                        max_complexity = complexity
-                        max_complexity_env_traj_tuple = env_traj_tuple
-                else:
-                    continue
+            best_env_idxs, best_traj_idxs = zip(*max_env_traj_tuples)
+            best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs,
+                                                                      traj_record, previous_demos, type='testing', opt_simplicity=False, opt_similarity=False)
+            max_complexity_env_traj_tuple = (best_env_idx, best_traj_idx)
 
             constituent_constraints = []
             for idx in env_constraint_mapping[max_complexity_env_traj_tuple]:
@@ -1470,6 +1452,8 @@ def obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_r
     Summary: Obtain a set of efficient demonstrations that recovers the behavioral equivalence class (BEC) of a set of demos / policy.
     An modified implementation of 'Machine Teaching for Inverse Reinforcement Learning: Algorithms and Applications' (Brown et al. AAAI 2019).
     '''
+    # Note: this function is no longer supported as of 1/26/2023
+
     min_BEC_summary = []
     summary = []
 
@@ -1873,6 +1857,9 @@ def visualize_summary(BEC_summaries_collection, weights, step_cost_flag):
     '''
     Summary: visualize the BEC demonstrations
     '''
+    # extract out the demonstrations from the series of units (each unit can contain multiple demonstrations)
+    BEC_summaries_collection = list(itertools.chain(*BEC_summaries_collection))
+
     for summary_idx, BEC_summary in enumerate(BEC_summaries_collection):
         print("Showing demo {} out of {}".format(summary_idx + 1, len(BEC_summaries_collection)))
 

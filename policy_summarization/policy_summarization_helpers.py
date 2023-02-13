@@ -252,7 +252,7 @@ def _in_summary(mdp, summary, initial_state):
             return True
     return False
 
-def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_record, summary, opt_simplicity=True, opt_similarity=True):
+def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_record, summary, type='training', opt_simplicity=True, opt_similarity=True):
     visual_dissimilarities = np.zeros(len(best_env_idxs))
     complexities = np.zeros(len(best_env_idxs))
 
@@ -269,12 +269,20 @@ def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_recor
                 wt_vi_traj_env = pickle.load(f)
             best_mdp = wt_vi_traj_env[0][1].mdp
 
-        # compare the visual dissimilarity to the most recent summary (only if it's not the first summary
-        # and you didn't recently switch which variable you wished to convey
-        if len(summary) > 0:
-            # get similar demos (todo: consider various scenarios for similarity and dissimilarity later)
-            visual_dissimilarities[j] = best_mdp.measure_visual_dissimilarity(
-                chunked_traj_record[best_env_idx][best_traj_idxs[j]][0][0], summary[-1][0], summary[-1][1][0][0])
+        if len(summary) > 1:
+            if type == 'training':
+                # only consider the most recent demo
+                visual_dissimilarities[j] = best_mdp.measure_visual_dissimilarity(
+                        chunked_traj_record[best_env_idx][best_traj_idxs[j]][0][0], summary[0][0], summary[0][1][0][0])
+            elif type == 'testing':
+                # consider all previous demos
+                for demo in summary:
+                    visual_dissimilarities[j] += best_mdp.measure_visual_dissimilarity(
+                    chunked_traj_record[best_env_idx][best_traj_idxs[j]][0][0], demo[0], demo[1][0][0])
+
+                visual_dissimilarities /= len(summary)
+            else:
+                raise AssertionError("Unsupported type for visual optimization")
         else:
             first_state = chunked_traj_record[best_env_idx][best_traj_idxs[j]][0][0]
 
@@ -295,12 +303,11 @@ def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_recor
                 visual_dissimilarities[j] = average_dissimilarity
 
         # get demos of low visual complexity
-        complexities[j] = best_mdp.measure_env_complexity()
+        complexities[j] = best_mdp.measure_env_complexity(chunked_traj_record[best_env_idx][best_traj_idxs[j]][0][0])
 
         prev_env_idx = best_env_idx
 
     tie_breaker = np.arange(len(best_env_idxs))
-    np.random.shuffle(tie_breaker)
     # sorts from small to large values
 
     if not opt_simplicity:

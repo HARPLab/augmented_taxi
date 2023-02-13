@@ -395,10 +395,13 @@ class AugmentedTaxi2OOMDP(OOMDP):
 
         return next_state
 
-    def measure_env_complexity(self):
-        # measure the number of tolls and initial hotswap stations in the environment
-        return len(self.tolls) + len(self.init_state.objects['hotswap_station'])
-
+    def measure_env_complexity(self, state=None):
+        if state is None:
+            # measure the number of tolls and initial hotswap stations in the environment
+            return len(self.tolls) + len(self.init_state.objects['hotswap_station'])
+        else:
+            # measure the number of tolls and remaining hotswap stations in the environment
+            return len(self.tolls) + len(state.objects['hotswap_station'])
     def measure_visual_dissimilarity(self, start_state, other_mdp, other_start_state):
         start_state_weight = 2
 
@@ -414,8 +417,10 @@ class AugmentedTaxi2OOMDP(OOMDP):
         dissimilarity += np.sum(np.abs(np.array([int(x) for x in start_state_hash[0:overlap]]) - np.array(
             [int(x) for x in other_start_state_hash[0:overlap]]))) * start_state_weight
 
-        # tolls and hotswap station
-        dissimilarity += np.sum(np.abs(np.array(self.env_code) - np.array(other_mdp.env_code)))
+        # tolls
+        dissimilarity += np.sum(np.abs(np.array(self.env_code[:-1]) - np.array(other_mdp.env_code[:-1])))
+        # hotswap station (current assuming that there is only one)
+        dissimilarity += abs(len(start_state.objects['hotswap_station']) - len(other_start_state.objects['hotswap_station']))
 
         return dissimilarity
 
