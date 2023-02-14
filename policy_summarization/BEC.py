@@ -1209,12 +1209,11 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
 
     return summary, visited_env_traj_idxs, particles
 
-def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, human_response_constraint, min_subset_constraints_record, env_record, traj_record, prev_test, visited_env_traj_idxs, variable_filter, consistent_state_count, step_cost_flag, info_gain_tolerance=0.01, consider_human_models_jointly=True):
+def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BEC_constraints, min_subset_constraints_record, env_record, traj_record, previous_demonstrations, visited_env_traj_idxs, variable_filter, consistent_state_count, step_cost_flag, type='training', info_gain_tolerance=0.01, consider_human_models_jointly=True):
     remedial_demonstrations = []
 
     # if you're looking for demonstrations that will convey the most constraining BEC region or will be employing scaffolding,
     # obtain the demos needed to convey the most constraining BEC region
-    BEC_constraints = -human_response_constraint # take the negative as you want to correct for the human's mistakes
     BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(BEC_constraints,
                                                                                 min_subset_constraints_record, visited_env_traj_idxs, traj_record)
     if len(BEC_constraint_bookkeeping[0]) > 0:
@@ -1223,7 +1222,7 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, hu
 
         # simply optimize for the visuals of the direct counterexample
         best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record,
-                                                                  prev_test)
+                                                                  previous_demonstrations, type=type)
 
     else:
         # the human's incorrect response does not have a direct counterexample, and thus you need to use information gain to obtain the next example
@@ -1245,7 +1244,7 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, hu
             pool.restart()
             args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]),
                      traj_record[i], particles, [], step_cost_flag, None,
-                     variable_filter, consider_human_models_jointly) for i in range(len(traj_record[0:2]))]
+                     variable_filter, consider_human_models_jointly) for i in range(len(traj_record))]
 
             info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals, args), total=len(args)))
             pool.close()
@@ -1297,7 +1296,7 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, hu
                             best_env_idxs = [env_idx]
                             best_traj_idxs = [traj_idx]
 
-        best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, prev_test)
+        best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, previous_demonstrations, type=type)
 
     traj = traj_record[best_env_idx][best_traj_idx]
     filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
@@ -1305,7 +1304,7 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, hu
         wt_vi_traj_env = pickle.load(f)
     best_mdp = wt_vi_traj_env[0][1].mdp
     best_mdp.set_init_state(traj[0][0])  # for completeness
-    remedial_demonstrations.append([best_mdp, traj, (best_env_idx, best_traj_idx), BEC_constraints])
+    remedial_demonstrations.append([best_mdp, traj, (best_env_idx, best_traj_idx), BEC_constraints, variable_filter])
     visited_env_traj_idxs.append((best_env_idx, best_traj_idx))
 
     return remedial_demonstrations, visited_env_traj_idxs
@@ -1356,8 +1355,7 @@ def obtain_diagnostic_tests(data_loc, previous_demos, visited_env_traj_idxs, min
             for env_traj_tuples in BEC_constraint_bookkeeping[::-1]:
                 best_env_idxs, best_traj_idxs = zip(*env_traj_tuples)
                 best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs,
-                                                                          traj_record, previous_demos, type='testing',
-                                                                          opt_simplicity=False, opt_similarity=False)
+                                                                          traj_record, previous_demos, type='testing')
                 max_complexity_env_traj_tuple = (best_env_idx, best_traj_idx)
                 preliminary_test_info.append((max_complexity_env_traj_tuple, BEC_constraints.pop()))
 
@@ -1365,7 +1363,7 @@ def obtain_diagnostic_tests(data_loc, previous_demos, visited_env_traj_idxs, min
             # filter for the most visually complex environment that can cover multiple constraints
             best_env_idxs, best_traj_idxs = zip(*max_env_traj_tuples)
             best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs,
-                                                                      traj_record, previous_demos, type='testing', opt_simplicity=False, opt_similarity=False)
+                                                                      traj_record, previous_demos, type='testing')
             max_complexity_env_traj_tuple = (best_env_idx, best_traj_idx)
 
             constituent_constraints = []
