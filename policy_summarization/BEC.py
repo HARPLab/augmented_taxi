@@ -1366,7 +1366,7 @@ def obtain_diagnostic_tests(data_loc, previous_demos, visited_env_traj_idxs, min
                 best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs,
                                                                           traj_record, previous_demos, type='testing')
                 max_complexity_env_traj_tuple = (best_env_idx, best_traj_idx)
-                preliminary_test_info.append((max_complexity_env_traj_tuple, BEC_constraints.pop()))
+                preliminary_test_info.append((max_complexity_env_traj_tuple, [BEC_constraints.pop()]))
 
         else:
             # filter for the most visually complex environment that can cover multiple constraints

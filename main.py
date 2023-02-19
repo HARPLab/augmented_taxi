@@ -423,20 +423,19 @@ def obtain_unit_tests(mdp_class, BEC_summary, visited_env_traj_idxs, particles_s
     # run through the pre-selected units
     for unit_idx, unit in enumerate(BEC_summary):
         print("Here are the demonstrations for this unit")
-
         unit_constraints = []
         running_variable_filter = unit[0][4]
 
         # show each demonstration that is part of this unit
         for subunit in unit:
-            # subunit[0].visualize_trajectory(subunit[1]) # todo: temp
+            subunit[0].visualize_trajectory(subunit[1])
             unit_constraints.extend(subunit[3])
 
             # update particle filter with demonstration's constraint
             particles.update(subunit[3])
             # visualize the updated particle filter
             if visualize_pf_transition:
-                # BEC_viz.visualize_pf_transition(subunit[3], particles_prev, particles, mdp_class, weights) # todo: temp
+                BEC_viz.visualize_pf_transition(subunit[3], particles_prev, particles, mdp_class, weights)
                 particles_prev = copy.deepcopy(particles)
 
         # obtain the constraints conveyed by the unit's demonstrations

@@ -217,8 +217,9 @@ def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_r
                             # conveys information about variable designated to be filtered out, so skip this demonstration
                             contains_filtered_variable = True
                 # prevent showing a trajectory that contains feature counts of a feature to be filtered out
-                if abs(variable_filter.dot(traj_features_record[env_idx][traj_idx].T)[0, 0]) > 0:
-                    contains_filtered_variable = True
+                if variable_filter is not None:
+                    if abs(variable_filter.dot(traj_features_record[env_idx][traj_idx].T)[0, 0]) > 0:
+                        contains_filtered_variable = True
                 if contains_BEC_constraint and not contains_filtered_variable:
                     # different MDPs can lead to the same trajectory and demonstration (e.g. if the battery disappears)
                     # thus, you want to also compare trajectories directly instead of relying solely on a history of
