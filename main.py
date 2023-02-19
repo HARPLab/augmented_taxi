@@ -81,16 +81,16 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
 
     try:
         with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
-            policy_constraints, min_subset_constraints_record, env_record, traj_record, reward_record, consistent_state_count = pickle.load(f)
+            policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, consistent_state_count = pickle.load(f)
     except:
         if hardcode_envs:
             # use demo BEC to extract constraints
-            policy_constraints, min_subset_constraints_record, env_record, traj_record, reward_record, consistent_state_count = BEC.extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=vi_traj_triplets, print_flag=True)
+            policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, consistent_state_count = BEC.extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=vi_traj_triplets, print_flag=True)
         else:
             # use policy BEC to extract constraints
-            policy_constraints, min_subset_constraints_record, env_record, traj_record, reward_record, consistent_state_count = BEC.extract_constraints(data_loc, step_cost_flag, pool, print_flag=True)
+            policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, consistent_state_count = BEC.extract_constraints(data_loc, step_cost_flag, pool, print_flag=True)
         with open('models/' + data_loc + '/base_constraints.pickle', 'wb') as f:
-            pickle.dump((policy_constraints, min_subset_constraints_record, env_record, traj_record, reward_record, consistent_state_count), f)
+            pickle.dump((policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, consistent_state_count), f)
 
     try:
         with open('models/' + data_loc + '/BEC_constraints.pickle', 'rb') as f:
@@ -408,35 +408,53 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
                                 step_cost_flag)
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints
 
-def obtain_unit_tests(BEC_summary, visited_env_traj_idxs, particles, pool, n_human_models, data_loc, weights, step_cost_flag):
+def obtain_unit_tests(mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, data_loc, weights, step_cost_flag, visualize_pf_transition=True):
     # todo: maybe pass in some of these objects later
     with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
-        policy_constraints, min_subset_constraints_record, env_record, traj_record, reward_record, consistent_state_count = pickle.load(
+        policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, consistent_state_count = pickle.load(
             f)
 
+    # initialize a particle filter model of human
+    particle_positions = BEC_helpers.sample_human_models_uniform([], n_particles)
+    particles = pf.Particles(particle_positions)
+    particles.update(prior)
+    particles_prev = copy.deepcopy(particles)
+
+    # run through the pre-selected units
     for unit_idx, unit in enumerate(BEC_summary):
         print("Here are the demonstrations for this unit")
-        BEC.visualize_summary([unit], weights, step_cost_flag)
 
-        running_variable_filter = unit[0][4]
         unit_constraints = []
-        for unit_demo in unit:
-            unit_constraints.extend(unit_demo[3])
+        running_variable_filter = unit[0][4]
 
+        # show each demonstration that is part of this unit
+        for subunit in unit:
+            # subunit[0].visualize_trajectory(subunit[1]) # todo: temp
+            unit_constraints.extend(subunit[3])
+
+            # update particle filter with demonstration's constraint
+            particles.update(subunit[3])
+            # visualize the updated particle filter
+            if visualize_pf_transition:
+                # BEC_viz.visualize_pf_transition(subunit[3], particles_prev, particles, mdp_class, weights) # todo: temp
+                particles_prev = copy.deepcopy(particles)
+
+        # obtain the constraints conveyed by the unit's demonstrations
         min_constraints = BEC_helpers.remove_redundant_constraints(unit_constraints, weights, step_cost_flag)
+        # obtain the diagnostic tests that will test the human's understanding of the unit's constraints
+        preliminary_tests, visited_env_traj_idxs = BEC.obtain_diagnostic_tests(data_loc, unit, visited_env_traj_idxs, min_constraints, min_subset_constraints_record, traj_record, traj_features_record, running_variable_filter)
 
-        print(min_constraints)
-
-        preliminary_tests, visited_env_traj_idxs = BEC.obtain_diagnostic_tests(data_loc, unit, visited_env_traj_idxs, min_constraints, min_subset_constraints_record, traj_record, running_variable_filter)
         # with open('models/' + data_loc + '/preliminary_tests.pickle', 'wb') as f:
         #     pickle.dump((preliminary_tests, visited_env_traj_idxs), f)
         # with open('models/' + data_loc + '/preliminary_tests.pickle', 'rb') as f:
         #     preliminary_tests, visited_env_traj_idxs = pickle.load(f)
 
+        # query the human's response to the diagnostic tests
         for test in preliminary_tests:
             test_mdp = test[0]
             opt_traj = test[1]
-            test_history = [test]
+            test_constraints = test[3]
+            test_history = [test] # to ensure that remedial demonstrations and tests are visually simple/similar and complex/different, respectively
 
             human_traj, human_history = test_mdp.visualize_interaction(keys_map=params.keys_map) # the latter is simply the gridworld locations of the agent
             # with open('models/' + data_loc + '/human_traj.pickle', 'wb') as f:
@@ -447,23 +465,37 @@ def obtain_unit_tests(BEC_summary, visited_env_traj_idxs, particles, pool, n_hum
             human_feature_count = test_mdp.accumulate_reward_features(human_traj, discount=True)
             opt_feature_count = test_mdp.accumulate_reward_features(opt_traj, discount=True)
 
-            print(human_feature_count)
-            print(opt_feature_count)
-
             if (human_feature_count == opt_feature_count).all():
                 print("you got it right")
+
+                particles.update(test_constraints)
+                if visualize_pf_transition:
+                    BEC_viz.visualize_pf_transition(test_constraints, particles_prev, particles, mdp_class, weights)
+                    particles_prev = copy.deepcopy(particles)
+
             else:
                 print("you got it wrong. here's the correct answer")
                 failed_BEC_constraint = opt_feature_count - human_feature_count
                 print("Failed BEC constraint: {}".format(failed_BEC_constraint))
 
+                particles.update([-failed_BEC_constraint])
+                if visualize_pf_transition:
+                    BEC_viz.visualize_pf_transition([-failed_BEC_constraint], particles_prev, particles, mdp_class, weights)
+                    particles_prev = copy.deepcopy(particles)
+
                 test_mdp.visualize_trajectory_comparison(opt_traj, human_traj)
+
                 print("here is another example that might be helpful")
 
-                remedial_instruction, visited_env_traj_idxs = BEC.obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, failed_BEC_constraint, min_subset_constraints_record, env_record, traj_record, test_history, visited_env_traj_idxs, running_variable_filter, consistent_state_count, step_cost_flag)
-                remedial_mdp, remedial_traj, _, _, _ = remedial_instruction[0]
+                remedial_instruction, visited_env_traj_idxs = BEC.obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, failed_BEC_constraint, min_subset_constraints_record, env_record, traj_record, traj_features_record, test_history, visited_env_traj_idxs, running_variable_filter, consistent_state_count, step_cost_flag)
+                remedial_mdp, remedial_traj, _, remedial_constraint, _ = remedial_instruction[0]
                 remedial_mdp.visualize_trajectory(remedial_traj)
                 test_history.extend(remedial_instruction)
+
+                particles.update([remedial_constraint])
+                if visualize_pf_transition:
+                    BEC_viz.visualize_pf_transition([remedial_constraint], particles_prev, particles, mdp_class, weights)
+                    particles_prev = copy.deepcopy(particles)
 
                 with open('models/' + data_loc + '/remedial_instruction.pickle', 'wb') as f:
                     pickle.dump(remedial_instruction, f)
@@ -480,6 +512,7 @@ def obtain_unit_tests(BEC_summary, visited_env_traj_idxs, particles, pool, n_hum
                                                                                                      min_subset_constraints_record,
                                                                                                      env_record,
                                                                                                      traj_record,
+                                                                                                     traj_features_record,
                                                                                                      test_history,
                                                                                                      visited_env_traj_idxs,
                                                                                                      running_variable_filter,
@@ -502,10 +535,24 @@ def obtain_unit_tests(BEC_summary, visited_env_traj_idxs, particles, pool, n_hum
                     if (human_feature_count == opt_feature_count).all():
                         print("you got it right")
                         remedial_test_correct = True
+
+                        particles.update([failed_BEC_constraint])
+                        if visualize_pf_transition:
+                            BEC_viz.visualize_pf_transition([failed_BEC_constraint], particles_prev, particles, mdp_class,
+                                                            weights)
+                            particles_prev = copy.deepcopy(particles)
                     else:
+                        failed_remedial_constraint = opt_feature_count - human_feature_count
                         print("you got it wrong. here's the correct answer")
                         remedial_mdp.visualize_trajectory_comparison(remedial_traj, human_traj)
                         print("now let's try another test")
+
+                        particles.update([-failed_remedial_constraint])
+                        if visualize_pf_transition:
+                            BEC_viz.visualize_pf_transition([-failed_remedial_constraint], particles_prev, particles, mdp_class,
+                                                            weights)
+                            particles_prev = copy.deepcopy(particles)
+
 
     return preliminary_tests, visited_env_traj_idxs
 
@@ -521,11 +568,11 @@ if __name__ == "__main__":
     # generate_agent(params.mdp_class, params.data_loc['base'], params.mdp_parameters, visualize=True)
 
     # b) obtain a BEC summary of the agent's policy
-    BEC_summary, visited_env_traj_idxs, particles = obtain_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
+    BEC_summary, visited_env_traj_idxs, particles_summary = obtain_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
                             params.step_cost_flag, params.BEC['summary_variant'], pool, params.BEC['n_train_demos'],
                             params.BEC['n_human_models'], params.BEC['n_particles'], params.prior, params.posterior, params.BEC['obj_func_proportion'])
 
-    unit_tests = obtain_unit_tests(BEC_summary, visited_env_traj_idxs, particles, pool, params.BEC['n_human_models'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag)
+    unit_tests = obtain_unit_tests(params.mdp_class,BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag)
 
     # c) obtain test environments
     # obtain_test_environments(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,

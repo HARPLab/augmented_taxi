@@ -5,6 +5,8 @@ import policy_summarization.computational_geometry as cg
 from scipy.spatial import geometric_slerp
 import matplotlib.tri as mtri
 from termcolor import colored
+import sage.all
+import sage.geometry.polyhedron.base as Polyhedron
 
 def visualize_spherical_polygon(poly, fig=None, ax=None, alpha=1.0, color='y', plot_ref_sphere=True):
     '''
@@ -263,3 +265,79 @@ def visualize_projection(constraints, weights, proj_type, plot_lim=[(-1, 1), (-1
     if not just_save:
         plt.show()
     plt.close()
+
+def visualize_pf_transition(constraints, particles_before, particles_after, mdp_class, weights, fig=None):
+    '''
+    Visualize the change in particle filter due to constraints
+    '''
+    if fig == None:
+        fig = plt.figure()
+    def label_axes(ax, mdp_class):
+        ax.set_facecolor('white')
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
+        ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100)
+        if mdp_class == 'augmented_taxi2':
+            ax.set_xlabel('$\mathregular{w_0}$: Mud')
+            ax.set_ylabel('$\mathregular{w_1}$: Recharge')
+        elif mdp_class == 'two_goal2':
+            ax.set_xlabel('X: Goal 1 (grey)')
+            ax.set_ylabel('Y: Goal 2 (green)')
+        else:
+            ax.set_xlabel('X: Goal')
+            ax.set_ylabel('Y: Skateboard')
+        ax.set_zlabel('$\mathregular{w_2}$: Action')
+
+        ax.view_init(elev=16, azim=-160)
+
+    ax1 = fig.add_subplot(1, 3, 1, projection='3d')
+    ax2 = fig.add_subplot(1, 3, 2, projection='3d', sharex=ax1, sharey=ax1, sharez=ax1)
+    ax3 = fig.add_subplot(1, 3, 3, projection='3d', sharex=ax1, sharey=ax1, sharez=ax1)
+    ax1.title.set_text('Particles before')
+    ax2.title.set_text('Demo constraints')
+    ax3.title.set_text('Particles after')
+
+    # plot particles before and after the constraints
+    particles_before.plot(fig=fig, ax=ax1)
+    particles_after.plot(fig=fig, ax=ax3)
+
+    # plot the constraints
+    ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints)
+    poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
+    for constraints in [constraints]:
+        visualize_planes(constraints, fig=fig, ax=ax2)
+    visualize_spherical_polygon(poly, fig=fig, ax=ax2, plot_ref_sphere=False, alpha=0.75)
+
+    label_axes(ax1, mdp_class)
+    label_axes(ax2, mdp_class)
+    label_axes(ax3, mdp_class)
+
+    # https://stackoverflow.com/questions/41167196/using-matplotlib-3d-axes-how-to-drag-two-axes-at-once
+    # link the pan of the three axes together
+    n_angles = 36
+    n_radii = 8
+
+    radii = np.linspace(0.125, 1.0, n_radii)
+    angles = np.linspace(0, 2 * np.pi, n_angles, endpoint=False)
+    angles = np.repeat(angles[..., np.newaxis], n_radii, axis=1)
+
+    x = np.append(0, (radii * np.cos(angles)).flatten())
+    y = np.append(0, (radii * np.sin(angles)).flatten())
+    z = np.sin(-x * y)
+    def on_move(event):
+        if event.inaxes == ax1:
+            ax2.view_init(elev=ax1.elev, azim=ax1.azim)
+            ax3.view_init(elev=ax1.elev, azim=ax1.azim)
+        elif event.inaxes == ax2:
+            ax1.view_init(elev=ax2.elev, azim=ax2.azim)
+            ax3.view_init(elev=ax2.elev, azim=ax2.azim)
+        elif event.inaxes == ax3:
+            ax1.view_init(elev=ax3.elev, azim=ax3.azim)
+            ax2.view_init(elev=ax3.elev, azim=ax3.azim)
+            return
+        fig.canvas.draw_idle()
+
+    fig.canvas.mpl_connect('motion_notify_event', on_move)
+
+    plt.show()

@@ -34,6 +34,7 @@ def extract_constraints_policy(args):
     policy_constraints = []               # BEC constraints that define a policy (i.e. constraints arising from one action
                                           # deviations from every possible starting state and the corresponding optimal trajectories)
     traj_record = []
+    traj_features_record = []             # reward feature counts of each trajectory
     reward_record = []                    # the rewards associated with the optimal trajectories
 
     for state in mdp.states:
@@ -63,13 +64,15 @@ def extract_constraints_policy(args):
                     BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag))
                 reward_record.append(weights.dot(mu_sa.T))
 
+                traj_features_record.append(mu_sa)
+
         # also store the BEC constraints for optimal trajectory in each state, along with the associated
         # demo and environment number
         min_subset_constraints_record.append(
             BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag))
         traj_record.append(traj_opt)
 
-    return env_idx, traj_record, policy_constraints, min_subset_constraints_record, reward_record
+    return env_idx, traj_record, traj_features_record, policy_constraints, min_subset_constraints_record, reward_record
 
 def extract_constraints_demonstration(args):
     env_idx, vi, traj_opt, step_cost_flag = args
@@ -78,6 +81,7 @@ def extract_constraints_demonstration(args):
     policy_constraints = []               # BEC constraints that define a policy (i.e. constraints arising from one action
                                           # deviations from every possible starting state and the corresponding optimal trajectories)
     traj_record = []
+    traj_features_record = []             # reward feature counts of each trajectory
     reward_record = []                    # the rewards associated with the optimal trajectories
 
     mdp = vi.mdp
@@ -106,6 +110,8 @@ def extract_constraints_demonstration(args):
         if sas_idx == 0:
             reward_record.append(weights.dot(mu_sa.T))
 
+            traj_features_record.append(mu_sa)
+
     # store the BEC constraints for each environment, along with the associated demo and environment number
     min_subset_constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
     min_subset_constraints_record.append(min_subset_constraints)
@@ -114,7 +120,7 @@ def extract_constraints_demonstration(args):
     # demos) that the policy can generate in these environments
     policy_constraints.append(min_subset_constraints)
 
-    return env_idx, traj_record, policy_constraints, min_subset_constraints_record, reward_record
+    return env_idx, traj_record, traj_features_record, policy_constraints, min_subset_constraints_record, reward_record
 
 
 def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=None, print_flag=False):
@@ -131,6 +137,7 @@ def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=None, p
     policy_constraints = []               # BEC constraints that define a policy (i.e. constraints arising from one action
                                           # deviations from every possible starting state and the corresponding optimal trajectories)
     traj_record = []
+    traj_features_record = []  # reward feature counts of each trajectory
     reward_record = []
 
     n_envs = len(os.listdir('models/' + data_loc + '/gt_policies/'))
@@ -161,9 +168,10 @@ def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=None, p
 
             env_record.append(result[0])
             traj_record.append(result[1])
-            policy_constraints.extend(result[2])
-            min_subset_constraints_record.append(result[3])
-            reward_record.append(result[4])
+            traj_features_record.append(result[2])
+            policy_constraints.extend(result[3])
+            min_subset_constraints_record.append(result[4])
+            reward_record.append(result[5])
     else:
         # b) demonstration-driven BEC: generate constraints by considering the expected feature counts after taking one
         # suboptimal action in every state along a trajectory (demonstration), then acting optimally afterward.
@@ -179,14 +187,15 @@ def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=None, p
         for result in results:
             env_record.append(result[0])
             traj_record.append(result[1])
-            policy_constraints.extend(result[2])
-            min_subset_constraints_record.append(result[3])
-            reward_record.append(result[4])
+            traj_features_record.append(result[2])
+            policy_constraints.extend(result[3])
+            min_subset_constraints_record.append(result[4])
+            reward_record.append(result[5])
 
         # this isn't really relevant for demonstration BEC
         consistent_state_count = False
 
-    return policy_constraints, min_subset_constraints_record, env_record, traj_record, reward_record, consistent_state_count
+    return policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, consistent_state_count
 
 def extract_BEC_constraints(policy_constraints, min_subset_constraints_record, env_record, weights, step_cost_flag, pool):
     '''
@@ -1209,13 +1218,13 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
 
     return summary, visited_env_traj_idxs, particles
 
-def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BEC_constraints, min_subset_constraints_record, env_record, traj_record, previous_demonstrations, visited_env_traj_idxs, variable_filter, consistent_state_count, step_cost_flag, type='training', info_gain_tolerance=0.01, consider_human_models_jointly=True):
+def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BEC_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, previous_demonstrations, visited_env_traj_idxs, variable_filter, consistent_state_count, step_cost_flag, type='training', info_gain_tolerance=0.01, consider_human_models_jointly=True):
     remedial_demonstrations = []
 
     # if you're looking for demonstrations that will convey the most constraining BEC region or will be employing scaffolding,
     # obtain the demos needed to convey the most constraining BEC region
     BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(BEC_constraints,
-                                                                                min_subset_constraints_record, visited_env_traj_idxs, traj_record)
+                                                                                min_subset_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record, variable_filter=variable_filter)
     if len(BEC_constraint_bookkeeping[0]) > 0:
         # the human's incorrect response can be corrected with a direct counterexample
         best_env_idxs, best_traj_idxs = list(zip(*BEC_constraint_bookkeeping[0]))
@@ -1309,14 +1318,14 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BE
 
     return remedial_demonstrations, visited_env_traj_idxs
 
-def obtain_diagnostic_tests(data_loc, previous_demos, visited_env_traj_idxs, min_BEC_constraints, min_subset_constraints_record, traj_record, variable_filter, downsample_threshold=float("inf"), opt_simplicity=True, opt_similarity=True):
+def obtain_diagnostic_tests(data_loc, previous_demos, visited_env_traj_idxs, min_BEC_constraints, min_subset_constraints_record, traj_record, traj_features_record, variable_filter, downsample_threshold=float("inf"), opt_simplicity=True, opt_similarity=True):
     preliminary_test_info = []
 
     # if you're looking for demonstrations that will convey the most constraining BEC region or will be employing scaffolding,
     # obtain the demos needed to convey the most constraining BEC region
     BEC_constraints = min_BEC_constraints.copy()
     BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(BEC_constraints,
-                                                                                min_subset_constraints_record, visited_env_traj_idxs, traj_record, variable_filter=variable_filter)
+                                                                                min_subset_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record, variable_filter=variable_filter)
     while len(BEC_constraints) > 0:
         # downsampling strategy 1: randomly cull sets with too many members for computational feasibility
         # for j, set in enumerate(sets):

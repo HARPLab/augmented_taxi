@@ -543,9 +543,9 @@ class Particles():
         #     centroid = cg.spherical_centroid(self.positions.squeeze().T, self.weights)
         # ax.scatter(centroid[0], centroid[1], centroid[2], marker='o', c='r', s=100)
 
-        if matplotlib.get_backend() == 'TkAgg':
-            mng = plt.get_current_fig_manager()
-            mng.resize(*mng.window.maxsize())
+        # if matplotlib.get_backend() == 'TkAgg':
+        #     mng = plt.get_current_fig_manager()
+        #     mng.resize(*mng.window.maxsize())
 
     def resample_from_index(self, indexes, K=1):
         self.weights_prev = self.weights.copy()
