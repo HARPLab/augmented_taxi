@@ -150,9 +150,9 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
     #
 
     # # constraint visualization
+    # BEC_summary = list(itertools.chain(*BEC_summary))
     # constraints_record = prior
     # for summary in BEC_summary:
-    #     print(summary[3])
     #     constraints_record.extend(summary[3])
     #     # constraints_record = summary[3]
     #
@@ -455,6 +455,7 @@ def obtain_unit_tests(mdp_class, BEC_summary, visited_env_traj_idxs, particles_s
             test_constraints = test[3]
             test_history = [test] # to ensure that remedial demonstrations and tests are visually simple/similar and complex/different, respectively
 
+            print("Here is a diagnostic test for this unit")
             human_traj, human_history = test_mdp.visualize_interaction(keys_map=params.keys_map) # the latter is simply the gridworld locations of the agent
             # with open('models/' + data_loc + '/human_traj.pickle', 'wb') as f:
             #     pickle.dump((human_traj, human_history), f)
@@ -465,7 +466,7 @@ def obtain_unit_tests(mdp_class, BEC_summary, visited_env_traj_idxs, particles_s
             opt_feature_count = test_mdp.accumulate_reward_features(opt_traj, discount=True)
 
             if (human_feature_count == opt_feature_count).all():
-                print("you got it right")
+                print("You got the diagnostic test right")
 
                 particles.update(test_constraints)
                 if visualize_pf_transition:
@@ -473,7 +474,7 @@ def obtain_unit_tests(mdp_class, BEC_summary, visited_env_traj_idxs, particles_s
                     particles_prev = copy.deepcopy(particles)
 
             else:
-                print("you got it wrong. here's the correct answer")
+                print("You got the diagnostic test wrong. Here's the correct answer")
                 failed_BEC_constraint = opt_feature_count - human_feature_count
                 print("Failed BEC constraint: {}".format(failed_BEC_constraint))
 
@@ -484,7 +485,7 @@ def obtain_unit_tests(mdp_class, BEC_summary, visited_env_traj_idxs, particles_s
 
                 test_mdp.visualize_trajectory_comparison(opt_traj, human_traj)
 
-                print("here is another example that might be helpful")
+                print("Here is a remedial demonstration that might be helpful")
 
                 remedial_instruction, visited_env_traj_idxs = BEC.obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, failed_BEC_constraint, min_subset_constraints_record, env_record, traj_record, traj_features_record, test_history, visited_env_traj_idxs, running_variable_filter, consistent_state_count, step_cost_flag)
                 remedial_mdp, remedial_traj, _, remedial_constraint, _ = remedial_instruction[0]
@@ -501,7 +502,7 @@ def obtain_unit_tests(mdp_class, BEC_summary, visited_env_traj_idxs, particles_s
 
                 remedial_test_correct = False
 
-                print("Remedial tests:")
+                print("Here is a remedial test to see if you've correctly learned the lesson")
                 while not remedial_test_correct:
 
                     remedial_test, visited_env_traj_idxs = BEC.obtain_remedial_demonstrations(data_loc, pool,
@@ -532,7 +533,7 @@ def obtain_unit_tests(mdp_class, BEC_summary, visited_env_traj_idxs, particles_s
                     opt_feature_count = remedial_mdp.accumulate_reward_features(remedial_traj, discount=True)
 
                     if (human_feature_count == opt_feature_count).all():
-                        print("you got it right")
+                        print("You got the remedial test correct")
                         remedial_test_correct = True
 
                         particles.update([failed_BEC_constraint])
@@ -542,9 +543,8 @@ def obtain_unit_tests(mdp_class, BEC_summary, visited_env_traj_idxs, particles_s
                             particles_prev = copy.deepcopy(particles)
                     else:
                         failed_remedial_constraint = opt_feature_count - human_feature_count
-                        print("you got it wrong. here's the correct answer")
+                        print("You got the remedial test wrong. Here's the correct answer")
                         remedial_mdp.visualize_trajectory_comparison(remedial_traj, human_traj)
-                        print("now let's try another test")
 
                         particles.update([-failed_remedial_constraint])
                         if visualize_pf_transition:

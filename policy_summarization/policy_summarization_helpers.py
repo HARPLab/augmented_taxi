@@ -269,7 +269,7 @@ def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_recor
                 wt_vi_traj_env = pickle.load(f)
             best_mdp = wt_vi_traj_env[0][1].mdp
 
-        if len(summary) > 1:
+        if len(summary) >= 1:
             if type == 'training':
                 # only consider the most recent demo
                 visual_dissimilarities[j] = best_mdp.measure_visual_dissimilarity(
@@ -300,7 +300,7 @@ def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_recor
                 average_dissimilarity = average_dissimilarity / (len(best_mdp.states) - 1)
                 average_dissimilarity_dict[first_state] = average_dissimilarity
 
-                visual_dissimilarities[j] = average_dissimilarity
+                visual_dissimilarities[j] = round(average_dissimilarity)
 
         # get demos of low visual complexity
         complexities[j] = best_mdp.measure_env_complexity(chunked_traj_record[best_env_idx][best_traj_idxs[j]][0][0])
@@ -308,14 +308,14 @@ def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_recor
         prev_env_idx = best_env_idx
 
     tie_breaker = np.arange(len(best_env_idxs))
-    # sorts from small to large values
+    np.random.shuffle(tie_breaker)
 
     if type == 'testing':
         # if obtaining tests, opt for greatest complexity and dissimilarity to previous demonstrations
         complexities *= -1
         visual_dissimilarities *= -1
 
-    # sort first for visual simplicity, then visual similarity
+    # sort first for visual simplicity, then visual similarity  (sorts from small to large values)
     sorted_zipped = sorted(zip(complexities, visual_dissimilarities, tie_breaker, best_env_idxs, best_traj_idxs))
     complexities_sorted, visual_dissimilarities_sorted, _, best_env_idxs_sorted, best_traj_idxs_sorted = list(
         zip(*sorted_zipped))
