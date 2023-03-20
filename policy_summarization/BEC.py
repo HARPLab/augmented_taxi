@@ -359,7 +359,7 @@ def compute_counterfactuals(args):
 
             # don't consider environments that convey information about a variable you don't currently wish to convey
             skip_demo = False
-            if variable_filter is not None:
+            if np.any(variable_filter):
                 for constraint in constraints:
                     if abs(variable_filter.dot(constraint.T)[0, 0]) > 0:
                         # conveys information about variable designated to be filtered out, so block this demonstration
@@ -443,10 +443,14 @@ def combine_limiting_constraints_IG(args):
 
         # don't consider environments that convey information about a variable you don't currently wish to convey
         skip_demo = False
-        if variable_filter is not None:
+        if np.any(variable_filter):
             for constraint in min_env_constraints:
                 if abs(variable_filter.dot(constraint.T)[0, 0]) > 0:
                     # conveys information about variable designated to be filtered out, so block this demonstration
+                    skip_demo = True
+
+                # also prevent showing a trajectory that contains feature counts of a feature to be filtered out
+                if abs(variable_filter.dot(constraint.T)[0, 0]) > 0:
                     skip_demo = True
 
         if not skip_demo:
@@ -619,7 +623,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
 
     if summary_variant == 'counterfactual_only':
         # no variable scaffolding
-        nonzero_counter = np.array([[float('inf'), float('inf'), float('inf')]])
+        nonzero_counter = np.array([float('inf'), float('inf'), float('inf')])
     else:
         # for variable scaffolding
         nonzero_counter = (min_subset_constraints_record_array != 0).astype(float)
@@ -704,9 +708,8 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
 
         # no need to continue search for demonstrations if none of them will improve the human's understanding
         if no_info_flag:
-            # sample up two more set of human models to try and find a demonstration that will improve the human's
-            # understanding before concluding that there is no more information to be conveyed
-            if variable_filter is None:
+            # if no variables had been filtered out, then there are no more informative demonstrations to be found
+            if not np.any(variable_filter):
                 break
             else:
                 # no more informative demonstrations with this variable filter, so update it
@@ -728,6 +731,9 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
             pool.join()
             pool.terminate()
 
+            with open('models/' + data_loc + '/info_gains_joint' + str(summary_count) + '.pickle', 'wb') as f:
+                pickle.dump(info_gains_record, f)
+
             differing_constraint_count = 1          # number of constraints in the running human model that would differ after showing a particular demonstration
             max_differing_constraint_count = max(list(itertools.chain(*n_diff_constraints_record)))
             print("max_differing_constraint_count: {}".format(max_differing_constraint_count))
@@ -748,7 +754,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
                     # not considering demos where there is no info gain helps ensure that the final demonstration
                     # provides the maximum info gain (in conjuction with previously shown demonstrations)
                     obj_function[info_gains == 1] = 0
-                    obj_function[n_diff_constraints == differing_constraint_count] = 0
+                    obj_function[n_diff_constraints != differing_constraint_count] = 0
 
                     max_info_gain = np.max(info_gains)
                     if max_info_gain == 1:
@@ -852,9 +858,14 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
                             best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, [])
                         no_info_flag = False
 
+            with open('models/' + data_loc + '/best_env_idxs' + str(summary_count) + '.pickle', 'wb') as f:
+                pickle.dump((best_env_idx, best_traj_idx, best_env_idxs, best_traj_idxs), f)
+
             print("current max info: {}".format(max_info_gain))
+            # no need to continue search for demonstrations if none of them will improve the human's understanding
             if no_info_flag:
-                if variable_filter is None:
+                # if no variables had been filtered out, then there are no more informative demonstrations to be found
+                if not np.any(variable_filter):
                     break
                 else:
                     # no more informative demonstrations with this variable filter, so update it
@@ -879,10 +890,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
                 summary.append(unit)
 
                 unit = [[best_mdp, best_traj, (best_env_idx, best_traj_idx), min_env_constraints_record[best_env_idx][best_traj_idx], variable_filter, sample_human_models]]
-                if variable_filter is not None:
-                    running_variable_filter = variable_filter.copy()
-                else:
-                    running_variable_filter = None
+                running_variable_filter = variable_filter.copy()
                 summary_count += 1
             visited_env_traj_idxs.append((best_env_idx, best_traj_idx))
         else:
@@ -1686,7 +1694,7 @@ def obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_r
 
                 for traj_idx, min_env_constraints in enumerate(min_subset_constraints_record):
                     skip_demo = False
-                    if variable_filter is not None:
+                    if np.any(variable_filter):
                         for constraint in min_env_constraints:
                             if abs(variable_filter.dot(constraint.T)[0, 0]) > 0:
                                 # conveys information about variable designated to be filtered out, so block this demonstration

@@ -300,13 +300,13 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
 
         try:
             with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
-                policy_constraints, min_subset_constraints_record, env_record, traj_record, reward_record, consistent_state_count = pickle.load(f)
+                policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, consistent_state_count = pickle.load(f)
         except:
             # use policy BEC to extract constraints
-            policy_constraints, min_subset_constraints_record, env_record, traj_record, reward_record, consistent_state_count = BEC.extract_constraints(
+            policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, consistent_state_count = BEC.extract_constraints(
                 data_loc, step_cost_flag, pool, print_flag=True)
             with open('models/' + data_loc + '/base_constraints.pickle', 'wb') as f:
-                pickle.dump((policy_constraints, min_subset_constraints_record, env_record, traj_record, reward_record,
+                pickle.dump((policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record,
                              consistent_state_count), f)
 
         try:

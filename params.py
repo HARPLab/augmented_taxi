@@ -287,15 +287,15 @@ BEC = {
                                               # counterfactual_only: counterfactual (Y), feature scaffolding (N)
                                               # (Frontiers21) baseline: counterfactual (N), feature scaffolding (N)
 
-    'n_train_demos': 5,                       # number of desired training demonstrations
+    'n_train_demos': 8,                       # number of desired training demonstrations
 
     'n_test_demos': 30,                       # number of desired test demonstration
 
     'test_difficulty': 'high',                # expected ease for human to correctly predict the agent's actions in this test environment (low, medium, high)
 
-    'n_human_models': 8,                      # number of human beliefs to consider
+    'n_human_models': 12,                      # number of human beliefs to consider
 
-    'n_particles': 50,                      # number of particles in particle filter
+    'n_particles': 200,                      # number of particles in particle filter
 
     'obj_func_proportion': 1                  # proportion of the max objective function (i.e. info gain) to aim for
                                               # when selecting the next demonstration (range: 0 - 1). selecting a value

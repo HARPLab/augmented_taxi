@@ -8,6 +8,7 @@ from policy_summarization import policy_summarization_helpers
 import json
 from collections import defaultdict
 from simple_rl.utils import mdp_helpers
+import policy_summarization.multiprocessing_helpers as mp_helpers
 
 '''
 For managing data related to the user study 
@@ -188,6 +189,88 @@ def check_training_testing_overlap():
                 if policy_summarization_helpers._in_summary(test_tuple[1].mdp, summary, test_tuple[2][0][0]):
                     print('Overlap, Test difficulty: {}, Test #: {}'.format(test_difficulty, j))
 
+def extract_mdp_dict(test_wt_vi_traj_tuple, data_loc, element=-1, test_difficulty='none', optimal_traj=None):
+    '''
+    Extract the MDP information from the test environment tuple (e.g. to be later put into a json)
+    '''
+
+    vi = test_wt_vi_traj_tuple[1]
+    mdp = test_wt_vi_traj_tuple[1].mdp
+    if optimal_traj is None:
+        optimal_traj = test_wt_vi_traj_tuple[2]
+    test_mdp_dict = test_wt_vi_traj_tuple[3]
+
+    # update the MDP parameters to begin with the desired start state
+    if data_loc == 'augmented_taxi2':
+        test_mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
+        test_mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
+        test_mdp_dict['agent']['has_passenger'] = mdp.init_state.get_objects_of_class("agent")[
+            0].get_attribute('has_passenger')
+
+        test_mdp_dict['passengers'][0]['x'] = mdp.init_state.get_objects_of_class("passenger")[
+            0].get_attribute('x')
+        test_mdp_dict['passengers'][0]['y'] = mdp.init_state.get_objects_of_class("passenger")[
+            0].get_attribute('y')
+        test_mdp_dict['passengers'][0]['dest_x'] = mdp.init_state.get_objects_of_class("passenger")[
+            0].get_attribute('dest_x')
+        test_mdp_dict['passengers'][0]['dest_y'] = mdp.init_state.get_objects_of_class("passenger")[
+            0].get_attribute('dest_y')
+        test_mdp_dict['passengers'][0]['in_taxi'] = mdp.init_state.get_objects_of_class("passenger")[
+            0].get_attribute('in_taxi')
+
+        if (len(mdp.init_state.get_objects_of_class("hotswap_station")) > 0):
+            test_mdp_dict['hotswap_station'][0]['x'] = mdp.init_state.get_objects_of_class("hotswap_station")[
+                0].get_attribute('x')
+            test_mdp_dict['hotswap_station'][0]['y'] = mdp.init_state.get_objects_of_class("hotswap_station")[
+                0].get_attribute('y')
+        else:
+            test_mdp_dict['hotswap_station'] = []
+
+
+    elif data_loc == 'colored_tiles':
+        test_mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
+        test_mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
+    else:
+        test_mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
+        test_mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
+        test_mdp_dict['agent']['has_skateboard'] = mdp.init_state.get_objects_of_class("agent")[
+            0].get_attribute('has_skateboard')
+
+        test_mdp_dict['skateboard'][0]['x'] = mdp.init_state.get_objects_of_class("skateboard")[
+            0].get_attribute('x')
+        test_mdp_dict['skateboard'][0]['y'] = mdp.init_state.get_objects_of_class("skateboard")[
+            0].get_attribute('y')
+        test_mdp_dict['skateboard'][0]['on_agent'] = mdp.init_state.get_objects_of_class("skateboard")[
+            0].get_attribute('on_agent')
+
+    test_mdp_dict['opt_actions'] = [sas[1] for sas in optimal_traj]
+    test_mdp_dict['opt_traj_length'] = len(optimal_traj)
+    test_mdp_dict['opt_traj_reward'] = mdp.weights.dot(mdp.accumulate_reward_features(optimal_traj).T)[0][0]
+    test_mdp_dict['test_difficulty'] = test_difficulty
+    # to be able to trace the particular environment (0-5)
+    test_mdp_dict['tag'] = element
+
+    # also obtain all possible optimal trajectories
+    all_opt_trajs = mdp_helpers.rollout_policy_recursive(mdp, vi, optimal_traj[0][0], [])
+    # extract all of the actions
+    all_opt_actions = []
+    for opt_traj in all_opt_trajs:
+        all_opt_actions.append([sas[1] for sas in opt_traj])
+    test_mdp_dict['all_opt_actions'] = all_opt_actions
+
+    # delete unserializable numpy arrays that aren't necessary
+    try:
+        del test_mdp_dict['weights_lb']
+        del test_mdp_dict['weights_ub']
+        del test_mdp_dict['weights']
+    except:
+        pass
+
+    # print(test_mdp_dict)
+    # print(test_mdp_dict['env_code'])
+
+    return test_mdp_dict
+
 def create_testing_dictionaries(test_env_dict, mapping):
     '''
     Translate the selected testing pickle files into dictionaries so that they can be uploaded and used in the web user study
@@ -208,82 +291,7 @@ def create_testing_dictionaries(test_env_dict, mapping):
             for pair in pairs:
                 pair_mdp_dict = []
                 for element in pair:
-                    test_wt_vi_traj_tuple = test_wt_vi_traj_tuples[element]
-
-                    vi = test_wt_vi_traj_tuple[1]
-                    mdp = test_wt_vi_traj_tuple[1].mdp
-                    optimal_traj = test_wt_vi_traj_tuple[2]
-                    test_mdp_dict = test_wt_vi_traj_tuple[3]
-
-                    # update the MDP parameters to begin with the desired start state
-                    if data_loc == 'augmented_taxi2':
-                        test_mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
-                        test_mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
-                        test_mdp_dict['agent']['has_passenger'] = mdp.init_state.get_objects_of_class("agent")[
-                            0].get_attribute('has_passenger')
-
-                        test_mdp_dict['passengers'][0]['x'] = mdp.init_state.get_objects_of_class("passenger")[
-                            0].get_attribute('x')
-                        test_mdp_dict['passengers'][0]['y'] = mdp.init_state.get_objects_of_class("passenger")[
-                            0].get_attribute('y')
-                        test_mdp_dict['passengers'][0]['dest_x'] = mdp.init_state.get_objects_of_class("passenger")[
-                            0].get_attribute('dest_x')
-                        test_mdp_dict['passengers'][0]['dest_y'] = mdp.init_state.get_objects_of_class("passenger")[
-                            0].get_attribute('dest_y')
-                        test_mdp_dict['passengers'][0]['in_taxi'] = mdp.init_state.get_objects_of_class("passenger")[
-                            0].get_attribute('in_taxi')
-
-                        if (len(mdp.init_state.get_objects_of_class("hotswap_station")) > 0):
-                            test_mdp_dict['hotswap_station'][0]['x'] = mdp.init_state.get_objects_of_class("hotswap_station")[
-                                0].get_attribute('x')
-                            test_mdp_dict['hotswap_station'][0]['y'] = mdp.init_state.get_objects_of_class("hotswap_station")[
-                                0].get_attribute('y')
-                        else:
-                            test_mdp_dict['hotswap_station'] = []
-
-
-                    elif data_loc == 'colored_tiles':
-                        test_mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
-                        test_mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
-                    else:
-                        test_mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
-                        test_mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
-                        test_mdp_dict['agent']['has_skateboard'] = mdp.init_state.get_objects_of_class("agent")[
-                            0].get_attribute('has_skateboard')
-
-                        test_mdp_dict['skateboard'][0]['x'] = mdp.init_state.get_objects_of_class("skateboard")[
-                            0].get_attribute('x')
-                        test_mdp_dict['skateboard'][0]['y'] = mdp.init_state.get_objects_of_class("skateboard")[
-                            0].get_attribute('y')
-                        test_mdp_dict['skateboard'][0]['on_agent'] = mdp.init_state.get_objects_of_class("skateboard")[
-                            0].get_attribute('on_agent')
-
-                    test_mdp_dict['opt_actions'] = [sas[1] for sas in optimal_traj]
-                    test_mdp_dict['opt_traj_length'] = len(optimal_traj)
-                    test_mdp_dict['opt_traj_reward'] = mdp.weights.dot(mdp.accumulate_reward_features(optimal_traj).T)[0][0]
-                    test_mdp_dict['test_difficulty'] = test_difficulty
-                    # to be able to trace the particular environment (0-5)
-                    test_mdp_dict['tag'] = element
-
-                    # also obtain all possible optimal trajectories
-                    all_opt_trajs = mdp_helpers.rollout_policy_recursive(mdp, vi, optimal_traj[0][0], [])
-                    # extract all of the actions
-                    all_opt_actions = []
-                    for opt_traj in all_opt_trajs:
-                        all_opt_actions.append([sas[1] for sas in opt_traj])
-                    test_mdp_dict['all_opt_actions'] = all_opt_actions
-
-                    # delete unserializable numpy arrays that aren't necessary
-                    try:
-                        del test_mdp_dict['weights_lb']
-                        del test_mdp_dict['weights_ub']
-                        del test_mdp_dict['weights']
-                    except:
-                        pass
-
-                    # print(test_mdp_dict)
-                    # print(test_mdp_dict['env_code'])
-
+                    test_mdp_dict = extract_mdp_dict(test_wt_vi_traj_tuples[element], data_loc, element=element, test_difficulty=test_difficulty)
                     pair_mdp_dict.append(test_mdp_dict)
 
                 test_difficulty_dicts.append(pair_mdp_dict)
@@ -643,8 +651,347 @@ def process_human_scores(test_env_dict, type='binary'):
         else:
             df_testing.at[i, 'test_difficulty'] = 2
 
-    with open('dfs_processed.pickle', 'wb') as f:
-        pickle.dump((df_training, df_testing, df_testing_sandbox, df_training_survey, df_post_survey), f)
+    # with open('dfs_processed.pickle', 'wb') as f:
+    #     pickle.dump((df_training, df_testing, df_testing_sandbox, df_training_survey, df_post_survey), f)
+
+def obtain_human_trajectories(test_env_dict):
+    '''
+    Extract human trajectories for each test difficulty level from pandas dfs and store them in a dictionary
+    '''
+
+    with open('dfs.pickle', 'rb') as f:
+        df_training, df_testing, df_testing_sandbox, df_training_survey, df_post_survey = pickle.load(f)
+
+    trajectory_dict = {
+        'augmented_taxi2':
+            {
+                'low':
+                    {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                'medium': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+                'high': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+            },
+        'colored_tiles':
+            {
+                'low':
+                    {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                'medium': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+                'high': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+            },
+        'skateboard2':
+            {
+                'low':
+                    {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                'medium': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+                'high': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+            }
+    }
+
+    # remove ids that were flagged for IROS22 study
+    flagged_ids = ['5efb33ad6ad15505fd008366',
+                            '5fbfe145e52a44000a9c2966',
+                            '60f6f802c0ede08f7cf69720', '61423a70286bdb2a2d226fa7']
+
+    for id in flagged_ids:
+        df_testing = df_testing[df_testing.uniqueid != id]
+
+    for i in df_testing.index:
+        domain = df_testing.at[i, 'domain']
+        moves_list = df_testing.moves[i][1:-1].replace('\', ', '').split('\'')[1:-1]
+        test_difficulty = df_testing.test_mdp[i]['test_difficulty']
+        tag = df_testing.test_mdp[i]['tag']
+
+        mdp = test_env_dict[domain][test_difficulty][tag][1].mdp
+
+        mdp.reset()
+        trajectory = []
+        cur_state = mdp.get_init_state()
+
+        for idx in range(len(moves_list)):
+            reward, next_state = mdp.execute_agent_action(moves_list[idx])
+            trajectory.append((cur_state, moves_list[idx], next_state))
+
+            # deepcopy occurs within transition function
+            cur_state = next_state
+
+        human_reward = mdp.weights.dot(mdp.accumulate_reward_features(trajectory).T)
+
+        trajectory_dict[domain][test_difficulty][str(tag)].append((mdp, trajectory, df_testing.test_mdp[i]['opt_traj_reward'], human_reward))
+
+    with open('human_trajectories.pickle', 'wb') as f:
+        pickle.dump(trajectory_dict, f)
+
+def view_trajectories():
+    '''
+    View human trajectories (obtained through user studies) to get a general sense of human understanding and performance
+    '''
+
+    with open('human_trajectories.pickle', 'rb') as f:
+        trajectory_dict = pickle.load(f)
+
+    filtered_trajectory_dict = {
+        'augmented_taxi2':
+            {
+                'low':
+                    {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                'medium': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+                'high': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+            },
+        'colored_tiles':
+            {
+                'low':
+                    {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                'medium': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+                'high': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+            },
+        'skateboard2':
+            {
+                'low':
+                    {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                'medium': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+                'high': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+            }
+    }
+    filtered_count_dict = {
+        'augmented_taxi2':
+            {
+                'low':
+                    {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                'medium': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+                'high': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+            },
+        'colored_tiles':
+            {
+                'low':
+                    {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                'medium': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+                'high': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+            },
+        'skateboard2':
+            {
+                'low':
+                    {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                'medium': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+                'high': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+            }
+    }
+    filtered_mdp_dict = {
+        'augmented_taxi2':
+            {
+                'low':
+                    {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                'medium': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+                'high': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+            },
+        'colored_tiles':
+            {
+                'low':
+                    {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                'medium': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+                'high': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+            },
+        'skateboard2':
+            {
+                'low':
+                    {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                'medium': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+                'high': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+            }
+    }
+    filtered_opt_reward_dict = {
+        'augmented_taxi2':
+            {
+                'low':
+                    {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                'medium': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+                'high': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+            },
+        'colored_tiles':
+            {
+                'low':
+                    {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                'medium': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+                'high': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+            },
+        'skateboard2':
+            {
+                'low':
+                    {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                'medium': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+                'high': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+            }
+    }
+    filtered_human_reward_dict = {
+        'augmented_taxi2':
+            {
+                'low':
+                    {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                'medium': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+                'high': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+            },
+        'colored_tiles':
+            {
+                'low':
+                    {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                'medium': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+                'high': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+            },
+        'skateboard2':
+            {
+                'low':
+                    {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                'medium': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+                'high': {
+                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                },
+            }
+    }
+
+    # account for duplicate test responses
+    for domain in trajectory_dict.keys():
+        # print(domain)
+        for difficulty in trajectory_dict[domain].keys():
+            # print(difficulty)
+            for tag in trajectory_dict[domain][difficulty].keys():
+                # print(tag)
+                for traj in trajectory_dict[domain][difficulty][tag]:
+                    # print(traj[3] / traj[2]) # human reward / optimal reward
+                    if traj[1] not in filtered_trajectory_dict[domain][difficulty][tag]:
+                        filtered_trajectory_dict[domain][difficulty][tag].append(traj[1])
+                        filtered_mdp_dict[domain][difficulty][tag].append(traj[0])
+                        filtered_count_dict[domain][difficulty][tag].append(1)
+                        filtered_opt_reward_dict[domain][difficulty][tag].append(traj[2])
+                        filtered_human_reward_dict[domain][difficulty][tag].append(traj[3])
+                        # traj[0].visualize_trajectory(traj[1])
+                    else:
+                        for j, stored_traj in enumerate(filtered_trajectory_dict[domain][difficulty][tag]):
+                            if traj[1] == stored_traj:
+                                filtered_count_dict[domain][difficulty][tag][j] += 1
+                                break
+
+    # go through potentially duplicate trajectories and visualize them
+    for domain in filtered_trajectory_dict.keys():
+        print('domain: {}'.format(domain))
+        for difficulty in filtered_trajectory_dict[domain].keys():
+            print('difficulty: {}'.format(difficulty))
+            for tag in filtered_trajectory_dict[domain][difficulty].keys():
+                print('tag: {}'.format(tag))
+                print('total number of trajectories: {}'.format(sum(filtered_count_dict[domain][difficulty][tag])))
+                total_num_unique_traj = len(filtered_trajectory_dict[domain][difficulty][tag])
+                for i, traj in enumerate(filtered_trajectory_dict[domain][difficulty][tag]):
+                    print('trajectory {}/{}'.format(i + 1, total_num_unique_traj))
+                    print('duplicate # of this trajectory: {}'.format(filtered_count_dict[domain][difficulty][tag][i]))
+                    # print('opt reward vs human reward: {} vs {}'.format(filtered_opt_reward_dict[domain][difficulty][tag][i], filtered_human_reward_dict[domain][difficulty][tag][i]))
+                    print('optimal?: {}'.format(
+                        filtered_opt_reward_dict[domain][difficulty][tag][i] ==
+                        filtered_human_reward_dict[domain][difficulty][tag][i][0][0]))
+                    filtered_mdp_dict[domain][difficulty][tag][i].visualize_trajectory(filtered_trajectory_dict[domain][difficulty][tag][i])
+
 if __name__ == "__main__":
     data_loc = params.data_loc['BEC']
 
@@ -699,4 +1046,40 @@ if __name__ == "__main__":
     # create_testing_dictionaries(test_env_dict, mapping)
     # print_training_summary_lengths()
     # process_human_scores(test_env_dict, type='binary')  # binary, raw, scaled, or scale-truncated
-    obtain_outlier_human_scores(test_env_dict)
+    # obtain_outlier_human_scores(test_env_dict)
+
+    # going through IROS human participant trajectories
+    # obtain_human_trajectories(test_env_dict)
+    view_trajectories()
+
+
+    # # todo: getting initial training demonstrations and diagnostic test in augmented taxi domain for rithika
+    # training_demos = {'augmented_taxi2': [(8,0), (10, 15)], 'colored_tiles': [(160, 10), (416, 10)], 'skateboard2': [(1, 376), (1, 383)]}
+    # diagnostic_tests = {(25, 190)}
+    #
+    # train_env_dict = {
+    #     'augmented_taxi2': {},
+    #     'colored_tiles': {},
+    #     'skateboard2': {}
+    # }
+    #
+    # for data_loc in training_demos.keys():
+    #     with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
+    #         policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, consistent_state_count = pickle.load(
+    #             f)
+    #
+    #     env_traj_pairs = training_demos[data_loc]
+    #     for j, env_traj_pair in enumerate(env_traj_pairs):
+    #         env_idx = env_traj_pair[0]
+    #         traj_idx = env_traj_pair[1]
+    #         filename = mp_helpers.lookup_env_filename(data_loc, env_idx)
+    #         with open(filename, 'rb') as f:
+    #             wt_vi_traj_env = pickle.load(f)
+    #
+    #         optimal_traj = traj_record[env_idx][traj_idx]
+    #         wt_vi_traj_env[0][1].mdp.set_init_state(optimal_traj[0][0])
+    #         train_env_dict[data_loc][j] = extract_mdp_dict(wt_vi_traj_env[0], data_loc, optimal_traj=optimal_traj)
+    #
+    # # save the training mdp information as a json
+    # with open('train_env_dict.json', 'w') as f:
+    #     json.dump(train_env_dict, f)

@@ -213,11 +213,11 @@ class ColoredTilesOOMDP(OOMDP):
 
         visualize_state(self, _draw_state, cur_state=cur_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
 
-    def visualize_trajectory(self, trajectory, marked_state_importances=None, width_scr_scale=180, height_scr_scale=180):
+    def visualize_trajectory(self, trajectory, marked_state_importances=None, width_scr_scale=180, height_scr_scale=180, counterfactual_traj=None):
         from simple_rl.utils.mdp_visualizer import visualize_trajectory
         from .colored_tiles_visualizer import _draw_state
 
-        visualize_trajectory(self, trajectory, _draw_state, marked_state_importances=marked_state_importances, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='colored_tiles')
+        visualize_trajectory(self, trajectory, _draw_state, marked_state_importances=marked_state_importances, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='colored_tiles', counterfactual_traj=None)
 
     # ----------------------------
     # -- Action Implementations --
@@ -247,7 +247,7 @@ class ColoredTilesOOMDP(OOMDP):
 
         return next_state
 
-    def measure_env_complexity(self):
+    def measure_env_complexity(self, state=None):
         return len(self.A_tiles) + len(self.B_tiles)
 
     def measure_visual_dissimilarity(self, start_state, other_mdp, other_start_state):

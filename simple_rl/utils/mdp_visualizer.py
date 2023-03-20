@@ -402,7 +402,7 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
                 pygame.display.quit()
                 return
 
-def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=None, cur_state=None, scr_width=720, scr_height=720, mdp_class=None, counterfactual_traj=None):
+def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=None, cur_state=None, scr_width=720, scr_height=720, mdp_class=None, counterfactual_traj=None, delay=0.1):
     '''
     Args:
         mdp (MDP)
@@ -463,6 +463,8 @@ def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=N
 
         pygame.display.flip()
 
+        time.sleep(delay)
+
     if cur_state.is_terminal():
         goal_text_rendered, goal_text_point = _draw_terminal_text(mdp_class, cur_state, scr_width, scr_height, title_font)
         screen.blit(goal_text_rendered, goal_text_point)
@@ -478,8 +480,10 @@ def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=N
                 pygame.display.quit()
                 return
 
+        time.sleep(delay)
 
-def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, draw_state, marked_state_importances=None, cur_state=None, scr_width=720, scr_height=720, mdp_class=None):
+
+def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, draw_state, marked_state_importances=None, cur_state=None, scr_width=720, scr_height=720, mdp_class=None, delay=0.1):
     '''
     Args:
         mdp (MDP)
@@ -539,6 +543,8 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
 
         pygame.display.flip()
 
+        time.sleep(delay)
+
     if cur_state.is_terminal():
         goal_text_rendered, goal_text_point = _draw_terminal_text(mdp_class, cur_state, scr_width, scr_height, title_font)
         screen.blit(goal_text_rendered, goal_text_point)
@@ -554,7 +560,7 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
                 pygame.display.quit()
                 return
 
-
+        time.sleep(delay)
 def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_height=720, mdp_class=None):
     '''
     Args:

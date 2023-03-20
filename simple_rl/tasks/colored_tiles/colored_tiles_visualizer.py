@@ -24,7 +24,9 @@ def _draw_state(screen,
                 agent=None,
                 draw_statics=True,
                 agent_shape=None,
-                agent_history=[]):
+                agent_history=[],
+                counterfactual_traj=None,
+                offset_direction=0):
     '''
     Args:
         screen (pygame.Surface)
@@ -71,6 +73,16 @@ def _draw_state(screen,
     font_size = int(min(cell_width, cell_height) / 4.0)
     reg_font = pygame.font.SysFont("CMU Serif", font_size)
     cc_font = pygame.font.SysFont("Courier", font_size * 2 + 2)
+
+    # for visualizing two agents/paths at once
+    offset_magnitude = cell_width / 8.0
+    if offset_direction != 0:
+        offset_counterfactual = offset_magnitude * offset_direction
+    else:
+        offset_counterfactual = 0
+
+    # for clearing dynamic shapes (e.g. agent)
+    dynamic_shapes_list = []
 
     if agent_shape is not None:
         # Clear the old shape.
@@ -139,7 +151,7 @@ def _draw_state(screen,
     # Draw new agent.
     top_left_point = width_buffer + cell_width * (agent_x - 1), height_buffer + cell_height * (
                 colored_tiles_oomdp.height - agent_y)
-    agent_center = int(top_left_point[0] + cell_width / 2.0), int(top_left_point[1] + cell_height / 2.0)
+    agent_center = int(top_left_point[0] + cell_width / 2.0 + offset_counterfactual), int(top_left_point[1] + cell_height / 2.0)
     agent_shape = _draw_agent(agent_center, screen, base_size=min(cell_width, cell_height) / 2.5 - 4)
 
 
@@ -175,7 +187,9 @@ def _draw_state(screen,
 
     pygame.display.flip()
 
-    return agent_shape, agent_history
+    dynamic_shapes_list.append(agent_shape)
+
+    return dynamic_shapes_list, agent_history
 
 def _draw_agent(center_point, screen, base_size=30):
     '''
