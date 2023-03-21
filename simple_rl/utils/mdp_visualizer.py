@@ -2,6 +2,7 @@
 from __future__ import print_function
 import sys
 import time
+import difflib
 try:
     import pygame
     from pygame.locals import *
@@ -493,6 +494,11 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
     Summary:
         Visualizes the sequence of states and actions stored in the trajectory.
     '''
+    #counterfactual is user input 
+
+    wait = True 
+    proportional = False
+
     screen = pygame.display.set_mode((scr_width, scr_height))
     cur_state = trajectory[0][0]
     cur_state_counterfactual = trajectory_counterfactual[0][0]
@@ -502,40 +508,72 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
     dynamic_shapes_counterfactual, agent_history_counterfactual = draw_state(screen, mdp, cur_state_counterfactual, draw_statics=False, agent_history=[], offset_direction=-1, alpha=150)
 
     pygame.event.clear()
-    step = 0
+    step_traj = 0
+    step_counter = 0
 
-    while True and (step < len(trajectory) or step < len(trajectory_counterfactual)):
+    len_traj = len(trajectory)
+    len_counter = len(trajectory_counterfactual)
 
-        # Check for key presses.
-        for event in pygame.event.get():
-            if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
-                # Quit.
-                pygame.display.quit()
-                return
-            if event.type == KEYDOWN and event.key == K_SPACE:
-                # clear the old dynamic shapes
-                for shape in dynamic_shapes:
-                    pygame.draw.rect(screen, (255, 255, 255), shape)
-                for shape in dynamic_shapes_counterfactual:
-                    pygame.draw.rect(screen, (255, 255, 255), shape)
+    anchor_points = []
+    matcher = difflib.SequenceMatcher(None,trajectory, trajectory_counterfactual, autojunk=False)
+    matches = matcher.get_matching_blocks()
+    for match in matches:
+        #add states in overlap 
+        stp = match[0]
+        anchor_points.append(trajectory[match[0] - 1][2])
+        
 
-                if step < len(trajectory):
-                    cur_state = trajectory[step][2]
-                else:
-                    cur_state = trajectory[-1][2]
+    while True and (step_traj < len(trajectory) or step_counter < len(trajectory_counterfactual)):
+        if wait:  
+            # Check for key presses.
+            for event in pygame.event.get():
+                if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
+                    # Quit.
+                    pygame.display.quit()
+                    return
+                if event.type == KEYDOWN and event.key == K_SPACE:
+                    # clear the old dynamic shapes
+                    for shape in dynamic_shapes:
+                        pygame.draw.rect(screen, (255, 255, 255), shape)
+                    for shape in dynamic_shapes_counterfactual:
+                        pygame.draw.rect(screen, (255, 255, 255), shape)
 
-                dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state,
-                                                           agent_history=agent_history, offset_direction=1, visualize_history=False)
+                    if (step_traj != 0 and step_counter != 0):
+                        prev_traj = cur_state_traj
+                        prev_counter = cur_state_counter
 
-                if step < len(trajectory_counterfactual):
-                    cur_state = trajectory_counterfactual[step][2]
-                else:
-                    cur_state = trajectory_counterfactual[-1][2]
+                    if step_traj < len(trajectory):
+                        cur_state_traj = trajectory[step_traj][2]
+                        if ((cur_state_traj in anchor_points) and prev_counter not in anchor_points):
+                            step_traj -= 1
+                            if (cur_state_counter in anchor_points):
+                                step_traj += 1
+                    else:
+                        cur_state_traj = trajectory[-1][2]
 
-                dynamic_shapes_counterfactual, agent_history_counterfactual = draw_state(screen, mdp, cur_state,agent_history=agent_history_counterfactual,
-                                                                                    draw_statics=False, offset_direction=-1, alpha=150, visualize_history=False)
+                    if step_counter < len(trajectory_counterfactual):
+                        cur_state_counter = trajectory_counterfactual[step_counter][2]
+                        if ((cur_state_counter in anchor_points) and prev_traj not in anchor_points):
+                            step_counter -= 1
+                            if (cur_state_traj in anchor_points):
+                                step_counter += 1
+                    else:
+                        cur_state_counter = trajectory_counterfactual[-1][2]
 
-                step += 1
+                    dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state_traj,
+                                                            agent_history=agent_history, offset_direction=1, visualize_history=False)
+
+                    dynamic_shapes_counterfactual, agent_history_counterfactual = draw_state(screen, mdp, cur_state_counter,agent_history=agent_history_counterfactual,
+                                                                                        draw_statics=False, offset_direction=-1, alpha=150, visualize_history=False)
+
+                    step_traj += 1
+                    step_counter += 1
+
+        elif proportional:
+            return
+        
+        else:
+            return
 
         pygame.display.flip()
 
