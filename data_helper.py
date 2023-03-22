@@ -720,6 +720,7 @@ def obtain_human_trajectories(test_env_dict):
 
         mdp = test_env_dict[domain][test_difficulty][tag][1].mdp
 
+        # get human trajectory
         mdp.reset()
         trajectory = []
         cur_state = mdp.get_init_state()
@@ -731,266 +732,328 @@ def obtain_human_trajectories(test_env_dict):
             # deepcopy occurs within transition function
             cur_state = next_state
 
+        # get optimal trajectory
+        mdp.reset()
+        opt_trajectory = []
+        opt_moves_list = df_testing.test_mdp[i]['opt_actions']
+        for idx in range(len(opt_moves_list)):
+            reward, next_state = mdp.execute_agent_action(opt_moves_list[idx])
+            opt_trajectory.append((cur_state, opt_moves_list[idx], next_state))
+
+            # deepcopy occurs within transition function
+            cur_state = next_state
+
         human_reward = mdp.weights.dot(mdp.accumulate_reward_features(trajectory).T)
 
-        trajectory_dict[domain][test_difficulty][str(tag)].append((mdp, trajectory, df_testing.test_mdp[i]['opt_traj_reward'], human_reward))
+        trajectory_dict[domain][test_difficulty][str(tag)].append((mdp, trajectory, df_testing.test_mdp[i]['opt_traj_reward'], human_reward, opt_trajectory))
 
     with open('human_trajectories.pickle', 'wb') as f:
         pickle.dump(trajectory_dict, f)
 
-def view_trajectories():
+def view_trajectories(visualize=False):
     '''
     View human trajectories (obtained through user studies) to get a general sense of human understanding and performance
     '''
 
-    with open('human_trajectories.pickle', 'rb') as f:
-        trajectory_dict = pickle.load(f)
+    try:
+        with open('filtered_human_responses.pickle', 'rb') as f:
+            filtered_human_traj_dict, filtered_mdp_dict, filtered_count_dict, filtered_opt_reward_dict, filtered_human_reward_dict, filtered_opt_traj_dict = pickle.load(
+                f)
+    except:
+        with open('human_trajectories.pickle', 'rb') as f:
+            trajectory_dict = pickle.load(f)
 
-    filtered_trajectory_dict = {
-        'augmented_taxi2':
-            {
-                'low':
-                    {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                    },
-                'medium': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-                'high': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-            },
-        'colored_tiles':
-            {
-                'low':
-                    {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                    },
-                'medium': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-                'high': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-            },
-        'skateboard2':
-            {
-                'low':
-                    {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                    },
-                'medium': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-                'high': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-            }
-    }
-    filtered_count_dict = {
-        'augmented_taxi2':
-            {
-                'low':
-                    {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                    },
-                'medium': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-                'high': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-            },
-        'colored_tiles':
-            {
-                'low':
-                    {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                    },
-                'medium': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-                'high': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-            },
-        'skateboard2':
-            {
-                'low':
-                    {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                    },
-                'medium': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-                'high': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-            }
-    }
-    filtered_mdp_dict = {
-        'augmented_taxi2':
-            {
-                'low':
-                    {
+        filtered_human_traj_dict = {
+            'augmented_taxi2':
+                {
+                    'low':
+                        {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                        },
+                    'medium': {
                         '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
                     },
-                'medium': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-                'high': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-            },
-        'colored_tiles':
-            {
-                'low':
-                    {
+                    'high': {
                         '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
                     },
-                'medium': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
                 },
-                'high': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-            },
-        'skateboard2':
-            {
-                'low':
-                    {
+            'colored_tiles':
+                {
+                    'low':
+                        {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                        },
+                    'medium': {
                         '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
                     },
-                'medium': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-                'high': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-            }
-    }
-    filtered_opt_reward_dict = {
-        'augmented_taxi2':
-            {
-                'low':
-                    {
+                    'high': {
                         '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
                     },
-                'medium': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
                 },
-                'high': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-            },
-        'colored_tiles':
-            {
-                'low':
-                    {
+            'skateboard2':
+                {
+                    'low':
+                        {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                        },
+                    'medium': {
                         '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
                     },
-                'medium': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-                'high': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-            },
-        'skateboard2':
-            {
-                'low':
-                    {
+                    'high': {
                         '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
                     },
-                'medium': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-                'high': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-            }
-    }
-    filtered_human_reward_dict = {
-        'augmented_taxi2':
-            {
-                'low':
-                    {
+                }
+        }
+        filtered_count_dict = {
+            'augmented_taxi2':
+                {
+                    'low':
+                        {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                        },
+                    'medium': {
                         '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
                     },
-                'medium': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-                'high': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-            },
-        'colored_tiles':
-            {
-                'low':
-                    {
+                    'high': {
                         '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
                     },
-                'medium': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
                 },
-                'high': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
-                },
-            },
-        'skateboard2':
-            {
-                'low':
-                    {
+            'colored_tiles':
+                {
+                    'low':
+                        {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                        },
+                    'medium': {
                         '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
                     },
-                'medium': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    'high': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
                 },
-                'high': {
-                    '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+            'skateboard2':
+                {
+                    'low':
+                        {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                        },
+                    'medium': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                    'high': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                }
+        }
+        filtered_mdp_dict = {
+            'augmented_taxi2':
+                {
+                    'low':
+                        {
+                            '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                        },
+                    'medium': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                    'high': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
                 },
-            }
-    }
+            'colored_tiles':
+                {
+                    'low':
+                        {
+                            '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                        },
+                    'medium': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                    'high': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                },
+            'skateboard2':
+                {
+                    'low':
+                        {
+                            '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                        },
+                    'medium': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                    'high': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                }
+        }
+        filtered_opt_reward_dict = {
+            'augmented_taxi2':
+                {
+                    'low':
+                        {
+                            '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                        },
+                    'medium': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                    'high': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                },
+            'colored_tiles':
+                {
+                    'low':
+                        {
+                            '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                        },
+                    'medium': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                    'high': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                },
+            'skateboard2':
+                {
+                    'low':
+                        {
+                            '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                        },
+                    'medium': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                    'high': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                }
+        }
+        filtered_human_reward_dict = {
+            'augmented_taxi2':
+                {
+                    'low':
+                        {
+                            '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                        },
+                    'medium': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                    'high': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                },
+            'colored_tiles':
+                {
+                    'low':
+                        {
+                            '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                        },
+                    'medium': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                    'high': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                },
+            'skateboard2':
+                {
+                    'low':
+                        {
+                            '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                        },
+                    'medium': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                    'high': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                }
+        }
+        filtered_opt_traj_dict = {
+            'augmented_taxi2':
+                {
+                    'low':
+                        {
+                            '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                        },
+                    'medium': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                    'high': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                },
+            'colored_tiles':
+                {
+                    'low':
+                        {
+                            '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                        },
+                    'medium': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                    'high': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                },
+            'skateboard2':
+                {
+                    'low':
+                        {
+                            '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                        },
+                    'medium': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                    'high': {
+                        '0': [], '1': [], '2': [], '3': [], '4': [], '5': [],
+                    },
+                }
+        }
 
-    # account for duplicate test responses
-    for domain in trajectory_dict.keys():
-        # print(domain)
-        for difficulty in trajectory_dict[domain].keys():
-            # print(difficulty)
-            for tag in trajectory_dict[domain][difficulty].keys():
-                # print(tag)
-                for traj in trajectory_dict[domain][difficulty][tag]:
-                    # print(traj[3] / traj[2]) # human reward / optimal reward
-                    if traj[1] not in filtered_trajectory_dict[domain][difficulty][tag]:
-                        filtered_trajectory_dict[domain][difficulty][tag].append(traj[1])
-                        filtered_mdp_dict[domain][difficulty][tag].append(traj[0])
-                        filtered_count_dict[domain][difficulty][tag].append(1)
-                        filtered_opt_reward_dict[domain][difficulty][tag].append(traj[2])
-                        filtered_human_reward_dict[domain][difficulty][tag].append(traj[3])
-                        # traj[0].visualize_trajectory(traj[1])
-                    else:
-                        for j, stored_traj in enumerate(filtered_trajectory_dict[domain][difficulty][tag]):
-                            if traj[1] == stored_traj:
-                                filtered_count_dict[domain][difficulty][tag][j] += 1
-                                break
+        # account for duplicate test responses
+        for domain in trajectory_dict.keys():
+            # print(domain)
+            for difficulty in trajectory_dict[domain].keys():
+                # print(difficulty)
+                for tag in trajectory_dict[domain][difficulty].keys():
+                    # print(tag)
+                    for traj in trajectory_dict[domain][difficulty][tag]:
+                        # print(traj[3] / traj[2]) # human reward / optimal reward
+                        if traj[1] not in filtered_human_traj_dict[domain][difficulty][tag]:
+                            filtered_human_traj_dict[domain][difficulty][tag].append(traj[1])
+                            filtered_mdp_dict[domain][difficulty][tag].append(traj[0])
+                            filtered_count_dict[domain][difficulty][tag].append(1)
+                            filtered_opt_reward_dict[domain][difficulty][tag].append(traj[2])
+                            filtered_human_reward_dict[domain][difficulty][tag].append(traj[3])
+                            filtered_opt_traj_dict[domain][difficulty][tag].append(traj[4])
+                            # traj[0].visualize_trajectory(traj[1])
+                        else:
+                            for j, stored_traj in enumerate(filtered_human_traj_dict[domain][difficulty][tag]):
+                                if traj[1] == stored_traj:
+                                    filtered_count_dict[domain][difficulty][tag][j] += 1
+                                    break
 
-    # go through potentially duplicate trajectories and visualize them
-    for domain in filtered_trajectory_dict.keys():
-        print('domain: {}'.format(domain))
-        for difficulty in filtered_trajectory_dict[domain].keys():
-            print('difficulty: {}'.format(difficulty))
-            for tag in filtered_trajectory_dict[domain][difficulty].keys():
-                print('tag: {}'.format(tag))
-                print('total number of trajectories: {}'.format(sum(filtered_count_dict[domain][difficulty][tag])))
-                total_num_unique_traj = len(filtered_trajectory_dict[domain][difficulty][tag])
-                for i, traj in enumerate(filtered_trajectory_dict[domain][difficulty][tag]):
-                    print('trajectory {}/{}'.format(i + 1, total_num_unique_traj))
-                    print('duplicate # of this trajectory: {}'.format(filtered_count_dict[domain][difficulty][tag][i]))
-                    # print('opt reward vs human reward: {} vs {}'.format(filtered_opt_reward_dict[domain][difficulty][tag][i], filtered_human_reward_dict[domain][difficulty][tag][i]))
-                    print('optimal?: {}'.format(
-                        filtered_opt_reward_dict[domain][difficulty][tag][i] ==
-                        filtered_human_reward_dict[domain][difficulty][tag][i][0][0]))
-                    filtered_mdp_dict[domain][difficulty][tag][i].visualize_trajectory(filtered_trajectory_dict[domain][difficulty][tag][i])
+    if visualize:
+        # go through potentially duplicate trajectories and visualize them
+        for domain in filtered_human_traj_dict.keys():
+            print('domain: {}'.format(domain))
+            for difficulty in filtered_human_traj_dict[domain].keys():
+                print('difficulty: {}'.format(difficulty))
+                for tag in filtered_human_traj_dict[domain][difficulty].keys():
+                    print('tag: {}'.format(tag))
+                    print('total number of trajectories: {}'.format(sum(filtered_count_dict[domain][difficulty][tag])))
+                    total_num_unique_traj = len(filtered_human_traj_dict[domain][difficulty][tag])
+                    for i, traj in enumerate(filtered_human_traj_dict[domain][difficulty][tag]):
+                        print('trajectory {}/{}'.format(i + 1, total_num_unique_traj))
+                        print('duplicate # of this trajectory: {}'.format(filtered_count_dict[domain][difficulty][tag][i]))
+                        # print('opt reward vs human reward: {} vs {}'.format(filtered_opt_reward_dict[domain][difficulty][tag][i], filtered_human_reward_dict[domain][difficulty][tag][i]))
+                        print('optimal?: {}'.format(
+                            filtered_opt_reward_dict[domain][difficulty][tag][i] ==
+                            filtered_human_reward_dict[domain][difficulty][tag][i][0][0]))
+                        filtered_mdp_dict[domain][difficulty][tag][i].visualize_trajectory(filtered_human_traj_dict[domain][difficulty][tag][i])
+
+    with open('filtered_human_responses.pickle', 'wb') as f:
+        pickle.dump((filtered_human_traj_dict, filtered_mdp_dict, filtered_count_dict, filtered_opt_reward_dict, filtered_human_reward_dict, filtered_opt_traj_dict), f)
 
 if __name__ == "__main__":
     data_loc = params.data_loc['BEC']
@@ -1049,8 +1112,8 @@ if __name__ == "__main__":
     # obtain_outlier_human_scores(test_env_dict)
 
     # going through IROS human participant trajectories
-    # obtain_human_trajectories(test_env_dict)
-    view_trajectories()
+    obtain_human_trajectories(test_env_dict)
+    view_trajectories(visualize=True)
 
 
     # # todo: getting initial training demonstrations and diagnostic test in augmented taxi domain for rithika
