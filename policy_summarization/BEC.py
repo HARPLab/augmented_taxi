@@ -1919,15 +1919,16 @@ def visualize_summary(BEC_summaries_collection, weights, step_cost_flag):
     '''
     Summary: visualize the BEC demonstrations
     '''
-    # extract out the demonstrations from the series of units (each unit can contain multiple demonstrations)
-    BEC_summaries_collection = list(itertools.chain(*BEC_summaries_collection))
+    for unit_idx, unit in enumerate(BEC_summaries_collection):
+        # unit_constraints = []
 
-    for summary_idx, BEC_summary in enumerate(BEC_summaries_collection):
-        print("Showing demo {} out of {}".format(summary_idx + 1, len(BEC_summaries_collection)))
+        # show each demonstration that is part of this unit
+        for subunit in unit:
+            subunit[0].visualize_trajectory(subunit[1])
+            # unit_constraints.extend(subunit[3])
 
-        # visualize demonstration
-        BEC_summary[0].visualize_trajectory(BEC_summary[1])
-
+        # min_constraints = BEC_helpers.remove_redundant_constraints(unit_constraints, weights, step_cost_flag)
+        # print(min_constraints)
 
 def visualize_test_envs(posterior, test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, selected_env_traj_tracers, weights, step_cost_flag):
     for j, test_wt_vi_traj_tuple in enumerate(test_wt_vi_traj_tuples):
