@@ -57,6 +57,9 @@ class AugmentedTaxi2OOMDP(OOMDP):
         self.fuel_stations = fuel_station_objs
         self.slip_prob = slip_prob
 
+        # does this MDP have the capability of conveying the following reward features?
+        self.reward_features = np.array([[len(self.tolls) > 0, len(hotswap_station_objs) > 0, True]])
+
         init_state = self._create_state(agent_obj, pass_objs, hotswap_station_objs)
 
         if init_state.track_fuel():

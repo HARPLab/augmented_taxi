@@ -36,6 +36,7 @@ def extract_constraints_policy(args):
     traj_record = []
     traj_features_record = []             # reward feature counts of each trajectory
     reward_record = []                    # the rewards associated with the optimal trajectories
+    mdp_reward_features = mdp.reward_features        # logs which reward features each mdp contains
 
     for state in mdp.states:
         constraints = []
@@ -72,7 +73,7 @@ def extract_constraints_policy(args):
             BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag))
         traj_record.append(traj_opt)
 
-    return env_idx, traj_record, traj_features_record, policy_constraints, min_subset_constraints_record, reward_record
+    return env_idx, traj_record, traj_features_record, policy_constraints, min_subset_constraints_record, reward_record, mdp_reward_features
 
 def extract_constraints_demonstration(args):
     env_idx, vi, traj_opt, step_cost_flag = args
@@ -87,6 +88,8 @@ def extract_constraints_demonstration(args):
     mdp = vi.mdp
     agent = FixedPolicyAgent(vi.policy)
     weights = mdp.weights
+
+    mdp_reward_features = mdp.reward_features  # logs which reward features each mdp contains
 
     constraints = []
     # BEC constraints are obtained by ensuring that the optimal actions accumulate at least as much reward as
@@ -120,7 +123,7 @@ def extract_constraints_demonstration(args):
     # demos) that the policy can generate in these environments
     policy_constraints.append(min_subset_constraints)
 
-    return env_idx, traj_record, traj_features_record, policy_constraints, min_subset_constraints_record, reward_record
+    return env_idx, traj_record, traj_features_record, policy_constraints, min_subset_constraints_record, reward_record, mdp_reward_features
 
 
 def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=None, print_flag=False):
@@ -139,6 +142,7 @@ def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=None, p
     traj_record = []
     traj_features_record = []  # reward feature counts of each trajectory
     reward_record = []
+    mdp_features_record = []
 
     n_envs = len(os.listdir('models/' + data_loc + '/gt_policies/'))
 
@@ -172,6 +176,7 @@ def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=None, p
             policy_constraints.extend(result[3])
             min_subset_constraints_record.append(result[4])
             reward_record.append(result[5])
+            mdp_features_record.append(result[6])
     else:
         # b) demonstration-driven BEC: generate constraints by considering the expected feature counts after taking one
         # suboptimal action in every state along a trajectory (demonstration), then acting optimally afterward.
@@ -191,11 +196,12 @@ def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=None, p
             policy_constraints.extend(result[3])
             min_subset_constraints_record.append(result[4])
             reward_record.append(result[5])
+            mdp_features_record.append(result[6])
 
         # this isn't really relevant for demonstration BEC
         consistent_state_count = False
 
-    return policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, consistent_state_count
+    return policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count
 
 def extract_BEC_constraints(policy_constraints, min_subset_constraints_record, env_record, weights, step_cost_flag, pool):
     '''
@@ -291,7 +297,7 @@ def obtain_potential_summary_demos(BEC_lengths_record, n_demos, n_clusters, type
     return covering_demos_idxs
 
 def compute_counterfactuals(args):
-    data_loc, model_idx, env_idx, w_human_normalized, env_filename, trajs_opt, particles, min_BEC_constraints_running, step_cost_flag, summary_len, variable_filter, consider_human_models_jointly = args
+    data_loc, model_idx, env_idx, w_human_normalized, env_filename, trajs_opt, particles, min_BEC_constraints_running, step_cost_flag, summary_len, variable_filter, mdp_features, consider_human_models_jointly = args
 
     with open(env_filename, 'rb') as f:
         wt_vi_traj_env = pickle.load(f)
@@ -357,26 +363,15 @@ def compute_counterfactuals(args):
             if len(constraints) > 0:
                 constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
 
-            # don't consider environments that convey information about a variable you don't currently wish to convey
-            skip_demo = False
-            if np.any(variable_filter):
-                for constraint in constraints:
-                    if abs(variable_filter.dot(constraint.T)[0, 0]) > 0:
-                        # conveys information about variable designated to be filtered out, so block this demonstration
-                        skip_demo = True
-
-                # also prevent showing a trajectory that contains feature counts of a feature to be filtered out
-                if abs(variable_filter.dot(traj_opt_feature_count.T)[0, 0]) > 0:
-                    skip_demo = True
-
-            if not skip_demo:
+            # don't consider environments that convey information about a feature you don't currently wish to convey
+            if variable_filter.dot(mdp_features.T) > 0:
+                info_gain = 0
+            else:
                 if particles is not None:
                     info_gain = particles.calc_info_gain(constraints)
                 else:
                     info_gain = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, constraints,
                                                                        weights, step_cost_flag)
-            else:
-                info_gain = 0
 
             human_rewards_env.append(best_human_reward)
             best_human_trajs_record_env.append(best_human_trajs_record)
@@ -414,7 +409,7 @@ def combine_limiting_constraints_IG(args):
     Summary: combine the most limiting constraints across all potential human models for each potential demonstration
     '''
     env_idx, n_sample_human_models, data_loc, curr_summary_len, weights, step_cost_flag, variable_filter,\
-    trajs_opt, min_BEC_constraints_running, particles = args
+    mdp_features, trajs_opt, min_BEC_constraints_running, particles = args
 
     info_gains_record = []
     min_env_constraints_record = []
@@ -442,22 +437,15 @@ def combine_limiting_constraints_IG(args):
         min_env_constraints_record.append(min_env_constraints)
 
         # don't consider environments that convey information about a variable you don't currently wish to convey
-        skip_demo = False
-        if np.any(variable_filter):
-            for constraint in min_env_constraints:
-                if abs(variable_filter.dot(constraint.T)[0, 0]) > 0:
-                    # conveys information about variable designated to be filtered out, so block this demonstration
-                    skip_demo = True
-
-                # also prevent showing a trajectory that contains feature counts of a feature to be filtered out
-                if abs(variable_filter.dot(constraint.T)[0, 0]) > 0:
-                    skip_demo = True
-
-        if not skip_demo:
+        if variable_filter.dot(mdp_features.T) > 0:
+            info_gains_record.append(0)
+            n_diff_constraints.append(0)
+        else:
             if particles is not None:
                 ig = particles.calc_info_gain(min_env_constraints)
             else:
-                ig = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, min_env_constraints, weights, step_cost_flag)
+                ig = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, min_env_constraints, weights,
+                                                            step_cost_flag)
             info_gains_record.append(ig)
 
             hypothetical_constraints = min_BEC_constraints_running.copy()
@@ -474,9 +462,6 @@ def combine_limiting_constraints_IG(args):
             max_diff = abs(len(hypothetical_constraints) - overlapping_constraint_count)
 
             n_diff_constraints.append(max_diff)
-        else:
-            info_gains_record.append(0)
-            n_diff_constraints.append(0)
 
     # obtain the counterfactual human trajectories that could've given rise to the most limiting constraints and
     # how much it overlaps the agent's optimal trajectory
@@ -604,7 +589,7 @@ def overlap_demo_BEC_and_human_posterior(args):
 
     return BEC_areas
 
-def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
+def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
                        n_train_demos=3, prior=[], downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=1):
     summary = []
     unit = []
@@ -671,7 +656,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
             os.makedirs(cf_data_dir, exist_ok=True)
             if consider_human_models_jointly:
                 pool.restart()
-                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], None, min_BEC_constraints_running, step_cost_flag, summary_count, variable_filter, consider_human_models_jointly) for i in range(len(traj_record))]
+                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], None, min_BEC_constraints_running, step_cost_flag, summary_count, variable_filter, mdp_features_record[i], consider_human_models_jointly) for i in range(len(traj_record))]
                 info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals, args), total=len(args)))
                 pool.close()
                 pool.join()
@@ -680,7 +665,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
                 info_gains_record.append(info_gain_envs)
             else:
                 pool.restart()
-                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], None, min_BEC_constraints_running, step_cost_flag, summary_count, variable_filter, consider_human_models_jointly) for i in range(len(traj_record))]
+                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], None, min_BEC_constraints_running, step_cost_flag, summary_count, variable_filter, mdp_features_record[i], consider_human_models_jointly) for i in range(len(traj_record))]
                 info_gain_envs, overlap_in_opt_and_counterfactual_traj_env = zip(*pool.imap(compute_counterfactuals, tqdm(args), total=len(args)))
                 pool.close()
                 pool.join()
@@ -722,7 +707,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
         if consider_human_models_jointly:
             print("Combining the most limiting constraints across human models:")
             pool.restart()
-            args = [(i, len(sample_human_models), data_loc, summary_count, weights, step_cost_flag, variable_filter,
+            args = [(i, len(sample_human_models), data_loc, summary_count, weights, step_cost_flag, variable_filter, mdp_features_record[i],
                      traj_record[i], min_BEC_constraints_running, None) for
                     i in range(len(traj_record))]
             info_gains_record, min_env_constraints_record, n_diff_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(
@@ -994,7 +979,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
 
     return summary, visited_env_traj_idxs
 
-def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
+def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
                        n_train_demos=np.inf, prior=[], downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=1, min_info_gain=0.01):
     summary = []
     visited_env_traj_idxs = []
@@ -1069,7 +1054,7 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
             os.makedirs(cf_data_dir, exist_ok=True)
             if consider_human_models_jointly:
                 pool.restart()
-                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], particles, min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter, consider_human_models_jointly) for i in range(len(traj_record))]
+                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], particles, min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter, mdp_features_record[i], consider_human_models_jointly) for i in range(len(traj_record))]
 
                 info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals, args), total=len(args)))
                 pool.close()
@@ -1079,7 +1064,7 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
                 info_gains_record.append(info_gain_envs)
             else:
                 pool.restart()
-                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], particles, min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter, consider_human_models_jointly) for i in range(len(traj_record))]
+                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], particles, min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter, mdp_features_record[i], consider_human_models_jointly) for i in range(len(traj_record))]
                 info_gain_envs, overlap_in_opt_and_counterfactual_traj_env = zip(*pool.imap(compute_counterfactuals, tqdm(args), total=len(args)))
                 pool.close()
                 pool.join()
@@ -1106,16 +1091,14 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
 
         # no need to continue search for demonstrations if none of them will improve the human's understanding
         if no_info_flag:
-            # sample up two more set of human models to try and find a demonstration that will improve the human's
-            # understanding before concluding that there is no more information to be conveyed
-            if variable_filter is None:
+            # if no variables had been filtered out, then there are no more informative demonstrations to be found
+            if not np.any(variable_filter):
                 break
             else:
                 # no more informative demonstrations with this variable filter, so update it
                 variable_filter, nonzero_counter = BEC_helpers.update_variable_filter(nonzero_counter)
                 print(colored('Did not find any informative demonstrations.', 'red'))
                 print('variable filter: {}'.format(variable_filter))
-
                 continue
 
         # todo: now that we're utilizing a probabilistic human model, we should account for the probability of having
@@ -1123,7 +1106,7 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
         #  gain), rather than simply combine all of the constraints that could've been generated (which is currently done)
         print("Combining the most limiting constraints across human models:")
         pool.restart()
-        args = [(i, len(sample_human_models), data_loc, len(summary), weights, step_cost_flag, variable_filter,
+        args = [(i, len(sample_human_models), data_loc, len(summary), weights, step_cost_flag, variable_filter, mdp_features_record[i],
                  traj_record[i], min_BEC_constraints_running, particles) for
                 i in range(len(traj_record))]
         info_gains_record, min_env_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(
@@ -1235,8 +1218,10 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
                 best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
 
         print("current max info: {}".format(max_info_gain))
+        # no need to continue search for demonstrations if none of them will improve the human's understanding
         if no_info_flag:
-            if variable_filter is None:
+            # if no variables had been filtered out, then there are no more informative demonstrations to be found
+            if not np.any(variable_filter):
                 break
             else:
                 # no more informative demonstrations with this variable filter, so update it
@@ -1273,13 +1258,13 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
 
     return summary, visited_env_traj_idxs, particles
 
-def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BEC_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, previous_demonstrations, visited_env_traj_idxs, variable_filter, consistent_state_count, step_cost_flag, type='training', info_gain_tolerance=0.01, consider_human_models_jointly=True):
+def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BEC_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, previous_demonstrations, visited_env_traj_idxs, variable_filter, mdp_features_record, consistent_state_count, step_cost_flag, type='training', info_gain_tolerance=0.01, consider_human_models_jointly=True):
     remedial_demonstrations = []
 
     # if you're looking for demonstrations that will convey the most constraining BEC region or will be employing scaffolding,
     # obtain the demos needed to convey the most constraining BEC region
     BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(BEC_constraints,
-                                                                                min_subset_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record, variable_filter=variable_filter)
+                                                                                min_subset_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record, mdp_features_record, variable_filter=variable_filter)
     if len(BEC_constraint_bookkeeping[0]) > 0:
         # the human's incorrect response can be corrected with a direct counterexample
         best_env_idxs, best_traj_idxs = list(zip(*BEC_constraint_bookkeeping[0]))
@@ -1308,7 +1293,7 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BE
             pool.restart()
             args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]),
                      traj_record[i], particles, [], step_cost_flag, None,
-                     variable_filter, consider_human_models_jointly) for i in range(len(traj_record))]
+                     variable_filter, mdp_features_record[i], consider_human_models_jointly) for i in range(len(traj_record))]
 
             info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals, args), total=len(args)))
             pool.close()

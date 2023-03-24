@@ -81,16 +81,16 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
 
     try:
         with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
-            policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, consistent_state_count = pickle.load(f)
+            policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(f)
     except:
         if hardcode_envs:
             # use demo BEC to extract constraints
-            policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, consistent_state_count = BEC.extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=vi_traj_triplets, print_flag=True)
+            policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = BEC.extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=vi_traj_triplets, print_flag=True)
         else:
             # use policy BEC to extract constraints
-            policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, consistent_state_count = BEC.extract_constraints(data_loc, step_cost_flag, pool, print_flag=True)
+            policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = BEC.extract_constraints(data_loc, step_cost_flag, pool, print_flag=True)
         with open('models/' + data_loc + '/base_constraints.pickle', 'wb') as f:
-            pickle.dump((policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, consistent_state_count), f)
+            pickle.dump((policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count), f)
 
     try:
         with open('models/' + data_loc + '/BEC_constraints.pickle', 'rb') as f:
@@ -114,11 +114,11 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
 
         if summary_variant == 'particle_filter':
             BEC_summary, visited_env_traj_idxs, particles = BEC.obtain_summary_particle_filter(data_loc, particles, summary_variant, min_subset_constraints_record,
-                                           min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool,
+                                           min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool,
                                            n_human_models, consistent_state_count)
 
         elif summary_variant == 'proposed' or summary_variant == 'counterfactual_only':
-            BEC_summary, visited_env_traj_idxs = BEC.obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count, n_train_demos=n_train_demos, prior=prior, obj_func_proportion=obj_func_proportion)
+            BEC_summary, visited_env_traj_idxs = BEC.obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count, n_train_demos=n_train_demos, prior=prior, obj_func_proportion=obj_func_proportion)
         elif summary_variant == 'feature_only' or summary_variant == 'baseline':
             BEC_summary = BEC.obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=n_train_demos)
         else:
@@ -561,7 +561,7 @@ def simulate_human_model_updates(domain, BEC_summary, visited_env_traj_idxs, par
             f)
 
     with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
-        policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, consistent_state_count = pickle.load(
+        policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(
             f)
 
     # go through potentially duplicate trajectories and visualize them
@@ -659,6 +659,7 @@ def simulate_human_model_updates(domain, BEC_summary, visited_env_traj_idxs, par
                                                                                                      [],
                                                                                                      visited_env_traj_idxs,
                                                                                                      running_variable_filter,
+                                                                                                     mdp_features_record,
                                                                                                      consistent_state_count,
                                                                                                      step_cost_flag)
                     remedial_mdp, remedial_traj, _, remedial_constraint, _ = remedial_instruction[0]
@@ -690,6 +691,7 @@ def simulate_human_model_updates(domain, BEC_summary, visited_env_traj_idxs, par
                                                                                                   [],
                                                                                                   visited_env_traj_idxs,
                                                                                                   running_variable_filter,
+                                                                                                  mdp_features_record,
                                                                                                   consistent_state_count,
                                                                                                   step_cost_flag,
                                                                                                   type='testing')

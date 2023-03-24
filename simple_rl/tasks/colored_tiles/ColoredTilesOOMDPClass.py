@@ -45,6 +45,9 @@ class ColoredTilesOOMDP(OOMDP):
         self.goal = goal
         self.slip_prob = slip_prob
 
+        # does this MDP have the capability of conveying the following reward features?
+        self.reward_features = np.array([[len(self.A_tiles) > 0, len(self.B_tiles) > 0, True]])
+
         init_state = self._create_state(agent_obj)
         OOMDP.__init__(self, ColoredTilesOOMDP.ACTIONS, self._skateboard_transition_func, self._colored_tiles_reward_func,
                        init_state=init_state, gamma=gamma, step_cost=step_cost, sample_rate=sample_rate)

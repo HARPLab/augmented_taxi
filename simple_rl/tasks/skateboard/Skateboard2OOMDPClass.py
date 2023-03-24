@@ -51,6 +51,9 @@ class Skateboard2OOMDP(OOMDP):
         self.goal = goal
         self.slip_prob = slip_prob
 
+        # does this MDP have the capability of conveying the following reward features?
+        self.reward_features = np.array([[len(skateboard_objs) > 0, len(self.paths) > 0, True]])
+
         init_state = self._create_state(agent_obj, skateboard_objs)
         OOMDP.__init__(self, Skateboard2OOMDP.ACTIONS, self._skateboard_transition_func, self._skateboard_reward_func,
                        init_state=init_state, gamma=gamma, step_cost=step_cost, sample_rate=sample_rate)
