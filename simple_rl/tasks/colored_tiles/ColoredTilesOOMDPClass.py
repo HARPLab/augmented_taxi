@@ -222,6 +222,15 @@ class ColoredTilesOOMDP(OOMDP):
 
         visualize_trajectory(self, trajectory, _draw_state, marked_state_importances=marked_state_importances, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='colored_tiles', counterfactual_traj=None)
 
+
+    def visualize_trajectory_comparison(self, trajectory, trajectory_counterfactual, marked_state_importances=None,
+                                        width_scr_scale=180, height_scr_scale=180):
+        # for moving through two trajectories simultaneously
+        from simple_rl.utils.mdp_visualizer import visualize_trajectory_comparison
+        from .colored_tiles_visualizer import _draw_state
+
+        visualize_trajectory_comparison(self, trajectory, trajectory_counterfactual, _draw_state, marked_state_importances=marked_state_importances, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='colored_tiles')
+
     # ----------------------------
     # -- Action Implementations --
     # ----------------------------

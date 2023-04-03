@@ -26,7 +26,8 @@ def _draw_state(screen,
                 agent_shape=None,
                 agent_history=[],
                 counterfactual_traj=None,
-                offset_direction=0):
+                alpha=255,
+                offset_direction=0, visualize_history=True):
     '''
     Args:
         screen (pygame.Surface)
@@ -133,7 +134,7 @@ def _draw_state(screen,
     pygame.draw.rect(screen, dest_col, top_left_point + (cell_width / 2, cell_height / 2))
 
     # Draw history of past agent locations if applicable
-    if len(agent_history) > 0:
+    if len(agent_history) > 0 and visualize_history:
         for i, position in enumerate(agent_history):
             if i == 0:
                 top_left_point = int(width_buffer + cell_width * (position[0] - 0.5)), int(
@@ -152,7 +153,7 @@ def _draw_state(screen,
     top_left_point = width_buffer + cell_width * (agent_x - 1), height_buffer + cell_height * (
                 colored_tiles_oomdp.height - agent_y)
     agent_center = int(top_left_point[0] + cell_width / 2.0 + offset_counterfactual), int(top_left_point[1] + cell_height / 2.0)
-    agent_shape = _draw_agent(agent_center, screen, base_size=min(cell_width, cell_height) / 2.5 - 4)
+    agent_shape = _draw_agent(agent_center, screen, base_size=min(cell_width, cell_height) / 2.5 - 4, alpha=alpha)
 
 
     if draw_statics:
@@ -191,7 +192,7 @@ def _draw_state(screen,
 
     return dynamic_shapes_list, agent_history
 
-def _draw_agent(center_point, screen, base_size=30):
+def _draw_agent(center_point, screen, base_size=30, alpha=255):
     '''
     Args:
         center_point (tuple): (x,y)
@@ -204,6 +205,8 @@ def _draw_agent(center_point, screen, base_size=30):
     tri_bot_right = center_point[0] + base_size, center_point[1] + base_size
     tri_top = center_point[0], center_point[1] - base_size
     tri = [tri_bot_left, tri_top, tri_bot_right]
-    tri_color = (98, 140, 190)
-
-    return pygame.draw.polygon(screen, tri_color, tri)
+    tri_color = (98, 140, 190, alpha)
+    if alpha < 255:
+        return mdpv._draw_polygon_alpha(screen, tri_color, tri)
+    else:
+        return pygame.draw.polygon(screen, tri_color, tri)

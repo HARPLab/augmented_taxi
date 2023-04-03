@@ -162,7 +162,7 @@ elif mdp_class == 'skateboard2':
     prior = [np.array([[0, 0, -1]])]
     posterior = [np.array([[-1, 0, 0]]), np.array([[0, -1, 0]]), np.array([[0, 0, -1]])]
 elif mdp_class == 'colored_tiles':
-    w = np.array([[-6.5, -5.25, -1]]) # A_tile, B_tile, step cost
+    w = np.array([[-6.5, -5.25, -1]]) # A_tile (square), B_tile (ring), step cost
     w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order)
 
     mdp_parameters = {

@@ -300,13 +300,13 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
 
         try:
             with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
-                policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, consistent_state_count = pickle.load(f)
+                policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(f)
         except:
             # use policy BEC to extract constraints
             policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, consistent_state_count = BEC.extract_constraints(
                 data_loc, step_cost_flag, pool, print_flag=True)
             with open('models/' + data_loc + '/base_constraints.pickle', 'wb') as f:
-                pickle.dump((policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record,
+                pickle.dump((policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record,
                              consistent_state_count), f)
 
         try:
@@ -411,7 +411,7 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
 def obtain_unit_tests(mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, data_loc, weights, step_cost_flag, visualize_pf_transition=True):
     # todo: maybe pass in some of these objects later
     with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
-        policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, consistent_state_count = pickle.load(
+        policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(
             f)
 
     # initialize a particle filter model of human
@@ -441,7 +441,8 @@ def obtain_unit_tests(mdp_class, BEC_summary, visited_env_traj_idxs, particles_s
         # obtain the constraints conveyed by the unit's demonstrations
         min_constraints = BEC_helpers.remove_redundant_constraints(unit_constraints, weights, step_cost_flag)
         # obtain the diagnostic tests that will test the human's understanding of the unit's constraints
-        preliminary_tests, visited_env_traj_idxs = BEC.obtain_diagnostic_tests(data_loc, unit, visited_env_traj_idxs, min_constraints, min_subset_constraints_record, traj_record, traj_features_record, running_variable_filter)
+        preliminary_tests, visited_env_traj_idxs = BEC.obtain_diagnostic_tests(data_loc, unit, visited_env_traj_idxs, min_constraints, min_subset_constraints_record, traj_record, traj_features_record, running_variable_filter, mdp_features_record)
+        print(preliminary_tests[0])
 
         # with open('models/' + data_loc + '/preliminary_tests.pickle', 'wb') as f:
         #     pickle.dump((preliminary_tests, visited_env_traj_idxs), f)
@@ -487,7 +488,7 @@ def obtain_unit_tests(mdp_class, BEC_summary, visited_env_traj_idxs, particles_s
 
                 print("Here is a remedial demonstration that might be helpful")
 
-                remedial_instruction, visited_env_traj_idxs = BEC.obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, failed_BEC_constraint, min_subset_constraints_record, env_record, traj_record, traj_features_record, test_history, visited_env_traj_idxs, running_variable_filter, consistent_state_count, step_cost_flag)
+                remedial_instruction, visited_env_traj_idxs = BEC.obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, failed_BEC_constraint, min_subset_constraints_record, env_record, traj_record, traj_features_record, test_history, visited_env_traj_idxs, running_variable_filter, mdp_features_record, consistent_state_count, step_cost_flag)
                 remedial_mdp, remedial_traj, _, remedial_constraint, _ = remedial_instruction[0]
                 remedial_mdp.visualize_trajectory(remedial_traj)
                 test_history.extend(remedial_instruction)
@@ -516,6 +517,7 @@ def obtain_unit_tests(mdp_class, BEC_summary, visited_env_traj_idxs, particles_s
                                                                                                      test_history,
                                                                                                      visited_env_traj_idxs,
                                                                                                      running_variable_filter,
+                                                                                                     mdp_features_record,
                                                                                                      consistent_state_count,
                                                                                                      step_cost_flag, type='testing')
 
@@ -575,9 +577,17 @@ def simulate_human_model_updates(domain, BEC_summary, visited_env_traj_idxs, par
         model_high = model_medium.copy()
         model_high.extend([np.array([[1, 1, 0]])])
     elif domain == 'colored_tiles':
-        raise NotImplementedError
+        model_low = [np.array([[1, 0, -8]]), np.array([[-1, 0, 6]])]
+        model_medium = model_low.copy()
+        model_medium.extend([np.array([[ 0, -1,  4]]), np.array([[ 0,  1, -6]])])
+        model_high = model_medium.copy()
+        model_high.extend([np.array([[1, -1, -2]])])
     elif domain == 'skateboard2':
-        raise NotImplementedError
+        model_low = [np.array([[-6, 0, 1]]), np.array([[9, 0, -2]])]
+        model_medium = model_low.copy()
+        model_medium.extend([np.array([[ 0, -2,  1]]), np.array([[ 0,  5, -3]])])
+        model_high = model_medium.copy()
+        model_high.extend([np.array([[-6,  4, -1]]), np.array([[ 8,  1, -2]]), np.array([[ 5,  2, -2]])])
 
     for difficulty in filtered_human_traj_dict[domain].keys():
 
@@ -592,7 +602,7 @@ def simulate_human_model_updates(domain, BEC_summary, visited_env_traj_idxs, par
             running_variable_filter = np.array([[0, 1, 0]])
         elif difficulty == 'medium':
             particles_orig.update(model_medium)
-            running_variable_filter = np.array([[0, 0, 0]])
+            running_variable_filter = np.array([[1, 0, 0]])
         elif difficulty == 'high':
             particles_orig.update(model_high)
             running_variable_filter = np.array([[0, 0, 0]])
