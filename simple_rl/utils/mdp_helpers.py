@@ -35,12 +35,14 @@ def rollout_policy_recursive(mdp, agent, cur_state, trajs, cur_traj=[], cur_acti
 
         # deepcopy of state occurs within transition function
         reward, next_state = mdp.execute_agent_action(action)
-        next_traj = cur_traj.copy()
-        next_traj.append((cur_state, action, next_state))
-        next_action_seq = cur_action_seq.copy() # for debugging
-        next_action_seq.append(action)
 
-        rollout_policy_recursive(mdp, agent, next_state, trajs, cur_traj=next_traj, cur_action_seq=next_action_seq)
+        if next_state != cur_state:
+            next_traj = cur_traj.copy()
+            next_traj.append((cur_state, action, next_state))
+            next_action_seq = cur_action_seq.copy() # for debugging
+            next_action_seq.append(action)
+
+            rollout_policy_recursive(mdp, agent, next_state, trajs, cur_traj=next_traj, cur_action_seq=next_action_seq)
 
     return trajs
 
@@ -74,27 +76,29 @@ def rollout_policy(mdp, agent, cur_state=None, action_seq=None, max_depth=25, ti
     if action_seq is not None:
         for idx in range(len(action_seq)):
             reward, next_state = mdp.execute_agent_action(action_seq[idx])
-            trajectory.append((cur_state, action_seq[idx], next_state))
 
-            # deepcopy occurs within transition function
-            cur_state = next_state
+            if next_state != cur_state:
+                trajectory.append((cur_state, action_seq[idx], next_state))
 
-            depth += 1
+                # deepcopy occurs within transition function
+                cur_state = next_state
+
+                depth += 1
 
     while not cur_state.is_terminal() and depth < max_depth and timeout_counter <= timeout:
         action = agent.act(cur_state, reward)
         reward, next_state = mdp.execute_agent_action(action)
-        trajectory.append((cur_state, action, next_state))
 
-        if next_state == cur_state:
-            timeout_counter += 1
-        else:
+        if next_state != cur_state:
+            trajectory.append((cur_state, action, next_state))
+
+            # deepcopy occurs within transition function
+            cur_state = next_state
+            depth += 1
+
             timeout_counter += 0
-
-        # deepcopy occurs within transition function
-        cur_state = next_state
-
-        depth += 1
+        else:
+            timeout_counter += 1
 
     return trajectory
 

@@ -466,6 +466,7 @@ def obtain_outlier_human_scores(test_env_dict):
         cur_state = mdp.get_init_state()
 
         for idx in range(len(moves_list)):
+            # assumes that the user study only allows actions that change the state of the MDP
             reward, next_state = mdp.execute_agent_action(moves_list[idx])
             trajectory.append((cur_state, moves_list[idx], next_state))
 
@@ -562,6 +563,7 @@ def obtain_test_demos_low_human_scores(df_testing, test_env_dict):
         cur_state = mdp.get_init_state()
 
         for idx in range(len(moves_list)):
+            # assumes that the user study only allows actions that change the state of the MDP
             reward, next_state = mdp.execute_agent_action(moves_list[idx])
             trajectory.append((cur_state, moves_list[idx], next_state))
 
@@ -595,6 +597,7 @@ def process_human_scores(test_env_dict, type='binary'):
         cur_state = mdp.get_init_state()
 
         for idx in range(len(moves_list)):
+            # assumes that the user study only allows actions that change the state of the MDP
             reward, next_state = mdp.execute_agent_action(moves_list[idx])
             trajectory.append((cur_state, moves_list[idx], next_state))
 
@@ -726,6 +729,7 @@ def obtain_human_trajectories(test_env_dict):
         cur_state = mdp.get_init_state()
 
         for idx in range(len(moves_list)):
+            # assumes that the user study only allows actions that change the state of the MDP
             reward, next_state = mdp.execute_agent_action(moves_list[idx])
             trajectory.append((cur_state, moves_list[idx], next_state))
 

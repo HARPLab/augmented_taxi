@@ -281,9 +281,9 @@ def visualize_pf_transition(constraints, particles_before, particles_after, mdp_
         if mdp_class == 'augmented_taxi2':
             ax.set_xlabel('$\mathregular{w_0}$: Mud')
             ax.set_ylabel('$\mathregular{w_1}$: Recharge')
-        elif mdp_class == 'two_goal2':
-            ax.set_xlabel('X: Goal 1 (grey)')
-            ax.set_ylabel('Y: Goal 2 (green)')
+        elif mdp_class == 'colored_tiles':
+            ax.set_xlabel('X: Tile A (brown)')
+            ax.set_ylabel('Y: Tile B (green)')
         else:
             ax.set_xlabel('X: Goal')
             ax.set_ylabel('Y: Skateboard')

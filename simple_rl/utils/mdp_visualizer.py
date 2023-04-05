@@ -330,6 +330,7 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
 
 
             # Move agent.
+            prev_state = cur_state.copy()
             action = agent.act(cur_state, reward)
 
             if cur_state.is_terminal():
@@ -342,10 +343,10 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
 
             reward, cur_state = mdp.execute_agent_action(action)
             dynamic_shapes, _ = draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True)
-
-            score += int(reward)
-
             pygame.display.update()
+
+            if cur_state != prev_state:
+                score += int(reward)
 
             time.sleep(delay)
 
@@ -368,17 +369,17 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
                         mdp.reset()
 
                 # Move agent.
+                prev_state = cur_state.copy()
                 action = agent.act(cur_state, reward)
                 reward, cur_state = mdp.execute_agent_action(action)
                 dynamic_shapes, _ = draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True)
-
-                score = round(rpl)
-                rpl += reward
-
                 pygame.display.update()
+                if cur_state != prev_state:
+                    score = round(rpl)
+                    rpl += reward
+                    j += 1
 
                 time.sleep(delay)
-                j+=1
 
                 if cur_state.is_terminal():
                     cur_state = mdp.get_init_state()
@@ -604,16 +605,20 @@ def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_h
                     pygame.draw.rect(screen, (255,255,255), shape)
 
                 # Move agent.
+                prev_state = cur_state.copy()
                 action = agent.act(cur_state, reward)
                 print("A: " + str(action))
                 reward, cur_state = mdp.execute_agent_action(action)
-                cumulative_reward += reward * gamma ** step
-                dynamic_shapes, _ = draw_state(screen, mdp, cur_state)
 
+                dynamic_shapes, _ = draw_state(screen, mdp, cur_state)
                 # Update state text.
                 _draw_lower_left_text(cur_state, screen)
 
-                step += 1
+                # only update the cumulative reward on a state change (i.e. else count the action as a no-op)
+                if prev_state != cur_state:
+                    cumulative_reward += reward * gamma ** step
+
+                    step += 1
 
         if cur_state.is_terminal():
             goal_text_rendered, goal_text_point = _draw_terminal_text(mdp_class, cur_state, scr_width, scr_height, title_font)
@@ -713,17 +718,22 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
                 prev_state = cur_state
                 action = actions[keys.index(event.key)]
                 reward, cur_state = mdp.execute_agent_action(action=action)
-                current_reward = reward * gamma ** step
-                cumulative_reward += current_reward
-                dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, agent_history=agent_history)
-                trajectory.append((prev_state, action, cur_state))
-                if interaction_callback is not None:
-                    interaction_callback(action)
 
+                dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, agent_history=agent_history)
                 # Update state text.
                 _draw_lower_left_text(cur_state, screen)
 
-                step += 1
+                # only update the cumulative reward on a state change (i.e. else count the action as a no-op)
+                if cur_state != prev_state:
+                    current_reward = reward * gamma ** step
+                    cumulative_reward += current_reward
+
+                    trajectory.append((prev_state, action, cur_state))
+                    if interaction_callback is not None:
+                        interaction_callback(action)
+
+
+                    step += 1
         if cur_state.is_terminal():
             goal_text_rendered, goal_text_point = _draw_terminal_text(mdp_class, cur_state, scr_width, scr_height, title_font)
             screen.blit(goal_text_rendered, goal_text_point)
