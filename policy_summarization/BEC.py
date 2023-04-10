@@ -1283,79 +1283,84 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BE
         best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record,
                                                                   previous_demonstrations, type=type)
 
+        print('Found an exact match for constraint: {}'.format(BEC_constraints))
     else:
-        # the human's incorrect response does not have a direct counterexample, and thus you need to use information gain to obtain the next example
-        sample_human_models, model_weights = BEC_helpers.sample_human_models_pf(particles, n_human_models)
-        info_gains_record = []
+        nn_BEC_constraint_bookkeeping, minimal_distances = BEC_helpers.perform_nn_BEC_constraint_bookkeeping(BEC_constraints,
+                                                                                    min_subset_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record, mdp_features_record, variable_filter=variable_filter)
+        if len(nn_BEC_constraint_bookkeeping[0]) > 0:
+            # the human's incorrect response can be corrected with similar enough counterexample
+            best_env_idxs, best_traj_idxs = list(zip(*nn_BEC_constraint_bookkeeping[0]))
 
-        for model_idx, human_model in enumerate(sample_human_models):
-            print(colored('Model #: {}'.format(model_idx), 'red'))
-            print(colored('Model val: {}'.format(human_model), 'red'))
+            # simply optimize for the visuals of the direct counterexample
+            best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs,
+                                                                      traj_record,
+                                                                      previous_demonstrations, type=type)
 
-            # based on the human's current model, obtain the information gain generated when comparing to the agent's
-            # optimal trajectories in each environment (human's corresponding optimal trajectories and constraints
-            # are saved for reference later)
-            print("Obtaining counterfactual information gains:")
-
-            cf_data_dir = 'models/' + data_loc + '/counterfactual_data_remedial_demo/model' + str(model_idx)
-            os.makedirs(cf_data_dir, exist_ok=True)
-
-            pool.restart()
-            args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]),
-                     traj_record[i], particles, [], step_cost_flag, None,
-                     variable_filter, mdp_features_record[i], consider_human_models_jointly) for i in range(len(traj_record))]
-
-            info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals, args), total=len(args)))
-            pool.close()
-            pool.join()
-            pool.terminate()
-
-            # [# of human models][# of environments]
-            info_gains_record.append(info_gain_envs)
-
-        # make an entry for each environment (averaging over the human models)
-        expected_info_gain_envs = []
-        for human_model_idx in range(len(info_gains_record)):
-            for env_idx, info_gain_env in enumerate(info_gains_record[human_model_idx]):
-                if human_model_idx == 0:
-                    expected_info_gain_envs.append(model_weights[human_model_idx] * np.array(info_gain_env))
-                else:
-                    expected_info_gain_envs[env_idx] += model_weights[human_model_idx] * np.array(info_gain_env)
-
-        if consistent_state_count:
-            expected_info_gain_envs = np.array(expected_info_gain_envs)
-            best_env_idxs, best_traj_idxs = np.where(expected_info_gain_envs == max(expected_info_gain_envs.flatten()))
-            # # compute weighted information gain (weighted by the probability of that human model / particle representing the
-            # # human's true beliefs
-            # info_gains_record = np.array(info_gains_record)
-            # weighted_info_gains = [model_weights.dot(info_gains_record[:, j]) for j in range(len(env_record))]
-            #
-            # # note that these correspond to the positions of the (env, traj) pair that yields the high information gain
-            # best_info_gain_idxs = np.where(abs(weighted_info_gains - max(weighted_info_gains)) < info_gain_tolerance)[0]
-            #
-            # best_env_idxs_filtered = [best_env_idxs[i] for i in best_info_gain_idxs]
-            # best_traj_idxs_filtered = [best_traj_idxs[i] for i in best_info_gain_idxs]
+            print('Failed constraint: {}'.format(minimal_distances[0][2]))
+            print('Similar-enough constraint: {}'.format(minimal_distances[0][3]))
         else:
-            best_obj = float('-inf')
-            best_env_idxs = []
-            best_traj_idxs = []
+            # the human's incorrect response does not have a direct counterexample, and thus you need to use information gain to obtain the next example
+            sample_human_models, model_weights = BEC_helpers.sample_human_models_pf(particles, n_human_models)
+            info_gains_record = []
 
-            # select the trajectories with the maximal information gain
-            for env_idx, info_gains_per_env in enumerate(expected_info_gain_envs):
-                for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
-                    if info_gain_per_traj > 0:
-                        obj = info_gain_per_traj
+            for model_idx, human_model in enumerate(sample_human_models):
+                print(colored('Model #: {}'.format(model_idx), 'red'))
+                print(colored('Model val: {}'.format(human_model), 'red'))
 
-                        if np.isclose(obj, best_obj):
-                            best_env_idxs.append(env_idx)
-                            best_traj_idxs.append(traj_idx)
-                        elif obj > best_obj:
-                            best_obj = obj
+                # based on the human's current model, obtain the information gain generated when comparing to the agent's
+                # optimal trajectories in each environment (human's corresponding optimal trajectories and constraints
+                # are saved for reference later)
+                print("Obtaining counterfactual information gains:")
 
-                            best_env_idxs = [env_idx]
-                            best_traj_idxs = [traj_idx]
+                cf_data_dir = 'models/' + data_loc + '/counterfactual_data_remedial_demo/model' + str(model_idx)
+                os.makedirs(cf_data_dir, exist_ok=True)
 
-        best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, previous_demonstrations, type=type)
+                pool.restart()
+                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]),
+                         traj_record[i], particles, [], step_cost_flag, None,
+                         variable_filter, mdp_features_record[i], consider_human_models_jointly) for i in range(len(traj_record))]
+
+                info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals, args), total=len(args)))
+                pool.close()
+                pool.join()
+                pool.terminate()
+
+                # [# of human models][# of environments]
+                info_gains_record.append(info_gain_envs)
+
+            # make an entry for each environment (averaging over the human models)
+            expected_info_gain_envs = []
+            for human_model_idx in range(len(info_gains_record)):
+                for env_idx, info_gain_env in enumerate(info_gains_record[human_model_idx]):
+                    if human_model_idx == 0:
+                        expected_info_gain_envs.append(model_weights[human_model_idx] * np.array(info_gain_env))
+                    else:
+                        expected_info_gain_envs[env_idx] += model_weights[human_model_idx] * np.array(info_gain_env)
+
+            if consistent_state_count:
+                expected_info_gain_envs = np.array(expected_info_gain_envs)
+                best_env_idxs, best_traj_idxs = np.where(expected_info_gain_envs == max(expected_info_gain_envs.flatten()))
+            else:
+                best_obj = float('-inf')
+                best_env_idxs = []
+                best_traj_idxs = []
+
+                # select the trajectories with the maximal information gain
+                for env_idx, info_gains_per_env in enumerate(expected_info_gain_envs):
+                    for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
+                        if info_gain_per_traj > 0:
+                            obj = info_gain_per_traj
+
+                            if np.isclose(obj, best_obj):
+                                best_env_idxs.append(env_idx)
+                                best_traj_idxs.append(traj_idx)
+                            elif obj > best_obj:
+                                best_obj = obj
+
+                                best_env_idxs = [env_idx]
+                                best_traj_idxs = [traj_idx]
+
+            best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, previous_demonstrations, type=type)
 
     traj = traj_record[best_env_idx][best_traj_idx]
     filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)

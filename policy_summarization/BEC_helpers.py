@@ -54,6 +54,17 @@ def equal_constraints(c1, c2):
     else:
         return False
 
+def compute_distance_between_constraints(c1, c2):
+    '''
+    Summary: Compute the feature-wise distance (i.e. how many of the features do not match their respective counts)
+     and total distance (i.e. total feature counts that do not match between the two constraints)
+    '''
+    diff = c1 - c2
+    featurewise_distance = np.count_nonzero(diff)
+    total_feature_distance = np.sum(diff)
+
+    return featurewise_distance, total_feature_distance
+
 def clean_up_constraints(constraints, weights, step_cost_flag):
     '''
     Summary: Normalize constraints, remove duplicates, and remove redundant constraints
@@ -218,16 +229,7 @@ def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_r
                     if equal_constraints(constraint, BEC_constraints[BEC_constraint_idx]):
                         contains_BEC_constraint = True
                 if contains_BEC_constraint:
-                    # different MDPs can lead to the same trajectory and demonstration (e.g. if the battery disappears)
-                    # thus, you want to also compare trajectories directly instead of relying solely on a history of
-                    # shown (env, traj) pairs
-                    same_trajectory = False
-                    for env_traj_tuple in visited_env_traj_idxs:
-                        env, traj = env_traj_tuple
-                        if traj_record[env][traj] == traj_record[env_idx][traj_idx]:
-                            same_trajectory = True
-                            break
-                    if (env_idx, traj_idx) not in visited_env_traj_idxs and not same_trajectory:
+                    if traj_not_shown_previously(env_idx, traj_idx, visited_env_traj_idxs, traj_record):
                         # demonstrations that haven't already been shown
                         BEC_constraint_bookkeeping[BEC_constraint_idx].append((env_idx, traj_idx))
                     else:
@@ -239,6 +241,74 @@ def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_r
             BEC_constraint_bookkeeping[BEC_constraint_idx] = BEC_constraint_bookkeeping_redundant[BEC_constraint_idx]
 
     return BEC_constraint_bookkeeping
+
+def traj_not_shown_previously(env_idx, traj_idx, visited_env_traj_idxs, traj_record):
+    '''
+    Summary: Check if two trajectories are the same
+
+    Different MDPs can lead to the same trajectory and demonstration (e.g. if the battery disappears).
+    Thus, you want to also compare trajectories directly instead of relying solely on a history of
+    shown (env, traj) pairs (which assumes that different env will yield different trajectories).
+
+    '''
+    same_trajectory = False
+    for env_traj_tuple in visited_env_traj_idxs:
+        env, traj = env_traj_tuple
+        if traj_record[env][traj] == traj_record[env_idx][traj_idx]:
+            same_trajectory = True
+            break
+
+    return (env_idx, traj_idx) not in visited_env_traj_idxs and not same_trajectory
+
+def perform_nn_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record, mdp_features_record, variable_filter=np.array([[0, 0, 0]])):
+    '''
+    Summary: For each constraint in min_subset_constraints_record, try to find a nearest neighbor match to one of the BEC_constraints
+    '''
+    BEC_constraint_bookkeeping = [[] for i in range(len(BEC_constraints))]
+    BEC_constraint_bookkeeping_redundant = [[] for i in range(len(BEC_constraints))]
+
+    # keep track of feature distance, total distance, target constraint, and nearest neighbor constraint
+    minimal_distances = [[np.inf, np.inf, None, None] for i in range(len(BEC_constraints))]
+
+    # keep track of which demo conveys which of the BEC constraints
+    for env_idx, constraints_env in enumerate(min_subset_constraints_record):
+        # skip any environments that have the potential of showing a filtered reward feature
+        if np.any(variable_filter):
+            if variable_filter.dot(mdp_features_record[env_idx].T) > 0:
+                # conveys information about feature designated to be filtered out, so skip this demonstration
+                continue
+
+        for traj_idx, constraints_traj in enumerate(constraints_env):
+            for BEC_constraint_idx in range(len(BEC_constraints)):
+                for constraint in constraints_traj:
+                    featurewise_distance, total_feature_distance = compute_distance_between_constraints(constraint, BEC_constraints[BEC_constraint_idx])
+
+                    if featurewise_distance == minimal_distances[BEC_constraint_idx][0]:
+                        if total_feature_distance == minimal_distances[BEC_constraint_idx][1]:
+                            if traj_not_shown_previously(env_idx, traj_idx, visited_env_traj_idxs, traj_record):
+                                BEC_constraint_bookkeeping[BEC_constraint_idx].append((env_idx, traj_idx))
+                            else:
+                                BEC_constraint_bookkeeping_redundant[BEC_constraint_idx].append((env_idx, traj_idx))
+                        elif total_feature_distance < minimal_distances[BEC_constraint_idx][1]:
+                            if traj_not_shown_previously(env_idx, traj_idx, visited_env_traj_idxs, traj_record):
+                                minimal_distances[BEC_constraint_idx] = (featurewise_distance, total_feature_distance, BEC_constraints[BEC_constraint_idx], constraint)
+                                BEC_constraint_bookkeeping[BEC_constraint_idx] = [(env_idx, traj_idx)]
+                            else:
+                                BEC_constraint_bookkeeping_redundant[BEC_constraint_idx].append((env_idx, traj_idx))
+                    elif featurewise_distance < minimal_distances[BEC_constraint_idx][0]:
+                        print(featurewise_distance)
+                        if traj_not_shown_previously(env_idx, traj_idx, visited_env_traj_idxs, traj_record):
+                            minimal_distances[BEC_constraint_idx] = (featurewise_distance, total_feature_distance, BEC_constraints[BEC_constraint_idx], constraint)
+                            BEC_constraint_bookkeeping[BEC_constraint_idx] = [(env_idx, traj_idx)]
+                        else:
+                            BEC_constraint_bookkeeping_redundant[BEC_constraint_idx].append((env_idx, traj_idx))
+
+    # if any of the BEC constraints fails to find a new environment and trajectory match, simply recycle old ones
+    for BEC_constraint_idx, bookkeeping in enumerate(BEC_constraint_bookkeeping):
+        if len(bookkeeping) == 0:
+            BEC_constraint_bookkeeping[BEC_constraint_idx] = BEC_constraint_bookkeeping_redundant[BEC_constraint_idx]
+
+    return BEC_constraint_bookkeeping, minimal_distances
 
 '''
 reward weight in 2D with known step cost
