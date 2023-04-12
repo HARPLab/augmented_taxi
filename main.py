@@ -58,7 +58,7 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
         mdp_agent.reset()  # reset the current state to the initial state
         mdp_agent.visualize_interaction()
 
-def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, pool, n_train_demos, n_human_models, n_particles, prior, posterior, obj_func_proportion, hardcode_envs=False):
+def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, pool, n_train_demos, BEC_depth, n_human_models, n_particles, prior, posterior, obj_func_proportion, hardcode_envs=False):
     if hardcode_envs:
         # using 4 hardcoded environments
         ps_helpers.obtain_env_policies(mdp_class, data_loc, np.expand_dims(weights, axis=0), mdp_parameters, pool, hardcode_envs=True)
@@ -85,10 +85,10 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
     except:
         if hardcode_envs:
             # use demo BEC to extract constraints
-            policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = BEC.extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=vi_traj_triplets, print_flag=True)
+            policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = BEC.extract_constraints(data_loc, BEC_depth, step_cost_flag, pool, vi_traj_triplets=vi_traj_triplets, print_flag=True)
         else:
             # use policy BEC to extract constraints
-            policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = BEC.extract_constraints(data_loc, step_cost_flag, pool, print_flag=True)
+            policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = BEC.extract_constraints(data_loc, BEC_depth, step_cost_flag, pool, print_flag=True)
         with open('models/' + data_loc + '/base_constraints.pickle', 'wb') as f:
             pickle.dump((policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count), f)
 
@@ -597,15 +597,6 @@ def simulate_human_model_updates(domain, BEC_summary, visited_env_traj_idxs, par
         particle_positions = BEC_helpers.sample_human_models_uniform([], n_particles)
         particles_orig = pf.Particles(particle_positions)
         particles_orig.update(prior)
-        if difficulty == 'low':
-            particles_orig.update(model_low)
-            running_variable_filter = np.array([[0, 1, 0]])
-        elif difficulty == 'medium':
-            particles_orig.update(model_medium)
-            running_variable_filter = np.array([[1, 0, 0]])
-        elif difficulty == 'high':
-            particles_orig.update(model_high)
-            running_variable_filter = np.array([[0, 0, 0]])
 
         for tag in filtered_human_traj_dict[domain][difficulty].keys():
 
@@ -634,6 +625,11 @@ def simulate_human_model_updates(domain, BEC_summary, visited_env_traj_idxs, par
                 human_feature_count = test_mdp.accumulate_reward_features(human_traj, discount=True)
                 opt_feature_count = test_mdp.accumulate_reward_features(opt_traj, discount=True)
 
+                # filter any features that the human got right from subsequent remedial demonstrations and tests
+                running_variable_filter = (opt_feature_count - human_feature_count) == 0
+                # however, always allow for differences in action features since essentially every demonstration will
+                # convey information about the action weight when considering one or two step deviations (this may be mitigated if we used counterfactual reasoning)
+                running_variable_filter[0][2] = 0
 
                 if (human_feature_count == opt_feature_count).all():
                     print("You got the test right")

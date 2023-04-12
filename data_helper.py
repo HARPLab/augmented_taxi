@@ -740,6 +740,8 @@ def obtain_human_trajectories(test_env_dict):
         mdp.reset()
         opt_trajectory = []
         opt_moves_list = df_testing.test_mdp[i]['opt_actions']
+        cur_state = mdp.get_init_state()
+
         for idx in range(len(opt_moves_list)):
             reward, next_state = mdp.execute_agent_action(opt_moves_list[idx])
             opt_trajectory.append((cur_state, opt_moves_list[idx], next_state))

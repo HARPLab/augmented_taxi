@@ -297,9 +297,11 @@ BEC = {
 
     'n_particles': 200,                      # number of particles in particle filter
 
-    'obj_func_proportion': 1                  # proportion of the max objective function (i.e. info gain) to aim for
+    'obj_func_proportion': 1,                 # proportion of the max objective function (i.e. info gain) to aim for
                                               # when selecting the next demonstration (range: 0 - 1). selecting a value
                                               # less than 1 may yield a greater number of demonstrations
+
+    'BEC_depth': 2,                           # number of action deviations to consider when extracting BEC constraints
 }
 
 data_loc = {

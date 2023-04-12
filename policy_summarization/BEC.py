@@ -22,7 +22,7 @@ import policy_summarization.BEC_visualization as BEC_viz
 from policy_summarization import computational_geometry as cg
 
 def extract_constraints_policy(args):
-    env_idx, data_loc, step_cost_flag = args
+    env_idx, data_loc, BEC_depth, step_cost_flag = args
     with open(mp_helpers.lookup_env_filename(data_loc, env_idx), 'rb') as f:
         wt_vi_traj_env = pickle.load(f)
 
@@ -38,6 +38,8 @@ def extract_constraints_policy(args):
     reward_record = []                    # the rewards associated with the optimal trajectories
     mdp_reward_features = mdp.reward_features        # logs which reward features each mdp contains
 
+    action_seq_list = list(itertools.product(mdp.actions, repeat=BEC_depth))
+
     for state in mdp.states:
         constraints = []
         traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state)
@@ -49,14 +51,12 @@ def extract_constraints_policy(args):
             sas = traj_opt[sas_idx]
             cur_state = sas[0]
 
-            # currently assumes that all actions are executable from all states. only considering
-            # action depth of 1 currently
-            for action in mdp.actions:
-                if action != sas[1]:
-                    traj_hyp = mdp_helpers.rollout_policy(mdp, agent, cur_state=cur_state, action_seq=[action])
-                    mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
+            # currently assumes that all actions are executable from all states
+            for action_seq in action_seq_list:
+                traj_hyp = mdp_helpers.rollout_policy(mdp, agent, cur_state=cur_state, action_seq=action_seq)
+                mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
 
-                    constraints.append(mu_sa - mu_sb)
+                constraints.append(mu_sa - mu_sb)
 
             # if considering only suboptimal actions of the first sas, put the corresponding constraints
             # toward the BEC of the policy (per definition)
@@ -76,7 +76,7 @@ def extract_constraints_policy(args):
     return env_idx, traj_record, traj_features_record, policy_constraints, min_subset_constraints_record, reward_record, mdp_reward_features
 
 def extract_constraints_demonstration(args):
-    env_idx, vi, traj_opt, step_cost_flag = args
+    env_idx, vi, traj_opt, BEC_depth, step_cost_flag = args
 
     min_subset_constraints_record = []    # minimum BEC constraints conveyed by a trajectory
     policy_constraints = []               # BEC constraints that define a policy (i.e. constraints arising from one action
@@ -94,7 +94,7 @@ def extract_constraints_demonstration(args):
     constraints = []
     # BEC constraints are obtained by ensuring that the optimal actions accumulate at least as much reward as
     # all other possible actions along a trajectory (only considering an action depth of 1 currently)
-    action_seq_list = list(itertools.product(mdp.actions, repeat=1))
+    action_seq_list = list(itertools.product(mdp.actions, repeat=BEC_depth))
 
     for sas_idx in range(len(traj_opt)):
         # reward features of optimal action
@@ -126,7 +126,7 @@ def extract_constraints_demonstration(args):
     return env_idx, traj_record, traj_features_record, policy_constraints, min_subset_constraints_record, reward_record, mdp_reward_features
 
 
-def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=None, print_flag=False):
+def extract_constraints(data_loc, BEC_depth, step_cost_flag, pool, vi_traj_triplets=None, print_flag=False):
     '''
     :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
     :param weights (numpy array): Ground truth reward weights used by agent to derive its optimal policy
@@ -152,7 +152,7 @@ def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=None, p
         # a) policy-driven BEC: generate constraints by considering the expected feature counts after taking one
         # suboptimal action in every possible state in the state space, then acting optimally afterward. see eq 13, 14
         # of Brown et al. 'Machine Teaching for Inverse Reinforcement Learning: Algorithms and Applications' 2019
-        args = [(i, data_loc, step_cost_flag) for i in range(n_envs)]
+        args = [(i, data_loc, BEC_depth, step_cost_flag) for i in range(n_envs)]
         results = list(tqdm(pool.imap(extract_constraints_policy, args), total=len(args)))
         pool.close()
         pool.join()
@@ -183,7 +183,7 @@ def extract_constraints(data_loc, step_cost_flag, pool, vi_traj_triplets=None, p
         # see eq 16 of Brown et al. 'Machine Teaching for Inverse Reinforcement Learning: Algorithms and Applications' 2019
         # need to specify the environment idx, environment, and corresponding optimal trajectories (first, second, and
         # third elements of vi_traj_triplet, respectively) that you want to extract constraints from
-        args = [(vi_traj_triplet[0], vi_traj_triplet[1], vi_traj_triplet[2], step_cost_flag) for vi_traj_triplet in vi_traj_triplets]
+        args = [(vi_traj_triplet[0], vi_traj_triplet[1], vi_traj_triplet[2], BEC_depth, step_cost_flag) for vi_traj_triplet in vi_traj_triplets]
         results = list(tqdm(pool.imap(extract_constraints_demonstration, args), total=len(args)))
         pool.close()
         pool.join()
