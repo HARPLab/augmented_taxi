@@ -306,8 +306,7 @@ class AugmentedTaxi2OOMDP(OOMDP):
             dy (int) [optional]
 
         Returns:
-            (AugmentedTaxiState)
-        '''
+            (AugmentedTaxiState)'''
 
         if taxi_helpers._is_wall_in_the_way(self, state, dx=dx, dy=dy):
             # There's a wall in the way.
