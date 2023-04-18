@@ -432,7 +432,6 @@ def calculate_new_pos (new_cop, pointer, step_size, currx, curry, currstate, cou
                 (twox, twoy, twostate) = new_cop[pointer + 2]
             elif (counter == 1):
                 (twox, twoy, twostate) = (last.get_agent_x(), last.get_agent_y(), last)
-            else:
             new_direction = (twox - nextx, twoy - nexty) 
             if twox > nextx: 
                 newx = nextx + diff
