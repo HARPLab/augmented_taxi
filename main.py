@@ -37,6 +37,8 @@ mpl.rcParams['axes.labelsize'] = 'x-large'
 mpl.rcParams['xtick.labelsize'] = 'large'
 
 
+import pdb
+
 def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
     try:
         with open('models/' + data_loc + '/vi_agent.pickle', 'rb') as f:
@@ -414,9 +416,10 @@ def calculate_new_pos (new_cop, pointer, step_size, currx, curry, currstate, cou
         (nextx, nexty, nextstate) = new_cop[pointer + 1]
     elif counter == 1:
         (nextx, nexty, nextstate) = new_cop[-1]
+
     else:
         (nextx, nexty, nextstate) = (last.get_agent_x(), last.get_agent_y(), last)
-        print(last)
+    
     #going left
     if nextx < currx:    
         action = "left"
@@ -425,8 +428,11 @@ def calculate_new_pos (new_cop, pointer, step_size, currx, curry, currstate, cou
         if (newx < nextx):
             diff = nextx - newx
             #this should only happen on not last part of this segment
-            (twox, twoy, twostate) = new_cop[pointer + 2]
-            
+            if (counter == 0):
+                (twox, twoy, twostate) = new_cop[pointer + 2]
+            elif (counter == 1):
+                (twox, twoy, twostate) = (last.get_agent_x(), last.get_agent_y(), last)
+            else:
             new_direction = (twox - nextx, twoy - nexty) 
             if twox > nextx: 
                 newx = nextx + diff
@@ -445,7 +451,10 @@ def calculate_new_pos (new_cop, pointer, step_size, currx, curry, currstate, cou
         if (newx > nextx):
             diff = newx - nextx
             #this should only happen on not last part of this segment
-            (twox, twoy, twostate) = new_cop[pointer + 2]
+            if (counter == 0):
+                (twox, twoy, twostate) = new_cop[pointer + 2]
+            elif (counter == 1):
+                (twox, twoy, twostate) = (last.get_agent_x(), last.get_agent_y(), last)
             new_direction = (twox - nextx, twoy - nexty) 
             if twox < nextx:
                 newx = nextx - diff
@@ -464,7 +473,10 @@ def calculate_new_pos (new_cop, pointer, step_size, currx, curry, currstate, cou
         if (newy > nexty):
             diff = newy - nexty
             #this should only happen on not last part of this segment
-            (twox, twoy, twostate) = new_cop[pointer + 2]
+            if (counter == 0):
+                (twox, twoy, twostate) = new_cop[pointer + 2]
+            elif (counter == 1):
+                (twox, twoy, twostate) = (last.get_agent_x(), last.get_agent_y(), last)
             new_direction = (twox - nextx, twoy - nexty) 
             if twox < nextx: 
                 newy = nexty
@@ -476,14 +488,17 @@ def calculate_new_pos (new_cop, pointer, step_size, currx, curry, currstate, cou
                 newy = nexty - diff
             pointer += 1
     #going down
-    elif curry < nexty:  
+    elif curry > nexty:  
         action = "down"
         (newx, newy) = (currx, curry - step_size)
         #need to make changes if wrapping around
         if (newy < nexty):
             diff = nexty - newy
             #this should only happen on not last part of this segment
-            (twox, twoy, twostate) = new_cop[pointer + 2]
+            if (counter == 0):
+                (twox, twoy, twostate) = new_cop[pointer + 2]
+            elif (counter == 1):
+                (twox, twoy, twostate) = (last.get_agent_x(), last.get_agent_y(), last)
             new_direction = (twox - nextx, twoy - nexty) 
             if twox < nextx: 
                 newy = nexty
@@ -496,26 +511,15 @@ def calculate_new_pos (new_cop, pointer, step_size, currx, curry, currstate, cou
             pointer += 1
     else:
         return
-    print(action)
-    print(currx, curry)
-    print(newx, newy)
-    print(nextx, nexty)
     editedstate = copy.deepcopy(currstate)
     editedstate.objects["agent"][0]["x"] = newx
     editedstate.objects["agent"][0]["y"] = newy
-    print(editedstate.get_agent_x(), editedstate.get_agent_y())
 
     return newx, newy, editedstate, action
 
 
 
 def normalize_trajs(opt_traj, human_traj):
-    '''
-    see screenshot in slack 
-    subpixel interpolation?
-    library to do partial steps for trajectory in terms of coordinates
-    trajectory walking 
-    '''
     opt_traj_currs = [currstate for (prevstate, action, currstate) in opt_traj]
     human_traj_currs = [currstate for (prevstate, action, currstate) in human_traj]
     matcher = difflib.SequenceMatcher(None, opt_traj_currs, human_traj_currs, autojunk=False)
@@ -525,12 +529,13 @@ def normalize_trajs(opt_traj, human_traj):
     for match in matches:
         for i in range(match[2]):
             anchor_points.append((match[0] + i, match[1] + i))
+    
+    for pt in anchor_points:
+        (opt, hum) = pt
             
     normalized_opt_traj = []
     normalized_human_traj = []
-    #so now anchor points contains tuples of indices in the companion trajectories where the trajectories
-    #overlap, want to normalize the indices
-    
+
     for i in range(len(anchor_points)):
         (opt_idx, human_idx) = anchor_points[i]
 
@@ -542,11 +547,13 @@ def normalize_trajs(opt_traj, human_traj):
              
         diff_opt = opt_idx - prev_opt_idx + 1
         diff_human = human_idx - prev_human_idx + 1
+
         #all good no normalization needed for this segment
         if (diff_opt == diff_human):
             normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx, human_idx)]
             normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx, opt_idx)]
             continue
+
         else: 
             opt_start_state = opt_traj[prev_opt_idx][0]
             human_start_state = human_traj[prev_human_idx][0]
@@ -560,7 +567,7 @@ def normalize_trajs(opt_traj, human_traj):
                 opt_segment = [] #going to hold normalized segment in terms of states
                 for j in range(prev_opt_idx, opt_idx + 1):
                     new_cop.append((opt_traj[j][0].get_agent_x(), opt_traj[j][0].get_agent_y(), opt_traj[j][0]))
-                #should run diff_opt number of times
+
                 counter = 0
                 last = opt_traj[opt_idx][2]
                 for k in range(len(new_cop) + 1):
@@ -571,8 +578,8 @@ def normalize_trajs(opt_traj, human_traj):
                     if (k == len(new_cop) - 1):
                         counter = 1
                     elif (k == len(new_cop)):
-                        print("HERE")
                         counter = 2
+
                     newx, newy, editedstate, action = calculate_new_pos(new_cop, pointer, step_size, currx, curry, currstate, counter, last)
                     opt_segment.append((currstate, action, editedstate))
                     holder.append((newx, newy, editedstate))
@@ -582,13 +589,12 @@ def normalize_trajs(opt_traj, human_traj):
                 
             #need to expand human trajectory
             else:
-                
                 step_size = diff_human/diff_opt
 
                 human_segment = [] #going to hold normalized segment in terms of states
                 for j in range(prev_human_idx, human_idx + 1):
                     new_cop.append((human_traj[j][0].get_agent_x(), human_traj[j][0].get_agent_y(), human_traj[j][0]))
-                #should run diff_opt number of times
+
                 counter = 0
                 last = human_traj[human_idx][2]
                 for k in range(len(new_cop) + 1):
@@ -599,7 +605,6 @@ def normalize_trajs(opt_traj, human_traj):
                     if (k == len(new_cop) - 1):
                         counter = 1
                     elif (k == len(new_cop)):
-                        print("HERE")
                         counter = 2
                     newx, newy, editedstate, action = calculate_new_pos(new_cop, pointer, step_size, currx, curry, currstate, counter, last)
                     human_segment.append((currstate, action, editedstate))
@@ -608,12 +613,10 @@ def normalize_trajs(opt_traj, human_traj):
 
                 normalized_human_traj = normalized_human_traj + human_segment
                 normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx, opt_idx)]
-                print(normalized_human_traj, len(normalized_human_traj))
-                print(normalized_opt_traj, len(normalized_opt_traj))
+
     normalized_human_traj.append(human_traj[-1])
     normalized_opt_traj.append(opt_traj[-1])
-    print(normalized_opt_traj, len(normalized_opt_traj))
-    print(normalized_human_traj, len(normalized_human_traj))
+
     return normalized_opt_traj, normalized_human_traj                
                     
 
@@ -697,10 +700,7 @@ def obtain_unit_tests(mdp_class, BEC_summary, visited_env_traj_idxs, particles_s
                     BEC_viz.visualize_pf_transition([-failed_BEC_constraint], particles_prev, particles, mdp_class, weights)
                     particles_prev = copy.deepcopy(particles)
 
-                #test_mdp.visualize_trajectory(human_traj)
                 normalized_opt_traj, normalized_human_traj = normalize_trajs(opt_traj, human_traj)
-                test_mdp.visualize_trajectory(normalized_human_traj)
-                test_mdp.visualize_trajectory(normalized_opt_traj)
                 test_mdp.visualize_trajectory_comparison(normalized_opt_traj, normalized_human_traj)
 
                 print("Here is a remedial demonstration that might be helpful")
