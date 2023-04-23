@@ -495,18 +495,16 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
         Visualizes the sequence of states and actions stored in the trajectory.
     '''
     #counterfactual is user input 
-    print(trajectory)
-    print(trajectory_counterfactual)
-    wait = False
-    partial_steps = True
+
+    wait = True
 
     screen = pygame.display.set_mode((scr_width, scr_height))
-    cur_state = trajectory[0][0]
-    cur_state_counterfactual = trajectory_counterfactual[0][0]
+    cur_state_traj = trajectory[0][0]
+    cur_state_counter = trajectory_counterfactual[0][0]
 
     # Setup and draw initial state.
-    dynamic_shapes, agent_history = _vis_init(screen, mdp, draw_state, cur_state, offset_direction=1)
-    dynamic_shapes_counterfactual, agent_history_counterfactual = draw_state(screen, mdp, cur_state_counterfactual, draw_statics=False, agent_history=[], offset_direction=-1, alpha=150)
+    dynamic_shapes, agent_history = _vis_init(screen, mdp, draw_state, cur_state_traj, offset_direction=1)
+    dynamic_shapes_counterfactual, agent_history_counterfactual = draw_state(screen, mdp, cur_state_counter, draw_statics=False, agent_history=[], offset_direction=-1, alpha=150)
 
     pygame.event.clear()
     
@@ -515,19 +513,21 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
 
     step_traj = 0
     step_counter = 0
-    step_neutral = 0
 
     step = 0
 
-    '''anchor_points_wait = []
-    matcher = difflib.SequenceMatcher(None,trajectory, trajectory_counterfactual, autojunk=False)
+    anchor_points_wait = []
+    traj_currs = [currstate for (prevstate, action, currstate) in trajectory]
+    countertraj_currs = [currstate for (prevstate, action, currstate) in trajectory_counterfactual]
+    matcher = difflib.SequenceMatcher(None, traj_currs, countertraj_currs, autojunk=False)
     matches = matcher.get_matching_blocks()
+
 
     for match in matches:
         #add states in overlap
-        traj_idx = match[0]
-        counter_idx = match[1]
-        anchor_points_wait.append(trajectory[traj_idx - 1][2])'''
+        for i in range(match[2]):
+            anchor_points_wait.append(traj_currs[match[0] + i])
+
 
     while (step_traj < len_traj or step_counter < len_counter):
         if wait:  
@@ -544,30 +544,27 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
                     for shape in dynamic_shapes_counterfactual:
                         pygame.draw.rect(screen, (255, 255, 255), shape)
 
-                    if (step_traj != 0 and step_counter != 0):
-                        prev_traj = cur_state_traj
-                        prev_counter = cur_state_counter
+                    #if (step_traj != 0 and step_counter != 0):
+                    prev_traj = cur_state_traj
+                    prev_counter = cur_state_counter
 
                     if step_traj < len_traj:
                         cur_state_traj = trajectory[step_traj][2]
-                        if ((cur_state_traj in anchor_points_wait) and prev_counter not in anchor_points_wait):
-                            step_traj -= 1
-                            if (cur_state_counter in anchor_points_wait):
-                                step_traj += 1
+                        
                     else:
                         cur_state_traj = trajectory[-1][2]
 
                     if step_counter < len_counter:
                         cur_state_counter = trajectory_counterfactual[step_counter][2]
-                        if ((cur_state_counter in anchor_points_wait) and prev_traj not in anchor_points_wait):
-                            step_counter -= 1
-                            if (cur_state_traj in anchor_points_wait):
-                                step_counter += 1
+                  
                     else:
                         cur_state_counter = trajectory_counterfactual[-1][2]
                     
-                    if ((cur_state_counter in anchor_points_wait) and (cur_state_traj in anchor_points_wait) and (prev_counter not in anchor_points_wait)):
-                        step_traj += 1
+                    if (cur_state_traj in anchor_points_wait and cur_state_counter != cur_state_traj):
+                        step_traj -= 1
+
+                    if (cur_state_counter in anchor_points_wait and cur_state_traj != cur_state_counter):
+                        step_counter -= 1
 
                     dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state_traj,
                                                             agent_history=agent_history, offset_direction=1, visualize_history=False)
@@ -577,8 +574,9 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
 
                     step_traj += 1
                     step_counter += 1
+            cur_state = cur_state_traj
 
-        elif partial_steps:
+        else:
             for event in pygame.event.get():
                 if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
                     # Quit.
@@ -608,8 +606,6 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
                                                                                         draw_statics=False, offset_direction=-1, alpha=150, visualize_history=False)
 
                     step += 1
-        else:
-            return
 
         pygame.display.flip()
 
