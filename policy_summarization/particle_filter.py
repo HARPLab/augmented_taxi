@@ -610,7 +610,7 @@ class Particles():
 
     def calc_entropy(self):
         '''
-        Implement entropy measure for particle filter as described in Particle Filter Based Entropy (boers_mandal_ICIF2010)
+        Implement entropy measure for particle filter as described in Learning Human Ergonomic Preferences for Handovers (Bestick et al. 2018)
 
         Spherical discretization taken from : A new method to subdivide a spherical surface into equal-area cells,
         Malkin 2019 https://arxiv.org/pdf/1612.03467.pdf
@@ -636,6 +636,8 @@ class Particles():
         for item in list(bin_weight_mapping.values()):
             sum += np.sum(np.array(item))
         assert np.isclose(sum, 1)
+
+        entropy = entropy.round(4) # for numerical stability
 
         assert entropy >= 0, "Entropy shouldn't be negative!"
 

@@ -1275,9 +1275,11 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BE
     # obtain the demos needed to convey the most constraining BEC region
     BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(BEC_constraints,
                                                                                 min_subset_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record, mdp_features_record, variable_filter=variable_filter)
+
+    print('{} exact candidates for remedial demo/test'.format(len(BEC_constraint_bookkeeping[0])))
     if len(BEC_constraint_bookkeeping[0]) > 0:
         # the human's incorrect response can be corrected with a direct counterexample
-        best_env_idxs, best_traj_idxs = list(zip(*BEC_constraint_bookkeeping[0]))
+        best_env_idxs, best_traj_idxs, best_constraints = list(zip(*BEC_constraint_bookkeeping[0]))
 
         # simply optimize for the visuals of the direct counterexample
         best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record,
@@ -1287,9 +1289,10 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BE
     else:
         nn_BEC_constraint_bookkeeping, minimal_distances = BEC_helpers.perform_nn_BEC_constraint_bookkeeping(BEC_constraints,
                                                                                     min_subset_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record, mdp_features_record, variable_filter=variable_filter)
+        print('{} approximate candidates for remedial demo/test'.format(len(nn_BEC_constraint_bookkeeping[0])))
         if len(nn_BEC_constraint_bookkeeping[0]) > 0:
             # the human's incorrect response can be corrected with similar enough counterexample
-            best_env_idxs, best_traj_idxs = list(zip(*nn_BEC_constraint_bookkeeping[0]))
+            best_env_idxs, best_traj_idxs, best_constraints = list(zip(*nn_BEC_constraint_bookkeeping[0]))
 
             # simply optimize for the visuals of the direct counterexample
             best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs,

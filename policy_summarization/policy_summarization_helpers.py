@@ -252,7 +252,7 @@ def _in_summary(mdp, summary, initial_state):
             return True
     return False
 
-def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_record, summary, type='training'):
+def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_record, summary, type='training', return_all_equiv=False):
     visual_dissimilarities = np.zeros(len(best_env_idxs))
     complexities = np.zeros(len(best_env_idxs))
 
@@ -320,10 +320,22 @@ def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_recor
     complexities_sorted, visual_dissimilarities_sorted, _, best_env_idxs_sorted, best_traj_idxs_sorted = list(
         zip(*sorted_zipped))
 
-    best_env_idx = best_env_idxs_sorted[0]
-    best_traj_idx = best_traj_idxs_sorted[0]
 
-    return best_env_idx, best_traj_idx
+    if return_all_equiv:
+        # return all env/traj indices that have the same complexity, and the same visual dissimilarity (still preserving
+        # the hierarchical sorting of complexity first, visual dissimilarity second. useful for following this with info opt
+        indices = np.intersect1d(np.where(complexities_sorted == min(complexities_sorted))[0],
+                                 np.where(visual_dissimilarities_sorted == visual_dissimilarities_sorted[0])[0])
+
+        best_env_idxs = np.array(best_env_idxs_sorted)[indices]
+        best_traj_idxs = np.array(best_traj_idxs_sorted)[indices]
+
+        return best_env_idxs, best_traj_idxs
+    else:
+        best_env_idx = best_env_idxs_sorted[0]
+        best_traj_idx = best_traj_idxs_sorted[0]
+
+        return best_env_idx, best_traj_idx
 
 def select_test_demos(cluster_idx, data_loc, n_desired_test_env, env_idxs, traj_opts, BEC_lengths, BEC_constraints, env_traj_tracer_flattened, n_clusters=5):
     kmeans = KMeans(n_clusters=n_clusters).fit(np.array(BEC_lengths).reshape(-1, 1))

@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import os
 import itertools
+from collections import defaultdict
 
 # Other imports.
 sys.path.append("simple_rl")
@@ -569,34 +570,42 @@ def simulate_human_model_updates(domain, BEC_summary, visited_env_traj_idxs, par
     # go through potentially duplicate trajectories and visualize them
     print('domain: {}'.format(domain))
 
-    prior = [np.array([[0, 0, -1]])]
+    model_low = prior.copy()
     if domain == 'augmented_taxi2':
-        model_low = [np.array([[1, 0, -4]]), np.array([[-1, 0, 2]])]
+        model_low.extend([np.array([[1, 0, -4]]), np.array([[-1, 0, 2]])])
         model_medium = model_low.copy()
         model_medium.extend([np.array([[0, -1, -4]]), np.array([[0, 1, 2]])])
         model_high = model_medium.copy()
         model_high.extend([np.array([[1, 1, 0]])])
     elif domain == 'colored_tiles':
-        model_low = [np.array([[1, 0, -8]]), np.array([[-1, 0, 6]])]
+        model_low.extend([np.array([[1, 0, -8]]), np.array([[-1, 0, 6]])])
         model_medium = model_low.copy()
-        model_medium.extend([np.array([[ 0, -1,  4]]), np.array([[ 0,  1, -6]])])
+        model_medium.extend([np.array([[0, -1, 4]]), np.array([[0, 1, -6]])])
         model_high = model_medium.copy()
         model_high.extend([np.array([[1, -1, -2]])])
     elif domain == 'skateboard2':
-        model_low = [np.array([[-6, 0, 1]]), np.array([[9, 0, -2]])]
+        model_low.extend([np.array([[-6, 0, 1]]), np.array([[9, 0, -2]])])
         model_medium = model_low.copy()
-        model_medium.extend([np.array([[ 0, -2,  1]]), np.array([[ 0,  5, -3]])])
+        model_medium.extend([np.array([[0, -2, 1]]), np.array([[0, 5, -3]])])
         model_high = model_medium.copy()
-        model_high.extend([np.array([[-6,  4, -1]]), np.array([[ 8,  1, -2]]), np.array([[ 5,  2, -2]])])
+        model_high.extend([np.array([[-6, 4, -1]]), np.array([[8, 1, -2]]), np.array([[5, 2, -2]])])
 
     for difficulty in filtered_human_traj_dict[domain].keys():
+    # for difficulty in ['low']:
+
+        if difficulty == 'low':
+            human_model_constraints = model_low
+        elif difficulty == 'medium':
+            human_model_constraints = model_medium
+        else:
+            human_model_constraints = model_high
 
         print('difficulty: {}'.format(difficulty))
 
         # initialize a particle filter model of human
         particle_positions = BEC_helpers.sample_human_models_uniform([], n_particles)
         particles_orig = pf.Particles(particle_positions)
-        particles_orig.update(prior)
+        particles_orig.update(human_model_constraints)
 
         for tag in filtered_human_traj_dict[domain][difficulty].keys():
 
@@ -738,7 +747,258 @@ def simulate_human_model_updates(domain, BEC_summary, visited_env_traj_idxs, par
                                 particles_prev = copy.deepcopy(particles)
 
 
+def contrast_PF_2_step_dev(domain, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, data_loc, weights, step_cost_flag, visualize_pf_transition=False):
+    with open('filtered_human_responses.pickle', 'rb') as f:
+        filtered_human_traj_dict, filtered_mdp_dict, filtered_count_dict, filtered_opt_reward_dict, filtered_human_reward_dict, filtered_opt_traj_dict = pickle.load(
+            f)
+
+    with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
+        policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(
+            f)
+
+    # go through potentially duplicate trajectories and visualize them
+    print('domain: {}'.format(domain))
+
+    model_low = prior.copy()
+    if domain == 'augmented_taxi2':
+        model_low.extend([np.array([[1, 0, -4]]), np.array([[-1, 0, 2]])])
+        model_medium = model_low.copy()
+        model_medium.extend([np.array([[0, -1, -4]]), np.array([[0, 1, 2]])])
+        model_medium = BEC_helpers.remove_redundant_constraints(model_medium, weights, step_cost_flag)
+        model_high = model_medium.copy()
+        model_high.extend([np.array([[1, 1, 0]])])
+    elif domain == 'colored_tiles':
+        model_low.extend([np.array([[1, 0, -8]]), np.array([[-1, 0, 6]])])
+        model_medium = model_low.copy()
+        model_medium.extend([np.array([[ 0, -1,  4]]), np.array([[ 0,  1, -6]])])
+        model_high = model_medium.copy()
+        model_high.extend([np.array([[1, -1, -2]])])
+    elif domain == 'skateboard2':
+        model_low.extend([np.array([[-6, 0, 1]]), np.array([[9, 0, -2]])])
+        model_medium = model_low.copy()
+        model_medium.extend([np.array([[ 0, -2,  1]]), np.array([[ 0,  5, -3]])])
+        model_high = model_medium.copy()
+        model_high.extend([np.array([[-6,  4, -1]]), np.array([[ 8,  1, -2]]), np.array([[ 5,  2, -2]])])
+
+    try:
+        with open('models/' + data_loc + '/' + 'PF_2-step_dev_comparison.pickle', 'rb') as f:
+            overlap_counter, PF_best_idxs, VO_best_idxs, failed_constraints = pickle.load(f)
+        pass
+    except:
+        overlap_counter = {'low': [], 'medium': [], 'high': []}
+        PF_best_idxs = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+        VO_best_idxs = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+        failed_constraints = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+
+        for difficulty in filtered_human_traj_dict[domain].keys():
+        # for difficulty in ['high']:
+            if difficulty == 'low':
+                human_model_constraints = model_low
+            elif difficulty == 'medium':
+                human_model_constraints = model_medium
+            else:
+                human_model_constraints = model_high
+            print('difficulty: {}'.format(difficulty))
+
+            # initialize a particle filter model of human
+            particle_positions = BEC_helpers.sample_human_models_uniform([], n_particles)
+            particles_orig = pf.Particles(particle_positions)
+            particles_orig.update(human_model_constraints)
+
+            # precompute the constraints for the potential demonstrations you can show for domain and difficulty
+            try:
+                with open('models/' + data_loc + '/' + 'PF_constraints_' + difficulty + '.pickle', 'rb') as f:
+                    info_gains_record, min_env_constraints_record = pickle.load(f)
+
+            except:
+                # the human's incorrect response does not have a direct counterexample, and thus you need to use information gain to obtain the next example
+                sample_human_models, model_weights = BEC_helpers.sample_human_models_pf(particles_orig, n_human_models)
+                info_gains_record = []
+
+                for model_idx, human_model in enumerate(sample_human_models):
+                    print(colored('Model #: {}'.format(model_idx), 'red'))
+                    print(colored('Model val: {}'.format(human_model), 'red'))
+
+                    with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
+                        myfile.write('Model #: {}\n'.format(model_idx))
+                        myfile.write('Model val: {}\n'.format(human_model))
+
+                    # based on the human's current model, obtain the information gain generated when comparing to the agent's
+                    # optimal trajectories in each environment (human's corresponding optimal trajectories and constraints
+                    # are saved for reference later)
+                    print("Obtaining counterfactual information gains:")
+
+                    cf_data_dir = 'models/' + data_loc + '/counterfactual_data_' + difficulty + '/model' + str(model_idx)
+                    os.makedirs(cf_data_dir, exist_ok=True)
+
+                    pool.restart()
+                    args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], None, human_model, step_cost_flag, difficulty, np.zeros((1, 3)), mdp_features_record[i], True) for i in range(len(traj_record))]
+                    info_gain_envs = list(tqdm(pool.imap(BEC.compute_counterfactuals, args), total=len(args)))
+                    pool.close()
+                    pool.join()
+                    pool.terminate()
+
+                    info_gains_record.append(info_gain_envs)
+
+                print("Combining the most limiting constraints across human models:")
+                pool.restart()
+                args = [(i, len(sample_human_models), data_loc, difficulty, weights, step_cost_flag, np.zeros((1, 3)),
+                         mdp_features_record[i],
+                         traj_record[i], human_model_constraints, None) for
+                        i in range(len(traj_record))]
+                info_gains_record, min_env_constraints_record, n_diff_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(
+                    *pool.imap(BEC.combine_limiting_constraints_IG, tqdm(args)))
+                pool.close()
+                pool.join()
+                pool.terminate()
+
+                with open('models/' + data_loc + '/' + 'PF_constraints_' + difficulty + '.pickle', 'wb') as f:
+                    pickle.dump((info_gains_record, min_env_constraints_record), f)
+
+            overlap_counter_per_difficulty = []
+
+            for tag in filtered_human_traj_dict[domain][difficulty].keys():
+            # for tag in ['2']:
+                print('tag: {}'.format(tag))
+                print('total number of trajectories: {}'.format(sum(filtered_count_dict[domain][difficulty][tag])))
+                total_num_unique_traj = len(filtered_human_traj_dict[domain][difficulty][tag])
+                for i, traj in enumerate(filtered_human_traj_dict[domain][difficulty][tag]):
+                    # if i != 4:
+                    #     continue
+
+                    particles = copy.deepcopy(particles_orig)
+                    particles_prev = copy.deepcopy(particles_orig)
+
+                    test_mdp = filtered_mdp_dict[domain][difficulty][tag][i]
+                    human_traj = filtered_human_traj_dict[domain][difficulty][tag][i]
+                    opt_traj = filtered_opt_traj_dict[domain][difficulty][tag][i]
+
+                    print('trajectory {}/{}'.format(i + 1, total_num_unique_traj))
+
+                    human_feature_count = test_mdp.accumulate_reward_features(human_traj, discount=True)
+                    opt_feature_count = test_mdp.accumulate_reward_features(opt_traj, discount=True)
+
+                    # filter any features that the human got right from subsequent remedial demonstrations and tests
+                    running_variable_filter = (opt_feature_count - human_feature_count) == 0
+                    # however, always allow for differences in action features since essentially every demonstration will
+                    # convey information about the action weight when considering one or two step deviations (this may be mitigated if we used counterfactual reasoning)
+                    running_variable_filter[0][2] = 0
+
+                    if (human_feature_count == opt_feature_count).all():
+                        # print("You got the test right")
+                        pass
+                    else:
+                        # print("You got the test wrong. Here's the correct answer")
+
+                        failed_BEC_constraint = opt_feature_count - human_feature_count
+                        # print("Failed BEC constraint: {}".format(failed_BEC_constraint))
+
+                        particles.update([-failed_BEC_constraint])
+                        if visualize_pf_transition:
+                            BEC_viz.visualize_pf_transition([-failed_BEC_constraint], particles_prev, particles,
+                                                            domain, weights)
+                            particles_prev = copy.deepcopy(particles)
+
+                        # test_mdp.visualize_trajectory_comparison(opt_traj, human_traj)
+                        # print("Here is a remedial demonstration that might be helpful")
+
+                        # count the demonstration overlap between 2-step dev/BEC and PF
+                        BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(failed_BEC_constraint,
+                                                                                                    min_env_constraints_record,
+                                                                                                    visited_env_traj_idxs,
+                                                                                                    traj_record,
+                                                                                                    traj_features_record,
+                                                                                                    mdp_features_record,
+                                                                                                    variable_filter=running_variable_filter)
+
+                        print('{} exact candidates for remedial demo/test'.format(len(BEC_constraint_bookkeeping[0])))
+                        if len(BEC_constraint_bookkeeping[0]) > 0:
+                            # the human's incorrect response can be corrected with a direct counterexample
+                            best_env_idxs, best_traj_idxs, best_constraints = list(zip(*BEC_constraint_bookkeeping[0]))
+
+                        else:
+                            nn_BEC_constraint_bookkeeping, minimal_distances = BEC_helpers.perform_nn_BEC_constraint_bookkeeping(
+                                failed_BEC_constraint,
+                                min_subset_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record,
+                                mdp_features_record, variable_filter=running_variable_filter)
+                            print('{} approximate candidates for remedial demo/test'.format(
+                                len(nn_BEC_constraint_bookkeeping[0])))
+                            if len(nn_BEC_constraint_bookkeeping[0]) > 0:
+                                # the human's incorrect response can be corrected with similar enough counterexample
+                                best_env_idxs, best_traj_idxs, best_constraints = list(
+                                    zip(*nn_BEC_constraint_bookkeeping[0]))
+
+
+                                # print('Failed constraint: {}'.format(minimal_distances[0][2]))
+                                # print('Similar-enough constraint: {}'.format(minimal_distances[0][3]))
+
+
+                        # find the demonstration that minimizes PF information gain
+                        best_info_gain = float('inf')
+                        info_gains = {}
+
+                        smallest_BEC_area = float('inf')
+
+                        # obtain the demonstrations that will convey the lowest information gain (while still providing the desired information)
+                        for j in range(len(best_env_idxs)):
+                            info_gain = particles.calc_info_gain(best_constraints[j])
+                            info_gains[(best_env_idxs[j], best_traj_idxs[j])] = (info_gain, best_constraints[j])
+
+                            if np.isclose(info_gain, best_info_gain):
+                                best_infogains_env_traj_idxs.append((best_env_idxs[j], best_traj_idxs[j]))
+                            elif info_gain < best_info_gain:
+                                best_info_gain = info_gain
+                                best_infogains_env_traj_idxs = [(best_env_idxs[j], best_traj_idxs[j])]
+
+                            BEC_area = BEC_helpers.calc_solid_angles([best_constraints[j]])[0]
+                            if np.isclose(BEC_area, smallest_BEC_area):
+                                best_BEC_area_env_traj_idxs.append((best_env_idxs[j], best_traj_idxs[j]))
+                            elif BEC_area < smallest_BEC_area:
+                                smallest_BEC_area = BEC_area
+                                best_BEC_area_env_traj_idxs = [(best_env_idxs[j], best_traj_idxs[j])]
+
+                        best_env_idxs_BEC, best_traj_idxs_BEC = list(zip(*best_BEC_area_env_traj_idxs))
+                        best_env_idxs_pf, best_traj_idxs_pf = list(zip(*best_infogains_env_traj_idxs))
+
+
+                        # a) consider both information gain and visual optimization when counting demonstration overlap between 2-step dev/BEC and PF
+                        best_env_idxs_BEC_vo_opt, best_traj_idxs_BEC_vo_opt = ps_helpers.optimize_visuals(data_loc, best_env_idxs_BEC,
+                                                                                  best_traj_idxs_BEC, traj_record,
+                                                                                  [], type=type, return_all_equiv=True)
+
+                        # first optimize for PF information gain, then optimize for visuals
+                        best_env_idxs_pf_vo_opt, best_traj_idxs_pf_vo_opt = ps_helpers.optimize_visuals(data_loc,
+                                                                                                  best_env_idxs_pf,
+                                                                                                  best_traj_idxs_pf,
+                                                                                                  traj_record,
+                                                                                                  [], type=type, return_all_equiv=True)
+
+                        zipped_env_traj_idxs_BEC = list(zip(best_env_idxs_BEC_vo_opt, best_traj_idxs_BEC_vo_opt))
+                        zipped_env_traj_idxs_pf = list(zip(best_env_idxs_pf_vo_opt, best_traj_idxs_pf_vo_opt))
+
+                        # b) only consider information gain
+                        # zipped_env_traj_idxs_BEC = list(zip(best_env_idxs_BEC, best_traj_idxs_BEC))
+                        # zipped_env_traj_idxs_pf = list(zip(best_env_idxs_pf, best_traj_idxs_pf))
+
+
+                        if len(set(zipped_env_traj_idxs_BEC) & set(zipped_env_traj_idxs_pf)) > 0:
+                            overlap_counter_per_difficulty.append(True)
+                        else:
+                            overlap_counter_per_difficulty.append(False)
+
+                        PF_best_idxs[difficulty][tag][i] = zipped_env_traj_idxs_pf
+                        VO_best_idxs[difficulty][tag][i] = zipped_env_traj_idxs_BEC
+                        failed_constraints[difficulty][tag][i] = failed_BEC_constraint
+
+            overlap_counter[difficulty] = overlap_counter_per_difficulty
+
+        with open('models/' + data_loc + '/' + 'PF_2-step_dev_comparison.pickle', 'wb') as f:
+            pickle.dump((overlap_counter, PF_best_idxs, VO_best_idxs, failed_constraints), f)
+
 if __name__ == "__main__":
+    from numpy.random import seed
+    seed(0)
+
     pool = Pool(min(params.n_cpu, 60))
     os.makedirs('models/' + params.data_loc['base'], exist_ok=True)
     os.makedirs('models/' + params.data_loc['BEC'], exist_ok=True)
@@ -751,12 +1011,15 @@ if __name__ == "__main__":
 
     # b) obtain a BEC summary of the agent's policy
     BEC_summary, visited_env_traj_idxs, particles_summary = obtain_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
-                            params.step_cost_flag, params.BEC['summary_variant'], pool, params.BEC['n_train_demos'],
+                            params.step_cost_flag, params.BEC['summary_variant'], pool, params.BEC['n_train_demos'], params.BEC['BEC_depth'],
                             params.BEC['n_human_models'], params.BEC['n_particles'], params.prior, params.posterior, params.BEC['obj_func_proportion'])
 
     # unit_tests = obtain_unit_tests(params.mdp_class,BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag)
 
-    simulate_human_model_updates(params.mdp_class,BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag)
+    n_human_models_real_time = 8
+    # simulate_human_model_updates(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], n_human_models_real_time, params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, visualize_pf_transition=False)
+
+    contrast_PF_2_step_dev(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], n_human_models_real_time, params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, visualize_pf_transition=False)
 
     # c) obtain test environments
     # obtain_test_environments(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,
