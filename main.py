@@ -419,7 +419,6 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
     particle_positions = BEC_helpers.sample_human_models_uniform([], n_particles)
     particles = pf.Particles(particle_positions)
     particles.update(prior)
-    particles_prev = copy.deepcopy(particles)
 
     # run through the pre-selected units
     for unit_idx, unit in enumerate(BEC_summary):
@@ -436,8 +435,7 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
             particles.update(subunit[3])
             # visualize the updated particle filter
             if visualize_pf_transition:
-                BEC_viz.visualize_pf_transition(subunit[3], particles_prev, particles, mdp_class, weights)
-                particles_prev = copy.deepcopy(particles)
+                BEC_viz.visualize_pf_transition(subunit[3], particles, mdp_class, weights)
 
         # obtain the constraints conveyed by the unit's demonstrations
         min_constraints = BEC_helpers.remove_redundant_constraints(unit_constraints, weights, step_cost_flag)
@@ -472,8 +470,7 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
 
                 particles.update(test_constraints)
                 if visualize_pf_transition:
-                    BEC_viz.visualize_pf_transition(test_constraints, particles_prev, particles, mdp_class, weights)
-                    particles_prev = copy.deepcopy(particles)
+                    BEC_viz.visualize_pf_transition(test_constraints, particles, mdp_class, weights)
 
             else:
                 print("You got the diagnostic test wrong. Here's the correct answer")
@@ -482,8 +479,7 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
 
                 particles.update([-failed_BEC_constraint])
                 if visualize_pf_transition:
-                    BEC_viz.visualize_pf_transition([-failed_BEC_constraint], particles_prev, particles, mdp_class, weights)
-                    particles_prev = copy.deepcopy(particles)
+                    BEC_viz.visualize_pf_transition([-failed_BEC_constraint], particles, mdp_class, weights)
 
                 test_mdp.visualize_trajectory_comparison(opt_traj, human_traj)
 
@@ -496,8 +492,7 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
 
                 particles.update([remedial_constraint])
                 if visualize_pf_transition:
-                    BEC_viz.visualize_pf_transition([remedial_constraint], particles_prev, particles, mdp_class, weights)
-                    particles_prev = copy.deepcopy(particles)
+                    BEC_viz.visualize_pf_transition([remedial_constraint], particles, mdp_class, weights)
 
                 with open('models/' + data_loc + '/remedial_instruction.pickle', 'wb') as f:
                     pickle.dump(remedial_instruction, f)
@@ -541,9 +536,7 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
 
                         particles.update([failed_BEC_constraint])
                         if visualize_pf_transition:
-                            BEC_viz.visualize_pf_transition([failed_BEC_constraint], particles_prev, particles, mdp_class,
-                                                            weights)
-                            particles_prev = copy.deepcopy(particles)
+                            BEC_viz.visualize_pf_transition([failed_BEC_constraint], particles, mdp_class, weights)
                     else:
                         failed_remedial_constraint = opt_feature_count - human_feature_count
                         print("You got the remedial test wrong. Here's the correct answer")
@@ -551,9 +544,7 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
 
                         particles.update([-failed_remedial_constraint])
                         if visualize_pf_transition:
-                            BEC_viz.visualize_pf_transition([-failed_remedial_constraint], particles_prev, particles, mdp_class,
-                                                            weights)
-                            particles_prev = copy.deepcopy(particles)
+                            BEC_viz.visualize_pf_transition([-failed_remedial_constraint], particles, mdp_class, weights)
 
 
 def analyze_prev_study_tests(domain, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, data_loc, weights, step_cost_flag, visualize_pf_transition=True):
@@ -613,7 +604,6 @@ def analyze_prev_study_tests(domain, BEC_summary, visited_env_traj_idxs, particl
             for i, traj in enumerate(filtered_human_traj_dict[domain][difficulty][tag]):
 
                 particles = copy.deepcopy(particles_orig)
-                particles_prev = copy.deepcopy(particles_orig)
 
                 test_mdp = filtered_mdp_dict[domain][difficulty][tag][i]
                 human_traj = filtered_human_traj_dict[domain][difficulty][tag][i]
@@ -653,9 +643,7 @@ def analyze_prev_study_tests(domain, BEC_summary, visited_env_traj_idxs, particl
 
                     particles.update([-failed_BEC_constraint])
                     if visualize_pf_transition:
-                        BEC_viz.visualize_pf_transition([-failed_BEC_constraint], particles_prev, particles,
-                                                        domain, weights)
-                        particles_prev = copy.deepcopy(particles)
+                        BEC_viz.visualize_pf_transition([-failed_BEC_constraint], particles, domain, weights)
 
                     test_mdp.visualize_trajectory_comparison(opt_traj, human_traj)
 
@@ -681,9 +669,7 @@ def analyze_prev_study_tests(domain, BEC_summary, visited_env_traj_idxs, particl
 
                     particles.update([remedial_constraint])
                     if visualize_pf_transition:
-                        BEC_viz.visualize_pf_transition([remedial_constraint], particles_prev, particles, domain,
-                                                        weights)
-                        particles_prev = copy.deepcopy(particles)
+                        BEC_viz.visualize_pf_transition([remedial_constraint], particles, domain, weights)
 
                     with open('models/' + data_loc + '/remedial_instruction.pickle', 'wb') as f:
                         pickle.dump(remedial_instruction, f)
@@ -728,10 +714,8 @@ def analyze_prev_study_tests(domain, BEC_summary, visited_env_traj_idxs, particl
 
                             particles.update([failed_BEC_constraint])
                             if visualize_pf_transition:
-                                BEC_viz.visualize_pf_transition([failed_BEC_constraint], particles_prev, particles,
-                                                                domain,
-                                                                weights)
-                                particles_prev = copy.deepcopy(particles)
+                                BEC_viz.visualize_pf_transition([failed_BEC_constraint], particles, domain, weights)
+
                         else:
                             failed_remedial_constraint = opt_feature_count - human_feature_count
                             print("You got the remedial test wrong. Here's the correct answer")
@@ -739,10 +723,7 @@ def analyze_prev_study_tests(domain, BEC_summary, visited_env_traj_idxs, particl
 
                             particles.update([-failed_remedial_constraint])
                             if visualize_pf_transition:
-                                BEC_viz.visualize_pf_transition([-failed_remedial_constraint], particles_prev,
-                                                                particles, domain,
-                                                                weights)
-                                particles_prev = copy.deepcopy(particles)
+                                BEC_viz.visualize_pf_transition([failed_BEC_constraint], particles, domain, weights)
 
 
 def contrast_PF_2_step_dev(domain, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, data_loc, weights, step_cost_flag, visualize_pf_transition=False):

@@ -24,7 +24,6 @@ class Particles():
         self.weights = np.ones(len(positions)) / len(positions)
         self.eps = eps
 
-        # copy over
         self.positions_prev = self.positions.copy()
         self.weights_prev = self.weights.copy()
 
@@ -148,6 +147,10 @@ class Particles():
         self.bin_neighbor_mapping_20 = self.initialize_bin_neighbor_mapping_20()
         self.bin_particle_mapping = None
         self.bin_weight_mapping = None
+
+    def reinitialize(self, positions):
+        self.positions = np.array(positions)
+        self.weights = np.ones(len(positions)) / len(positions)
 
     def initialize_bin_neighbor_mapping(self):
         '''
@@ -507,8 +510,6 @@ class Particles():
         :param k: concentration parameter of VMF
         :return: probability of x under this composite distribution (uniform + VMF)
         '''
-        self.weights_prev = self.weights.copy()
-
         for j, x in enumerate(self.positions):
             self.weights[j] = self.weights[j] * self.observation_probability(x, constraints)
 
@@ -516,8 +517,15 @@ class Particles():
         self.weights /= sum(self.weights)
 
     def plot(self, centroid=None, fig=None, ax=None, cluster_centers=None, cluster_weights=None,
-                       cluster_assignments=None):
-        vis_scale_factor = 10 * len(self.positions)
+                       cluster_assignments=None, plot_prev=False):
+        if plot_prev:
+            particle_positions = self.positions_prev
+            particle_weights = self.weights_prev
+        else:
+            particle_positions = self.positions
+            particle_weights = self.weights
+
+        vis_scale_factor = 10 * len(particle_positions)
         if fig == None:
             fig = plt.figure()
         if ax == None:
@@ -526,31 +534,31 @@ class Particles():
         if cluster_centers is not None:
             for cluster_id, cluster_center in enumerate(cluster_centers):
                 ax.scatter(cluster_center[0][0], cluster_center[0][1], cluster_center[0][2],
-                           s=500 * cluster_weights[cluster_id], c='red', marker='+')
+                           # s=500 * cluster_weights[cluster_id], c='red', marker='+')
+                           s=1000, c='red', marker='+')
 
             print("# of clusters: {}".format(len(np.unique(cluster_assignments))))
 
         if cluster_assignments is not None:
             # color the particles according to their cluster assignments if provided
             plt.set_cmap("gist_rainbow")
-            ax.scatter(self.positions[:, 0, 0], self.positions[:, 0, 1], self.positions[:, 0, 2],
-                       s=self.weights * vis_scale_factor, c=cluster_assignments)
+            ax.scatter(particle_positions[:, 0, 0], particle_positions[:, 0, 1], particle_positions[:, 0, 2],
+                       s=particle_weights * vis_scale_factor, c=cluster_assignments)
         else:
-            ax.scatter(self.positions[:, 0, 0], self.positions[:, 0, 1], self.positions[:, 0, 2],
-                       s=self.weights * vis_scale_factor, color='tab:blue')
+
+            ax.scatter(particle_positions[:, 0, 0], particle_positions[:, 0, 1], particle_positions[:, 0, 2],
+                       s=particle_weights * vis_scale_factor, color='tab:blue')
 
         # if centroid == None:
-        #     centroid = cg.spherical_centroid(self.positions.squeeze().T, self.weights)
+        #     centroid = cg.spherical_centroid(particle_positions.squeeze().T, particle_weights)
         # ax.scatter(centroid[0], centroid[1], centroid[2], marker='o', c='r', s=100)
 
-        # if matplotlib.get_backend() == 'TkAgg':
-        #     mng = plt.get_current_fig_manager()
-        #     mng.resize(*mng.window.maxsize())
+        if matplotlib.get_backend() == 'TkAgg':
+            ax.set_xlabel('$\mathregular{w_0}$: Mud')
+            ax.set_ylabel('$\mathregular{w_1}$: Recharge')
+            ax.set_zlabel('$\mathregular{w_2}$: Action')
 
     def resample_from_index(self, indexes, K=1):
-        self.weights_prev = self.weights.copy()
-        self.positions_prev = self.positions.copy()
-
         # resample
         self.positions = self.positions[indexes]
 
@@ -697,27 +705,52 @@ class Particles():
         return np.array(resample_indexes)
 
     def update(self, constraints, c=0.5):
-        self.reweight(constraints)
+        self.weights_prev = self.weights.copy()
+        self.positions_prev = self.positions.copy()
 
-        n_eff = self.calc_n_eff(self.weights)
-        # print('n_eff: {}'.format(n_eff))
-        if n_eff < c * len(self.weights):
-            # a) use systematic resampling
-            # indexes = p_utils.systematic_resample(self.weights)
-            # self.resample_from_index(indexes)
+        # check if any particles satisfy all constraints
+        constraints_matrix = np.vstack(constraints)
+        dist_to_plane = constraints_matrix.dot(self.positions.squeeze().T)
+        n_constraints_satisfied = np.sum(dist_to_plane >= 0, axis=0)
+        n_min_constraints = constraints_matrix.shape[0]
+        idx_valid_sph_points = np.where(n_constraints_satisfied == n_min_constraints)[0]
 
-            # b) use KLD resampling
+        if len(idx_valid_sph_points) > 0:
+            # at least one particle exists that satisfies all constraints so proceed with the standard update
+            for constraint in constraints:
+                self.reweight(constraint)
+
+                n_eff = self.calc_n_eff(self.weights)
+                # print('n_eff: {}'.format(n_eff))
+                if n_eff < c * len(self.weights):
+                    # a) use systematic resampling
+                    # resample_indexes = p_utils.systematic_resample(self.weights)
+                    # self.resample_from_index(resample_indexes)
+
+                    # b) use KLD resampling
+                    resample_indexes = self.KLD_resampling()
+                    self.resample_from_index(np.array(resample_indexes))
+
+                    # print('Number of particles: {}'.format(len(resample_indexes)))
+
+                    # print(np.unique(indexes, return_counts=True))
+                    # print(colored('Resampled', 'red'))
+
+                # centroid = cg.spherical_centroid(self.positions.squeeze().T, self.weights)
+                # normed_var = normalized_weighted_variance(particles, spherical_centroid=centroid)
+                # print('weighted variance: {}'.format(normed_var))
+        else:
+            # perform a reset as none of the particles satisfy all constraints
+            solid_angle = BEC_helpers.calc_solid_angles(constraints)[0]
+            new_particle_positions = BEC_helpers.sample_human_models_uniform(constraints, int(solid_angle / (4 * np.pi) * 100))
+            joint_particle_positions = np.vstack((np.array(new_particle_positions), self.positions))
+            self.reinitialize(joint_particle_positions)
+
+            # rely on KLD resampling to restabilize to the optimal number of particles
             resample_indexes = self.KLD_resampling()
             self.resample_from_index(np.array(resample_indexes))
 
-            print('Number of particles: {}'.format(len(resample_indexes)))
-
-            # print(np.unique(indexes, return_counts=True))
-            # print(colored('Resampled', 'red'))
-
-        # centroid = cg.spherical_centroid(self.positions.squeeze().T, self.weights)
-        # normed_var = normalized_weighted_variance(particles, spherical_centroid=centroid)
-        # print('weighted variance: {}'.format(normed_var))
+            print(colored('Performed a reset', 'red'))
 
         self.binned = False
 
@@ -745,7 +778,12 @@ class Particles():
 
 def IROS_demonstrations():
     prior = [np.array([[0, 0, -1]])]
-    n_particles = 500
+    n_particles = 200
+
+    constraints_list = [prior]
+    constraints_list.extend([[np.array([[-1,  0,  0]]), np.array([[-1,  0,  2]])], [np.array([[ 1,  0, -4]])], [np.array([[0, 1, 2]])],
+                   [np.array([[  0,  -1, -10]]), np.array([[ 0, -1, -4]])], [np.array([[1, 1, 0]])]])
+
 
     particle_positions = BEC_helpers.sample_human_models_uniform([], n_particles)
     particles = Particles(particle_positions)
@@ -765,8 +803,37 @@ def IROS_demonstrations():
     # plt.show()
 
     constraints_list = [prior]
-    constraints_list.extend([[np.array([[-1,  0,  0]]), np.array([[-1,  0,  2]])], [np.array([[ 1,  0, -4]])], [np.array([[0, 1, 2]])],
-                   [np.array([[  0,  -1, -10]]), np.array([[ 0, -1, -4]])], [np.array([[1, 1, 0]])]])
+
+    # for testing whether to support incremental updates using constraints or not
+    # incremental (i.e. each constraint is provided one at a time)
+    # constraints_list.extend([[np.array([[1,  0,  -4]]), np.array([[-1,  0,  2]])], [np.array([[0, -1, -4]]), np.array([[0, 1, 2]])],
+    #                [np.array([[1, 1, 0]])]])
+
+    # medium
+    # constraints_list.extend([[np.array([[1,  0,  -4]]), np.array([[-1,  0,  2]]), np.array([[0, -1, -4]]), np.array([[0, 1, 2]])]])
+
+    # high (i.e. all constraints are provided all at once)
+    # constraints_list.extend([[np.array([[1,  0,  -4]]), np.array([[-1,  0,  2]]), np.array([[0, -1, -4]]), np.array([[0, 1, 2]]),
+    #                np.array([[1, 1, 0]])]])
+
+    # for testing PF resetting
+    # learned about mud upper and lowerbounds, then got 2-mud wrong (looks good - minor shift)
+    # constraints_list.extend([[np.array([[1,  0,  -4]]), np.array([[-1,  0,  2]])], [-np.array([[1,  0,  -4]])]])
+
+    # learned about mud upper and lowerbounds, then got 2-mud wrong, then got 2-mud right (looks good - minor shift)
+    # constraints_list.extend([[np.array([[1, 0, -4]]), np.array([[-1, 0, 2]])], [-np.array([[1, 0, -4]])], [np.array([[1, 0, -4]])]])
+
+    # learned about everything, then got 2-mud wrong (looks good - minor shift)
+    # constraints_list.extend([[np.array([[1,  0,  -4]]), np.array([[-1,  0,  2]]), np.array([[0, -1, -4]]), np.array([[0, 1, 2]]),
+    #                np.array([[1, 1, 0]])], [-np.array([[1, 0, -4]])]])
+
+    # learned about everything, then doesn't pick up the battery even when it's close (looks good - minor shift)
+    # constraints_list.extend([[np.array([[1,  0,  -4]]), np.array([[-1,  0,  2]]), np.array([[0, -1, -4]]), np.array([[0, 1, 2]]),
+    #                np.array([[1, 1, 0]])], [-np.array([[0, 1, 2]])]])
+
+    # learned about everything, then goes deviates into the mud when you shouldn't (requires a reset)
+    constraints_list.extend([[np.array([[1,  0,  -4]]), np.array([[-1,  0,  2]]), np.array([[0, -1, -4]]), np.array([[0, 1, 2]]),
+                   np.array([[1, 1, 0]])], [-np.array([[-1, 0, -2]])]])
 
     # todo: for playing around with what happens if you get a constraint wrong repeatedly
     # constraints_list.extend([[np.array([[0,  1,  2]]), np.array([[-1,  0,  2]])], [np.array([[0, -1, -2]])], [np.array([[0, -1, -2]])], [np.array([[0, -1, -2]])]
@@ -794,23 +861,28 @@ def IROS_demonstrations():
             else:
                 seen_dict[x] += 1
 
-        print("Clustering particles ... ")
-        particles.cluster()
+        # print("Clustering particles ... ")
+        # particles.cluster()
 
-        fig = plt.figure()
-        ax = fig.add_subplot(projection='3d')
-        ax.set_facecolor('white')
-        ax.xaxis.pane.fill = False
-        ax.yaxis.pane.fill = False
-        ax.zaxis.pane.fill = False
+        # print("Avg weight: {}".format(np.average(particles.weights)))
+        # print("Total weight: {}".format(np.sum(particles.weights)))
+        print("Number of particles: {}".format(len(particles.weights)))
 
-        ax.set_xlabel('x')
-        ax.set_ylabel('y')
-        ax.set_zlabel('z')
+        BEC_viz.visualize_pf_transition(constraints, particles, 'augmented_taxi2')
 
-        particles.plot(particles, fig=fig, ax=ax, cluster_centers=particles.cluster_centers, cluster_weights=particles.cluster_weights, cluster_assignments=particles.cluster_assignments)
+        # fig = plt.figure()
+        # ax = fig.add_subplot(projection='3d')
+        # ax.set_facecolor('white')
+        # ax.xaxis.pane.fill = False
+        # ax.yaxis.pane.fill = False
+        # ax.zaxis.pane.fill = False
+        #
+        # ax.set_xlabel('x')
+        # ax.set_ylabel('y')
+        # ax.set_zlabel('z')
         # particles.plot(particles, fig=fig, ax=ax)
-        BEC_viz.visualize_planes(constraints_running, fig=fig, ax=ax)
+        # BEC_viz.visualize_planes(constraints_running, fig=fig, ax=ax)
+        # particles.plot(particles, fig=fig, ax=ax, cluster_centers=particles.cluster_centers, cluster_weights=particles.cluster_weights, cluster_assignments=particles.cluster_assignments)
 
         # visualize spherical polygon
         # ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints_running)

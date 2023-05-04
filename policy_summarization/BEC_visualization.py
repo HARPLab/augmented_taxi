@@ -266,7 +266,7 @@ def visualize_projection(constraints, weights, proj_type, plot_lim=[(-1, 1), (-1
         plt.show()
     plt.close()
 
-def visualize_pf_transition(constraints, particles_before, particles_after, mdp_class, weights, fig=None):
+def visualize_pf_transition(constraints, particles, mdp_class, weights=None, fig=None):
     '''
     Visualize the change in particle filter due to constraints
     '''
@@ -277,7 +277,8 @@ def visualize_pf_transition(constraints, particles_before, particles_after, mdp_
         ax.xaxis.pane.fill = False
         ax.yaxis.pane.fill = False
         ax.zaxis.pane.fill = False
-        ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100)
+        if weights is not None:
+            ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100)
         if mdp_class == 'augmented_taxi2':
             ax.set_xlabel('$\mathregular{w_0}$: Mud')
             ax.set_ylabel('$\mathregular{w_1}$: Recharge')
@@ -299,14 +300,18 @@ def visualize_pf_transition(constraints, particles_before, particles_after, mdp_
     ax3.title.set_text('Particles after')
 
     # plot particles before and after the constraints
-    particles_before.plot(fig=fig, ax=ax1)
-    particles_after.plot(fig=fig, ax=ax3)
+    particles.plot(fig=fig, ax=ax1, plot_prev=True)
+    particles.plot(fig=fig, ax=ax3)
 
     # plot the constraints
     ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints)
     poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
     for constraints in [constraints]:
         visualize_planes(constraints, fig=fig, ax=ax2)
+    for constraints in [constraints]:
+        visualize_planes(constraints, fig=fig, ax=ax1)
+    for constraints in [constraints]:
+        visualize_planes(constraints, fig=fig, ax=ax3)
     visualize_spherical_polygon(poly, fig=fig, ax=ax2, plot_ref_sphere=False, alpha=0.75)
 
     label_axes(ax1, mdp_class)
@@ -315,16 +320,6 @@ def visualize_pf_transition(constraints, particles_before, particles_after, mdp_
 
     # https://stackoverflow.com/questions/41167196/using-matplotlib-3d-axes-how-to-drag-two-axes-at-once
     # link the pan of the three axes together
-    n_angles = 36
-    n_radii = 8
-
-    radii = np.linspace(0.125, 1.0, n_radii)
-    angles = np.linspace(0, 2 * np.pi, n_angles, endpoint=False)
-    angles = np.repeat(angles[..., np.newaxis], n_radii, axis=1)
-
-    x = np.append(0, (radii * np.cos(angles)).flatten())
-    y = np.append(0, (radii * np.sin(angles)).flatten())
-    z = np.sin(-x * y)
     def on_move(event):
         if event.inaxes == ax1:
             ax2.view_init(elev=ax1.elev, azim=ax1.azim)
