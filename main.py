@@ -409,7 +409,7 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
                                 step_cost_flag)
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints
 
-def obtain_unit_tests(mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, data_loc, weights, step_cost_flag, visualize_pf_transition=True):
+def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, data_loc, weights, step_cost_flag, visualize_pf_transition=True):
     # todo: maybe pass in some of these objects later
     with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
         policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(
@@ -556,9 +556,7 @@ def obtain_unit_tests(mdp_class, BEC_summary, visited_env_traj_idxs, particles_s
                             particles_prev = copy.deepcopy(particles)
 
 
-    return preliminary_tests, visited_env_traj_idxs
-
-def simulate_human_model_updates(domain, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, data_loc, weights, step_cost_flag, visualize_pf_transition=True):
+def analyze_prev_study_tests(domain, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, data_loc, weights, step_cost_flag, visualize_pf_transition=True):
     with open('filtered_human_responses.pickle', 'rb') as f:
         filtered_human_traj_dict, filtered_mdp_dict, filtered_count_dict, filtered_opt_reward_dict, filtered_human_reward_dict, filtered_opt_traj_dict = pickle.load(
             f)
@@ -903,7 +901,9 @@ def contrast_PF_2_step_dev(domain, BEC_summary, visited_env_traj_idxs, particles
                         # print("Here is a remedial demonstration that might be helpful")
 
                         # count the demonstration overlap between 2-step dev/BEC and PF
-                        BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(failed_BEC_constraint,
+                        # **Note that PF currently uses min_env_constraints_record, and BEC uses min_subset_constraints_record
+                        # for pf
+                        BEC_constraint_bookkeeping_pf = BEC_helpers.perform_BEC_constraint_bookkeeping(failed_BEC_constraint,
                                                                                                     min_env_constraints_record,
                                                                                                     visited_env_traj_idxs,
                                                                                                     traj_record,
@@ -911,51 +911,77 @@ def contrast_PF_2_step_dev(domain, BEC_summary, visited_env_traj_idxs, particles
                                                                                                     mdp_features_record,
                                                                                                     variable_filter=running_variable_filter)
 
-                        print('{} exact candidates for remedial demo/test'.format(len(BEC_constraint_bookkeeping[0])))
-                        if len(BEC_constraint_bookkeeping[0]) > 0:
+                        print('{} exact candidates for remedial demo/test'.format(len(BEC_constraint_bookkeeping_pf[0])))
+                        if len(BEC_constraint_bookkeeping_pf[0]) > 0:
                             # the human's incorrect response can be corrected with a direct counterexample
-                            best_env_idxs, best_traj_idxs, best_constraints = list(zip(*BEC_constraint_bookkeeping[0]))
+                            best_env_idxs_pf, best_traj_idxs_pf = list(zip(*BEC_constraint_bookkeeping_pf[0]))
 
                         else:
-                            nn_BEC_constraint_bookkeeping, minimal_distances = BEC_helpers.perform_nn_BEC_constraint_bookkeeping(
+                            nn_BEC_constraint_bookkeeping_pf, minimal_distances = BEC_helpers.perform_nn_BEC_constraint_bookkeeping(
                                 failed_BEC_constraint,
-                                min_subset_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record,
+                                min_env_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record,
                                 mdp_features_record, variable_filter=running_variable_filter)
                             print('{} approximate candidates for remedial demo/test'.format(
-                                len(nn_BEC_constraint_bookkeeping[0])))
-                            if len(nn_BEC_constraint_bookkeeping[0]) > 0:
+                                len(nn_BEC_constraint_bookkeeping_pf[0])))
+                            if len(nn_BEC_constraint_bookkeeping_pf[0]) > 0:
                                 # the human's incorrect response can be corrected with similar enough counterexample
-                                best_env_idxs, best_traj_idxs, best_constraints = list(
-                                    zip(*nn_BEC_constraint_bookkeeping[0]))
-
-
-                                # print('Failed constraint: {}'.format(minimal_distances[0][2]))
-                                # print('Similar-enough constraint: {}'.format(minimal_distances[0][3]))
-
+                                best_env_idxs_pf, best_traj_idxs_pf = list(
+                                    zip(*nn_BEC_constraint_bookkeeping_pf[0]))
 
                         # find the demonstration that minimizes PF information gain
                         best_info_gain = float('inf')
                         info_gains = {}
 
-                        smallest_BEC_area = float('inf')
-
                         # obtain the demonstrations that will convey the lowest information gain (while still providing the desired information)
-                        for j in range(len(best_env_idxs)):
-                            info_gain = particles.calc_info_gain(best_constraints[j])
-                            info_gains[(best_env_idxs[j], best_traj_idxs[j])] = (info_gain, best_constraints[j])
+                        for j in range(len(best_env_idxs_pf)):
+                            info_gain = particles.calc_info_gain(min_env_constraints_record[best_env_idxs_pf[j]][best_traj_idxs_pf[j]])
+                            info_gains[(best_env_idxs_pf[j], best_traj_idxs_pf[j])] = (info_gain, min_env_constraints_record[best_env_idxs_pf[j]][best_traj_idxs_pf[j]])
 
                             if np.isclose(info_gain, best_info_gain):
-                                best_infogains_env_traj_idxs.append((best_env_idxs[j], best_traj_idxs[j]))
+                                best_infogains_env_traj_idxs.append((best_env_idxs_pf[j], best_traj_idxs_pf[j]))
                             elif info_gain < best_info_gain:
                                 best_info_gain = info_gain
-                                best_infogains_env_traj_idxs = [(best_env_idxs[j], best_traj_idxs[j])]
+                                best_infogains_env_traj_idxs = [(best_env_idxs_pf[j], best_traj_idxs_pf[j])]
 
-                            BEC_area = BEC_helpers.calc_solid_angles([best_constraints[j]])[0]
+
+                        # for BEC
+                        BEC_constraint_bookkeeping_BEC = BEC_helpers.perform_BEC_constraint_bookkeeping(failed_BEC_constraint,
+                                                                                                    min_subset_constraints_record,
+                                                                                                    visited_env_traj_idxs,
+                                                                                                    traj_record,
+                                                                                                    traj_features_record,
+                                                                                                    mdp_features_record,
+                                                                                                    variable_filter=running_variable_filter)
+
+                        print('{} exact candidates for remedial demo/test'.format(len(BEC_constraint_bookkeeping_BEC[0])))
+                        if len(BEC_constraint_bookkeeping_BEC[0]) > 0:
+                            # the human's incorrect response can be corrected with a direct counterexample
+                            best_env_idxs_BEC, best_traj_idxs_BEC = list(zip(*BEC_constraint_bookkeeping_BEC[0]))
+
+                        else:
+                            nn_BEC_constraint_bookkeeping_BEC, minimal_distances = BEC_helpers.perform_nn_BEC_constraint_bookkeeping(
+                                failed_BEC_constraint,
+                                min_subset_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record,
+                                mdp_features_record, variable_filter=running_variable_filter)
+                            print('{} approximate candidates for remedial demo/test'.format(
+                                len(nn_BEC_constraint_bookkeeping_BEC[0])))
+                            if len(nn_BEC_constraint_bookkeeping_BEC[0]) > 0:
+                                # the human's incorrect response can be corrected with similar enough counterexample
+                                best_env_idxs_BEC, best_traj_idxs_BEC = list(
+                                    zip(*nn_BEC_constraint_bookkeeping_BEC[0]))
+
+                        # obtain the demonstrations that will convey the lowest information gain (while still providing the desired information)
+                        smallest_BEC_area = float('inf')
+                        for j in range(len(best_env_idxs_BEC)):
+
+                            BEC_area = BEC_helpers.calc_solid_angles(
+                                [min_subset_constraints_record[best_env_idxs_BEC[j]][best_traj_idxs_BEC[j]]])[0]
                             if np.isclose(BEC_area, smallest_BEC_area):
-                                best_BEC_area_env_traj_idxs.append((best_env_idxs[j], best_traj_idxs[j]))
+                                best_BEC_area_env_traj_idxs.append((best_env_idxs_BEC[j], best_traj_idxs_BEC[j]))
                             elif BEC_area < smallest_BEC_area:
                                 smallest_BEC_area = BEC_area
-                                best_BEC_area_env_traj_idxs = [(best_env_idxs[j], best_traj_idxs[j])]
+                                best_BEC_area_env_traj_idxs = [(best_env_idxs_BEC[j], best_traj_idxs_BEC[j])]
+
 
                         best_env_idxs_BEC, best_traj_idxs_BEC = list(zip(*best_BEC_area_env_traj_idxs))
                         best_env_idxs_pf, best_traj_idxs_pf = list(zip(*best_infogains_env_traj_idxs))
@@ -1014,11 +1040,15 @@ if __name__ == "__main__":
                             params.step_cost_flag, params.BEC['summary_variant'], pool, params.BEC['n_train_demos'], params.BEC['BEC_depth'],
                             params.BEC['n_human_models'], params.BEC['n_particles'], params.prior, params.posterior, params.BEC['obj_func_proportion'])
 
-    # unit_tests = obtain_unit_tests(params.mdp_class,BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag)
+    # c) run through the closed-loop teaching framework
+    # simulate_teaching_loop(params.mdp_class,BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag)
 
     n_human_models_real_time = 8
-    # simulate_human_model_updates(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], n_human_models_real_time, params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, visualize_pf_transition=False)
 
+    # d) run remedial demonstration and test selection on previous participant responses from IROS
+    # analyze_prev_study_tests(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], n_human_models_real_time, params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, visualize_pf_transition=False)
+
+    # e) compare the remedial demonstration selection when using 2-step dev/BEC vs. PF
     contrast_PF_2_step_dev(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], n_human_models_real_time, params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, visualize_pf_transition=False)
 
     # c) obtain test environments

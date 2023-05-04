@@ -231,9 +231,10 @@ def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_r
                 if contains_BEC_constraint:
                     if traj_not_shown_previously(env_idx, traj_idx, visited_env_traj_idxs, traj_record):
                         # demonstrations that haven't already been shown
-                        BEC_constraint_bookkeeping[BEC_constraint_idx].append((env_idx, traj_idx, constraints_traj))
+                        BEC_constraint_bookkeeping[BEC_constraint_idx].append((env_idx, traj_idx))
                     else:
-                        BEC_constraint_bookkeeping_redundant[BEC_constraint_idx].append((env_idx, traj_idx, constraints_traj))
+                        BEC_constraint_bookkeeping_redundant[BEC_constraint_idx].append(
+                            (env_idx, traj_idx))
 
     # if any of the BEC constraints fails to find a new environment and trajectory match, simply recycle old ones
     for BEC_constraint_idx, bookkeeping in enumerate(BEC_constraint_bookkeeping):
@@ -286,20 +287,23 @@ def perform_nn_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraint
                     if featurewise_distance == minimal_distances[BEC_constraint_idx][0]:
                         if total_feature_distance == minimal_distances[BEC_constraint_idx][1]:
                             if traj_not_shown_previously(env_idx, traj_idx, visited_env_traj_idxs, traj_record):
-                                BEC_constraint_bookkeeping[BEC_constraint_idx].append((env_idx, traj_idx, constraints_traj))
+                                BEC_constraint_bookkeeping[BEC_constraint_idx].append(
+                                    (env_idx, traj_idx))
                             else:
-                                BEC_constraint_bookkeeping_redundant[BEC_constraint_idx].append((env_idx, traj_idx, constraints_traj))
+                                BEC_constraint_bookkeeping_redundant[BEC_constraint_idx].append((env_idx, traj_idx))
                         elif total_feature_distance < minimal_distances[BEC_constraint_idx][1]:
                             if traj_not_shown_previously(env_idx, traj_idx, visited_env_traj_idxs, traj_record):
                                 minimal_distances[BEC_constraint_idx] = (featurewise_distance, total_feature_distance, BEC_constraints[BEC_constraint_idx], constraint)
-                                BEC_constraint_bookkeeping[BEC_constraint_idx] = [(env_idx, traj_idx, constraints_traj)]
+                                BEC_constraint_bookkeeping[BEC_constraint_idx] = [(env_idx, traj_idx)]
                             else:
-                                BEC_constraint_bookkeeping_redundant[BEC_constraint_idx].append((env_idx, traj_idx, constraints_traj))
+                                BEC_constraint_bookkeeping_redundant[BEC_constraint_idx].append(
+                                    (env_idx, traj_idx))
                     elif featurewise_distance < minimal_distances[BEC_constraint_idx][0]:
                         # print(featurewise_distance)
                         if traj_not_shown_previously(env_idx, traj_idx, visited_env_traj_idxs, traj_record):
                             minimal_distances[BEC_constraint_idx] = (featurewise_distance, total_feature_distance, BEC_constraints[BEC_constraint_idx], constraint)
-                            BEC_constraint_bookkeeping[BEC_constraint_idx] = [(env_idx, traj_idx, constraints_traj)]
+                            # BEC_constraint_bookkeeping[BEC_constraint_idx] = [(env_idx, traj_idx, constraints_traj)]
+                            BEC_constraint_bookkeeping[BEC_constraint_idx] = [(env_idx, traj_idx)]
                         else:
                             BEC_constraint_bookkeeping_redundant[BEC_constraint_idx].append((env_idx, traj_idx))
 
