@@ -148,6 +148,10 @@ class Particles():
         self.bin_particle_mapping = None
         self.bin_weight_mapping = None
 
+        self.integral_prob_uniform = 0.8029412189847138   # the total probability on the uniform half of the custom uniform + VMF distribution
+        self.integral_prob_VMF = 0.19705878101528612      # the total probability on the VMF half of the custom uniform + VMF distribution
+        self.VMF_kappa = 4                                # the concentration parameter of the VMF distribution
+
     def reinitialize(self, positions):
         self.positions = np.array(positions)
         self.weights = np.ones(len(positions)) / len(positions)
@@ -742,7 +746,22 @@ class Particles():
         else:
             # perform a reset as none of the particles satisfy all constraints
             solid_angle = BEC_helpers.calc_solid_angles(constraints)[0]
-            new_particle_positions = BEC_helpers.sample_human_models_uniform(constraints, int(solid_angle / (4 * np.pi) * 100))
+
+            n_desired_reset_particles = int(np.ceil(solid_angle / (4 * np.pi) * 100))
+
+            if len(constraints) == 1:
+                # if there is only one constraint, sample from the VMF + uniform distribution
+                new_particle_positions_uniform = BEC_helpers.sample_human_models_random(constraints, int(np.ceil(
+                    n_desired_reset_particles * self.integral_prob_uniform)))
+
+                mu_constraint = constraints[0][0] / np.linalg.norm(constraints[0][0])
+                new_particle_positions_VMF = p_utils.rand_von_mises_fisher(mu_constraint, kappa=self.VMF_kappa, N=int(np.ceil(n_desired_reset_particles * self.integral_prob_VMF)),
+                                                                halfspace=True)
+                new_particle_positions = np.vstack((np.array(new_particle_positions_uniform), np.expand_dims(new_particle_positions_VMF, 1)))
+            else:
+                # otherwise, fall back on simply sampling uniformly from the space obeys all constraints
+                new_particle_positions = BEC_helpers.sample_human_models_uniform(constraints, n_desired_reset_particles)
+
             joint_particle_positions = np.vstack((np.array(new_particle_positions), self.positions))
             self.reinitialize(joint_particle_positions)
 

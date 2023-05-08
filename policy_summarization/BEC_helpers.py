@@ -617,8 +617,7 @@ def sample_human_models_random(constraints, n_models):
             # reject points that fall outside of the desired area
 
             # see which points on the sphere obey all constraints
-            theta_grid, phi_grid = np.meshgrid(theta, phi)
-            sph_points = np.array(cg.sph2cart(np.array([phi_grid.flatten(), theta_grid.flatten()]).T))
+            sph_points = cg.sph2cart(np.array([phi, theta]).T)
             dist_to_plane = constraints_matrix.dot(sph_points.T)
             n_constraints_satisfied = np.sum(dist_to_plane >= 0, axis=0)
             n_min_constraints = constraints_matrix.shape[0]
