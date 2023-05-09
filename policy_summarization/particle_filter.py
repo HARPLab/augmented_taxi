@@ -517,9 +517,6 @@ class Particles():
         for j, x in enumerate(self.positions):
             self.weights[j] = self.weights[j] * self.observation_probability(x, constraints)
 
-        # normalize weights and update particles
-        self.weights /= sum(self.weights)
-
     def plot(self, centroid=None, fig=None, ax=None, cluster_centers=None, cluster_weights=None,
                        cluster_assignments=None, plot_prev=False):
         if plot_prev:
@@ -708,21 +705,44 @@ class Particles():
 
         return np.array(resample_indexes)
 
-    def update(self, constraints, c=0.5):
+    def update(self, constraints, c=0.5, reset_threshold_prob=0.001):
         self.weights_prev = self.weights.copy()
         self.positions_prev = self.positions.copy()
 
-        # check if any particles satisfy all constraints
-        constraints_matrix = np.vstack(constraints)
-        dist_to_plane = constraints_matrix.dot(self.positions.squeeze().T)
-        n_constraints_satisfied = np.sum(dist_to_plane >= 0, axis=0)
-        n_min_constraints = constraints_matrix.shape[0]
-        idx_valid_sph_points = np.where(n_constraints_satisfied == n_min_constraints)[0]
+        for constraint in constraints:
+            self.reweight(constraint)
 
-        if len(idx_valid_sph_points) > 0:
-            # at least one particle exists that satisfies all constraints so proceed with the standard update
-            for constraint in constraints:
-                self.reweight(constraint)
+            if sum(self.weights) < reset_threshold_prob:
+                # perform a reset as the particles do not fit the most recently observation well
+                # inspired by Sensor Resetting Localization for Poorly Modelled Mobile Robots, Lenser et al. 2000)
+                solid_angle = BEC_helpers.calc_solid_angles(constraints)[0]
+
+                n_desired_reset_particles = int(np.ceil(solid_angle / (4 * np.pi) * 100))
+
+                if len(constraints) == 1:
+                    # if there is only one constraint, sample from the VMF + uniform distribution
+                    new_particle_positions_uniform = BEC_helpers.sample_human_models_random(constraints, int(np.ceil(
+                        n_desired_reset_particles * self.integral_prob_uniform)))
+
+                    mu_constraint = constraints[0][0] / np.linalg.norm(constraints[0][0])
+                    new_particle_positions_VMF = p_utils.rand_von_mises_fisher(mu_constraint, kappa=self.VMF_kappa, N=int(np.ceil(n_desired_reset_particles * self.integral_prob_VMF)),
+                                                                    halfspace=True)
+                    new_particle_positions = np.vstack((np.array(new_particle_positions_uniform), np.expand_dims(new_particle_positions_VMF, 1)))
+                else:
+                    # otherwise, fall back on simply sampling uniformly from the space obeys all constraints
+                    new_particle_positions = BEC_helpers.sample_human_models_uniform(constraints, n_desired_reset_particles)
+
+                joint_particle_positions = np.vstack((np.array(new_particle_positions), self.positions))
+                self.reinitialize(joint_particle_positions)
+
+                # rely on KLD resampling to restabilize to the optimal number of particles
+                resample_indexes = self.KLD_resampling()
+                self.resample_from_index(np.array(resample_indexes))
+
+                print(colored('Performed a reset', 'red'))
+            else:
+                # normalize weights and update particles
+                self.weights /= sum(self.weights)
 
                 n_eff = self.calc_n_eff(self.weights)
                 # print('n_eff: {}'.format(n_eff))
@@ -734,42 +754,6 @@ class Particles():
                     # b) use KLD resampling
                     resample_indexes = self.KLD_resampling()
                     self.resample_from_index(np.array(resample_indexes))
-
-                    # print('Number of particles: {}'.format(len(resample_indexes)))
-
-                    # print(np.unique(indexes, return_counts=True))
-                    # print(colored('Resampled', 'red'))
-
-                # centroid = cg.spherical_centroid(self.positions.squeeze().T, self.weights)
-                # normed_var = normalized_weighted_variance(particles, spherical_centroid=centroid)
-                # print('weighted variance: {}'.format(normed_var))
-        else:
-            # perform a reset as none of the particles satisfy all constraints
-            solid_angle = BEC_helpers.calc_solid_angles(constraints)[0]
-
-            n_desired_reset_particles = int(np.ceil(solid_angle / (4 * np.pi) * 100))
-
-            if len(constraints) == 1:
-                # if there is only one constraint, sample from the VMF + uniform distribution
-                new_particle_positions_uniform = BEC_helpers.sample_human_models_random(constraints, int(np.ceil(
-                    n_desired_reset_particles * self.integral_prob_uniform)))
-
-                mu_constraint = constraints[0][0] / np.linalg.norm(constraints[0][0])
-                new_particle_positions_VMF = p_utils.rand_von_mises_fisher(mu_constraint, kappa=self.VMF_kappa, N=int(np.ceil(n_desired_reset_particles * self.integral_prob_VMF)),
-                                                                halfspace=True)
-                new_particle_positions = np.vstack((np.array(new_particle_positions_uniform), np.expand_dims(new_particle_positions_VMF, 1)))
-            else:
-                # otherwise, fall back on simply sampling uniformly from the space obeys all constraints
-                new_particle_positions = BEC_helpers.sample_human_models_uniform(constraints, n_desired_reset_particles)
-
-            joint_particle_positions = np.vstack((np.array(new_particle_positions), self.positions))
-            self.reinitialize(joint_particle_positions)
-
-            # rely on KLD resampling to restabilize to the optimal number of particles
-            resample_indexes = self.KLD_resampling()
-            self.resample_from_index(np.array(resample_indexes))
-
-            print(colored('Performed a reset', 'red'))
 
         self.binned = False
 
