@@ -5,6 +5,39 @@ from spherical_geometry import great_circle_arc
 '''
 2-sphere geometry
 '''
+def generate_equidistributed_points_on_sphere(num_points):
+    """
+    Generate `num_points` equidistributed points on the surface of a unit sphere using algorithm suggested in
+    "How to generate equidistributed points on the surface of a sphere" by Markus Deserno, 2004.
+
+    Note that this algorithm may return slightly fewer than the number of points requested.
+    """
+
+    N_count = 0
+    a = 4 * np.pi / num_points
+    d = np.sqrt(a)
+    M_theta = int(np.round(np.pi / d))
+    d_theta = np.pi / M_theta
+    d_phi = a / d_theta
+    points = np.empty((num_points, 3))
+    for m in range(M_theta):
+        theta = np.pi * (m + 0.5) / M_theta
+        M_phi = int(np.round(2 * np.pi * np.sin(theta) / d_phi))
+        for n in range(M_phi):
+            phi = 2 * np.pi * n / M_phi
+            points[N_count, 0] = np.sin(theta) * np.cos(phi)
+            points[N_count, 1] = np.sin(theta) * np.sin(phi)
+            points[N_count, 2] = np.cos(theta)
+            N_count += 1
+
+    points = points[0:N_count]
+    points = np.expand_dims(points, 1)
+
+    points_list = []
+    points_list.extend(points)
+
+    return points_list
+
 # following code from https://skeptric.com/calculate-centroid-on-sphere/#Attempting-to-Implement-Algorithm-A1
 def distance(x, y, axis=0):
     return np.sqrt((np.power(x - y, 2)).sum(axis=axis))
