@@ -16,7 +16,7 @@ from simple_rl.planning.PlannerClass import Planner
 
 class ValueIteration(Planner):
 
-    def __init__(self, mdp, name="value_iter", delta=1e-25, max_iterations=1000, sample_rate=5, best_action_tol=1e-05):
+    def __init__(self, mdp, name="value_iter", delta=1e-25, max_iterations=50, sample_rate=5, best_action_tol=1e-05):
         '''
         Args:
             mdp (MDP)
@@ -92,12 +92,20 @@ class ValueIteration(Planner):
         '''
         # Compute expected value.
         expected_future_val = 0
+        meaningful_transition_count = 0
+
         for s_prime in self.trans_dict[s][a].keys():
-            if not s.is_terminal():
+            if s == s_prime:
+                continue
+            elif not s.is_terminal():
                 expected_future_val += self.trans_dict[s][a][s_prime] * self.reward_func(s, a, s_prime) + \
                                        self.gamma * self.trans_dict[s][a][s_prime] * self.value_func[s_prime]
+                meaningful_transition_count += 1
 
-        return expected_future_val
+        if meaningful_transition_count == 0:
+            return float('-inf')
+        else:
+            return expected_future_val
 
 
     def run_vi(self):

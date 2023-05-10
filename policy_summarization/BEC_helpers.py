@@ -861,7 +861,9 @@ def sample_human_models_uniform(constraints, n_models):
                 select_sph_points = select_sph_points.reshape(select_sph_points.shape[0], 1, select_sph_points.shape[1])
                 sample_human_models.extend(select_sph_points)
     else:
-        sample_human_models = cg.generate_equidistributed_points_on_sphere(n_models)
+        points = cg.generate_equidistributed_points_on_sphere(n_models)
+        points = np.expand_dims(points, 1)
+        sample_human_models.extend(points)
 
     return sample_human_models
 

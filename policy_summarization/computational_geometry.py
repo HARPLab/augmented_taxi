@@ -31,12 +31,8 @@ def generate_equidistributed_points_on_sphere(num_points):
             N_count += 1
 
     points = points[0:N_count]
-    points = np.expand_dims(points, 1)
 
-    points_list = []
-    points_list.extend(points)
-
-    return points_list
+    return points
 
 # following code from https://skeptric.com/calculate-centroid-on-sphere/#Attempting-to-Implement-Algorithm-A1
 def distance(x, y, axis=0):

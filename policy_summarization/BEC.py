@@ -324,10 +324,10 @@ def compute_counterfactuals(args):
     if not skip_env:
         # only consider counterfactual trajectories from human models whose value iteration have converged and whose
         # mdp does not have a feature that is meant to be filtered out
-        best_human_trajs_record_env = []
+        # best_human_trajs_record_env = []
         constraints_env = []
         info_gain_env = []
-        human_rewards_env = []
+        # human_rewards_env = []
         overlap_in_opt_and_counterfactual_traj_env = []
 
         for traj_idx, traj_opt in enumerate(trajs_opt):
@@ -338,10 +338,12 @@ def compute_counterfactuals(args):
             # traj_hyp = mdp_helpers.rollout_policy(vi_human.mdp, vi_human)
             # mu_sb = vi_human.mdp.accumulate_reward_features(traj_hyp, discount=True)
             # constraints.append(mu_sa - mu_sb)
+            # best_human_trajs_record = [] # for symmetry with below
+            # best_human_reward = weights.dot(mu_sb.T)  # for symmetry with below
 
             # b) contrast differing expected feature counts for each state-action pair along the agent's optimal trajectory
-            best_human_trajs_record = []
-            best_human_reward = 0
+            # best_human_trajs_record = []
+            # best_human_reward = 0
             for sas_idx in range(len(traj_opt)):
                 # reward features of optimal action
                 mu_sa = mdp.accumulate_reward_features(traj_opt[sas_idx:], discount=True)
@@ -364,12 +366,18 @@ def compute_counterfactuals(args):
                         best_reward_features = mu_sb
                         best_human_traj = traj
 
+                # # todo: for testing how much computation and time I save by not doing a recursive rollout
+                # best_human_traj = mdp_helpers.rollout_policy(vi_human.mdp, vi_human, cur_state, [])
+                # best_reward_features = mdp.accumulate_reward_features(best_human_traj,
+                #                                        discount=True)  # the human and agent should be working with identical mdps
+                # cur_best_reward = weights.dot(best_reward_features.T)
+
                 # only store the reward of the full trajectory
-                if sas_idx == 0:
-                    best_human_reward = cur_best_reward
-                    traj_opt_feature_count = mu_sa
+                # if sas_idx == 0:
+                #     best_human_reward = cur_best_reward
+                #     traj_opt_feature_count = mu_sa
                 constraints.append(mu_sa - best_reward_features)
-                best_human_trajs_record.append(best_human_traj)
+                # best_human_trajs_record.append(best_human_traj)
 
             if len(constraints) > 0:
                 constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
@@ -380,31 +388,31 @@ def compute_counterfactuals(args):
                 info_gain = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, constraints,
                                                                    weights, step_cost_flag)
 
-            human_rewards_env.append(best_human_reward)
-            best_human_trajs_record_env.append(best_human_trajs_record)
+            # human_rewards_env.append(best_human_reward)
+            # best_human_trajs_record_env.append(best_human_trajs_record)
             constraints_env.append(constraints)
             info_gain_env.append(info_gain)
 
-            if not consider_human_models_jointly:
-                # you should only consider the overlap for the first counterfactual human trajectory (as opposed to
-                # counterfactual trajectories that could've arisen from states after the first state)
-                overlap_pct = BEC_helpers.calculate_counterfactual_overlap_pct(best_human_trajs_record[0], traj_opt)
-
-                overlap_in_opt_and_counterfactual_traj_env.append(overlap_pct)
+            # if not consider_human_models_jointly:
+            #     # you should only consider the overlap for the first counterfactual human trajectory (as opposed to
+            #     # counterfactual trajectories that could've arisen from states after the first state)
+            #     overlap_pct = BEC_helpers.calculate_counterfactual_overlap_pct(best_human_trajs_record[0], traj_opt)
+            #
+            #     overlap_in_opt_and_counterfactual_traj_env.append(overlap_pct)
 
     # else just populate with dummy variables
     else:
-        best_human_trajs_record_env = [[[]] for i in range(len(trajs_opt))]
+        # best_human_trajs_record_env = [[[]] for i in range(len(trajs_opt))]
         constraints_env = [[] for i in range(len(trajs_opt))]
         info_gain_env = [0 for i in range(len(trajs_opt))]
         if not consider_human_models_jointly:
             overlap_in_opt_and_counterfactual_traj_env = [float('inf') for i in range(len(trajs_opt))]
-        human_rewards_env = [np.array([[0]]) for i in range(len(trajs_opt))]
+        # human_rewards_env = [np.array([[0]]) for i in range(len(trajs_opt))]
 
     if summary_len is not None:
         with open('models/' + data_loc + '/counterfactual_data_' + str(summary_len) + '/model' + str(model_idx) +
                   '/cf_data_env' + str(env_idx).zfill(5) + '.pickle', 'wb') as f:
-            pickle.dump((best_human_trajs_record_env, constraints_env, human_rewards_env), f)
+            pickle.dump(constraints_env, f)
 
     if consider_human_models_jointly:
         return info_gain_env
@@ -436,7 +444,7 @@ def combine_limiting_constraints_IG(args):
             with open('models/' + data_loc + '/counterfactual_data_' + str(curr_summary_len) + '/model' + str(
                     model_idx) + '/cf_data_env' + str(
                 env_idx).zfill(5) + '.pickle', 'rb') as f:
-                best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
+                constraints_env = pickle.load(f)
             all_env_constraints.append(constraints_env)
 
         all_env_constraints_joint = [list(itertools.chain.from_iterable(i)) for i in zip(*all_env_constraints)]
@@ -484,7 +492,7 @@ def combine_limiting_constraints_IG(args):
         #     with open('models/' + data_loc + '/counterfactual_data_' + str(curr_summary_len) + '/model' + str(
         #             model_idx) + '/cf_data_env' + str(
         #         env_idx).zfill(5) + '.pickle', 'rb') as f:
-        #         best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
+        #         constraints_env = pickle.load(f)
         #
         #     # for each of the minimum constraint sets in each environment (with a unique starting state)
         #     for traj_idx, min_env_constraints in enumerate(min_env_constraints_record):
@@ -953,7 +961,7 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
             with open('models/' + data_loc + '/counterfactual_data_' + str(summary_count) + '/model' + str(
                     select_model) + '/cf_data_env' + str(
                     best_env_idx).zfill(5) + '.pickle', 'rb') as f:
-                best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
+                constraints_env = pickle.load(f)
 
             # best_human_trajs = best_human_trajs_record_env[best_traj_idx]
             best_traj = traj_record[best_env_idx][best_traj_idx]

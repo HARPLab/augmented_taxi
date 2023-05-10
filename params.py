@@ -293,7 +293,7 @@ BEC = {
 
     'test_difficulty': 'high',                # expected ease for human to correctly predict the agent's actions in this test environment (low, medium, high)
 
-    'n_human_models': 12,                      # number of human beliefs to consider
+    'n_human_models': 12,                      # number of human beliefs to actively consider
 
     'n_particles': 200,                      # number of particles in particle filter
 
@@ -302,6 +302,9 @@ BEC = {
                                               # less than 1 may yield a greater number of demonstrations
 
     'BEC_depth': 2,                           # number of action deviations to consider when extracting BEC constraints
+
+    'n_human_models_precomputed': 2500,         # number of human beliefs to precompute for future quick, real-time inference
+
 }
 
 data_loc = {

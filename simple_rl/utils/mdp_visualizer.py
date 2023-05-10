@@ -2,6 +2,7 @@
 from __future__ import print_function
 import sys
 import time
+import copy
 try:
     import pygame
     from pygame.locals import *
@@ -605,7 +606,7 @@ def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_h
                     pygame.draw.rect(screen, (255,255,255), shape)
 
                 # Move agent.
-                prev_state = cur_state.copy()
+                prev_state = copy.deepcopy(cur_state)
                 action = agent.act(cur_state, reward)
                 print("A: " + str(action))
                 reward, cur_state = mdp.execute_agent_action(action)
