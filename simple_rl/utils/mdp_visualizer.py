@@ -496,7 +496,7 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
     '''
     #counterfactual is user input 
 
-    wait = True
+    wait = False
 
     screen = pygame.display.set_mode((scr_width, scr_height))
     cur_state_traj = trajectory[0][0]
@@ -516,9 +516,10 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
 
     step = 0
 
-    anchor_points_wait = []
-    traj_currs = [currstate for (prevstate, action, currstate) in trajectory]
-    countertraj_currs = [currstate for (prevstate, action, currstate) in trajectory_counterfactual]
+    '''anchor_points_wait = []
+    traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y()) for (prevstate, action, currstate) in trajectory]
+    countertraj_currs = [(currstate.get_agent_x(), currstate.get_agent_y()) for (prevstate, action, currstate) in trajectory_counterfactual]
+
     matcher = difflib.SequenceMatcher(None, traj_currs, countertraj_currs, autojunk=False)
     matches = matcher.get_matching_blocks()
 
@@ -526,7 +527,7 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
     for match in matches:
         #add states in overlap
         for i in range(match[2]):
-            anchor_points_wait.append(traj_currs[match[0] + i])
+            anchor_points_wait.append(traj_currs[match[0] + i])'''
 
 
     while (step_traj < len_traj or step_counter < len_counter):
