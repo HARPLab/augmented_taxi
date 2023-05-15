@@ -537,6 +537,7 @@ def normalize_trajs(opt_traj, human_traj):
     normalized_human_traj = []
 
     for i in range(len(anchor_points)):
+        #pdb.set_trace()
         (opt_idx, human_idx) = anchor_points[i]
 
         if i == 0:
@@ -553,14 +554,14 @@ def normalize_trajs(opt_traj, human_traj):
             diff_human += 1
         
 
-        #all good no normalization needed for this segment
+        #no normalization needed for this segment
         if (diff_opt == diff_human):
             normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx, human_idx)]
             normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx, opt_idx)]
             continue
 
         else: 
-            new_cop = []  #creating trajectory in terms of (x, y) coordinates
+            new_cop = []  
             holder = []
             pointer = 0
             #need to expand optimal trajectory
@@ -575,8 +576,8 @@ def normalize_trajs(opt_traj, human_traj):
 
                 counter = 0
                 last = opt_traj[opt_idx][2]
-                
-                for k in range(diff_human):
+
+                for k in range(diff_human - 1):
                     if k == 0:
                         (currx, curry, currstate) = new_cop[k]
                     else:
@@ -586,7 +587,6 @@ def normalize_trajs(opt_traj, human_traj):
                         if (new_cop[pointer][0] == currx and new_cop[pointer][1] == curry):
                             pointer += 1
                     if (pointer == len(new_cop) - 1):
-                        #pdb.set_trace()
                         counter = 2
                     
                     newx, newy, editedstate, action, pointer = calculate_new_pos(new_cop, pointer, step_size, currx, curry, currstate, counter, last)
@@ -597,7 +597,6 @@ def normalize_trajs(opt_traj, human_traj):
                 
             #need to expand human trajectory
             else:
-                #pdb.set_trace()
                 step_size = (diff_human)/diff_opt
 
                 for j in range(prev_human_idx, human_idx + 1):
@@ -609,7 +608,7 @@ def normalize_trajs(opt_traj, human_traj):
                 counter = 0
                 last = human_traj[human_idx][2]
 
-                for k in range(diff_opt):
+                for k in range(diff_opt - 1):
                     if k == 0:
                         (currx, curry, currstate) = new_cop[k]
                     else:
@@ -619,7 +618,6 @@ def normalize_trajs(opt_traj, human_traj):
                         if (new_cop[pointer][0] == currx and new_cop[pointer][1] == curry):
                             pointer += 1
                     if (pointer == len(new_cop) - 1):
-                        #pdb.set_trace()
                         counter = 2
                     newx, newy, editedstate, action, pointer = calculate_new_pos(new_cop, pointer, step_size, currx, curry, currstate, counter, last)
                     normalized_human_traj.append((currstate, action, editedstate))
