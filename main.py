@@ -532,11 +532,18 @@ def normalize_trajs(opt_traj, human_traj):
     for match in matches:
         for i in range(match[2]):
             anchor_points.append((match[0] + i, match[1] + i))
+    
+    anch_opt = [opp for (opp, hummie) in anchor_points]
+    anch_hum = [hummie for (opp, hummie) in anchor_points]
      
     normalized_opt_traj = []
     normalized_human_traj = []
 
+    m1 = []
+    m2 = []
+
     for i in range(len(anchor_points)):
+        
         #pdb.set_trace()
         (opt_idx, human_idx) = anchor_points[i]
 
@@ -558,6 +565,16 @@ def normalize_trajs(opt_traj, human_traj):
         if (diff_opt == diff_human):
             normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx, human_idx)]
             normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx, opt_idx)]
+            if ((human_idx + 1) not in anch_hum) and (human_idx != len(human_traj) - 1):
+                normalized_human_traj.append(human_traj[human_idx])
+                m1.append(True)
+            else:
+                m1.append(False)
+            if (((opt_idx + 1) not in anch_opt)) and (opt_idx != len(opt_traj) - 1):
+                normalized_opt_traj.append(opt_traj[opt_idx])
+                m2.append(True)
+            else:
+                m2.append(False)
             continue
 
         else: 
@@ -593,7 +610,10 @@ def normalize_trajs(opt_traj, human_traj):
                     normalized_opt_traj.append((currstate, action, editedstate))
                     holder.append((newx, newy, editedstate))
                 
-                normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx, human_idx)]
+                if (len(m1) > 0) and (m1[-1]):
+                    normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx + 1, human_idx)]
+                else:
+                    normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx, human_idx)]
                 
             #need to expand human trajectory
             else:
@@ -623,12 +643,15 @@ def normalize_trajs(opt_traj, human_traj):
                     normalized_human_traj.append((currstate, action, editedstate))
                     holder.append((newx, newy, editedstate))
 
-                normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx, opt_idx)]
+                if (len(m2) > 0) and (m2[-1]):
+                    normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx + 1, opt_idx)]
+                else:
+                    normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx, opt_idx)]
 
     normalized_human_traj.append(human_traj[-1])
     normalized_opt_traj.append(opt_traj[-1])
-
-    return normalized_opt_traj, normalized_human_traj                         
+    
+    return normalized_opt_traj, normalized_human_traj
                     
 
 
