@@ -543,8 +543,6 @@ def normalize_trajs(opt_traj, human_traj):
     m2 = []
 
     for i in range(len(anchor_points)):
-        
-        #pdb.set_trace()
         (opt_idx, human_idx) = anchor_points[i]
 
         if i == 0:
@@ -652,7 +650,9 @@ def normalize_trajs(opt_traj, human_traj):
     normalized_opt_traj.append(opt_traj[-1])
     
     return normalized_opt_traj, normalized_human_traj
-                    
+
+
+wait_version = True
 
 
 def obtain_unit_tests(mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, data_loc, weights, step_cost_flag, visualize_pf_transition=False):
@@ -731,10 +731,11 @@ def obtain_unit_tests(mdp_class, BEC_summary, visited_env_traj_idxs, particles_s
                     BEC_viz.visualize_pf_transition([-failed_BEC_constraint], particles_prev, particles, mdp_class, weights)
                     particles_prev = copy.deepcopy(particles)
 
-                normalized_opt_traj, normalized_human_traj = normalize_trajs(opt_traj, human_traj)
-                test_mdp.visualize_trajectory_comparison(normalized_opt_traj, normalized_human_traj)
-                #test_mdp.visualize_trajectory_comparison(opt_traj, human_traj)
-
+                if wait_version:
+                    test_mdp.visualize_trajectory_comparison(True, opt_traj, human_traj)
+                else:
+                    normalized_opt_traj, normalized_human_traj = normalize_trajs(opt_traj, human_traj)
+                    test_mdp.visualize_trajectory_comparison(False, normalized_opt_traj, normalized_human_traj)
 
                 print("Here is a remedial demonstration that might be helpful")
 
@@ -797,10 +798,12 @@ def obtain_unit_tests(mdp_class, BEC_summary, visited_env_traj_idxs, particles_s
                         print("You got the remedial test wrong. Here's the correct answer")
 
                       
-                        normalized_remedial_traj, normalized_human_traj = normalize_trajs(remedial_traj, human_traj)
-                        remedial_mdp.visualize_trajectory_comparison(normalized_remedial_traj, normalized_human_traj)
-                        #remedial_mdp.visualize_trajectory_comparison(remedial_traj, human_traj)
-
+                        if wait_version:
+                            remedial_mdp.visualize_trajectory_comparison(True, remedial_traj, human_traj)
+                        else: 
+                            normalized_remedial_traj, normalized_human_traj = normalize_trajs(remedial_traj, human_traj)
+                            remedial_mdp.visualize_trajectory_comparison(False, normalized_remedial_traj, normalized_human_traj)
+                            
                         particles.update([-failed_remedial_constraint])
                         if visualize_pf_transition:
                             BEC_viz.visualize_pf_transition([-failed_remedial_constraint], particles_prev, particles, mdp_class,

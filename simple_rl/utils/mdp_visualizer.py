@@ -479,8 +479,7 @@ def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=N
                 pygame.display.quit()
                 return
 
-
-def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, draw_state, marked_state_importances=None, cur_state=None, scr_width=720, scr_height=720, mdp_class=None):
+def visualize_trajectory_comparison(mdp, flag, trajectory, trajectory_counterfactual, draw_state, marked_state_importances=None, cur_state=None, scr_width=720, scr_height=720, mdp_class=None):
     '''
     Args:
         mdp (MDP)
@@ -495,9 +494,6 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
         Visualizes the sequence of states and actions stored in the trajectory.
     '''
     #counterfactual is user input 
-
-    wait = False
-
     screen = pygame.display.set_mode((scr_width, scr_height))
     cur_state_traj = trajectory[0][0]
     cur_state_counter = trajectory_counterfactual[0][0]
@@ -516,22 +512,27 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
 
     step = 0
 
-    '''anchor_points_wait = []
-    traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y()) for (prevstate, action, currstate) in trajectory]
-    countertraj_currs = [(currstate.get_agent_x(), currstate.get_agent_y()) for (prevstate, action, currstate) in trajectory_counterfactual]
+    if flag:
+        
+        anchor_points_wait = []
+        traj_currs_coords = [(currstate.get_agent_x(), currstate.get_agent_y(), currstate.objects["agent"][0]["has_passenger"]) for (prevstate, action, currstate) in trajectory]
+        countertraj_currs_coords = [(currstate.get_agent_x(), currstate.get_agent_y(), currstate.objects["agent"][0]["has_passenger"]) for (prevstate, action, currstate) in trajectory_counterfactual]
 
-    matcher = difflib.SequenceMatcher(None, traj_currs, countertraj_currs, autojunk=False)
-    matches = matcher.get_matching_blocks()
-
-
-    for match in matches:
-        #add states in overlap
-        for i in range(match[2]):
-            anchor_points_wait.append(traj_currs[match[0] + i])'''
+        traj_currs = [currstate for (prevstate, action, currstate) in trajectory]
+       
+        matcher = difflib.SequenceMatcher(None, traj_currs_coords, countertraj_currs_coords, autojunk=False)
+        matches = matcher.get_matching_blocks()
 
 
-    while (step_traj < len_traj or step_counter < len_counter):
-        if wait:  
+        for match in matches:
+            #add states in overlap
+            for i in range(match[2]):
+                anchor_points_wait.append(traj_currs_coords[match[0] + i])
+
+        print(anchor_points_wait)
+
+    while (step_traj < len_traj or step_counter < len_counter) and (step < len_traj or step < len_counter):
+        if flag:  
             # Check for key presses.
             for event in pygame.event.get():
                 if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
@@ -545,28 +546,36 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
                     for shape in dynamic_shapes_counterfactual:
                         pygame.draw.rect(screen, (255, 255, 255), shape)
 
-                    #if (step_traj != 0 and step_counter != 0):
-                    prev_traj = cur_state_traj
-                    prev_counter = cur_state_counter
 
                     if step_traj < len_traj:
+                        cur_x_traj = trajectory[step_traj][2].get_agent_x()
+                        cur_y_traj = trajectory[step_traj][2].get_agent_y()
                         cur_state_traj = trajectory[step_traj][2]
                         
                     else:
+                        cur_x_traj = trajectory[-1][2].get_agent_x()
+                        cur_y_traj = trajectory[-1][2].get_agent_y()
                         cur_state_traj = trajectory[-1][2]
+                    cur_pass_traj = cur_state_traj.objects["agent"][0]["has_passenger"]
+                      
 
                     if step_counter < len_counter:
+                        cur_x_counter = trajectory_counterfactual[step_counter][2].get_agent_x()
+                        cur_y_counter = trajectory_counterfactual[step_counter][2].get_agent_y()
                         cur_state_counter = trajectory_counterfactual[step_counter][2]
-                  
                     else:
+                        cur_x_counter = trajectory_counterfactual[-1][2].get_agent_x()
+                        cur_y_counter = trajectory_counterfactual[-1][2].get_agent_y()
                         cur_state_counter = trajectory_counterfactual[-1][2]
+                    cur_pass_counter = cur_state_counter.objects["agent"][0]["has_passenger"]
                     
-                    if (cur_state_traj in anchor_points_wait and cur_state_counter != cur_state_traj):
+                    if ((cur_x_traj, cur_y_traj, cur_pass_traj) in anchor_points_wait and (cur_x_counter, cur_y_counter, cur_pass_counter) != (cur_x_traj, cur_y_traj, cur_pass_traj)):
                         step_traj -= 1
 
-                    if (cur_state_counter in anchor_points_wait and cur_state_traj != cur_state_counter):
+                    if ((cur_x_counter, cur_y_counter, cur_pass_counter) in anchor_points_wait and (cur_x_traj, cur_y_traj, cur_pass_traj) != (cur_x_counter, cur_y_counter, cur_pass_counter) ):
                         step_counter -= 1
 
+                    print(cur_state_traj, cur_state_counter)
                     dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state_traj,
                                                             agent_history=agent_history, offset_direction=1, visualize_history=False)
 
