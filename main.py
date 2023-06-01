@@ -543,6 +543,7 @@ def normalize_trajs(opt_traj, human_traj):
     m2 = []
 
     for i in range(len(anchor_points)):
+        pdb.set_trace()
         (opt_idx, human_idx) = anchor_points[i]
 
         if i == 0:
@@ -652,7 +653,7 @@ def normalize_trajs(opt_traj, human_traj):
     return normalized_opt_traj, normalized_human_traj
 
 
-wait_version = True
+wait_version = False
 
 
 def obtain_unit_tests(mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, data_loc, weights, step_cost_flag, visualize_pf_transition=False):
