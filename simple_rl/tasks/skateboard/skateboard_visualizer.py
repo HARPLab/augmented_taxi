@@ -172,10 +172,10 @@ def _draw_augmented_state(screen,
         pass_x, pass_y = p["x"], p["y"]
         agent_size = int(min(cell_width, cell_height) / 5.0)
         if p["on_agent"]:
-            top_left_point = int(width_buffer + cell_width * (pass_x - 1) + agent_size + 10), int(
+            top_left_point = int(width_buffer + cell_width * (pass_x - 1) + agent_size + 10 + offset_counterfactual), int(
                 height_buffer + cell_height * (skateboard_oomdp.height - pass_y) + agent_size + 75)
         else:
-            top_left_point = int(width_buffer + cell_width * (pass_x - 1) + agent_size + 10), int(
+            top_left_point = int(width_buffer + cell_width * (pass_x - 1) + agent_size + 10 + offset_counterfactual), int(
                 height_buffer + cell_height * (skateboard_oomdp.height - pass_y) + agent_size + 38)
         dest_col = (max(color_ls[-i-3][0]-30, 0), max(color_ls[-i-3][1]-30, 0), max(color_ls[-i-3][2]-30, 0))
         pygame.draw.rect(screen, dest_col, top_left_point + (cell_width / 2, cell_height / 10), 0)
