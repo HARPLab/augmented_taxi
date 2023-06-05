@@ -272,13 +272,13 @@ def visualize_pf_transition(constraints, particles, mdp_class, weights=None, fig
     '''
     if fig == None:
         fig = plt.figure()
-    def label_axes(ax, mdp_class):
+    def label_axes(ax, mdp_class, weights=None):
         ax.set_facecolor('white')
         ax.xaxis.pane.fill = False
         ax.yaxis.pane.fill = False
         ax.zaxis.pane.fill = False
         if weights is not None:
-            ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100)
+            ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100/2)
         if mdp_class == 'augmented_taxi2':
             ax.set_xlabel('$\mathregular{w_0}$: Mud')
             ax.set_ylabel('$\mathregular{w_1}$: Recharge')
@@ -295,9 +295,9 @@ def visualize_pf_transition(constraints, particles, mdp_class, weights=None, fig
     ax1 = fig.add_subplot(1, 3, 1, projection='3d')
     ax2 = fig.add_subplot(1, 3, 2, projection='3d', sharex=ax1, sharey=ax1, sharez=ax1)
     ax3 = fig.add_subplot(1, 3, 3, projection='3d', sharex=ax1, sharey=ax1, sharez=ax1)
-    ax1.title.set_text('Particles before')
-    ax2.title.set_text('Demo constraints')
-    ax3.title.set_text('Particles after')
+    ax1.title.set_text('Particles before Demonstration')
+    ax2.title.set_text('Constraint corresponding to demonstration')
+    ax3.title.set_text('Particles after demonstration')
 
     # plot particles before and after the constraints
     particles.plot(fig=fig, ax=ax1, plot_prev=True)
@@ -314,9 +314,9 @@ def visualize_pf_transition(constraints, particles, mdp_class, weights=None, fig
         visualize_planes(constraints, fig=fig, ax=ax3)
     visualize_spherical_polygon(poly, fig=fig, ax=ax2, plot_ref_sphere=False, alpha=0.75)
 
-    label_axes(ax1, mdp_class)
-    label_axes(ax2, mdp_class)
-    label_axes(ax3, mdp_class)
+    label_axes(ax1, mdp_class, weights)
+    label_axes(ax2, mdp_class, weights)
+    label_axes(ax3, mdp_class, weights)
 
     # https://stackoverflow.com/questions/41167196/using-matplotlib-3d-axes-how-to-drag-two-axes-at-once
     # link the pan of the three axes together

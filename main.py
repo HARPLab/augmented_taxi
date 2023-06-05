@@ -409,7 +409,7 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
                                 step_cost_flag)
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints
 
-def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, data_loc, weights, step_cost_flag, visualize_pf_transition=True):
+def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, data_loc, weights, step_cost_flag, visualize_pf_transition=False):
     # todo: maybe pass in some of these objects later
     with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
         policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(
@@ -485,7 +485,7 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
 
                 print("Here is a remedial demonstration that might be helpful")
 
-                remedial_instruction, visited_env_traj_idxs = BEC.obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, failed_BEC_constraint, min_subset_constraints_record, env_record, traj_record, traj_features_record, test_history, visited_env_traj_idxs, running_variable_filter, mdp_features_record, consistent_state_count, step_cost_flag)
+                remedial_instruction, visited_env_traj_idxs = BEC.obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, failed_BEC_constraint, min_subset_constraints_record, env_record, traj_record, traj_features_record, test_history, visited_env_traj_idxs, running_variable_filter, mdp_features_record, consistent_state_count, weights, step_cost_flag)
                 remedial_mdp, remedial_traj, _, remedial_constraint, _ = remedial_instruction[0]
                 remedial_mdp.visualize_trajectory(remedial_traj)
                 test_history.extend(remedial_instruction)
@@ -515,6 +515,7 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
                                                                                                      running_variable_filter,
                                                                                                      mdp_features_record,
                                                                                                      consistent_state_count,
+                                                                                                     weights,
                                                                                                      step_cost_flag, type='testing')
 
                     remedial_mdp, remedial_traj, _, _, _ = remedial_test[0]
@@ -662,6 +663,7 @@ def analyze_prev_study_tests(domain, BEC_summary, visited_env_traj_idxs, particl
                                                                                                      running_variable_filter,
                                                                                                      mdp_features_record,
                                                                                                      consistent_state_count,
+                                                                                                     weights,
                                                                                                      step_cost_flag)
                     remedial_mdp, remedial_traj, _, remedial_constraint, _ = remedial_instruction[0]
                     remedial_mdp.visualize_trajectory(remedial_traj)
@@ -692,6 +694,7 @@ def analyze_prev_study_tests(domain, BEC_summary, visited_env_traj_idxs, particl
                                                                                                   running_variable_filter,
                                                                                                   mdp_features_record,
                                                                                                   consistent_state_count,
+                                                                                                  weights,
                                                                                                   step_cost_flag,
                                                                                                   type='testing')
 
@@ -1062,12 +1065,12 @@ if __name__ == "__main__":
     # generate_agent(params.mdp_class, params.data_loc['base'], params.mdp_parameters, visualize=True)
 
     # b) obtain a BEC summary of the agent's policy
-    # BEC_summary, visited_env_traj_idxs, particles_summary = obtain_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
-    #                         params.step_cost_flag, params.BEC['summary_variant'], pool, params.BEC['n_train_demos'], params.BEC['BEC_depth'],
-    #                         params.BEC['n_human_models'], params.BEC['n_particles'], params.prior, params.posterior, params.BEC['obj_func_proportion'])
+    BEC_summary, visited_env_traj_idxs, particles_summary = obtain_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
+                            params.step_cost_flag, params.BEC['summary_variant'], pool, params.BEC['n_train_demos'], params.BEC['BEC_depth'],
+                            params.BEC['n_human_models'], params.BEC['n_particles'], params.prior, params.posterior, params.BEC['obj_func_proportion'])
 
     # c) run through the closed-loop teaching framework
-    # simulate_teaching_loop(params.mdp_class,BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag)
+    simulate_teaching_loop(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag)
 
     n_human_models_real_time = 8
 

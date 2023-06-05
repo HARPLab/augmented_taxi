@@ -496,9 +496,9 @@ class Particles():
         # cluster particles using mean-shift and store the cluster centers
         mean_shifter = ms.MeanShift()
         # only use a subset of neighboring points to perform meanshift clustering
-        mean_shift_result = mean_shifter.cluster(self.positions.squeeze(), self.weights, downselect_points=self.meanshift_plusplus_neighbors)
+        # mean_shift_result = mean_shifter.cluster(self.positions.squeeze(), self.weights, downselect_points=self.meanshift_plusplus_neighbors)
         # use all points to perform meanshift clustering
-        # mean_shift_result = mean_shifter.cluster(self.positions.squeeze(), self.weights)
+        mean_shift_result = mean_shifter.cluster(self.positions.squeeze(), self.weights)
         self.cluster_centers = mean_shift_result.cluster_centers
         self.cluster_assignments = mean_shift_result.cluster_assignments
 
@@ -717,27 +717,31 @@ class Particles():
                 # inspired by Sensor Resetting Localization for Poorly Modelled Mobile Robots, Lenser et al. 2000)
                 solid_angle = BEC_helpers.calc_solid_angles(constraints)[0]
 
-                n_desired_reset_particles = int(np.ceil(solid_angle / (4 * np.pi) * 100))
+                # obtain the optimal number of samples to cover the new space using KLD resampling
+                n_desired_reset_particles_heuristic = int(np.ceil(solid_angle / (4 * np.pi) * 100))
+                print('heuristic number: {}'.format(n_desired_reset_particles_heuristic))
+                new_particle_positions = BEC_helpers.sample_human_models_uniform(constraints, n_desired_reset_particles_heuristic)
+                joint_particle_positions = np.vstack((np.array(new_particle_positions), self.positions))
+                self.reinitialize(joint_particle_positions)
+                resample_indexes = self.KLD_resampling()
+                n_desired_reset_particles_informed = len(resample_indexes)
+                print('informed number: {}'.format(n_desired_reset_particles_informed))
 
                 if len(constraints) == 1:
                     # if there is only one constraint, sample from the VMF + uniform distribution
                     new_particle_positions_uniform = BEC_helpers.sample_human_models_random(constraints, int(np.ceil(
-                        n_desired_reset_particles * self.integral_prob_uniform)))
+                        n_desired_reset_particles_informed * self.integral_prob_uniform)))
 
                     mu_constraint = constraints[0][0] / np.linalg.norm(constraints[0][0])
-                    new_particle_positions_VMF = p_utils.rand_von_mises_fisher(mu_constraint, kappa=self.VMF_kappa, N=int(np.ceil(n_desired_reset_particles * self.integral_prob_VMF)),
+                    new_particle_positions_VMF = p_utils.rand_von_mises_fisher(mu_constraint, kappa=self.VMF_kappa, N=int(np.ceil(n_desired_reset_particles_informed * self.integral_prob_VMF)),
                                                                     halfspace=True)
                     new_particle_positions = np.vstack((np.array(new_particle_positions_uniform), np.expand_dims(new_particle_positions_VMF, 1)))
                 else:
                     # otherwise, fall back on simply sampling uniformly from the space obeys all constraints
-                    new_particle_positions = BEC_helpers.sample_human_models_uniform(constraints, n_desired_reset_particles)
+                    new_particle_positions = BEC_helpers.sample_human_models_uniform(constraints, n_desired_reset_particles_informed)
 
-                joint_particle_positions = np.vstack((np.array(new_particle_positions), self.positions))
+                joint_particle_positions = np.vstack((np.array(new_particle_positions), self.positions_prev))
                 self.reinitialize(joint_particle_positions)
-
-                # rely on KLD resampling to restabilize to the optimal number of particles
-                resample_indexes = self.KLD_resampling()
-                self.resample_from_index(np.array(resample_indexes))
 
                 print(colored('Performed a reset', 'red'))
             else:
@@ -780,6 +784,10 @@ class Particles():
 
 
 def IROS_demonstrations():
+    w = np.array([[-3, 3.5, -1]])  # toll, hotswap station, step cost
+    w_normalized = w / (np.linalg.norm(w[0, :], ord=2) - np.linalg.norm(w[0, :], ord=2) * 0.05)
+    # w_normalized = w / (np.linalg.norm(w[0, :], ord=2))
+
     prior = [np.array([[0, 0, -1]])]
     n_particles = 200
 
@@ -802,8 +810,8 @@ def IROS_demonstrations():
     # ax.set_xlabel('x')
     # ax.set_ylabel('y')
     # ax.set_zlabel('z')
-    # particles.plot(particles)
-    # plt.show()
+    particles.plot(particles)
+    plt.show()
 
     constraints_list = [prior]
 
@@ -838,6 +846,9 @@ def IROS_demonstrations():
     constraints_list.extend([[np.array([[1,  0,  -4]]), np.array([[-1,  0,  2]]), np.array([[0, -1, -4]]), np.array([[0, 1, 2]]),
                    np.array([[1, 1, 0]])], [-np.array([[-1, 0, -2]])]])
 
+    # for ICML paper (the constraint that conveys that mud is at least twice as costly as an action)
+    # constraints_list.extend([[np.array([[-1,  0,  2]])]])
+
     # todo: for playing around with what happens if you get a constraint wrong repeatedly
     # constraints_list.extend([[np.array([[0,  1,  2]]), np.array([[-1,  0,  2]])], [np.array([[0, -1, -2]])], [np.array([[0, -1, -2]])], [np.array([[0, -1, -2]])]
     #                          , [np.array([[0, -1, -2]])], [np.array([[0, -1, -2]])], [np.array([[0, -1, -2]])]])
@@ -871,7 +882,7 @@ def IROS_demonstrations():
         # print("Total weight: {}".format(np.sum(particles.weights)))
         print("Number of particles: {}".format(len(particles.weights)))
 
-        BEC_viz.visualize_pf_transition(constraints, particles, 'augmented_taxi2')
+        BEC_viz.visualize_pf_transition(constraints, particles, 'augmented_taxi2', weights=w_normalized)
 
         # fig = plt.figure()
         # ax = fig.add_subplot(projection='3d')

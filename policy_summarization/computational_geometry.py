@@ -110,6 +110,20 @@ def sph2cart(spherical):
 
     return cartesian
 
+def cart2latlong(coords):
+    """
+    Convert an array of 3D Cartesian coordinates (x, y, z) to spherical coordinates (latitude, longitude).
+    The input `coords` should be a numpy array of shape (N, 3), where N is the number of points and each row contains the x, y, and z coordinates of a point.
+    The output is a numpy array of shape (N, 2), where each row contains the latitude and longitude of a point.
+    Latitude is between -pi/2 and pi/2 (with 0 being the xy plane), and longitude is between -pi and pi (with 0 being the x axis).
+    """
+    x, y, z = np.transpose(coords)
+    longitude = np.arctan2(y, x)
+    r_xy = np.sqrt(x**2 + y**2)
+    latitude = np.arctan2(z, r_xy)
+
+    return np.column_stack((latitude, longitude))
+
 def sample_valid_region(constraints, min_azi, max_azi, min_ele, max_ele, n_azi, n_ele):
     # sample along the sphere
     u = np.linspace(min_azi, max_azi, n_azi, endpoint=True)
