@@ -543,7 +543,7 @@ def normalize_trajs(opt_traj, human_traj):
     m2 = []
 
     for i in range(len(anchor_points)):
-        pdb.set_trace()
+        #pdb.set_trace()
         (opt_idx, human_idx) = anchor_points[i]
 
         if i == 0:
@@ -584,6 +584,9 @@ def normalize_trajs(opt_traj, human_traj):
             if (diff_opt < diff_human):
                 step_size = diff_opt/diff_human
 
+                if (len(m2) > 0) and not (m2[-1]):
+                    normalized_opt_traj.append(opt_traj[prev_opt_idx])
+
                 for j in range(prev_opt_idx, opt_idx + 1):
                     if j != opt_idx:
                         if (opt_traj[j][0].get_agent_x() == opt_traj[j + 1][0].get_agent_x()) and (opt_traj[j][0].get_agent_y() == opt_traj[j + 1][0].get_agent_y()):
@@ -617,6 +620,9 @@ def normalize_trajs(opt_traj, human_traj):
             #need to expand human trajectory
             else:
                 step_size = (diff_human)/diff_opt
+
+                if (len(m1) > 0) and not (m1[-1]):
+                    normalized_human_traj.append(opt_traj[prev_human_idx])
 
                 for j in range(prev_human_idx, human_idx + 1):
                     if j != human_idx:
