@@ -409,7 +409,7 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
                                 step_cost_flag)
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints
 
-def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, data_loc, weights, step_cost_flag, visualize_pf_transition=False):
+def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, n_human_models_precomputed, data_loc, weights, step_cost_flag, visualize_pf_transition=False):
     # todo: maybe pass in some of these objects later
     with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
         policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(
@@ -485,7 +485,7 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
 
                 print("Here is a remedial demonstration that might be helpful")
 
-                remedial_instruction, visited_env_traj_idxs = BEC.obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, failed_BEC_constraint, min_subset_constraints_record, env_record, traj_record, traj_features_record, test_history, visited_env_traj_idxs, running_variable_filter, mdp_features_record, consistent_state_count, weights, step_cost_flag)
+                remedial_instruction, visited_env_traj_idxs = BEC.obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, failed_BEC_constraint, min_subset_constraints_record, env_record, traj_record, traj_features_record, test_history, visited_env_traj_idxs, running_variable_filter, mdp_features_record, consistent_state_count, weights, step_cost_flag, n_human_models_precomputed=n_human_models_precomputed)
                 remedial_mdp, remedial_traj, _, remedial_constraint, _ = remedial_instruction[0]
                 remedial_mdp.visualize_trajectory(remedial_traj)
                 test_history.extend(remedial_instruction)
@@ -516,7 +516,7 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
                                                                                                      mdp_features_record,
                                                                                                      consistent_state_count,
                                                                                                      weights,
-                                                                                                     step_cost_flag, type='testing')
+                                                                                                     step_cost_flag, type='testing', n_human_models_precomputed=n_human_models_precomputed)
 
                     remedial_mdp, remedial_traj, _, _, _ = remedial_test[0]
                     test_history.extend(remedial_test)
@@ -548,7 +548,7 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
                             BEC_viz.visualize_pf_transition([-failed_remedial_constraint], particles, mdp_class, weights)
 
 
-def analyze_prev_study_tests(domain, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, data_loc, weights, step_cost_flag, visualize_pf_transition=True):
+def analyze_prev_study_tests(domain, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, n_human_models_precomputed, data_loc, weights, step_cost_flag, visualize_pf_transition=True):
     with open('filtered_human_responses.pickle', 'rb') as f:
         filtered_human_traj_dict, filtered_mdp_dict, filtered_count_dict, filtered_opt_reward_dict, filtered_human_reward_dict, filtered_opt_traj_dict = pickle.load(
             f)
@@ -664,7 +664,7 @@ def analyze_prev_study_tests(domain, BEC_summary, visited_env_traj_idxs, particl
                                                                                                      mdp_features_record,
                                                                                                      consistent_state_count,
                                                                                                      weights,
-                                                                                                     step_cost_flag)
+                                                                                                     step_cost_flag, n_human_models_precomputed=n_human_models_precomputed)
                     remedial_mdp, remedial_traj, _, remedial_constraint, _ = remedial_instruction[0]
                     remedial_mdp.visualize_trajectory(remedial_traj)
                     # test_history.extend(remedial_instruction)
@@ -696,7 +696,7 @@ def analyze_prev_study_tests(domain, BEC_summary, visited_env_traj_idxs, particl
                                                                                                   consistent_state_count,
                                                                                                   weights,
                                                                                                   step_cost_flag,
-                                                                                                  type='testing')
+                                                                                                  type='testing', n_human_models_precomputed=n_human_models_precomputed)
 
                         remedial_mdp, remedial_traj, _, _, _ = remedial_test[0]
                         # test_history.extend(remedial_test)
@@ -824,9 +824,9 @@ def contrast_PF_2_step_dev(domain, BEC_summary, visited_env_traj_idxs, particles
 
                 print("Combining the most limiting constraints across human models:")
                 pool.restart()
-                args = [(i, len(sample_human_models), data_loc, difficulty, weights, step_cost_flag, np.zeros((1, 3)),
+                args = [(i, range(len(sample_human_models)), data_loc, difficulty, weights, step_cost_flag, np.zeros((1, 3)),
                          mdp_features_record[i],
-                         traj_record[i], human_model_constraints, None) for
+                         traj_record[i], human_model_constraints, None, False, False) for
                         i in range(len(traj_record))]
                 info_gains_record, min_env_constraints_record, n_diff_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(
                     *pool.imap(BEC.combine_limiting_constraints_IG, tqdm(args)))
@@ -1070,12 +1070,12 @@ if __name__ == "__main__":
                             params.BEC['n_human_models'], params.BEC['n_particles'], params.prior, params.posterior, params.BEC['obj_func_proportion'])
 
     # c) run through the closed-loop teaching framework
-    simulate_teaching_loop(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag)
+    simulate_teaching_loop(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.BEC['n_human_models_precomputed'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag)
 
     n_human_models_real_time = 8
 
     # d) run remedial demonstration and test selection on previous participant responses from IROS
-    # analyze_prev_study_tests(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], n_human_models_real_time, params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, visualize_pf_transition=True)
+    analyze_prev_study_tests(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], n_human_models_real_time, params.BEC['n_human_models_precomputed'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, visualize_pf_transition=True)
 
     # e) compare the remedial demonstration selection when using 2-step dev/BEC vs. PF (assuming 3 static humans models for low, medium, and high difficulties)
     # contrast_PF_2_step_dev(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], n_human_models_real_time, params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, visualize_pf_transition=False)
