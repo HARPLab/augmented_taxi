@@ -1061,6 +1061,39 @@ def view_trajectories(visualize=False):
     with open('filtered_human_responses.pickle', 'wb') as f:
         pickle.dump((filtered_human_traj_dict, filtered_mdp_dict, filtered_count_dict, filtered_opt_reward_dict, filtered_human_reward_dict, filtered_opt_traj_dict), f)
 
+def consolidate_counterfactual_constraints():
+    '''
+    Consolidate counterfactual constraints into a single file
+    '''
+    data_loc = 'augmented_taxi2'
+    from pathos.multiprocessing import ProcessPool as Pool
+    from tqdm import tqdm
+
+    pool = Pool(min(params.n_cpu, 1))
+
+    def load_constraints(args):
+        model_idx = args
+        precomputed_PF_constraints = []
+
+        for env_idx in range(64):
+            with open('models/' + data_loc + '/counterfactual_data_precomputed/model' + str(model_idx) + '/cf_data_env'
+                      + str(env_idx).zfill(5) + '.pickle', 'rb') as f:
+                constraints_env = pickle.load(f)
+                precomputed_PF_constraints.append(constraints_env)
+
+        return precomputed_PF_constraints
+
+    pool.restart()
+    args = [(i) for i in range(2500)]
+    precomputed_PF_constraints = list(tqdm(pool.imap(load_constraints, args), total=len(args)))
+    pool.close()
+    pool.join()
+    pool.terminate()
+
+    with open('models/' + data_loc + '/' + 'precomputed_PF_constraints.pickle', 'wb') as f:
+        pickle.dump(precomputed_PF_constraints, f)
+
+
 if __name__ == "__main__":
     data_loc = params.data_loc['BEC']
 
@@ -1118,8 +1151,8 @@ if __name__ == "__main__":
     # obtain_outlier_human_scores(test_env_dict)
 
     # going through IROS human participant trajectories
-    obtain_human_trajectories(test_env_dict)
-    view_trajectories(visualize=True)
+    # obtain_human_trajectories(test_env_dict)
+    # view_trajectories(visualize=False)
 
 
     # # todo: getting initial training demonstrations and diagnostic test in augmented taxi domain for rithika

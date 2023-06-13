@@ -470,12 +470,131 @@ def combine_limiting_constraints_IG(args):
             else:
                 info_gains_record.append(0)
 
-            hypothetical_constraints = min_BEC_constraints_running.copy()
-            hypothetical_constraints.extend(min_env_constraints)
-            if len(hypothetical_constraints) > 1:
-                hypothetical_constraints = BEC_helpers.remove_redundant_constraints(hypothetical_constraints,
-                                                                                    weights, step_cost_flag)
             if compute_n_diff_constraints_flag:
+                hypothetical_constraints = min_BEC_constraints_running.copy()
+                hypothetical_constraints.extend(min_env_constraints)
+                if len(hypothetical_constraints) > 1:
+                    hypothetical_constraints = BEC_helpers.remove_redundant_constraints(hypothetical_constraints,
+                                                                                        weights, step_cost_flag)
+
+                overlapping_constraint_count = 0
+                for arr1 in min_BEC_constraints_running:
+                    for arr2 in hypothetical_constraints:
+                        if np.array_equal(arr1, arr2):
+                            overlapping_constraint_count += 1
+                            break
+
+                max_diff = abs(len(hypothetical_constraints) - overlapping_constraint_count)
+            else:
+                max_diff = 0
+
+            n_diff_constraints.append(max_diff)
+
+        # obtain the counterfactual human trajectories that could've given rise to the most limiting constraints and
+        # how much it overlaps the agent's optimal trajectory
+        human_counterfactual_trajs = [[] for i in range(len(min_env_constraints_record))]
+        overlap_in_opt_and_counterfactual_traj = [[] for i in range(len(min_env_constraints_record))]
+        overlap_in_opt_and_counterfactual_traj_avg = []
+
+        # commenting out trajectory overlap calculation
+        # for model_idx in range(sample_human_model_idxs):
+        #     with open('models/' + data_loc + '/counterfactual_data_' + str(curr_summary_len) + '/model' + str(
+        #             model_idx) + '/cf_data_env' + str(
+        #         env_idx).zfill(5) + '.pickle', 'rb') as f:
+        #         constraints_env = pickle.load(f)
+        #
+        #     # for each of the minimum constraint sets in each environment (with a unique starting state)
+        #     for traj_idx, min_env_constraints in enumerate(min_env_constraints_record):
+        #         in_minimum_set = False
+        #
+        #         # see if any of the constraints generated using this human trajectory match any of those in the minimum constraint set
+        #         for constraint in constraints_env[traj_idx]:
+        #             for min_env_constraint in min_env_constraints:
+        #                 # if there is a match, consider the overlap with the agent's optimal trajectory and store that trajectory
+        #                 if BEC_helpers.equal_constraints(constraint, min_env_constraint):
+        #                     in_minimum_set = True
+        #
+        #                     # you should only consider the overlap for the first counterfactual human trajectory (as opposed to
+        #                     # counterfactual trajectories that could've arisen from states after the first state)
+        #                     overlap_pct = BEC_helpers.calculate_counterfactual_overlap_pct(best_human_trajs_record_env[traj_idx][0], trajs_opt[traj_idx])
+        #
+        #                     overlap_in_opt_and_counterfactual_traj[traj_idx].append(overlap_pct)
+        #                     # store the required information for replaying the closest human counterfactual trajectory
+        #                     human_counterfactual_trajs[traj_idx].append((curr_summary_len, model_idx, env_idx, traj_idx))
+        #                     break
+        #
+        #             # a counterfactual trajectory only needs to contribute one constraint in the minimal set for the
+        #             # corresponding optimal trajectory to be considered for the summary
+        #             if in_minimum_set:
+        #                 break
+        #
+        # # take the average overlap across all counterfactual trajectories that contributed to the most limiting constraints
+        # for traj_idx, overlap_pcts in enumerate(overlap_in_opt_and_counterfactual_traj):
+        #     if len(overlap_pcts) > 0:
+        #         overlap_in_opt_and_counterfactual_traj_avg.append(np.mean(overlap_pcts))
+        #     else:
+        #         overlap_in_opt_and_counterfactual_traj_avg.append(0)
+
+    return info_gains_record, min_env_constraints_record, n_diff_constraints, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs
+
+def combine_limiting_constraints_IG2(args):
+    '''
+    Summary: combine the most limiting constraints across all potential human models for each potential demonstration
+    '''
+    env_idx, sample_human_model_idxs, data_loc, curr_summary_len, weights, step_cost_flag, variable_filter,\
+    mdp_features, trajs_opt, min_BEC_constraints_running, particles, compute_IG_flag, compute_n_diff_constraints_flag, all_env_constraints = args
+
+    info_gains_record = []
+    min_env_constraints_record = []
+    # all_env_constraints = []
+    n_diff_constraints = []               # number of constraints in the running human model that would differ after showing a particular demonstration
+
+    if variable_filter.dot(mdp_features.T) > 0:
+        # don't consider environments that convey information about a variable you don't currently wish to convey
+        info_gains_record = [0 for _ in range(len(trajs_opt))]
+        n_diff_constraints = [0 for _ in range(len(trajs_opt))]
+        overlap_in_opt_and_counterfactual_traj_avg = []
+        human_counterfactual_trajs = [[] for i in range(len(min_env_constraints_record))]
+        # print("skipping environment " + str(env_idx) + " because it contains a variable you don't want to convey")
+    else:
+        # jointly consider the constraints generated by suboptimal trajectories by each human model
+        # for model_idx in sample_human_model_idxs:
+        #     with open('models/' + data_loc + '/counterfactual_data_' + str(curr_summary_len) + '/model' + str(
+        #             model_idx) + '/cf_data_env' + str(
+        #         env_idx).zfill(5) + '.pickle', 'rb') as f:
+        #         constraints_env = pickle.load(f)
+        #     all_env_constraints.append(constraints_env)
+
+
+        all_env_constraints_joint = [list(itertools.chain.from_iterable(i)) for i in zip(*all_env_constraints)]
+        # for each possible demonstration in each environment, find the non-redundant constraints across all human models
+        # and use that to calculate the information gain for that demonstration
+        for traj_idx in range(len(all_env_constraints_joint)):
+            if len(all_env_constraints_joint[traj_idx]) > 1:
+                min_env_constraints = BEC_helpers.remove_redundant_constraints(all_env_constraints_joint[traj_idx],
+                                                                               weights, step_cost_flag)
+            else:
+                min_env_constraints = all_env_constraints_joint[traj_idx]
+
+            min_env_constraints_record.append(min_env_constraints)
+
+            if compute_IG_flag:
+                if particles is not None:
+                    ig = particles.calc_info_gain(min_env_constraints)
+                else:
+                    ig = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, min_env_constraints, weights,
+                                                                step_cost_flag)
+                info_gains_record.append(ig)
+            else:
+                info_gains_record.append(0)
+
+            if compute_n_diff_constraints_flag:
+                hypothetical_constraints = min_BEC_constraints_running.copy()
+                hypothetical_constraints.extend(min_env_constraints)
+                if len(hypothetical_constraints) > 1:
+                    hypothetical_constraints = BEC_helpers.remove_redundant_constraints(hypothetical_constraints,
+                                                                                        weights, step_cost_flag)
+
                 overlapping_constraint_count = 0
                 for arr1 in min_BEC_constraints_running:
                     for arr2 in hypothetical_constraints:
@@ -1289,6 +1408,13 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
 def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BEC_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, previous_demonstrations, visited_env_traj_idxs, variable_filter, mdp_features_record, consistent_state_count, weights, step_cost_flag, type='training', info_gain_tolerance=0.01, consider_human_models_jointly=True, n_human_models_precomputed=None):
     remedial_demonstrations = []
 
+    import time
+    start_time = time.time()
+    with open('models/' + data_loc + '/' + 'precomputed_PF_constraints.pickle', 'rb') as f:
+        precomputed_PF_constraints = pickle.load(f)
+    elapsed_time = time.time() - start_time
+    print("Elapsed time: " + str(elapsed_time))
+
     if n_human_models_precomputed is not None:
         # rely on constraints generated via sampled human models from cached particle filter
         sample_human_models_ref = BEC_helpers.sample_human_models_uniform([], n_human_models_precomputed)
@@ -1296,22 +1422,34 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BE
         # the human's incorrect response does not have a direct counterexample, and thus you need to use information gain to obtain the next example
         sample_human_models, model_weights = BEC_helpers.sample_human_models_pf(particles, n_human_models)
 
-        # get the distances
+        # obtain the indices of the reference human models (that have precomputed constraints) that are closest to the sampled human models
         sample_human_models_ref_latllong = cg.cart2latlong(np.array(sample_human_models_ref).squeeze())
         sample_human_models_latlong = cg.cart2latlong(np.array(sample_human_models).squeeze())
-
         distances = haversine_distances(sample_human_models_latlong, sample_human_models_ref_latllong)
         min_model_idxs = np.argmin(distances, axis=1)
 
         # todo: think about information gain later (simply try to match constraints for now)
+        # print("Combining the most limiting constraints across human models:")
+        # pool.restart()
+        # args = [(i, min_model_idxs, data_loc, 'precomputed', weights, step_cost_flag, variable_filter,
+        #          mdp_features_record[i],
+        #          traj_record[i], [], None, False, False) for
+        #         i in range(len(traj_record))]
+        # info_gains_record, min_env_constraints_record, n_diff_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(
+        #     *pool.imap(combine_limiting_constraints_IG, tqdm(args)))
+        # pool.close()
+        # pool.join()
+        # pool.terminate()
+
+        # testing out new way of combining constraints from a single large file of precomputed constraints (as opposed to opening up many files on the fly)
         print("Combining the most limiting constraints across human models:")
         pool.restart()
         args = [(i, min_model_idxs, data_loc, 'precomputed', weights, step_cost_flag, variable_filter,
                  mdp_features_record[i],
-                 traj_record[i], [], None, False, False) for
+                 traj_record[i], [], None, False, False, [precomputed_PF_constraints[j][i] for j in min_model_idxs]) for
                 i in range(len(traj_record))]
         info_gains_record, min_env_constraints_record, n_diff_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(
-            *pool.imap(combine_limiting_constraints_IG, tqdm(args)))
+            *pool.imap(combine_limiting_constraints_IG2, tqdm(args)))
         pool.close()
         pool.join()
         pool.terminate()
