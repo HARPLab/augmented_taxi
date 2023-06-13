@@ -1066,7 +1066,7 @@ def consolidate_counterfactual_constraints():
     Consolidate counterfactual constraints into a single file
     '''
     data_loc = 'augmented_taxi2'
-    from pathos.multiprocessing import ProcessPool as Pool
+    from multiprocessing import Pool
     from tqdm import tqdm
 
     pool = Pool(min(params.n_cpu, 1))
@@ -1083,12 +1083,10 @@ def consolidate_counterfactual_constraints():
 
         return precomputed_PF_constraints
 
-    pool.restart()
     args = [(i) for i in range(2500)]
     precomputed_PF_constraints = list(tqdm(pool.imap(load_constraints, args), total=len(args)))
     pool.close()
     pool.join()
-    pool.terminate()
 
     with open('models/' + data_loc + '/' + 'precomputed_PF_constraints.pickle', 'wb') as f:
         pickle.dump(precomputed_PF_constraints, f)

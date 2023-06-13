@@ -301,7 +301,7 @@ BEC = {
                                               # when selecting the next demonstration (range: 0 - 1). selecting a value
                                               # less than 1 may yield a greater number of demonstrations
 
-    'BEC_depth': 2,                           # number of action deviations to consider when extracting BEC constraints
+    'BEC_depth': 1,                           # number of action deviations to consider when extracting BEC constraints
 
     'n_human_models_precomputed': 2500,         # number of human beliefs to precompute for future quick, real-time inference
 

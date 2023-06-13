@@ -6,7 +6,6 @@ import dill as pickle
 import numpy as np
 import copy
 from termcolor import colored
-from pathos.multiprocessing import ProcessPool as Pool
 import sage.all
 import sage.geometry.polyhedron.base as Polyhedron
 import matplotlib
@@ -16,6 +15,7 @@ from tqdm import tqdm
 import os
 import itertools
 from collections import defaultdict
+from multiprocessing import Process, Queue, Pool
 
 # Other imports.
 sys.path.append("simple_rl")
@@ -352,42 +352,30 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
                     print(colored('Model val: {}'.format(human_model), 'red'))
 
                     # assuming that I'm considering human models jointly
-                    pool.restart()
                     n_processed_envs = len(os.listdir(cf_data_dir))
                     args = [
                         (data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]),
                          traj_record[i], posterior, step_cost_flag, counterfactual_folder_idx, None,
                          True) for i in range(n_processed_envs, len(traj_record))]
                     _ = list(tqdm(pool.imap(BEC.compute_counterfactuals, args), total=len(args)))
-                    pool.close()
-                    pool.join()
-                    pool.terminate()
 
             try:
                 with open('models/' + data_loc + '/BEC_constraints_counterfactual.pickle', 'rb') as f:
                     min_subset_constraints_record_counterfactual = pickle.load(f)
             except:
-                pool.restart()
                 args = [(data_loc, i, min_subset_constraints_record[i], n_human_models, counterfactual_folder_idx, weights, step_cost_flag) for i in range(len(min_subset_constraints_record))]
                 # combine the human counterfactual and one-step deviation constraints
                 min_subset_constraints_record_counterfactual = list(tqdm(pool.imap(BEC_helpers.combine_counterfactual_constraints, args), total=len(args)))
-                pool.close()
-                pool.join()
-                pool.terminate()
 
                 with open('models/' + data_loc + '/BEC_constraints_counterfactual.pickle', 'wb') as f:
                     pickle.dump(min_subset_constraints_record_counterfactual, f)
 
             # take the overlap of the human posterior with BEC of suboptimal trajectories of one-step deviation
-            pool.restart()
             args = [(i, n_human_models, min_subset_constraints, prior, posterior, data_loc, counterfactual_folder_idx, weights, traj_record[i], step_cost_flag, pool)
                     for i, min_subset_constraints in enumerate(min_subset_constraints_record_counterfactual)]
 
             print("Obtaining overlap in BEC area between posterior human model and potential test demonstrations: ")
             BEC_lengths_record_counterfactual = list(tqdm(pool.imap(BEC.overlap_demo_BEC_and_human_posterior, args), total=len(args)))
-            pool.close()
-            pool.join()
-            pool.terminate()
             with open('models/' + data_loc + '/BEC_lengths_counterfactual.pickle', 'wb') as f:
                 pickle.dump(BEC_lengths_record_counterfactual, f)
 
@@ -813,26 +801,17 @@ def contrast_PF_2_step_dev(domain, BEC_summary, visited_env_traj_idxs, particles
                     cf_data_dir = 'models/' + data_loc + '/counterfactual_data_' + difficulty + '/model' + str(model_idx)
                     os.makedirs(cf_data_dir, exist_ok=True)
 
-                    pool.restart()
                     args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], None, human_model, step_cost_flag, difficulty, np.zeros((1, 3)), mdp_features_record[i], True) for i in range(len(traj_record))]
                     info_gain_envs = list(tqdm(pool.imap(BEC.compute_counterfactuals, args), total=len(args)))
-                    pool.close()
-                    pool.join()
-                    pool.terminate()
-
                     info_gains_record.append(info_gain_envs)
 
                 print("Combining the most limiting constraints across human models:")
-                pool.restart()
                 args = [(i, range(len(sample_human_models)), data_loc, difficulty, weights, step_cost_flag, np.zeros((1, 3)),
                          mdp_features_record[i],
                          traj_record[i], human_model_constraints, None, False, False) for
                         i in range(len(traj_record))]
                 info_gains_record, min_env_constraints_record, n_diff_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(
                     *pool.imap(BEC.combine_limiting_constraints_IG, tqdm(args)))
-                pool.close()
-                pool.join()
-                pool.terminate()
 
                 with open('models/' + data_loc + '/' + 'PF_constraints_' + difficulty + '.pickle', 'wb') as f:
                     pickle.dump((info_gains_record, min_env_constraints_record), f)
@@ -1035,16 +1014,12 @@ def precompute_counterfactual_constraints(data_loc, mdp_parameters, weights, BEC
             print(colored('Model #: {}'.format(model_idx), 'red'))
             print(colored('Model val: {}'.format(human_model), 'red'))
 
-            pool.restart()
             n_processed_envs = len(os.listdir(cf_data_dir))
             args = [
                 (data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]),
                  traj_record[i], None, [], step_cost_flag, 'precomputed', np.array([[0, 0, 0]]),  mdp_features_record[i],
                  True) for i in range(n_processed_envs, len(traj_record))]
             _ = list(tqdm(pool.imap(BEC.compute_counterfactuals, args), total=len(args)))
-            pool.close()
-            pool.join()
-            pool.terminate()
 
 if __name__ == "__main__":
     from numpy.random import seed
@@ -1083,3 +1058,7 @@ if __name__ == "__main__":
     # c) obtain test environments
     # obtain_test_environments(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,
     #                          params.step_cost_flag, params.BEC['n_human_models'], params.prior, params.posterior, summary=BEC_summary, visualize_test_env=True, use_counterfactual=True)
+
+
+    pool.close()
+    pool.join()

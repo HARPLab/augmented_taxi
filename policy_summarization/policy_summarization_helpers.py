@@ -232,12 +232,8 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, pool
     n_processed_envs = len(os.listdir(policy_dir))
 
     print("Solving for the optimal policy in each environment:")
-    pool.restart()
     args = [(i, mdp_codes[i], mdp_class, hardcode_envs, mdp_parameters, wt_candidates, data_loc) for i in range(n_processed_envs, len(mdp_codes))]
     list(tqdm(pool.imap(solve_policy, args), total=len(args)))
-    pool.close()
-    pool.join()
-    pool.terminate()
 
 def _in_summary(mdp, summary, initial_state):
     '''
