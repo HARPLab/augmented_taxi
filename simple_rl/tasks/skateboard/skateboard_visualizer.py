@@ -23,17 +23,15 @@ def _draw_state(screen,
                 show_value=False,
                 agent=None,
                 draw_statics=True,
-                agent_shape=None,
                 agent_history=[],
                 counterfactual_traj=None,
-                offset_direction=0):
+                alpha=255, offset_direction=0, visualize_history=True):
     '''
     Args:
         screen (pygame.Surface)
         skateboard_oomdp (SkateboardOOMDP)
         state (State)
         agent_shape (pygame.rect)
-
     Returns:
         (pygame.Shape)
     '''
@@ -84,10 +82,6 @@ def _draw_state(screen,
     # for clearing dynamic shapes (e.g. agent)
     dynamic_shapes_list = []
 
-    if agent_shape is not None:
-        # Clear the old shape.
-        pygame.draw.rect(screen, (255,255,255), agent_shape)
-
     # Statics
     if draw_statics:
         # Draw walls.
@@ -107,15 +101,15 @@ def _draw_state(screen,
             pygame.draw.rect(screen, (255, 255, 255), top_left_point + (cell_width - 10, cell_height - 10), 0)
             pygame.gfxdraw.box(screen, top_left_point + (cell_width - 10, cell_height - 10), (220, 187, 252))
 
-    # Draw the destination.
-    dest_x, dest_y = skateboard_oomdp.goal["x"], skateboard_oomdp.goal["y"]
-    top_left_point = int(width_buffer + cell_width * (dest_x - 1) + 37), int(
-        height_buffer + cell_height * (skateboard_oomdp.height - dest_y) + 34)
-    dest_col = (int(max(color_ls[-2][0]-30, 0)), int(max(color_ls[-2][1]-30, 0)), int(max(color_ls[-2][2]-30, 0)))
-    pygame.draw.rect(screen, dest_col, top_left_point + (cell_width / 2, cell_height / 2))
+        # Draw the destination.
+        dest_x, dest_y = skateboard_oomdp.goal["x"], skateboard_oomdp.goal["y"]
+        top_left_point = int(width_buffer + cell_width * (dest_x - 1) + 37), int(
+            height_buffer + cell_height * (skateboard_oomdp.height - dest_y) + 34)
+        dest_col = (int(max(color_ls[-2][0]-30, 0)), int(max(color_ls[-2][1]-30, 0)), int(max(color_ls[-2][2]-30, 0)))
+        pygame.draw.rect(screen, dest_col, top_left_point + (cell_width / 2, cell_height / 2))
 
     # Draw history of past agent locations if applicable
-    if len(agent_history) > 0:
+    if len(agent_history) > 0 and visualize_history:
         for i, position in enumerate(agent_history):
             if i == 0:
                 top_left_point = int(width_buffer + cell_width * (position[0] - 0.5)), int(
@@ -128,13 +122,29 @@ def _draw_state(screen,
                 top_left_point = int(width_buffer + cell_width * (position[0] - 0.5)), int(
                     height_buffer + cell_height * (skateboard_oomdp.height - position[1] + 0.5))
                 pygame.draw.circle(screen, (103, 115, 135), top_left_point, int(min(cell_width, cell_height) / 15))
-    agent_history.append((agent_x, agent_y))
+
+    # Draw history of past counterfactual agent locations if applicable
+    if counterfactual_traj is not None:
+        for i, position in enumerate(counterfactual_traj):
+            if i == 0:
+                top_left_point = int(width_buffer + cell_width * (position[0] - 0.5)), int(
+                    height_buffer + cell_height * (skateboard_oomdp.height - position[1] + 0.5))
+                pygame.draw.circle(screen, (255, 0, 0), top_left_point, int(min(cell_width, cell_height) / 15))
+                top_left_point_rect = int(width_buffer + cell_width * (position[0] - 0.5) - cell_width/8), int(
+                    height_buffer + cell_height * (skateboard_oomdp.height - position[1] + 0.5) - 2)
+                pygame.draw.rect(screen, (255, 0, 0), top_left_point_rect + (cell_width / 4, cell_height / 20), 0)
+            else:
+                top_left_point = int(width_buffer + cell_width * (position[0] - 0.5)), int(
+                    height_buffer + cell_height * (skateboard_oomdp.height - position[1] + 0.5))
+                pygame.draw.circle(screen, (255, 0, 0), top_left_point, int(min(cell_width, cell_height) / 15))
+
 
     # Draw new agent.
     top_left_point = width_buffer + cell_width * (agent_x - 1), height_buffer + cell_height * (
                 skateboard_oomdp.height - agent_y)
     agent_center = int(top_left_point[0] + cell_width / 2.0 + offset_counterfactual), int(top_left_point[1] + cell_height / 2.0)
-    agent_shape = _draw_agent(agent_center, screen, base_size=min(cell_width, cell_height) / 2.5 - 4)
+    agent_shape = _draw_agent(agent_center, screen, base_size=min(cell_width, cell_height) / 2.5 - 4, alpha=alpha)
+    agent_history.append((agent_x, agent_y))
 
     # Draw the skateboards.
     for i, p in enumerate(objects["skateboard"]):
@@ -147,8 +157,9 @@ def _draw_state(screen,
         else:
             top_left_point = int(width_buffer + cell_width * (pass_x - 1) + agent_size + 10 + offset_counterfactual), int(
                 height_buffer + cell_height * (skateboard_oomdp.height - pass_y) + agent_size + 38)
-        dest_col = (max(color_ls[-i-3][0]-30, 0), max(color_ls[-i-3][1]-30, 0), max(color_ls[-i-3][2]-30, 0))
-        pygame.draw.rect(screen, dest_col, top_left_point + (cell_width / 2, cell_height / 10), 0)
+        dest_col = (max(color_ls[-i-3][0]-30, 0), max(color_ls[-i-3][1]-30, 0), max(color_ls[-i-3][2]-30, 0), alpha)
+        skateboard_shape = mdpv._draw_rect_alpha(screen, dest_col, top_left_point + (cell_width / 2, cell_height / 10))
+        dynamic_shapes_list.append(skateboard_shape)
 
     if draw_statics:
         # For each row:
@@ -186,7 +197,7 @@ def _draw_state(screen,
 
     return dynamic_shapes_list, agent_history
 
-def _draw_agent(center_point, screen, base_size=30):
+def _draw_agent(center_point, screen, base_size=30, alpha=255):
     '''
     Args:
         center_point (tuple): (x,y)
@@ -199,6 +210,9 @@ def _draw_agent(center_point, screen, base_size=30):
     tri_bot_right = center_point[0] + base_size, center_point[1] + base_size
     tri_top = center_point[0], center_point[1] - base_size
     tri = [tri_bot_left, tri_top, tri_bot_right]
-    tri_color = (98, 140, 190)
+    tri_color = (98, 140, 190, alpha)
 
-    return pygame.draw.polygon(screen, tri_color, tri)
+    if alpha < 255:
+        return mdpv._draw_polygon_alpha(screen, tri_color, tri)
+    else:
+        return pygame.draw.polygon(screen, tri_color, tri)

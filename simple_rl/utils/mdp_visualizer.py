@@ -160,6 +160,13 @@ def _draw_circle_alpha(surface, color, center, radius):
     shape_surf = pygame.Surface(target_rect.size, pygame.SRCALPHA)
     pygame.draw.circle(shape_surf, color, (radius, radius), radius)
     surface.blit(shape_surf, target_rect)
+    return target_rect
+
+def _draw_rect_alpha(surface, color, rect):
+    shape_surf = pygame.Surface(pygame.Rect(rect).size, pygame.SRCALPHA)
+    pygame.draw.rect(shape_surf, color, shape_surf.get_rect())
+    surface.blit(shape_surf, rect)
+    return rect
 
 def visualize_state(mdp, draw_state, cur_state=None, scr_width=720, scr_height=720):
     '''
@@ -500,12 +507,12 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
         Visualizes the sequence of states and actions stored in the trajectory.
     '''
     screen = pygame.display.set_mode((scr_width, scr_height))
-    cur_state = trajectory[0][0]
     cur_state_counterfactual = trajectory_counterfactual[0][0]
+    cur_state = trajectory[0][0]
 
     # Setup and draw initial state.
-    dynamic_shapes, agent_history = _vis_init(screen, mdp, draw_state, cur_state, offset_direction=1)
-    dynamic_shapes_counterfactual, agent_history_counterfactual = draw_state(screen, mdp, cur_state_counterfactual, draw_statics=False, agent_history=[], offset_direction=-1, alpha=150)
+    dynamic_shapes, agent_history = _vis_init(screen, mdp, draw_state, cur_state_counterfactual, offset_direction=-1, alpha=150)
+    dynamic_shapes_counterfactual, agent_history_counterfactual = draw_state(screen, mdp, cur_state, draw_statics=False, agent_history=[], offset_direction=1)
 
     pygame.event.clear()
     step = 0
@@ -525,21 +532,21 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
                 for shape in dynamic_shapes_counterfactual:
                     pygame.draw.rect(screen, (255, 255, 255), shape)
 
-                if step < len(trajectory):
-                    cur_state = trajectory[step][2]
-                else:
-                    cur_state = trajectory[-1][2]
-
-                dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state,
-                                                           agent_history=agent_history, offset_direction=1, visualize_history=False)
-
                 if step < len(trajectory_counterfactual):
                     cur_state = trajectory_counterfactual[step][2]
                 else:
                     cur_state = trajectory_counterfactual[-1][2]
 
                 dynamic_shapes_counterfactual, agent_history_counterfactual = draw_state(screen, mdp, cur_state,agent_history=agent_history_counterfactual,
-                                                                                    draw_statics=False, offset_direction=-1, alpha=150, visualize_history=False)
+                                                                                    offset_direction=-1, alpha=150, visualize_history=False)
+
+                if step < len(trajectory):
+                    cur_state = trajectory[step][2]
+                else:
+                    cur_state = trajectory[-1][2]
+
+                dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, draw_statics=False,
+                                                           agent_history=agent_history, offset_direction=1, visualize_history=False)
 
                 step += 1
 
@@ -753,7 +760,7 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
                 pygame.display.quit()
                 return trajectory, agent_history
 
-def _vis_init(screen, mdp, draw_state, cur_state, agent=None, value=False, score=-1, counterfactual_traj=None, offset_direction=0):
+def _vis_init(screen, mdp, draw_state, cur_state, agent=None, value=False, score=-1, counterfactual_traj=None, offset_direction=0, alpha=255):
     # Pygame setup.
     pygame.init()
     screen.fill((255, 255, 255))
@@ -765,7 +772,7 @@ def _vis_init(screen, mdp, draw_state, cur_state, agent=None, value=False, score
     else:
         _draw_lower_left_text(cur_state, screen)
 
-    dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, agent=agent, draw_statics=True, agent_history=[], counterfactual_traj=counterfactual_traj, offset_direction=offset_direction)
+    dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, agent=agent, draw_statics=True, agent_history=[], counterfactual_traj=counterfactual_traj, offset_direction=offset_direction, alpha=alpha)
 
     return dynamic_shapes, agent_history
 

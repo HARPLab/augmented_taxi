@@ -126,12 +126,12 @@ def _draw_state(screen,
                 y = center[1] + dy
                 pygame.draw.circle(screen, dest_col, (x, y), 5)
 
-    # Draw the destination.
-    dest_x, dest_y = colored_tiles_oomdp.goal["x"], colored_tiles_oomdp.goal["y"]
-    top_left_point = int(width_buffer + cell_width * (dest_x - 1) + 37), int(
-        height_buffer + cell_height * (colored_tiles_oomdp.height - dest_y) + 34)
-    dest_col = (int(max(color_ls[-2][0]-30, 0)), int(max(color_ls[-2][1]-30, 0)), int(max(color_ls[-2][2]-30, 0)))
-    pygame.draw.rect(screen, dest_col, top_left_point + (cell_width / 2, cell_height / 2))
+        # Draw the destination.
+        dest_x, dest_y = colored_tiles_oomdp.goal["x"], colored_tiles_oomdp.goal["y"]
+        top_left_point = int(width_buffer + cell_width * (dest_x - 1) + 37), int(
+            height_buffer + cell_height * (colored_tiles_oomdp.height - dest_y) + 34)
+        dest_col = (int(max(color_ls[-2][0]-30, 0)), int(max(color_ls[-2][1]-30, 0)), int(max(color_ls[-2][2]-30, 0)))
+        pygame.draw.rect(screen, dest_col, top_left_point + (cell_width / 2, cell_height / 2))
 
     # Draw history of past agent locations if applicable
     if len(agent_history) > 0 and visualize_history:
