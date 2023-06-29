@@ -5,6 +5,8 @@ from policy_summarization import probability_utils as p_utils
 import matplotlib
 import matplotlib.pyplot as plt
 from termcolor import colored
+import os
+from multiprocessing import Pool
 
 MIN_DISTANCE = 0.00001
 
@@ -14,7 +16,67 @@ class MeanShift(object):
     def __init__(self, kernel=p_utils.VMF_pdf):
         self.kernel = kernel
 
-    def cluster(self, points, weights=None, kernel_bandwidth=16, iteration_callback=None, downselect_points=None):
+    def evaluate_point_multiprocessing(self, args):
+        p_new, still_shifting, downselect_points, points, weights, kernel_bandwidth = args
+
+        # this check could probably happen outside of the function to save a function call
+        if not still_shifting:
+            return p_new, 0, False
+
+        p_new_start = p_new
+
+        if downselect_points is not None:
+            # if a method to downselect neighboring points is provided, use it when shifting to the mean
+            downselected_points, downselect_weights = downselect_points(p_new, points, weights)
+            p_new = self._shift_point(p_new, downselected_points, downselect_weights, kernel_bandwidth)
+        else:
+            p_new = self._shift_point(p_new, points, weights, kernel_bandwidth)
+
+        dist = cg.geodist(p_new, p_new_start)
+        if dist < MIN_DISTANCE:
+            still_shifting = False
+
+        return p_new, dist, still_shifting
+
+    def cluster_multiprocessing(self, points, weights=None, kernel_bandwidth=16, iteration_callback=None, downselect_points=None, pool=None):
+        '''
+        :param points:
+        :param weights: weights corresponding to points (such that points can be unevenly weighted during clustering)
+        :param kernel_bandwidth:
+        :param iteration_callback:
+        :return:
+        '''
+
+        points = np.array([[float(v) for v in point] for point in points])
+        if(iteration_callback):
+            iteration_callback(points, 0)
+        shift_points = np.array(points)
+        max_min_dist = 1
+        iteration_number = 0
+
+        if pool is None:
+            pool = Pool(os.cpu_count())
+            print("Create a new pool instance")
+
+        still_shifting = [True] * points.shape[0]
+        while max_min_dist > MIN_DISTANCE:
+            iteration_number += 1
+
+            args = [(shift_points[i], still_shifting[i], downselect_points, points, weights, kernel_bandwidth) for
+                    i in range(len(shift_points))]
+
+            shift_points, shift_distances, still_shifting = zip(*pool.imap(self.evaluate_point_multiprocessing, args))
+            max_min_dist = max(shift_distances)
+
+            if iteration_callback:
+                iteration_callback(shift_points, iteration_number)
+            # print(max_min_dist)
+        point_grouper = pg.PointGrouper()
+        cluster_centers, group_assignments = point_grouper.group_points(shift_points, points, weights)
+
+        return MeanShiftResult(points, cluster_centers, group_assignments, shift_points)
+
+    def cluster(self, points, weights=None, kernel_bandwidth=16, iteration_callback=None, downselect_points=None, pool=None):
         '''
         :param points:
         :param weights: weights corresponding to points (such that points can be unevenly weighted during clustering)

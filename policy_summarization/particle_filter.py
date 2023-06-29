@@ -496,9 +496,9 @@ class Particles():
         # cluster particles using mean-shift and store the cluster centers
         mean_shifter = ms.MeanShift()
         # only use a subset of neighboring points to perform meanshift clustering
-        # mean_shift_result = mean_shifter.cluster(self.positions.squeeze(), self.weights, downselect_points=self.meanshift_plusplus_neighbors)
+        # mean_shift_result = mean_shifter.cluster(self.positions.squeeze(), weights=self.weights, downselect_points=self.meanshift_plusplus_neighbors)
         # use all points to perform meanshift clustering
-        mean_shift_result = mean_shifter.cluster(self.positions.squeeze(), self.weights)
+        mean_shift_result = mean_shifter.cluster(self.positions.squeeze(), weights=self.weights)
         self.cluster_centers = mean_shift_result.cluster_centers
         self.cluster_assignments = mean_shift_result.cluster_assignments
 
@@ -705,6 +705,34 @@ class Particles():
 
         return np.array(resample_indexes)
 
+
+    def reset(self, constraint):
+        '''
+        Reset the particle filter to conservative include a set of new particles that are consistent with the specified constraint
+        '''
+        new_particle_positions = BEC_helpers.sample_human_models_uniform(constraint, 50)  # 50 is a heuristic number of particles to seed KLD resampling for calculating optimal number of resampled particles
+        joint_particle_positions = np.vstack((np.array(new_particle_positions), self.positions))
+        self.reinitialize(joint_particle_positions)
+        resample_indexes = self.KLD_resampling()
+        n_desired_reset_particles_informed = len(resample_indexes)
+        print('informed number: {}'.format(n_desired_reset_particles_informed))
+
+        # sample from the VMF + uniform distribution
+        new_particle_positions_uniform = BEC_helpers.sample_human_models_random(constraint, int(np.ceil(
+            n_desired_reset_particles_informed * self.integral_prob_uniform)))
+
+        mu_constraint = constraint[0] / np.linalg.norm(constraint[0])
+        new_particle_positions_VMF = p_utils.rand_von_mises_fisher(mu_constraint, kappa=self.VMF_kappa, N=int(
+            np.ceil(n_desired_reset_particles_informed * self.integral_prob_VMF)),
+                                                                   halfspace=True)
+        new_particle_positions = np.vstack(
+            (np.array(new_particle_positions_uniform), np.expand_dims(new_particle_positions_VMF, 1)))
+
+        joint_particle_positions = np.vstack((np.array(new_particle_positions), self.positions_prev))
+        self.reinitialize(joint_particle_positions)
+
+        print(colored('Performed a reset', 'red'))
+
     def update(self, constraints, c=0.5, reset_threshold_prob=0.001):
         self.weights_prev = self.weights.copy()
         self.positions_prev = self.positions.copy()
@@ -713,37 +741,7 @@ class Particles():
             self.reweight(constraint)
 
             if sum(self.weights) < reset_threshold_prob:
-                # perform a reset as the particles do not fit the most recently observation well
-                # inspired by Sensor Resetting Localization for Poorly Modelled Mobile Robots, Lenser et al. 2000)
-                solid_angle = BEC_helpers.calc_solid_angles(constraints)[0]
-
-                # obtain the optimal number of samples to cover the new space using KLD resampling
-                n_desired_reset_particles_heuristic = int(np.ceil(solid_angle / (4 * np.pi) * 100))
-                print('heuristic number: {}'.format(n_desired_reset_particles_heuristic))
-                new_particle_positions = BEC_helpers.sample_human_models_uniform(constraints, n_desired_reset_particles_heuristic)
-                joint_particle_positions = np.vstack((np.array(new_particle_positions), self.positions))
-                self.reinitialize(joint_particle_positions)
-                resample_indexes = self.KLD_resampling()
-                n_desired_reset_particles_informed = len(resample_indexes)
-                print('informed number: {}'.format(n_desired_reset_particles_informed))
-
-                if len(constraints) == 1:
-                    # if there is only one constraint, sample from the VMF + uniform distribution
-                    new_particle_positions_uniform = BEC_helpers.sample_human_models_random(constraints, int(np.ceil(
-                        n_desired_reset_particles_informed * self.integral_prob_uniform)))
-
-                    mu_constraint = constraints[0][0] / np.linalg.norm(constraints[0][0])
-                    new_particle_positions_VMF = p_utils.rand_von_mises_fisher(mu_constraint, kappa=self.VMF_kappa, N=int(np.ceil(n_desired_reset_particles_informed * self.integral_prob_VMF)),
-                                                                    halfspace=True)
-                    new_particle_positions = np.vstack((np.array(new_particle_positions_uniform), np.expand_dims(new_particle_positions_VMF, 1)))
-                else:
-                    # otherwise, fall back on simply sampling uniformly from the space obeys all constraints
-                    new_particle_positions = BEC_helpers.sample_human_models_uniform(constraints, n_desired_reset_particles_informed)
-
-                joint_particle_positions = np.vstack((np.array(new_particle_positions), self.positions_prev))
-                self.reinitialize(joint_particle_positions)
-
-                print(colored('Performed a reset', 'red'))
+                self.reset(constraint)
             else:
                 # normalize weights and update particles
                 self.weights /= sum(self.weights)

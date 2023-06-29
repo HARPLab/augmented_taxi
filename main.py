@@ -527,13 +527,14 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
                         if visualize_pf_transition:
                             BEC_viz.visualize_pf_transition([failed_BEC_constraint], particles, mdp_class, weights)
                     else:
-                        failed_remedial_constraint = opt_feature_count - human_feature_count
+                        failed_BEC_constraint = opt_feature_count - human_feature_count
                         print("You got the remedial test wrong. Here's the correct answer")
+                        print("Failed BEC constraint: {}".format(failed_BEC_constraint))
                         remedial_mdp.visualize_trajectory_comparison(remedial_traj, human_traj)
 
-                        particles.update([-failed_remedial_constraint])
+                        particles.update([-failed_BEC_constraint])
                         if visualize_pf_transition:
-                            BEC_viz.visualize_pf_transition([-failed_remedial_constraint], particles, mdp_class, weights)
+                            BEC_viz.visualize_pf_transition([-failed_BEC_constraint], particles, mdp_class, weights)
 
 
 def analyze_prev_study_tests(domain, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, n_human_models_precomputed, data_loc, weights, step_cost_flag, visualize_pf_transition=True):
