@@ -606,10 +606,9 @@ def overlap_demo_BEC_and_human_posterior(args):
     return BEC_areas
 
 def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
-                       n_train_demos=3, prior=[], downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=1):
+                       n_train_demos=3, prior=[], downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=1, visited_env_traj_idxs=[]):
     summary = []
     unit = []
-    visited_env_traj_idxs = []
     summary_count = 0
 
     # impose prior
@@ -767,13 +766,22 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
                             closest_obj = obj_function_flat[target_idx]
                             best_env_idxs, best_traj_idxs = np.where(obj_function == obj_function_flat[closest_obj])
 
-                        if (running_variable_filter == variable_filter).all():
-                            # we're still in the same unit so try and optimize visuals wrt other demonstrations in this unit
-                            best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, unit)
+                        # filter best_env_idxs and best_traj_idxs to only include those that haven't been visited yet
+                        candidate_envs_trajs = list(zip(best_env_idxs, best_traj_idxs))
+                        filtered_candidate_envs_trajs = [env_traj for env_traj in candidate_envs_trajs if env_traj not in visited_env_traj_idxs]
+                        if len(filtered_candidate_envs_trajs) > 0:
+                            best_env_idxs, best_traj_idxs = zip(*filtered_candidate_envs_trajs)
+                            if (running_variable_filter == variable_filter).all():
+                                # we're still in the same unit so try and optimize visuals wrt other demonstrations in this unit
+                                best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, unit)
+                            else:
+                                # we've moved on to a different unit so no need to consider previous demonstrations when optimizing visuals
+                                best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, [])
+                            no_info_flag = False
                         else:
-                            # we've moved on to a different unit so no need to consider previous demonstrations when optimizing visuals
-                            best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, [])
-                        no_info_flag = False
+                            print("Ran into a conflict with a previously shown demonstration")
+                            no_info_flag = True
+                            differing_constraint_count += 1
                 else:
                     best_obj = float('-inf')
                     best_env_idxs = []
@@ -839,13 +847,22 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
                         no_info_flag = True
                         differing_constraint_count += 1
                     else:
-                        if (running_variable_filter == variable_filter).all():
-                            # we're still in the same unit so try and optimize visuals wrt other demonstrations in this unit
-                            best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, unit)
+                        # filter best_env_idxs and best_traj_idxs to only include those that haven't been visited yet
+                        candidate_envs_trajs = list(zip(best_env_idxs, best_traj_idxs))
+                        filtered_candidate_envs_trajs = [env_traj for env_traj in candidate_envs_trajs if env_traj not in visited_env_traj_idxs]
+                        if len(filtered_candidate_envs_trajs) > 0:
+                            best_env_idxs, best_traj_idxs = zip(*filtered_candidate_envs_trajs)
+                            if (running_variable_filter == variable_filter).all():
+                                # we're still in the same unit so try and optimize visuals wrt other demonstrations in this unit
+                                best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, unit)
+                            else:
+                                # we've moved on to a different unit so no need to consider previous demonstrations when optimizing visuals
+                                best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, [])
+                            no_info_flag = False
                         else:
-                            # we've moved on to a different unit so no need to consider previous demonstrations when optimizing visuals
-                            best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, [])
-                        no_info_flag = False
+                            print("Ran into a conflict with a previously shown demonstration")
+                            no_info_flag = True
+                            differing_constraint_count += 1
 
             with open('models/' + data_loc + '/best_env_idxs' + str(summary_count) + '.pickle', 'wb') as f:
                 pickle.dump((best_env_idx, best_traj_idx, best_env_idxs, best_traj_idxs), f)
@@ -984,9 +1001,8 @@ def obtain_summary_counterfactual(data_loc, summary_variant, min_subset_constrai
     return summary, visited_env_traj_idxs
 
 def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
-                       n_train_demos=np.inf, prior=[], downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=1, min_info_gain=0.01):
+                       n_train_demos=np.inf, prior=[], downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=1, min_info_gain=0.01, visited_env_traj_idxs=[]):
     summary = []
-    visited_env_traj_idxs = []
 
     # impose prior
     min_BEC_constraints_running = prior.copy()
@@ -1101,7 +1117,10 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
         #  selected each human model in the information gain calculation (e.g. by taking an expectation over the information
         #  gain), rather than simply combine all of the constraints that could've been generated (which is currently done)
 
-        # todo: the code below isn't updated to provide demonstrations that only differ by a single constraint at a time
+        # todo: the code below isn't updated to provide demonstrations that only differ by a single constraint at a time,
+        #  nor does it ensure that the selected demonstrations don't conflict with prior selected demonstrations that are
+        #  specified through visited_env_traj_idxs (e.g. ones that will be used for assessment tests after teaching).
+        #  see obtain_summary_counterfactual() for a more updated version
         print("Combining the most limiting constraints across human models:")
         args = [(i, range(len(sample_human_models)), data_loc, len(summary), weights, step_cost_flag, variable_filter, mdp_features_record[i],
                  traj_record[i], min_BEC_constraints_running, particles, True, False) for
@@ -1257,7 +1276,7 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BE
 
     remedial_demonstration_selected = False
 
-    if n_human_models_precomputed is not 0:
+    if n_human_models_precomputed != 0:
         # rely on constraints generated via sampled human models from cached particle filter
         sample_human_models_ref = BEC_helpers.sample_human_models_uniform([], n_human_models_precomputed)
 
@@ -1421,9 +1440,9 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BE
                     print('Failed constraint: {}'.format(minimal_distances[0][2]))
                     print('Similar-enough constraint: {}'.format(minimal_distances[0][3]))
 
-    if len(best_env_idxs) > 1 and n_human_models_precomputed is not 0:
+    if len(best_env_idxs) > 1 and n_human_models_precomputed != 0:
         # optimizing information gain is currently only implemented for the instance where precomputed PF-based counterfactuals constraints are avilable
-        best_env_idx, best_traj_idx = BEC_helpers.optimize_information_gain(particles, best_env_idxs, best_traj_idxs, min_model_idxs, data_loc, weights,
+        best_env_idx, best_traj_idx = BEC_helpers.optimize_information_gain(particles, best_env_idxs, best_traj_idxs, min_model_idxs, model_weights, data_loc, weights,
                                       step_cost_flag)
     else:
         best_env_idx = best_env_idxs[0]
@@ -1569,7 +1588,7 @@ def obtain_SCOT_summaries(data_loc, summary_variant, min_BEC_constraints, BEC_le
 
     return min_BEC_summary
 
-def obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=3, downsample_threshold=float("inf")):
+def obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=3, downsample_threshold=float("inf"), visited_env_traj_idxs=[]):
     '''
     :param wt_vi_traj_candidates: Nested list of [weight, value iteration object, trajectory]
     :param BEC_constraints: Minimum set of constraints defining the BEC of a set of demos / policy (list of constraints)
@@ -1618,7 +1637,7 @@ def obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_r
     # obtain SCOT demos
     BEC_constraints = min_BEC_constraints
     BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(BEC_constraints,
-                                                                                min_subset_constraints_record, traj_record)
+                                                                                min_subset_constraints_record, visited_env_traj_idxs, traj_record)
 
     # extract sets of demos+environments pairs that can cover each BEC constraint
     sets = []
@@ -1717,7 +1736,6 @@ def obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_r
     print('# SCOT demos: {}'.format(len(min_BEC_summary)))
 
     # fill out the rest of the vacant demo slots
-    included_demo_idxs = []
     ongoing_summary_constraints = []
 
     if summary_variant == 'feature_only':
@@ -1796,7 +1814,7 @@ def obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_r
                     #remove demos that have already been included
                     duplicate_idxs = []
                     for covering_idx, covering_demo_idx in enumerate(covering_demo_idxs):
-                        for included_demo_idx in included_demo_idxs:
+                        for included_demo_idx in visited_env_traj_idxs:
                             if included_demo_idx == env_traj_tracer_filtered[covering_demo_idx]:
                                 duplicate_idxs.append(covering_idx)
 
@@ -1865,7 +1883,7 @@ def obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_r
                     print('Constrained added: {}'.format(constraints_added))
                     ongoing_summary_constraints.extend(constraints_added)
 
-                    included_demo_idxs.append(env_traj_tracer_filtered[best_idx])
+                    visited_env_traj_idxs.append(env_traj_tracer_filtered[best_idx])
 
                     if n_demos_sought is not None:
                         n_demos_sought -= 1
@@ -1897,7 +1915,7 @@ def obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_r
     else:
         # if you've obtained more demonstrations than were requested, return a subset of the most informative ones
         summary = min_BEC_summary[-n_train_demos:]
-    return summary
+    return summary, visited_env_traj_idxs
 
 def visualize_constraints(constraints, weights, step_cost_flag, plot_lim=[(-1, 1), (-1, 1)], scale=1.0, fig_name=None, just_save=False):
     '''
