@@ -1290,7 +1290,6 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BE
             distances = haversine_distances(sample_human_models_latlong, sample_human_models_ref_latllong)
             min_model_idxs = np.argmin(distances, axis=1)
 
-            # todo: think about information gain later (simply try to match constraints for now)
             print("Combining the most limiting constraints across human models:")
             args = [(i, min_model_idxs, data_loc, 'precomputed', weights, step_cost_flag, variable_filter,
                      mdp_features_record[i],
@@ -1443,7 +1442,7 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BE
     if len(best_env_idxs) > 1 and n_human_models_precomputed != 0:
         # optimizing information gain is currently only implemented for the instance where precomputed PF-based counterfactuals constraints are avilable
         best_env_idx, best_traj_idx = BEC_helpers.optimize_information_gain(particles, best_env_idxs, best_traj_idxs, min_model_idxs, model_weights, data_loc, weights,
-                                      step_cost_flag)
+                                      step_cost_flag, type)
     else:
         best_env_idx = best_env_idxs[0]
         best_traj_idx = best_traj_idxs[0]

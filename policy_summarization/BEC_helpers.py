@@ -996,33 +996,34 @@ def combine_counterfactual_constraints(args):
 
     return new_min_subset_constraints
 
-def optimize_information_gain(particles, best_env_idxs, best_traj_idxs, min_model_idxs, data_loc, weights, step_cost_flag):
-    best_ig = -1
-    prev_best_env_idx = -1
-    for j, best_env_idx_candidate in enumerate(best_env_idxs):
-        if best_env_idx_candidate != prev_best_env_idx:
-            all_env_constraints = []
-            for model_idx in min_model_idxs:
-                # optimizing information gain is currently only implemented for the instance where precomputed PF-based counterfactuals constraints are avilable
-                with open('models/' + data_loc + '/counterfactual_data_precomputed/model' + str(
-                        model_idx) + '/cf_data_env' + str(
-                    best_env_idx_candidate).zfill(5) + '.pickle', 'rb') as f:
-                    constraints_env = pickle.load(f)
-                all_env_constraints.append(constraints_env)
+def optimize_information_gain(particles, best_env_idxs, best_traj_idxs, min_model_idxs, model_weights, data_loc, weights, step_cost_flag, type):
+    # optimizing information gain is currently only implemented for the instance where precomputed PF-based counterfactuals constraints are avilable
+    information_gains = np.empty(len(best_env_idxs))
+    model_weights = model_weights / np.sum(model_weights)
 
-            all_env_constraints_joint = [list(itertools.chain.from_iterable(i)) for i in zip(*all_env_constraints)]
+    for env_position, best_env_idx_candidate in enumerate(best_env_idxs):
+        # for each candidate environment
+        for model_position, model_idx in enumerate(min_model_idxs):
+            # calculate an expected information gain using each human model and its associated probability
+            with open('models/' + data_loc + '/counterfactual_data_precomputed/model' + str(
+                    model_idx) + '/cf_data_env' + str(
+                best_env_idx_candidate).zfill(5) + '.pickle', 'rb') as f:
+                constraints_env = pickle.load(f)
 
-        if len(all_env_constraints_joint[best_traj_idxs[j]]) > 1:
-            min_env_constraints = remove_redundant_constraints(all_env_constraints_joint[best_traj_idxs[j]],
-                                                                           weights, step_cost_flag)
-        else:
-            min_env_constraints = all_env_constraints_joint[best_traj_idxs[j]]
+                if len(constraints_env[best_traj_idxs[env_position]]) > 1:
+                    min_env_constraints = remove_redundant_constraints(constraints_env[best_traj_idxs[env_position]], weights, step_cost_flag)
+                else:
+                    min_env_constraints = constraints_env[best_traj_idxs[env_position]]
 
-        ig = particles.calc_info_gain(min_env_constraints)
+                information_gains[env_position] += model_weights[model_position] * particles.calc_info_gain(min_env_constraints)
 
-        if ig > best_ig:
-            best_env_idx = best_env_idx_candidate
-            best_traj_idx = best_traj_idxs[j]
-            best_ig = ig
+    if type == 'training':
+        # provide the easiest for a remedial demonstration
+        best_idx = np.argmin(information_gains)
+    elif type == 'testing':
+        # provide the hardest for a remedial test
+        best_idx = np.argmax(information_gains)
+    else:
+        AssertionError("Unknown type of demonstration")
 
-    return best_env_idx, best_traj_idx
+    return best_env_idxs[best_idx], best_traj_idxs[best_idx]
