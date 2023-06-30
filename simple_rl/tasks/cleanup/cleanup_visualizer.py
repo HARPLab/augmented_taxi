@@ -170,7 +170,7 @@ def _draw_agent(center_point, screen, base_size=20):
     Returns:
         (pygame.rect)
     '''
-    tri_bot_left = center_point[0] - base_size, center_point[1] + base_size
+    tri_bot_left = center_point[0] - base_size, center_point[1] #+ base_size
     tri_bot_right = center_point[0] + base_size, center_point[1] + base_size
     tri_top = center_point[0], center_point[1] - base_size
     tri = [tri_bot_left, tri_top, tri_bot_right]
