@@ -37,6 +37,7 @@ def draw_state(screen,
         (pygame.Shape)
     '''
     # Make value dict.
+    print("entered draw_state")
     val_text_dict = defaultdict(lambda: defaultdict(float))
     if show_value:
         if agent is not None:
@@ -170,7 +171,7 @@ def _draw_agent(center_point, screen, base_size=20):
     Returns:
         (pygame.rect)
     '''
-    tri_bot_left = center_point[0] - base_size, center_point[1] #+ base_size
+    tri_bot_left = center_point[0] - base_size, center_point[1] + base_size
     tri_bot_right = center_point[0] + base_size, center_point[1] + base_size
     tri_top = center_point[0], center_point[1] - base_size
     tri = [tri_bot_left, tri_top, tri_bot_right]
