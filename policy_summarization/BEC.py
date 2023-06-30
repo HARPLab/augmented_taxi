@@ -1252,12 +1252,12 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
 
     return summary, visited_env_traj_idxs, particles
 
-def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BEC_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, previous_demonstrations, visited_env_traj_idxs, variable_filter, mdp_features_record, consistent_state_count, weights, step_cost_flag, type='training', info_gain_tolerance=0.01, consider_human_models_jointly=True, n_human_models_precomputed=None):
+def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BEC_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, previous_demonstrations, visited_env_traj_idxs, variable_filter, mdp_features_record, consistent_state_count, weights, step_cost_flag, type='training', info_gain_tolerance=0.01, consider_human_models_jointly=True, n_human_models_precomputed=0, fallback='particle_filter'):
     remedial_demonstrations = []
 
     remedial_demonstration_selected = False
 
-    if n_human_models_precomputed is not None:
+    if n_human_models_precomputed is not 0:
         # rely on constraints generated via sampled human models from cached particle filter
         sample_human_models_ref = BEC_helpers.sample_human_models_uniform([], n_human_models_precomputed)
 
@@ -1291,8 +1291,8 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BE
                 best_env_idxs, best_traj_idxs = list(zip(*BEC_constraint_bookkeeping[0]))
 
                 # simply optimize for the visuals of the direct counterexample
-                best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record,
-                                                                          previous_demonstrations, type=type)
+                best_env_idxs, best_traj_idxs = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record,
+                                                                          previous_demonstrations, type=type, return_all_equiv=True)
 
                 print('Found an exact match for constraint: {}'.format(BEC_constraints))
 
@@ -1306,9 +1306,9 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BE
                     best_env_idxs, best_traj_idxs = list(zip(*nn_BEC_constraint_bookkeeping[0]))
 
                     # simply optimize for the visuals of the direct counterexample
-                    best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs,
+                    best_env_idxs, best_traj_idxs = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs,
                                                                               traj_record,
-                                                                              previous_demonstrations, type=type)
+                                                                              previous_demonstrations, type=type, return_all_equiv=True)
 
                     print('Failed constraint: {}'.format(minimal_distances[0][2]))
                     print('Similar-enough constraint: {}'.format(minimal_distances[0][3]))
@@ -1318,107 +1318,116 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BE
                     # there aren't any current beliefs in the human model that could be corrected. this means that the
                     # human's model must be incorrectly concentrated. so reset to a more conservative human model
                     particles.reset(BEC_constraints)
-
-        # # rely on constraints generated via sampled human models from live particle filter
-        # # the human's incorrect response does not have a direct counterexample, and thus you need to use information gain to obtain the next example
-        # sample_human_models, model_weights = BEC_helpers.sample_human_models_pf(particles, n_human_models)
-        # info_gains_record = []
-        #
-        # for model_idx, human_model in enumerate(sample_human_models):
-        #     print(colored('Model #: {}'.format(model_idx), 'red'))
-        #     print(colored('Model val: {}'.format(human_model), 'red'))
-        #
-        #     # based on the human's current model, obtain the information gain generated when comparing to the agent's
-        #     # optimal trajectories in each environment (human's corresponding optimal trajectories and constraints
-        #     # are saved for reference later)
-        #     print("Obtaining counterfactual information gains:")
-        #
-        #     cf_data_dir = 'models/' + data_loc + '/counterfactual_data_remedial_demo/model' + str(model_idx)
-        #     os.makedirs(cf_data_dir, exist_ok=True)
-        #
-        #     args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]),
-        #              traj_record[i], particles, [], step_cost_flag, None,
-        #              variable_filter, mdp_features_record[i], consider_human_models_jointly) for i in
-        #             range(len(traj_record))]
-        #
-        #     info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals, args), total=len(args)))
-        #
-        #     # [# of human models][# of environments]
-        #     info_gains_record.append(info_gain_envs)
-        #
-        # # make an entry for each environment (averaging over the human models)
-        # expected_info_gain_envs = []
-        # for human_model_idx in range(len(info_gains_record)):
-        #     for env_idx, info_gain_env in enumerate(info_gains_record[human_model_idx]):
-        #         if human_model_idx == 0:
-        #             expected_info_gain_envs.append(model_weights[human_model_idx] * np.array(info_gain_env))
-        #         else:
-        #             expected_info_gain_envs[env_idx] += model_weights[human_model_idx] * np.array(info_gain_env)
-        #
-        # if consistent_state_count:
-        #     expected_info_gain_envs = np.array(expected_info_gain_envs)
-        #     best_env_idxs, best_traj_idxs = np.where(expected_info_gain_envs == max(expected_info_gain_envs.flatten()))
-        # else:
-        #     best_obj = float('-inf')
-        #     best_env_idxs = []
-        #     best_traj_idxs = []
-        #
-        #     # select the trajectories with the maximal information gain
-        #     for env_idx, info_gains_per_env in enumerate(expected_info_gain_envs):
-        #         for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
-        #             if info_gain_per_traj > 0:
-        #                 obj = info_gain_per_traj
-        #
-        #                 if np.isclose(obj, best_obj):
-        #                     best_env_idxs.append(env_idx)
-        #                     best_traj_idxs.append(traj_idx)
-        #                 elif obj > best_obj:
-        #                     best_obj = obj
-        #
-        #                     best_env_idxs = [env_idx]
-        #                     best_traj_idxs = [traj_idx]
-        #
-        # best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record,
-        #                                                           previous_demonstrations, type=type)
     else:
-        # rely on constraints generated via 2-step deviation
-        # if you're looking for demonstrations that will convey the most constraining BEC region or will be employing scaffolding,
-        # obtain the demos needed to convey the most constraining BEC region
-        BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(BEC_constraints,
-                                                                                    min_subset_constraints_record,
-                                                                                    visited_env_traj_idxs, traj_record,
-                                                                                    traj_features_record,
-                                                                                    mdp_features_record,
-                                                                                    variable_filter=variable_filter)
+        if fallback == 'particle_filter':
+            # rely on constraints generated via sampled human models from live particle filter
+            # the human's incorrect response does not have a direct counterexample, and thus you need to use information gain to obtain the next example
+            sample_human_models, model_weights = BEC_helpers.sample_human_models_pf(particles, n_human_models)
+            info_gains_record = []
 
-        print('{} exact candidates for remedial demo/test'.format(len(BEC_constraint_bookkeeping[0])))
-        if len(BEC_constraint_bookkeeping[0]) > 0:
-            # the human's incorrect response can be corrected with a direct counterexample
-            best_env_idxs, best_traj_idxs = list(zip(*BEC_constraint_bookkeeping[0]))
+            for model_idx, human_model in enumerate(sample_human_models):
+                print(colored('Model #: {}'.format(model_idx), 'red'))
+                print(colored('Model val: {}'.format(human_model), 'red'))
 
-            # simply optimize for the visuals of the direct counterexample
-            best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs,
-                                                                      traj_record,
-                                                                      previous_demonstrations, type=type)
+                # based on the human's current model, obtain the information gain generated when comparing to the agent's
+                # optimal trajectories in each environment (human's corresponding optimal trajectories and constraints
+                # are saved for reference later)
+                print("Obtaining counterfactual information gains:")
 
-            print('Found an exact match for constraint: {}'.format(BEC_constraints))
+                cf_data_dir = 'models/' + data_loc + '/counterfactual_data_remedial_demo/model' + str(model_idx)
+                os.makedirs(cf_data_dir, exist_ok=True)
+
+                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]),
+                         traj_record[i], particles, [], step_cost_flag, None,
+                         variable_filter, mdp_features_record[i], consider_human_models_jointly) for i in
+                        range(len(traj_record))]
+
+                info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals, args), total=len(args)))
+
+                # [# of human models][# of environments]
+                info_gains_record.append(info_gain_envs)
+
+            # make an entry for each environment (averaging over the human models)
+            expected_info_gain_envs = []
+            for human_model_idx in range(len(info_gains_record)):
+                for env_idx, info_gain_env in enumerate(info_gains_record[human_model_idx]):
+                    if human_model_idx == 0:
+                        expected_info_gain_envs.append(model_weights[human_model_idx] * np.array(info_gain_env))
+                    else:
+                        expected_info_gain_envs[env_idx] += model_weights[human_model_idx] * np.array(info_gain_env)
+
+            if consistent_state_count:
+                expected_info_gain_envs = np.array(expected_info_gain_envs)
+                best_env_idxs, best_traj_idxs = np.where(expected_info_gain_envs == max(expected_info_gain_envs.flatten()))
+            else:
+                best_obj = float('-inf')
+                best_env_idxs = []
+                best_traj_idxs = []
+
+                # select the trajectories with the maximal information gain
+                for env_idx, info_gains_per_env in enumerate(expected_info_gain_envs):
+                    for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
+                        if info_gain_per_traj > 0:
+                            obj = info_gain_per_traj
+
+                            if np.isclose(obj, best_obj):
+                                best_env_idxs.append(env_idx)
+                                best_traj_idxs.append(traj_idx)
+                            elif obj > best_obj:
+                                best_obj = obj
+
+                                best_env_idxs = [env_idx]
+                                best_traj_idxs = [traj_idx]
+
+            best_env_idxs, best_traj_idxs = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record,
+                                                                      previous_demonstrations, type=type, return_all_equiv=True)
         else:
-            nn_BEC_constraint_bookkeeping, minimal_distances = BEC_helpers.perform_nn_BEC_constraint_bookkeeping(
-                BEC_constraints,
-                min_subset_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record,
-                mdp_features_record, variable_filter=variable_filter)
-            print('{} approximate candidates for remedial demo/test'.format(len(nn_BEC_constraint_bookkeeping[0])))
-            if len(nn_BEC_constraint_bookkeeping[0]) > 0:
-                # the human's incorrect response can be corrected with similar enough counterexample
-                best_env_idxs, best_traj_idxs = list(zip(*nn_BEC_constraint_bookkeeping[0]))
+            # rely on constraints generated via 2-step deviation
+            # if you're looking for demonstrations that will convey the most constraining BEC region or will be employing scaffolding,
+            # obtain the demos needed to convey the most constraining BEC region
+            BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(BEC_constraints,
+                                                                                        min_subset_constraints_record,
+                                                                                        visited_env_traj_idxs, traj_record,
+                                                                                        traj_features_record,
+                                                                                        mdp_features_record,
+                                                                                        variable_filter=variable_filter)
+
+            print('{} exact candidates for remedial demo/test'.format(len(BEC_constraint_bookkeeping[0])))
+            if len(BEC_constraint_bookkeeping[0]) > 0:
+                # the human's incorrect response can be corrected with a direct counterexample
+                best_env_idxs, best_traj_idxs = list(zip(*BEC_constraint_bookkeeping[0]))
 
                 # simply optimize for the visuals of the direct counterexample
-                best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs,
+                best_env_idxs, best_traj_idxs = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs,
                                                                           traj_record,
-                                                                          previous_demonstrations, type=type)
+                                                                          previous_demonstrations, type=type, return_all_equiv=True)
 
-                print('Failed constraint: {}'.format(minimal_distances[0][2]))
-                print('Similar-enough constraint: {}'.format(minimal_distances[0][3]))
+                print('Found an exact match for constraint: {}'.format(BEC_constraints))
+            else:
+                nn_BEC_constraint_bookkeeping, minimal_distances = BEC_helpers.perform_nn_BEC_constraint_bookkeeping(
+                    BEC_constraints,
+                    min_subset_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record,
+                    mdp_features_record, variable_filter=variable_filter)
+                print('{} approximate candidates for remedial demo/test'.format(len(nn_BEC_constraint_bookkeeping[0])))
+                if len(nn_BEC_constraint_bookkeeping[0]) > 0:
+                    # the human's incorrect response can be corrected with similar enough counterexample
+                    best_env_idxs, best_traj_idxs = list(zip(*nn_BEC_constraint_bookkeeping[0]))
+
+                    # simply optimize for the visuals of the direct counterexample
+                    best_env_idxs, best_traj_idxs = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs,
+                                                                              traj_record,
+                                                                              previous_demonstrations, type=type, return_all_equiv=True)
+
+                    print('Failed constraint: {}'.format(minimal_distances[0][2]))
+                    print('Similar-enough constraint: {}'.format(minimal_distances[0][3]))
+
+    if len(best_env_idxs) > 1 and n_human_models_precomputed is not 0:
+        # optimizing information gain is currently only implemented for the instance where precomputed PF-based counterfactuals constraints are avilable
+        best_env_idx, best_traj_idx = BEC_helpers.optimize_information_gain(particles, best_env_idxs, best_traj_idxs, min_model_idxs, data_loc, weights,
+                                      step_cost_flag)
+    else:
+        best_env_idx = best_env_idxs[0]
+        best_traj_idx = best_traj_idxs[0]
 
     traj = traj_record[best_env_idx][best_traj_idx]
     filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)

@@ -995,3 +995,34 @@ def combine_counterfactual_constraints(args):
         new_min_subset_constraints.append(joint_constraints)
 
     return new_min_subset_constraints
+
+def optimize_information_gain(particles, best_env_idxs, best_traj_idxs, min_model_idxs, data_loc, weights, step_cost_flag):
+    best_ig = -1
+    prev_best_env_idx = -1
+    for j, best_env_idx_candidate in enumerate(best_env_idxs):
+        if best_env_idx_candidate != prev_best_env_idx:
+            all_env_constraints = []
+            for model_idx in min_model_idxs:
+                # optimizing information gain is currently only implemented for the instance where precomputed PF-based counterfactuals constraints are avilable
+                with open('models/' + data_loc + '/counterfactual_data_precomputed/model' + str(
+                        model_idx) + '/cf_data_env' + str(
+                    best_env_idx_candidate).zfill(5) + '.pickle', 'rb') as f:
+                    constraints_env = pickle.load(f)
+                all_env_constraints.append(constraints_env)
+
+            all_env_constraints_joint = [list(itertools.chain.from_iterable(i)) for i in zip(*all_env_constraints)]
+
+        if len(all_env_constraints_joint[best_traj_idxs[j]]) > 1:
+            min_env_constraints = remove_redundant_constraints(all_env_constraints_joint[best_traj_idxs[j]],
+                                                                           weights, step_cost_flag)
+        else:
+            min_env_constraints = all_env_constraints_joint[best_traj_idxs[j]]
+
+        ig = particles.calc_info_gain(min_env_constraints)
+
+        if ig > best_ig:
+            best_env_idx = best_env_idx_candidate
+            best_traj_idx = best_traj_idxs[j]
+            best_ig = ig
+
+    return best_env_idx, best_traj_idx
