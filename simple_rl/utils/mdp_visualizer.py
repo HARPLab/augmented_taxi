@@ -425,6 +425,7 @@ def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=N
     Summary:
         Visualizes the sequence of states and actions stored in the trajectory.
     '''
+    print("Entered trajectory function")
     screen = pygame.display.set_mode((scr_width, scr_height))
     cur_state = trajectory[0][0]
 
