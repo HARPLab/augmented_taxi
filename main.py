@@ -1051,20 +1051,22 @@ if __name__ == "__main__":
                             params.BEC['n_human_models'], params.BEC['n_particles'], params.prior, params.posterior, params.BEC['obj_func_proportion'], visited_env_traj_idxs)
 
     # c) run through the closed-loop teaching framework
-    simulate_teaching_loop(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.BEC['n_human_models_precomputed'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag)
-
-    n_human_models_real_time = 8
+    # simulate_teaching_loop(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.BEC['n_human_models_precomputed'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag)
 
     # d) run remedial demonstration and test selection on previous participant responses from IROS
-    # analyze_prev_study_tests(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], n_human_models_real_time, params.BEC['n_human_models_precomputed'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, visualize_pf_transition=True)
+    # analyze_prev_study_tests(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.BEC['n_human_models_precomputed'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, visualize_pf_transition=True)
 
     # e) compare the remedial demonstration selection when using 2-step dev/BEC vs. PF (assuming 3 static humans models for low, medium, and high difficulties)
-    # contrast_PF_2_step_dev(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], n_human_models_real_time, params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, visualize_pf_transition=False)
+    # contrast_PF_2_step_dev(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, visualize_pf_transition=False)
 
-    # c) obtain test environments
+    # f) obtain test environments
     # obtain_test_environments(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,
     #                          params.step_cost_flag, params.BEC['n_human_models'], params.prior, params.posterior, summary=BEC_summary, visualize_test_env=True, use_counterfactual=True)
 
+    # g) expand a summary to the desired number of demonstrations (e.g. as a baseline condition for a user study)
+    n_demos_desired = 8
+    expanded_summary = ps_helpers.obtain_expanded_summary(BEC_summary, n_demos_desired, visited_env_traj_idxs, params.data_loc['BEC'])
+    BEC.visualize_summary(expanded_summary)
 
     pool.close()
     pool.join()

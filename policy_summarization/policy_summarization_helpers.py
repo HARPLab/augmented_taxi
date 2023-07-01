@@ -443,3 +443,92 @@ def obtain_test_environments(data_loc, min_subset_constraints_record, env_record
                                                                                            obj_func_flattened, min_subset_constraints_record_flattened, env_traj_tracer_flattened)
 
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, selected_env_traj_tracers
+
+def obtain_expanded_summary(template_summary, n_demos_desired, visited_env_traj_idxs, data_loc, type='testing'):
+    '''
+    Expand a summary of demonstrations to a desired number of demonstrations for baseline experimental condition.
+    Assuming a 'testing' condition when optimizing for visuals to ensure that expanded demonstrations are
+    visually dissimilar from one another, while providing the same information as the original demonstrations.
+    '''
+    with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
+        policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(
+            f)
+    # calculate how many each original demonstration should be expanded by
+    n_template_demos = len(list(itertools.chain.from_iterable(template_summary)))
+    interval = n_demos_desired / n_template_demos
+    expanded_demo_counts = np.ediff1d(np.floor(np.arange(n_template_demos + 1) * interval).astype(int))
+    print(expanded_demo_counts)
+
+    template_summary_idx = 0
+    expanded_summary = []
+
+    for unit_idx, unit in enumerate(template_summary):
+        # for each unit (or lesson) in the summary
+        expanded_unit = []
+        for demonstration in unit:
+            # for each demonstration in the unit
+            previous_demonstrations = []
+            running_variable_filter = unit[0][4]
+
+            print("this is the original demo for constraint {}".format(demonstration[3]))
+            # demonstration[0].visualize_trajectory(demonstration[1])
+            demonstration_constraints = demonstration[3]
+            expanded_unit.append(demonstration)
+
+            # select the best supplementary demonstrations to add to the expanded summary (i.e. ones that ideally convey the
+            # same information but are visually complex and visually dissimilar from one another)
+            for _ in range(expanded_demo_counts[template_summary_idx] - 1): # subtract one to account for the original demo
+                BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(demonstration_constraints,
+                                                                                            min_subset_constraints_record,
+                                                                                            visited_env_traj_idxs,
+                                                                                            traj_record,
+                                                                                            traj_features_record,
+                                                                                            mdp_features_record,
+                                                                                            variable_filter=running_variable_filter)
+
+                print('{} exact candidates for remedial demo/test'.format(len(BEC_constraint_bookkeeping[0])))
+                if len(BEC_constraint_bookkeeping[0]) > 0:
+                    best_env_idxs, best_traj_idxs = list(zip(*BEC_constraint_bookkeeping[0]))
+
+                    best_env_idx, best_traj_idx = optimize_visuals(data_loc, best_env_idxs,
+                                                                                best_traj_idxs,
+                                                                                traj_record,
+                                                                                previous_demonstrations, type=type,
+                                                                                return_all_equiv=False)
+                else:
+                    nn_BEC_constraint_bookkeeping, minimal_distances = BEC_helpers.perform_nn_BEC_constraint_bookkeeping(
+                        demonstration_constraints, min_subset_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record,
+                        mdp_features_record, variable_filter=running_variable_filter)
+                    print('{} approximate candidates for remedial demo/test'.format(
+                        len(nn_BEC_constraint_bookkeeping[0])))
+                    if len(nn_BEC_constraint_bookkeeping[0]) > 0:
+                        best_env_idxs, best_traj_idxs = list(zip(*nn_BEC_constraint_bookkeeping[0]))
+
+                        best_env_idx, best_traj_idx = optimize_visuals(data_loc, best_env_idxs,
+                                                                                    best_traj_idxs,
+                                                                                    traj_record,
+                                                                                    previous_demonstrations,
+                                                                                    type=type,
+                                                                                    return_all_equiv=False)
+
+                        print('Similar-enough constraint: {}'.format(minimal_distances[0][3]))
+
+                best_traj = traj_record[best_env_idx][best_traj_idx]
+                filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
+                with open(filename, 'rb') as f:
+                    wt_vi_traj_env = pickle.load(f)
+                best_mdp = wt_vi_traj_env[0][1].mdp
+                best_mdp.set_init_state(best_traj[0][0])  # for completeness
+
+                # best_mdp.visualize_trajectory(best_traj)
+
+                visited_env_traj_idxs.append((best_env_idx, best_traj_idx))
+
+                expanded_unit.append([best_mdp, best_traj, (best_env_idx, best_traj_idx),
+                             min_subset_constraints_record[best_env_idx][best_traj_idx], running_variable_filter,
+                             None])
+            template_summary_idx += 1
+
+        expanded_summary.append(expanded_unit)
+
+    return expanded_summary

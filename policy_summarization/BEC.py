@@ -1999,7 +1999,7 @@ def visualize_constraints(constraints, weights, step_cost_flag, plot_lim=[(-1, 1
     plt.clf()
 
 
-def visualize_summary(BEC_summaries_collection, weights, step_cost_flag):
+def visualize_summary(BEC_summaries_collection):
     '''
     Summary: visualize the BEC demonstrations
     '''
@@ -2007,12 +2007,11 @@ def visualize_summary(BEC_summaries_collection, weights, step_cost_flag):
         # unit_constraints = []
 
         # show each demonstration that is part of this unit
-        for subunit in unit:
+        for subunit_idx, subunit in enumerate(unit):
+            print("Unit {}/{}, demo {}/{}:".format(unit_idx + 1, len(BEC_summaries_collection), subunit_idx + 1, len(unit)))
             subunit[0].visualize_trajectory(subunit[1])
             # unit_constraints.extend(subunit[3])
 
-        # min_constraints = BEC_helpers.remove_redundant_constraints(unit_constraints, weights, step_cost_flag)
-        # print(min_constraints)
 
 def visualize_test_envs(posterior, test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, selected_env_traj_tracers, weights, step_cost_flag):
     for j, test_wt_vi_traj_tuple in enumerate(test_wt_vi_traj_tuples):
