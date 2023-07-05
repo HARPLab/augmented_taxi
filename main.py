@@ -38,6 +38,7 @@ mpl.rcParams['xtick.labelsize'] = 'large'
 
 
 def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
+    print("entered this function")
     try:
         with open('models/' + data_loc + '/vi_agent.pickle', 'rb') as f:
             mdp_agent, vi_agent = pickle.load(f)
