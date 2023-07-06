@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+import random
 # Python imports.
 import sys
 import dill as pickle
@@ -427,6 +427,7 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
 
         # obtain the constraints conveyed by the unit's demonstrations
         min_constraints = BEC_helpers.remove_redundant_constraints(unit_constraints, weights, step_cost_flag)
+        random.shuffle(min_constraints) # shuffle the order of the constraints so that it's not always the same
         # obtain the diagnostic tests that will test the human's understanding of the unit's constraints
         preliminary_tests, visited_env_traj_idxs = BEC.obtain_diagnostic_tests(data_loc, unit, visited_env_traj_idxs, min_constraints, min_subset_constraints_record, traj_record, traj_features_record, running_variable_filter, mdp_features_record)
         print(preliminary_tests[0])

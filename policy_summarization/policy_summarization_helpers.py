@@ -248,7 +248,7 @@ def _in_summary(mdp, summary, initial_state):
             return True
     return False
 
-def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_record, summary, type='training', return_all_equiv=False):
+def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_record, summary, type='training', return_all_equiv=False, dissimilarity_only=False):
     visual_dissimilarities = np.zeros(len(best_env_idxs))
     complexities = np.zeros(len(best_env_idxs))
 
@@ -298,8 +298,9 @@ def optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_recor
 
                 visual_dissimilarities[j] = round(average_dissimilarity)
 
-        # get demos of low visual complexity
-        complexities[j] = best_mdp.measure_env_complexity(chunked_traj_record[best_env_idx][best_traj_idxs[j]][0][0])
+        if not dissimilarity_only:
+            # get demos of low visual complexity
+            complexities[j] = best_mdp.measure_env_complexity(chunked_traj_record[best_env_idx][best_traj_idxs[j]][0][0])
 
         prev_env_idx = best_env_idx
 
@@ -494,7 +495,7 @@ def obtain_expanded_summary(template_summary, n_demos_desired, visited_env_traj_
                                                                                 best_traj_idxs,
                                                                                 traj_record,
                                                                                 previous_demonstrations, type=type,
-                                                                                return_all_equiv=False)
+                                                                                return_all_equiv=False, dissimilarity_only=True)
                 else:
                     nn_BEC_constraint_bookkeeping, minimal_distances = BEC_helpers.perform_nn_BEC_constraint_bookkeeping(
                         demonstration_constraints, min_subset_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record,
@@ -509,7 +510,7 @@ def obtain_expanded_summary(template_summary, n_demos_desired, visited_env_traj_
                                                                                     traj_record,
                                                                                     previous_demonstrations,
                                                                                     type=type,
-                                                                                    return_all_equiv=False)
+                                                                                    return_all_equiv=False, dissimilarity_only=True)
 
                         print('Similar-enough constraint: {}'.format(minimal_distances[0][3]))
 
