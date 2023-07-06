@@ -206,10 +206,14 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, pool
     if hardcode_envs:
         # each of the domains has four possible hard-coded environments
         mdp_codes = list(map(list, itertools.product([0, 1], repeat=2)))
+        print(mdp_codes)
+        print("\n\n\n")
     else:
         # generate codes that govern the binary status of available tolls, walls, or crumbs
-        if mdp_class == 'augmented_taxi':
+        if mdp_class == 'augmented_taxi': # using this one
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_tolls']))))
+            print(mdp_codes)
+            print("\n\n\n")
         elif mdp_class == 'two_goal' or mdp_class == 'two_goal2':
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_walls']))))
         elif mdp_class == 'skateboard':
@@ -233,6 +237,8 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, pool
 
     print("Solving for the optimal policy in each environment:")
     args = [(i, mdp_codes[i], mdp_class, hardcode_envs, mdp_parameters, wt_candidates, data_loc) for i in range(n_processed_envs, len(mdp_codes))]
+    print(args)
+    print("\n\n\n")
     list(tqdm(pool.imap(solve_policy, args), total=len(args)))
 
 def _in_summary(mdp, summary, initial_state):
