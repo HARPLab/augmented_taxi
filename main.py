@@ -511,7 +511,7 @@ def calculate_new_pos (new_cop, pointer, step_size, currx, curry, currstate, cou
     else:
         newx = currx
         newy = curry
-        currstate = nextstate
+        #currstate = nextstate
         action = "pickup"
     editedstate = copy.deepcopy(currstate)
     editedstate.objects["agent"][0]["x"] = newx
@@ -522,8 +522,9 @@ def calculate_new_pos (new_cop, pointer, step_size, currx, curry, currstate, cou
 
 
 def normalize_trajs(opt_traj, human_traj):
-    opt_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y()) for (prevstate, action, currstate) in opt_traj]
-    human_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y()) for (prevstate, action, currstate) in human_traj]
+    #pdb.set_trace()
+    opt_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y(), currstate.objects["passenger"][0]["in_taxi"]) for (prevstate, action, currstate) in opt_traj]
+    human_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y(), currstate.objects["passenger"][0]["in_taxi"]) for (prevstate, action, currstate) in human_traj]
 
     matcher = difflib.SequenceMatcher(None, opt_traj_currs, human_traj_currs, autojunk=False)
     matches = matcher.get_matching_blocks()
@@ -543,6 +544,9 @@ def normalize_trajs(opt_traj, human_traj):
     m2 = []
 
     for i in range(len(anchor_points)):
+        opt_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y()) for (prevstate, action, currstate) in normalized_opt_traj]
+        human_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y()) for (prevstate, action, currstate) in normalized_human_traj]
+
         #pdb.set_trace()
         (opt_idx, human_idx) = anchor_points[i]
 
@@ -582,11 +586,33 @@ def normalize_trajs(opt_traj, human_traj):
             pointer = 0
             #need to expand optimal trajectory
             if (diff_opt < diff_human):
+                
                 step_size = diff_opt/diff_human
 
                 if (len(m2) > 0) and not (m2[-1]):
                     normalized_opt_traj.append(opt_traj[prev_opt_idx])
 
+                if len(opt_traj) == opt_idx + 1:
+                    if (opt_traj[prev_opt_idx][2].get_agent_x() == opt_traj[opt_idx][2].get_agent_x()) and (opt_traj[prev_opt_idx][2].get_agent_y() == opt_traj[opt_idx][2].get_agent_y()):
+                        for i in range(diff_human - 1):
+                            normalized_opt_traj.append((opt_traj[prev_opt_idx][2], "pickup", opt_traj[prev_opt_idx][2]))
+                        if (len(m1) > 0) and (m1[-1]):
+                            normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx + 1, human_idx)]
+                        else:
+                            normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx, human_idx)]
+                        
+                        continue
+                else:
+                    if (opt_traj[anchor_points[i + 1][0]][2].get_agent_x() == opt_traj[opt_idx][2].get_agent_x()) and (opt_traj[anchor_points[i + 1][0]][2].get_agent_y() == opt_traj[opt_idx][2].get_agent_y()):
+                        for i in range(diff_human - 1):
+                            normalized_opt_traj.append((opt_traj[opt_idx][2], "pickup", opt_traj[opt_idx][2]))
+                        if (len(m1) > 0) and (m1[-1]):
+                            normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx + 1, human_idx)]
+                        else:
+                            normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx, human_idx)]
+                        
+                        continue
+                
                 for j in range(prev_opt_idx, opt_idx + 1):
                     if j != opt_idx:
                         if (opt_traj[j][0].get_agent_x() == opt_traj[j + 1][0].get_agent_x()) and (opt_traj[j][0].get_agent_y() == opt_traj[j + 1][0].get_agent_y()):
@@ -624,6 +650,27 @@ def normalize_trajs(opt_traj, human_traj):
                 if (len(m1) > 0) and not (m1[-1]):
                     normalized_human_traj.append(opt_traj[prev_human_idx])
 
+                if len(human_traj) == human_idx + 1:
+                    if (human_traj[prev_human_idx][2].get_agent_x() == human_traj[human_idx][2].get_agent_x()) and (human_traj[prev_human_idx][2].get_agent_y() == human_traj[human_idx][2].get_agent_y()):
+                        for i in range(diff_opt - 1):
+                            normalized_human_traj.append((human_traj[prev_human_idx][2], "pickup", human_traj[prev_human_idx][2]))
+                        if (len(m2) > 0) and (m2[-1]):
+                            normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx + 1, opt_idx)]
+                        else:
+                            normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx, opt_idx)]
+
+                        continue
+                else:
+                    if (human_traj[prev_human_idx][2].get_agent_x() == human_traj[human_idx][2].get_agent_x()) and (human_traj[prev_human_idx][2].get_agent_y() == human_traj[human_idx][2].get_agent_y()):
+                        for i in range(diff_opt - 1):
+                            normalized_human_traj.append((human_traj[[i + 1][0]][2], "pickup", human_traj[[i + 1][0]][2]))
+                        if (len(m2) > 0) and (m2[-1]):
+                            normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx + 1, opt_idx)]
+                        else:
+                            normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx, opt_idx)]
+
+                        continue
+
                 for j in range(prev_human_idx, human_idx + 1):
                     if j != human_idx:
                         if (human_traj[j][0].get_agent_x() == human_traj[j + 1][0].get_agent_x()) and (human_traj[j][0].get_agent_y() == human_traj[j + 1][0].get_agent_y()):
@@ -653,8 +700,15 @@ def normalize_trajs(opt_traj, human_traj):
                 else:
                     normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx, opt_idx)]
 
+    
     normalized_human_traj.append(human_traj[-1])
     normalized_opt_traj.append(opt_traj[-1])
+
+    opt_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y()) for (prevstate, action, currstate) in normalized_opt_traj]
+    human_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y()) for (prevstate, action, currstate) in normalized_human_traj]
+
+
+    #pdb.set_trace()
     
     return normalized_opt_traj, normalized_human_traj
 
