@@ -204,7 +204,7 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, pool
     '''
     Summary: come up with an optimal policy for each of the candidates
     '''
-    print(f"before hand mdp_codes: {mdp_codes}")
+    print(f"inputs: mdp_class {mdp_class}, data_loc {data_loc}, wt_candidates {wt_candidates}, mdp_params {mdp_parameters}, pool {pool}, ")
     if hardcode_envs:
         # each of the domains has four possible hard-coded environments
         mdp_codes = list(map(list, itertools.product([0, 1], repeat=2)))
