@@ -199,20 +199,21 @@ def solve_policy(args):
     with open(mp_helpers.lookup_env_filename(data_loc, env_idx), 'wb') as f:
         pickle.dump(wt_vi_traj_env, f)
 
-def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, pool, hardcode_envs=False):
+# currently does not seem like it actually does much if anything since mdp_class remains empty and args is also empty when being run
+def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, pool, hardcode_envs=False): 
     '''
     Summary: come up with an optimal policy for each of the candidates
     '''
     if hardcode_envs:
         # each of the domains has four possible hard-coded environments
         mdp_codes = list(map(list, itertools.product([0, 1], repeat=2)))
-        print(mdp_codes)
+        print(f"mdp_codes with hardcode: {mdp_codes}")
         print("\n\n\n")
     else:
         # generate codes that govern the binary status of available tolls, walls, or crumbs
         if mdp_class == 'augmented_taxi': # using this one
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_tolls']))))
-            print(mdp_codes)
+            print(f"mdp_codes in else: {mdp_codes}")
             print("\n\n\n")
         elif mdp_class == 'two_goal' or mdp_class == 'two_goal2':
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_walls']))))
@@ -237,7 +238,8 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, pool
 
     print("Solving for the optimal policy in each environment:")
     args = [(i, mdp_codes[i], mdp_class, hardcode_envs, mdp_parameters, wt_candidates, data_loc) for i in range(n_processed_envs, len(mdp_codes))]
-    print(args)
+    print(f"args: {args}")
+    print(f"n_processed_envs: {n_processed_envs}")
     print("\n\n\n")
     list(tqdm(pool.imap(solve_policy, args), total=len(args)))
 
