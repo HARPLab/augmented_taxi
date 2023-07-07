@@ -204,6 +204,7 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, pool
     '''
     Summary: come up with an optimal policy for each of the candidates
     '''
+    print(f"before hand mdp_codes: {mdp_codes}")
     if hardcode_envs:
         # each of the domains has four possible hard-coded environments
         mdp_codes = list(map(list, itertools.product([0, 1], repeat=2)))
@@ -235,7 +236,7 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, pool
     policy_dir = 'models/' + data_loc + '/gt_policies/'
     os.makedirs(policy_dir, exist_ok=True)
     n_processed_envs = len(os.listdir(policy_dir))
-
+    print(f"n_processed_envs: {n_processed_envs}")
     print("Solving for the optimal policy in each environment:")
     args = [(i, mdp_codes[i], mdp_class, hardcode_envs, mdp_parameters, wt_candidates, data_loc) for i in range(n_processed_envs, len(mdp_codes))]
     print(f"args: {args}")
