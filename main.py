@@ -63,11 +63,10 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
 
 
 def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, pool, n_train_demos, BEC_depth, n_human_models, n_particles, prior, posterior, obj_func_proportion, hardcode_envs=False):
-    print("entered here\n\n\n\n\n")
+    print(f"data_loc: {data_loc}\nmdp_params: {mdp_parameters}\nweights: {weights}\nn_human_models: {n_human_models}\nn_train_demos: {n_train_demos}\n\n")
     if hardcode_envs:
         # using 4 hardcoded environments
         ps_helpers.obtain_env_policies(mdp_class, data_loc, np.expand_dims(weights, axis=0), mdp_parameters, pool, hardcode_envs=True)
-        print("entered if\n\n")
         vi_traj_triplets = []
         for i in range(4):
             env_filename = mp_helpers.lookup_env_filename(data_loc, i)
@@ -82,9 +81,7 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
 
             vi_traj_triplets.append((i, agent, trajectory))
     else:
-        print("did not enter if\n\n")
         ps_helpers.obtain_env_policies(mdp_class, data_loc, np.expand_dims(weights, axis=0), mdp_parameters, pool)
-        print("did not enter if\n\n")
     try:
         with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
             policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(f)
