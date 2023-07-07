@@ -204,7 +204,7 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, pool
     '''
     Summary: come up with an optimal policy for each of the candidates
     '''
-    print(f"inputs: mdp_class {mdp_class}, data_loc {data_loc}, wt_candidates {wt_candidates}, mdp_params {mdp_parameters}, pool {pool}, ")
+    print(f"inputs: mdp_class {mdp_class}\n data_loc {data_loc}\n wt_candidates {wt_candidates}\n mdp_params {mdp_parameters}\n pool {pool}")
     if hardcode_envs:
         # each of the domains has four possible hard-coded environments
         mdp_codes = list(map(list, itertools.product([0, 1], repeat=2)))
@@ -214,8 +214,6 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, pool
         # generate codes that govern the binary status of available tolls, walls, or crumbs
         if mdp_class == 'augmented_taxi': # using this one
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_tolls']))))
-            print(f"mdp_codes in else: {mdp_codes}")
-            print("\n\n\n")
         elif mdp_class == 'two_goal' or mdp_class == 'two_goal2':
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_walls']))))
         elif mdp_class == 'skateboard':
@@ -226,13 +224,16 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, pool
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_crumbs']))))
         elif mdp_class == 'augmented_taxi2':
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_tolls'])+1)))
+            print(f"mdp_codes in else: {mdp_codes}")
+            print("\n\n\n")
         elif mdp_class == 'colored_tiles':
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_A_tiles'])+len(mdp_parameters['available_B_tiles']))))
         elif mdp_class == 'augmented_navigation':
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=6)))  # todo: make this a variable
         else:
             raise Exception("Unknown MDP class.")
-
+    print(f"mdp_codes in outside: {mdp_codes}")
+    print("\n\n")
     policy_dir = 'models/' + data_loc + '/gt_policies/'
     os.makedirs(policy_dir, exist_ok=True)
     n_processed_envs = len(os.listdir(policy_dir))
