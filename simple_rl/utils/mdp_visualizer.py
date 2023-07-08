@@ -3,6 +3,7 @@ from __future__ import print_function
 import sys
 import time
 import difflib
+import copy
 try:
     import pygame
     from pygame.locals import *
@@ -160,6 +161,13 @@ def _draw_circle_alpha(surface, color, center, radius):
     shape_surf = pygame.Surface(target_rect.size, pygame.SRCALPHA)
     pygame.draw.circle(shape_surf, color, (radius, radius), radius)
     surface.blit(shape_surf, target_rect)
+    return target_rect
+
+def _draw_rect_alpha(surface, color, rect):
+    shape_surf = pygame.Surface(pygame.Rect(rect).size, pygame.SRCALPHA)
+    pygame.draw.rect(shape_surf, color, shape_surf.get_rect())
+    surface.blit(shape_surf, rect)
+    return rect
 
 def visualize_state(mdp, draw_state, cur_state=None, scr_width=720, scr_height=720):
     '''
@@ -331,6 +339,7 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
 
 
             # Move agent.
+            prev_state = cur_state.copy()
             action = agent.act(cur_state, reward)
 
             if cur_state.is_terminal():
@@ -343,10 +352,10 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
 
             reward, cur_state = mdp.execute_agent_action(action)
             dynamic_shapes, _ = draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True)
-
-            score += int(reward)
-
             pygame.display.update()
+
+            if cur_state != prev_state:
+                score += int(reward)
 
             time.sleep(delay)
 
@@ -369,17 +378,17 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
                         mdp.reset()
 
                 # Move agent.
+                prev_state = cur_state.copy()
                 action = agent.act(cur_state, reward)
                 reward, cur_state = mdp.execute_agent_action(action)
                 dynamic_shapes, _ = draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True)
-
-                score = round(rpl)
-                rpl += reward
-
                 pygame.display.update()
+                if cur_state != prev_state:
+                    score = round(rpl)
+                    rpl += reward
+                    j += 1
 
                 time.sleep(delay)
-                j+=1
 
                 if cur_state.is_terminal():
                     cur_state = mdp.get_init_state()
@@ -493,7 +502,7 @@ def visualize_trajectory_comparison(mdp, flag, trajectory, trajectory_counterfac
     Summary:
         Visualizes the sequence of states and actions stored in the trajectory.
     '''
-    #counterfactual is user input 
+    #counterfactual is user input
     screen = pygame.display.set_mode((scr_width, scr_height))
     cur_state_traj = trajectory[0][0]
     cur_state_counter = trajectory_counterfactual[0][0]
@@ -503,7 +512,7 @@ def visualize_trajectory_comparison(mdp, flag, trajectory, trajectory_counterfac
     dynamic_shapes_counterfactual, agent_history_counterfactual = draw_state(screen, mdp, cur_state_counter, draw_statics=False, agent_history=[], offset_direction=-1, alpha=150)
 
     pygame.event.clear()
-    
+
     len_traj = len(trajectory)
     len_counter = len(trajectory_counterfactual)
 
@@ -513,13 +522,13 @@ def visualize_trajectory_comparison(mdp, flag, trajectory, trajectory_counterfac
     step = 0
 
     if flag:
-        
+
         anchor_points_wait = []
         traj_currs_coords = [(currstate.get_agent_x(), currstate.get_agent_y(), currstate.objects["agent"][0]["has_passenger"]) for (prevstate, action, currstate) in trajectory]
         countertraj_currs_coords = [(currstate.get_agent_x(), currstate.get_agent_y(), currstate.objects["agent"][0]["has_passenger"]) for (prevstate, action, currstate) in trajectory_counterfactual]
 
         traj_currs = [currstate for (prevstate, action, currstate) in trajectory]
-       
+
         matcher = difflib.SequenceMatcher(None, traj_currs_coords, countertraj_currs_coords, autojunk=False)
         matches = matcher.get_matching_blocks()
 
@@ -532,7 +541,7 @@ def visualize_trajectory_comparison(mdp, flag, trajectory, trajectory_counterfac
         print(anchor_points_wait)
 
     while (step_traj < len_traj or step_counter < len_counter) and (step < len_traj or step < len_counter):
-        if flag:  
+        if flag:
             # Check for key presses.
             for event in pygame.event.get():
                 if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
@@ -551,13 +560,13 @@ def visualize_trajectory_comparison(mdp, flag, trajectory, trajectory_counterfac
                         cur_x_traj = trajectory[step_traj][2].get_agent_x()
                         cur_y_traj = trajectory[step_traj][2].get_agent_y()
                         cur_state_traj = trajectory[step_traj][2]
-                        
+
                     else:
                         cur_x_traj = trajectory[-1][2].get_agent_x()
                         cur_y_traj = trajectory[-1][2].get_agent_y()
                         cur_state_traj = trajectory[-1][2]
                     cur_pass_traj = cur_state_traj.objects["agent"][0]["has_passenger"]
-                      
+
 
                     if step_counter < len_counter:
                         cur_x_counter = trajectory_counterfactual[step_counter][2].get_agent_x()
@@ -568,7 +577,7 @@ def visualize_trajectory_comparison(mdp, flag, trajectory, trajectory_counterfac
                         cur_y_counter = trajectory_counterfactual[-1][2].get_agent_y()
                         cur_state_counter = trajectory_counterfactual[-1][2]
                     cur_pass_counter = cur_state_counter.objects["agent"][0]["has_passenger"]
-                    
+
                     if ((cur_x_traj, cur_y_traj, cur_pass_traj) in anchor_points_wait and (cur_x_counter, cur_y_counter, cur_pass_counter) != (cur_x_traj, cur_y_traj, cur_pass_traj)):
                         step_traj -= 1
 
@@ -678,16 +687,20 @@ def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_h
                     pygame.draw.rect(screen, (255,255,255), shape)
 
                 # Move agent.
+                prev_state = copy.deepcopy(cur_state)
                 action = agent.act(cur_state, reward)
                 print("A: " + str(action))
                 reward, cur_state = mdp.execute_agent_action(action)
-                cumulative_reward += reward * gamma ** step
-                dynamic_shapes, _ = draw_state(screen, mdp, cur_state)
 
+                dynamic_shapes, _ = draw_state(screen, mdp, cur_state)
                 # Update state text.
                 _draw_lower_left_text(cur_state, screen)
 
-                step += 1
+                # only update the cumulative reward on a state change (i.e. else count the action as a no-op)
+                if prev_state != cur_state:
+                    cumulative_reward += reward * gamma ** step
+
+                    step += 1
 
         if cur_state.is_terminal():
             goal_text_rendered, goal_text_point = _draw_terminal_text(mdp_class, cur_state, scr_width, scr_height, title_font)
@@ -787,17 +800,22 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
                 prev_state = cur_state
                 action = actions[keys.index(event.key)]
                 reward, cur_state = mdp.execute_agent_action(action=action)
-                current_reward = reward * gamma ** step
-                cumulative_reward += current_reward
-                dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, agent_history=agent_history)
-                trajectory.append((prev_state, action, cur_state))
-                if interaction_callback is not None:
-                    interaction_callback(action)
 
+                dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, agent_history=agent_history)
                 # Update state text.
                 _draw_lower_left_text(cur_state, screen)
 
-                step += 1
+                # only update the cumulative reward on a state change (i.e. else count the action as a no-op)
+                if cur_state != prev_state:
+                    current_reward = reward * gamma ** step
+                    cumulative_reward += current_reward
+
+                    trajectory.append((prev_state, action, cur_state))
+                    if interaction_callback is not None:
+                        interaction_callback(action)
+
+
+                    step += 1
         if cur_state.is_terminal():
             goal_text_rendered, goal_text_point = _draw_terminal_text(mdp_class, cur_state, scr_width, scr_height, title_font)
             screen.blit(goal_text_rendered, goal_text_point)
@@ -816,7 +834,7 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
                 pygame.display.quit()
                 return trajectory, agent_history
 
-def _vis_init(screen, mdp, draw_state, cur_state, agent=None, value=False, score=-1, counterfactual_traj=None, offset_direction=0):
+def _vis_init(screen, mdp, draw_state, cur_state, agent=None, value=False, score=-1, counterfactual_traj=None, offset_direction=0, alpha=255):
     # Pygame setup.
     pygame.init()
     screen.fill((255, 255, 255))
@@ -828,7 +846,7 @@ def _vis_init(screen, mdp, draw_state, cur_state, agent=None, value=False, score
     else:
         _draw_lower_left_text(cur_state, screen)
 
-    dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, agent=agent, draw_statics=True, agent_history=[], counterfactual_traj=counterfactual_traj, offset_direction=offset_direction)
+    dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, agent=agent, draw_statics=True, agent_history=[], counterfactual_traj=counterfactual_traj, offset_direction=offset_direction, alpha=alpha)
 
     return dynamic_shapes, agent_history
 

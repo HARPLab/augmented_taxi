@@ -271,8 +271,8 @@ class Skateboard2OOMDP(OOMDP):
                                         width_scr_scale=180, height_scr_scale=180):
         # for moving through two trajectories simultaneously
         from simple_rl.utils.mdp_visualizer import visualize_trajectory_comparison
-        from .skateboard_visualizer import _draw_augmented_state
-        visualize_trajectory_comparison(self, flag, trajectory, trajectory_counterfactual, _draw_augmented_state, marked_state_importances=marked_state_importances, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='skateboard2')
+        from .skateboard_visualizer import _draw_state
+        visualize_trajectory_comparison(self, flag, trajectory, trajectory_counterfactual, _draw_state, marked_state_importances=marked_state_importances, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='skateboard2')
 
 
     # ----------------------------
@@ -360,7 +360,7 @@ class Skateboard2OOMDP(OOMDP):
 
         return next_state
 
-    def measure_env_complexity(self):
+    def measure_env_complexity(self, state=None):
         return len(self.paths) + len(self.init_state.objects['skateboard'])
 
     def measure_visual_dissimilarity(self, start_state, other_mdp, other_start_state):

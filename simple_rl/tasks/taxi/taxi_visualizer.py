@@ -214,7 +214,8 @@ def _draw_augmented_state(screen,
             top_left_point = int(width_buffer + cell_width * (pass_x - 1) + taxi_size + 26 + offset_counterfactual), int(
                 height_buffer + cell_height * (taxi_oomdp.height - pass_y) + taxi_size + 38)
         dest_col = (max(color_ls[-i-1][0]-30, 0), max(color_ls[-i-1][1]-30, 0), max(color_ls[-i-1][2]-30, 0), alpha)
-        mdpv._draw_circle_alpha(screen, dest_col, top_left_point, taxi_size)
+        passenger_shape = mdpv._draw_circle_alpha(screen, dest_col, top_left_point, taxi_size)
+        dynamic_shapes_list.append(passenger_shape)
 
     if draw_statics:
         # For each row:

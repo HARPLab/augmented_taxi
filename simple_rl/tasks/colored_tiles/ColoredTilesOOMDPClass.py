@@ -45,6 +45,9 @@ class ColoredTilesOOMDP(OOMDP):
         self.goal = goal
         self.slip_prob = slip_prob
 
+        # does this MDP have the capability of conveying the following reward features?
+        self.reward_features = np.array([[len(self.A_tiles) > 0, len(self.B_tiles) > 0, True]])
+
         init_state = self._create_state(agent_obj)
         OOMDP.__init__(self, ColoredTilesOOMDP.ACTIONS, self._skateboard_transition_func, self._colored_tiles_reward_func,
                        init_state=init_state, gamma=gamma, step_cost=step_cost, sample_rate=sample_rate)
@@ -213,20 +216,20 @@ class ColoredTilesOOMDP(OOMDP):
 
         visualize_state(self, _draw_state, cur_state=cur_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
 
-    def visualize_trajectory(self, trajectory, marked_state_importances=None, width_scr_scale=180, height_scr_scale=180):
+    def visualize_trajectory(self, trajectory, marked_state_importances=None, width_scr_scale=180, height_scr_scale=180, counterfactual_traj=None):
         from simple_rl.utils.mdp_visualizer import visualize_trajectory
         from .colored_tiles_visualizer import _draw_state
 
-        visualize_trajectory(self, trajectory, _draw_state, marked_state_importances=marked_state_importances, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='colored_tiles')
+        visualize_trajectory(self, trajectory, _draw_state, marked_state_importances=marked_state_importances, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='colored_tiles', counterfactual_traj=None)
+
 
     def visualize_trajectory_comparison(self, flag, trajectory, trajectory_counterfactual, marked_state_importances=None,
                                         width_scr_scale=180, height_scr_scale=180):
         # for moving through two trajectories simultaneously
         from simple_rl.utils.mdp_visualizer import visualize_trajectory_comparison
-        from .colored_tiles_visualizer import _draw_augmented_state
-        visualize_trajectory_comparison(self, flag, trajectory, trajectory_counterfactual, _draw_augmented_state, marked_state_importances=marked_state_importances, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='colored_tiles')
+        from .colored_tiles_visualizer import _draw_state
 
-
+        visualize_trajectory_comparison(self, flag, trajectory, trajectory_counterfactual, _draw_state, marked_state_importances=marked_state_importances, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='colored_tiles')
 
     # ----------------------------
     # -- Action Implementations --
@@ -256,7 +259,7 @@ class ColoredTilesOOMDP(OOMDP):
 
         return next_state
 
-    def measure_env_complexity(self):
+    def measure_env_complexity(self, state=None):
         return len(self.A_tiles) + len(self.B_tiles)
 
     def measure_visual_dissimilarity(self, start_state, other_mdp, other_start_state):
