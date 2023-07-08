@@ -63,7 +63,7 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
 
 
 def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, pool, n_train_demos, BEC_depth, n_human_models, n_particles, prior, posterior, obj_func_proportion, hardcode_envs=False):
-    print(f"data_loc: {data_loc}\nmdp_params: {mdp_parameters}\nweights: {weights}\nn_human_models: {n_human_models}\nn_train_demos: {n_train_demos}\n\n")
+    #print(f"data_loc: {data_loc}\nmdp_params: {mdp_parameters}\nweights: {weights}\nn_human_models: {n_human_models}\nn_train_demos: {n_train_demos}\n\n")
     if hardcode_envs:
         # using 4 hardcoded environments
         ps_helpers.obtain_env_policies(mdp_class, data_loc, np.expand_dims(weights, axis=0), mdp_parameters, pool, hardcode_envs=True)
@@ -286,9 +286,6 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
     #
     #     plt.show()
     #     checking what is being returned
-    print(f"BEC_summary {BEC_summary}\n")
-    print(f"visited_env_trag_idxs {visited_env_traj_idxs}\n")
-    print(f"particles {particles}\n")
     return BEC_summary, visited_env_traj_idxs, particles
 
 def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_params, step_cost_flag, n_human_models, prior, posterior, summary=None, use_counterfactual=True, visualize_test_env=False):
