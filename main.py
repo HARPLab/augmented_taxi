@@ -1050,7 +1050,7 @@ if __name__ == "__main__":
     # c) run through the closed-loop teaching framework
     simulate_teaching_loop(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.BEC['n_human_models_precomputed'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag)
 
-    n_human_models_real_time = 8
+    #n_human_models_real_time = 8
 
     # d) run remedial demonstration and test selection on previous participant responses from IROS
     # analyze_prev_study_tests(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], n_human_models_real_time, params.BEC['n_human_models_precomputed'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, visualize_pf_transition=True)
