@@ -407,11 +407,8 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
     #print(f"min_subset_constraint_record: {min_subset_constraints_record}\nenv_record: {env_record}\ntraj_record: {traj_record}\ntraj_features_record: {traj_features_record}\nmdp_features_record: {mdp_features_record}\nconsistent_state_count: {consistent_state_count}\n")
     # initialize a particle filter model of human
     particle_positions = BEC_helpers.sample_human_models_uniform([], n_particles)
-    print(f"particle_positions: {particle_positions}")
     particles = pf.Particles(particle_positions)
-    print(f"particles: {particles}")
     particles.update(prior)
-    print(f"particles: {particles}")
 
     # run through the pre-selected units
     for unit_idx, unit in enumerate(BEC_summary):
