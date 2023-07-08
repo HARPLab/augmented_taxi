@@ -401,14 +401,17 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
 
 def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, n_human_models_precomputed, data_loc, weights, step_cost_flag, visualize_pf_transition=False):
     # todo: maybe pass in some of these objects later
+    print(f"mdp_class: {mdp_class}\nBEC_summary: {BEC_summary}\nvisited_env_traj_idxs: {visited_env_traj_idxs}\npool: {pool}\nprior: {prior}\nn_particles: {n_particles}\n n_human_models: {n_human_models}\nn_human_models_precomputed: {n_human_models_precomputed}\ndata_loc: {data_loc}\nweights: {weights}\nstep_cost_flag: {step_cost_flag}\nvisualize_pf_transition: {visualize_pf_transition}\n")
     with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
-        policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(
-            f)
-
+        policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(f)
+    print(f"min_subset_constraint_record: {min_subset_constraints_record}\nenv_record: {env_record}\ntraj_record: {traj_record}\ntraj_features_record: {traj_features_record}\nmdp_features_record: {mdp_features_record}\nconsistent_state_count: {consistent_state_count}\n")
     # initialize a particle filter model of human
     particle_positions = BEC_helpers.sample_human_models_uniform([], n_particles)
+    print(f"particle_positions")
     particles = pf.Particles(particle_positions)
+    print(f"particles: {particles}")
     particles.update(prior)
+    print(f"particles: {particles}")
 
     # run through the pre-selected units
     for unit_idx, unit in enumerate(BEC_summary):
@@ -1050,7 +1053,7 @@ if __name__ == "__main__":
     # c) run through the closed-loop teaching framework
     simulate_teaching_loop(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.BEC['n_human_models_precomputed'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag)
 
-    #n_human_models_real_time = 8
+    n_human_models_real_time = 8 #never used
 
     # d) run remedial demonstration and test selection on previous participant responses from IROS
     # analyze_prev_study_tests(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], n_human_models_real_time, params.BEC['n_human_models_precomputed'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, visualize_pf_transition=True)
