@@ -404,7 +404,7 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
     print(f"mdp_class: {mdp_class}\nBEC_summary: {BEC_summary}\nvisited_env_traj_idxs: {visited_env_traj_idxs}\npool: {pool}\nprior: {prior}\nn_particles: {n_particles}\n n_human_models: {n_human_models}\nn_human_models_precomputed: {n_human_models_precomputed}\ndata_loc: {data_loc}\nweights: {weights}\nstep_cost_flag: {step_cost_flag}\nvisualize_pf_transition: {visualize_pf_transition}\n")
     with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
         policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(f)
-    print(f"min_subset_constraint_record: {min_subset_constraints_record}\nenv_record: {env_record}\ntraj_record: {traj_record}\ntraj_features_record: {traj_features_record}\nmdp_features_record: {mdp_features_record}\nconsistent_state_count: {consistent_state_count}\n")
+    #print(f"min_subset_constraint_record: {min_subset_constraints_record}\nenv_record: {env_record}\ntraj_record: {traj_record}\ntraj_features_record: {traj_features_record}\nmdp_features_record: {mdp_features_record}\nconsistent_state_count: {consistent_state_count}\n")
     # initialize a particle filter model of human
     particle_positions = BEC_helpers.sample_human_models_uniform([], n_particles)
     print(f"particle_positions: {particle_positions}")
