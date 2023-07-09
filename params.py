@@ -7,7 +7,7 @@ import os
 # mdp_class = 'skateboard'
 
 # S22/IJCAI22 environments (doesn't allow exits)
-mdp_class = 'augmented_taxi2'
+mdp_class = 'skateboard'
 # mdp_class = 'colored_tiles'
 # mdp_class = 'skateboard2'
 # mdp_class = 'two_goal2'
@@ -98,7 +98,7 @@ elif mdp_class == 'augmented_taxi2':
     mdp_parameters = {
         'agent': {'x': 4, 'y': 1, 'has_passenger': 0},
         'walls': [{'x': 1, 'y': 3}, {'x': 1, 'y': 2}],
-        'passengers': [{'x': 4, 'y': 1, 'dest_x': 1, 'dest_y': 1, 'in_taxi': 0}, {'x': 3, 'y': 2, 'dest_x': 1, 'dest_y': 1, 'in_taxi': 0}],
+        'passengers': [{'x': 4, 'y': 1, 'dest_x': 1, 'dest_y': 1, 'in_taxi': 0}],
         'tolls': [{'x': 3, 'y': 1}],
         'available_tolls': [{"x": 3, "y": 3}, {"x": 2, "y": 2}, {"x": 3, "y": 2}, {"x": 4, "y": 2}, {"x": 3, "y": 1}],
         'traffic': [],  # probability that you're stuck
