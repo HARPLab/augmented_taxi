@@ -7,7 +7,7 @@ import os
 # mdp_class = 'skateboard'
 
 # S22/IJCAI22 environments (doesn't allow exits)
-mdp_class = 'skateboard'
+mdp_class = 'augmented_taxi2'
 # mdp_class = 'colored_tiles'
 # mdp_class = 'skateboard2'
 # mdp_class = 'two_goal2'
