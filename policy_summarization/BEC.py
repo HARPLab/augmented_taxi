@@ -1532,9 +1532,10 @@ def obtain_diagnostic_tests(data_loc, previous_demos, visited_env_traj_idxs, min
         filename = mp_helpers.lookup_env_filename(data_loc, env_idx)
         with open(filename, 'rb') as f:
             wt_vi_traj_env = pickle.load(f)
+        vi = wt_vi_traj_env[0][1]
         best_mdp = wt_vi_traj_env[0][1].mdp
         best_mdp.set_init_state(traj[0][0])  # for completeness
-        preliminary_tests.append([best_mdp, traj, (env_idx, traj_idx), constraints])
+        preliminary_tests.append([best_mdp, traj, (env_idx, traj_idx), constraints, vi, wt_vi_traj_env[0][3]])
         visited_env_traj_idxs.append((env_idx, traj_idx))
 
     return preliminary_tests, visited_env_traj_idxs
