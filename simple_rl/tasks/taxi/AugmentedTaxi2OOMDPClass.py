@@ -32,6 +32,7 @@ class AugmentedTaxi2OOMDP(OOMDP):
     CLASSES = ["agent", "wall", "passenger", "toll", "traffic", "fuel_station", "hotswap_station"]
 
     def __init__(self, width, height, agent, walls, passengers, tolls, traffic, fuel_stations, hotswap_stations, slip_prob=0, gamma=0.99, step_cost=0, weights=None, env_code=None, sample_rate=5):
+        print("Enetered init state function\n\n\n\n\n\n")
         self.env_code = env_code
         self.height = height
         self.width = width
@@ -84,7 +85,7 @@ class AugmentedTaxi2OOMDP(OOMDP):
 
         TODO: Make this more egneral and put it in OOMDPClass.
         '''
-
+        print("Enetered create state function\n\n\n\n\n\n")
         objects = {c : [] for c in AugmentedTaxi2OOMDP.CLASSES}
 
         objects["agent"].append(agent_oo_obj)
@@ -420,7 +421,7 @@ class AugmentedTaxi2OOMDP(OOMDP):
         dissimilarity += np.sum(np.abs(np.array([int(x) for x in start_state_hash[0:overlap]]) - np.array(
             [int(x) for x in other_start_state_hash[0:overlap]]))) * start_state_weight
 
-        # tolls
+        # tolls #go over this line
         dissimilarity += np.sum(np.abs(np.array(self.env_code[:-1]) - np.array(other_mdp.env_code[:-1])))
         # hotswap station (current assuming that there is only one)
         dissimilarity += abs(len(start_state.objects['hotswap_station']) - len(other_start_state.objects['hotswap_station']))
