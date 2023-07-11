@@ -32,7 +32,6 @@ class AugmentedTaxi2OOMDP(OOMDP):
     CLASSES = ["agent", "wall", "passenger", "toll", "traffic", "fuel_station", "hotswap_station"]
 
     def __init__(self, width, height, agent, walls, passengers, tolls, traffic, fuel_stations, hotswap_stations, slip_prob=0, gamma=0.99, step_cost=0, weights=None, env_code=None, sample_rate=5):
-        print("Enetered init state function\n\n\n\n\n\n")
         self.env_code = env_code
         self.height = height
         self.width = width
@@ -85,7 +84,6 @@ class AugmentedTaxi2OOMDP(OOMDP):
 
         TODO: Make this more egneral and put it in OOMDPClass.
         '''
-        print("Enetered create state function\n\n\n\n\n\n")
         objects = {c : [] for c in AugmentedTaxi2OOMDP.CLASSES}
 
         objects["agent"].append(agent_oo_obj)
