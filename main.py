@@ -17,6 +17,7 @@ import itertools
 from collections import defaultdict
 from multiprocessing import Process, Queue, Pool
 import difflib
+import pdb
 
 # Other imports.
 sys.path.append("simple_rl")
@@ -590,32 +591,14 @@ def normalize_trajs(opt_traj, human_traj, data_loc):
                 if (len(m2) > 0) and not (m2[-1]):
                     normalized_opt_traj.append(opt_traj[prev_opt_idx])
 
-                if len(opt_traj) == opt_idx + 1:
-                    if (opt_traj[prev_opt_idx][2].get_agent_x() == opt_traj[opt_idx][2].get_agent_x()) and (opt_traj[prev_opt_idx][2].get_agent_y() == opt_traj[opt_idx][2].get_agent_y()):
-                        for i in range(diff_human - 1):
-                            normalized_opt_traj.append((opt_traj[prev_opt_idx][2], "pickup", opt_traj[prev_opt_idx][2]))
-                        if (len(m1) > 0) and (m1[-1]):
-                            normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx + 1, human_idx)]
-                        else:
-                            normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx, human_idx)]
-
-                        continue
-                else:
-                    if (opt_traj[anchor_points[i + 1][0]][2].get_agent_x() == opt_traj[opt_idx][2].get_agent_x()) and (opt_traj[anchor_points[i + 1][0]][2].get_agent_y() == opt_traj[opt_idx][2].get_agent_y()):
-                        for i in range(diff_human - 1):
-                            normalized_opt_traj.append((opt_traj[opt_idx][2], "pickup", opt_traj[opt_idx][2]))
-                        if (len(m1) > 0) and (m1[-1]):
-                            normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx + 1, human_idx)]
-                        else:
-                            normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx, human_idx)]
-
-                        continue
-
                 for j in range(prev_opt_idx, opt_idx + 1):
                     if j != opt_idx:
                         if (opt_traj[j][0].get_agent_x() == opt_traj[j + 1][0].get_agent_x()) and (opt_traj[j][0].get_agent_y() == opt_traj[j + 1][0].get_agent_y()):
                             continue
-                    new_cop.append((opt_traj[j][0].get_agent_x(), opt_traj[j][0].get_agent_y(), opt_traj[j][0]))
+                    if (len(m2) > 0) and not (m2[-1]) and j == prev_opt_idx:
+                        continue
+                    else:
+                        new_cop.append((opt_traj[j][0].get_agent_x(), opt_traj[j][0].get_agent_y(), opt_traj[j][0]))
 
                 counter = 0
                 last = opt_traj[opt_idx][2]
@@ -648,32 +631,15 @@ def normalize_trajs(opt_traj, human_traj, data_loc):
                 if (len(m1) > 0) and not (m1[-1]):
                     normalized_human_traj.append(opt_traj[prev_human_idx])
 
-                if len(human_traj) == human_idx + 1:
-                    if (human_traj[prev_human_idx][2].get_agent_x() == human_traj[human_idx][2].get_agent_x()) and (human_traj[prev_human_idx][2].get_agent_y() == human_traj[human_idx][2].get_agent_y()):
-                        for i in range(diff_opt - 1):
-                            normalized_human_traj.append((human_traj[prev_human_idx][2], "pickup", human_traj[prev_human_idx][2]))
-                        if (len(m2) > 0) and (m2[-1]):
-                            normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx + 1, opt_idx)]
-                        else:
-                            normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx, opt_idx)]
-
-                        continue
-                else:
-                    if (human_traj[prev_human_idx][2].get_agent_x() == human_traj[human_idx][2].get_agent_x()) and (human_traj[prev_human_idx][2].get_agent_y() == human_traj[human_idx][2].get_agent_y()):
-                        for i in range(diff_opt - 1):
-                            normalized_human_traj.append((human_traj[[i + 1][0]][2], "pickup", human_traj[[i + 1][0]][2]))
-                        if (len(m2) > 0) and (m2[-1]):
-                            normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx + 1, opt_idx)]
-                        else:
-                            normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx, opt_idx)]
-
-                        continue
-
+                
                 for j in range(prev_human_idx, human_idx + 1):
                     if j != human_idx:
                         if (human_traj[j][0].get_agent_x() == human_traj[j + 1][0].get_agent_x()) and (human_traj[j][0].get_agent_y() == human_traj[j + 1][0].get_agent_y()):
                             continue
-                    new_cop.append((human_traj[j][0].get_agent_x(), human_traj[j][0].get_agent_y(), human_traj[j][0]))
+                    if (len(m1) > 0) and not (m1[-1]):
+                        continue
+                    else:
+                        new_cop.append((human_traj[j][0].get_agent_x(), human_traj[j][0].get_agent_y(), human_traj[j][0]))
 
                 counter = 0
                 last = human_traj[human_idx][2]
