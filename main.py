@@ -429,6 +429,8 @@ def calculate_new_pos (new_cop, pointer, step_size, currx, curry, currstate, cou
                 newx = nextx
                 newy = nexty - diff
             pointer += 1
+        elif newx - nextx < 0:
+            pointer += 1
     #going right
     elif   currx - nextx < -0.01: #currx < nextx:
         action = "right"
@@ -450,6 +452,8 @@ def calculate_new_pos (new_cop, pointer, step_size, currx, curry, currstate, cou
             elif twoy < nexty:
                 newx = nextx
                 newy = nexty - diff
+            pointer += 1
+        elif newx - nextx > 0:
             pointer += 1
     #going up
     elif  nexty - curry > 0.01:  #nexty > curry:
@@ -473,6 +477,8 @@ def calculate_new_pos (new_cop, pointer, step_size, currx, curry, currstate, cou
             elif twoy < nexty:
                 newy = nexty - diff
             pointer += 1
+        elif newy - nexty > 0:
+            pointer += 1
     #going down
     elif  curry - nexty > 0.01:  #curry > nexty:
         action = "down"
@@ -494,6 +500,8 @@ def calculate_new_pos (new_cop, pointer, step_size, currx, curry, currstate, cou
                 newx = nextx + diff
             elif twoy > nexty:
                 newy = nexty + diff
+            pointer += 1
+        elif newy - nexty < 0:
             pointer += 1
     else:
         newx = currx
