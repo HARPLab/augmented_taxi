@@ -525,10 +525,8 @@ def normalize_trajs(opt_traj, human_traj, data_loc):
         human_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y()) for (prevstate, action, currstate) in human_traj]
     elif data_loc == 'skateboard2':
         print('skateboard2!')
-        # opt_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y(), currstate.objects["skateboard"][0]["on_agent"]) for (prevstate, action, currstate) in opt_traj]
-        # human_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y(), currstate.objects["skateboard"][0]["on_agent"]) for (prevstate, action, currstate) in human_traj]
-        opt_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y(), currstate.objects["agent"][0]["has_skateboard"]) for (prevstate, action, currstate) in opt_traj]
-        human_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y(), currstate.objects["agent"][0]["has_skateboard"]) for (prevstate, action, currstate) in human_traj]
+        opt_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y()) for (prevstate, action, currstate) in opt_traj]
+        human_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y()) for (prevstate, action, currstate) in human_traj]
 
     else:
         raise AssertionError("Unrecognized domain.")
@@ -684,6 +682,110 @@ def normalize_trajs(opt_traj, human_traj, data_loc):
 
     return normalized_opt_traj, normalized_human_traj
 
+def extract_mdp_dict(vi, mdp, optimal_traj, test_mdp_dict, data_loc, element=-1, test_difficulty='none', normalized_opt_traj=None, normalized_human_traj=None):
+    '''
+    Extract the MDP information from the test environment tuple (e.g. to be later put into a json)
+    '''
+
+    # vi = test_wt_vi_traj_tuple[1]
+    # mdp = test_wt_vi_traj_tuple[1].mdp
+    # if optimal_traj is None:
+    #     optimal_traj = test_wt_vi_traj_tuple[2]
+    # test_mdp_dict = test_wt_vi_traj_tuple[3]
+
+    # update the MDP parameters to begin with the desired start state
+    if data_loc == 'augmented_taxi2':
+        test_mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
+        test_mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
+        test_mdp_dict['agent']['has_passenger'] = mdp.init_state.get_objects_of_class("agent")[
+            0].get_attribute('has_passenger')
+
+        test_mdp_dict['passengers'][0]['x'] = mdp.init_state.get_objects_of_class("passenger")[
+            0].get_attribute('x')
+        test_mdp_dict['passengers'][0]['y'] = mdp.init_state.get_objects_of_class("passenger")[
+            0].get_attribute('y')
+        test_mdp_dict['passengers'][0]['dest_x'] = mdp.init_state.get_objects_of_class("passenger")[
+            0].get_attribute('dest_x')
+        test_mdp_dict['passengers'][0]['dest_y'] = mdp.init_state.get_objects_of_class("passenger")[
+            0].get_attribute('dest_y')
+        test_mdp_dict['passengers'][0]['in_taxi'] = mdp.init_state.get_objects_of_class("passenger")[
+            0].get_attribute('in_taxi')
+
+        if (len(mdp.init_state.get_objects_of_class("hotswap_station")) > 0):
+            test_mdp_dict['hotswap_station'][0]['x'] = mdp.init_state.get_objects_of_class("hotswap_station")[
+                0].get_attribute('x')
+            test_mdp_dict['hotswap_station'][0]['y'] = mdp.init_state.get_objects_of_class("hotswap_station")[
+                0].get_attribute('y')
+        else:
+            test_mdp_dict['hotswap_station'] = []
+
+
+    elif data_loc == 'colored_tiles':
+        test_mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
+        test_mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
+    else:
+        test_mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
+        test_mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
+        test_mdp_dict['agent']['has_skateboard'] = mdp.init_state.get_objects_of_class("agent")[
+            0].get_attribute('has_skateboard')
+
+        test_mdp_dict['skateboard'][0]['x'] = mdp.init_state.get_objects_of_class("skateboard")[
+            0].get_attribute('x')
+        test_mdp_dict['skateboard'][0]['y'] = mdp.init_state.get_objects_of_class("skateboard")[
+            0].get_attribute('y')
+        test_mdp_dict['skateboard'][0]['on_agent'] = mdp.init_state.get_objects_of_class("skateboard")[
+            0].get_attribute('on_agent')
+
+    test_mdp_dict['opt_actions'] = [sas[1] for sas in optimal_traj]
+    test_mdp_dict['opt_traj_length'] = len(optimal_traj)
+    test_mdp_dict['opt_traj_reward'] = mdp.weights.dot(mdp.accumulate_reward_features(optimal_traj).T)[0][0]
+    test_mdp_dict['test_difficulty'] = test_difficulty
+    # to be able to trace the particular environment (0-5)
+    test_mdp_dict['tag'] = element
+
+    # also obtain all possible optimal trajectories
+    all_opt_trajs = mdp_helpers.rollout_policy_recursive(mdp, vi, optimal_traj[0][0], [])
+    # extract all of the actions
+    all_opt_actions = []
+    for opt_traj in all_opt_trajs:
+        all_opt_actions.append([sas[1] for sas in opt_traj])
+    test_mdp_dict['all_opt_actions'] = all_opt_actions
+
+
+    # store the normalized trajectories, if relevant
+    if normalized_opt_traj is not None:
+        test_mdp_dict['normalized_opt_actions'] = [sas[1] for sas in normalized_opt_traj]
+        normalized_agent_locations = [(sas[0].get_agent_x(), sas[0].get_agent_y()) for sas in normalized_opt_traj]
+        normalized_agent_locations.append((normalized_opt_traj[-1][2].get_agent_x(), normalized_opt_traj[-1][2].get_agent_y()))
+        test_mdp_dict['normalized_opt_locations'] = normalized_agent_locations
+    else:
+        test_mdp_dict['normalized_opt_actions'] = []
+        test_mdp_dict['normalized_opt_locations']
+
+    if normalized_human_traj is not None:
+        test_mdp_dict['normalized_human_actions'] = [sas[1] for sas in normalized_human_traj]
+        normalized_human_locations = [(sas[0].get_agent_x(), sas[0].get_agent_y()) for sas in normalized_human_traj]
+        normalized_human_locations.append((normalized_human_traj[-1][2].get_agent_x(), normalized_human_traj[-1][2].get_agent_y()))
+        test_mdp_dict['normalized_human_locations'] = normalized_human_locations
+    else:
+        test_mdp_dict['normalized_human_actions'] = []
+        test_mdp_dict['normalized_human_locations'] = []
+
+
+    # delete unserializable numpy arrays that aren't necessary
+    try:
+        del test_mdp_dict['weights_lb']
+        del test_mdp_dict['weights_ub']
+        del test_mdp_dict['weights']
+    except:
+        pass
+
+    # print(test_mdp_dict)
+    # print(test_mdp_dict['env_code'])
+
+    return test_mdp_dict
+
+
 def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, n_human_models_precomputed, data_loc, weights, step_cost_flag, keys_map, visualize_pf_transition=False):
     # todo: maybe pass in some of these objects later
     with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
@@ -729,6 +831,8 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
             test_mdp = test[0]
             opt_traj = test[1]
             test_constraints = test[3]
+            test_vi = test[4]
+            test_mdp_dict = test[5]
             test_history = [test] # to ensure that remedial demonstrations and tests are visually simple/similar and complex/different, respectively
 
             print("Here is a diagnostic test for this unit")
@@ -758,6 +862,12 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
                     BEC_viz.visualize_pf_transition([-failed_BEC_constraint], particles, mdp_class, weights)
 
                 normalized_opt_traj, normalized_human_traj = normalize_trajs(opt_traj, human_traj, data_loc)
+                traj_comparison_dict = extract_mdp_dict(test_vi, test_mdp, opt_traj, test_mdp_dict, data_loc,
+                                                        normalized_opt_traj=normalized_opt_traj,
+                                                        normalized_human_traj=normalized_human_traj)
+                import json
+                with open('traj_comparison_dict_' + data_loc + '.json', 'w') as f:
+                    json.dump(traj_comparison_dict, f)
                 test_mdp.visualize_trajectory_comparison(normalized_opt_traj, normalized_human_traj)
 
                 print("Here is a remedial demonstration that might be helpful")
