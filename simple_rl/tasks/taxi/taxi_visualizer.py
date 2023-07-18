@@ -83,8 +83,9 @@ def _draw_augmented_state(screen,
     # Prep some dimensions to make drawing easier.
     scr_width, scr_height = screen.get_width(), screen.get_height()
     width_buffer_left = scr_width / 20.0
+    witdth_buffer_right = width_buffer_left * 2
     height_buffer = 30 + (scr_height / 10.0) # Add 30 for title.
-    cell_width = (scr_width - width_buffer_left * 2) / taxi_oomdp.width
+    cell_width = (scr_width - width_buffer_left - witdth_buffer_right) / taxi_oomdp.width
     cell_height = (scr_height - height_buffer * 2) / taxi_oomdp.height
     objects = state.get_objects()
     agent_x, agent_y = objects["agent"][0]["x"], objects["agent"][0]["y"]
