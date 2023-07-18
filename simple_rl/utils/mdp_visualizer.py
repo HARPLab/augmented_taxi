@@ -722,7 +722,7 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
                 # clear the old shapes
                 for shape in dynamic_shapes:
                     pygame.draw.rect(screen, (255,255,255), shape)
-
+                print("not frozen\n")
                 prev_state = cur_state
                 action = actions[keys.index(event.key)]
                 reward, cur_state = mdp.execute_agent_action(action=action)
