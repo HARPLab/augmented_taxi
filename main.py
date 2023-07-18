@@ -1040,7 +1040,7 @@ if __name__ == "__main__":
     #                          params.step_cost_flag, params.BEC['BEC_depth'], params.BEC['n_human_models_precomputed'])
 
     # a) generate an agent if you want to explore the Augmented Taxi MDP
-    # generate_agent(params.mdp_class, params.data_loc['base'], params.mdp_parameters, visualize=True)
+    generate_agent(params.mdp_class, params.data_loc['base'], params.mdp_parameters, visualize=True)
 
     # b) obtain a BEC summary of the agent's policy
     BEC_summary, visited_env_traj_idxs, particles_summary = obtain_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
