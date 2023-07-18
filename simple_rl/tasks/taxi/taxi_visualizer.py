@@ -98,7 +98,7 @@ def _draw_augmented_state(screen,
     font_size = int(min(cell_width, cell_height) / 4.0)
     reg_font = pygame.font.SysFont("CMU Serif", font_size)
     cc_font = pygame.font.SysFont("Courier", font_size * 2 + 2)
-    small_font = pygame.font.SysFont("CMU Serif", font_size/2)
+    small_font = pygame.font.SysFont("CMU Serif", font_size)
     aug_text = small_font.render('Passenger 1', True, (255,255,255))
 
     # for visualizing two agents/paths at once
