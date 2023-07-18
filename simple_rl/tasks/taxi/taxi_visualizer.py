@@ -98,7 +98,8 @@ def _draw_augmented_state(screen,
     font_size = int(min(cell_width, cell_height) / 4.0)
     reg_font = pygame.font.SysFont("CMU Serif", font_size)
     cc_font = pygame.font.SysFont("Courier", font_size * 2 + 2)
-    aug_text = reg_font.render('Passenger 1', True, (255,255,255))
+    small_font = pygame.font.SysFont("CMU Serif", font_size/2)
+    aug_text = small_font.render('Passenger 1', True, (255,255,255))
 
     # for visualizing two agents/paths at once
     offset_magnitude = cell_width / 8.0
@@ -116,7 +117,7 @@ def _draw_augmented_state(screen,
         if augmented_inputs:
             top_left_point = scr_width - ((3.0*witdth_buffer_right)/4.0), scr_height/2 -20
             pygame.draw.rect(screen, color_light, top_left_point + (witdth_buffer_right/2.0,40))
-            screen.blit(aug_text, (top_left_point + (10,25)))
+            screen.blit(aug_text, (top_left_point + (10,30)))
         # Draw walls.
         for w in taxi_oomdp.walls:
             w_x, w_y = w["x"], w["y"]
