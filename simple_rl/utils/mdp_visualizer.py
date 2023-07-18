@@ -697,14 +697,12 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
                 return trajectory, agent_history
             if event.type == KEYDOWN and event.key in keys:
                 if event.key == eval('K_r'):
-                    print("not frozen 2\n")
                     # 'r' == reset
                     mdp, cur_state, dynamic_shapes, agent_history, cumulative_reward, step = interaction_reset(mdp, None, screen, draw_state, augmented_inputs)
                     current_reward = 0
                     trajectory = []
                     continue
                 elif event.key == eval('K_u'):
-                    print("not frozen 1\n")
                     # 'u' == undo
                     if len(trajectory) > 0:
                         # clear the old shapes
@@ -724,7 +722,6 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
                 # clear the old shapes
                 for shape in dynamic_shapes:
                     pygame.draw.rect(screen, (255,255,255), shape)
-                print("not frozen\n")
                 prev_state = cur_state
                 action = actions[keys.index(event.key)]
                 reward, cur_state = mdp.execute_agent_action(action=action)
