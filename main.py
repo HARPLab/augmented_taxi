@@ -6,8 +6,8 @@ import dill as pickle
 import numpy as np
 import copy
 from termcolor import colored
-#import sage.all
-#import sage.geometry.polyhedron.base as Polyhedron
+import sage.all
+import sage.geometry.polyhedron.base as Polyhedron
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
@@ -36,6 +36,7 @@ mpl.rcParams['figure.facecolor'] = '1.0'
 mpl.rcParams['axes.labelsize'] = 'x-large'
 mpl.rcParams['xtick.labelsize'] = 'large'
 
+#FUNCTION IS NOT USED IN CURRENT IMPLEMENTATION
 def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
     try:
         with open('models/' + data_loc + '/vi_agent.pickle', 'rb') as f:
@@ -44,7 +45,7 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
         cf_data_dir = 'models/' + data_loc
         os.makedirs(cf_data_dir, exist_ok=True)
 
-        mdp_agent = make_mdp.make_custom_mdp(mdp_class, mdp_parameters) #whole MDP not just agent
+        mdp_agent = make_mdp.make_custom_mdp(mdp_class, mdp_parameters)
         vi_agent = ValueIteration(mdp_agent, sample_rate=1)
         vi_agent.run_vi()
 
@@ -58,6 +59,7 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
         mdp_agent.reset()  # reset the current state to the initial state
         mdp_agent.visualize_interaction()
 
+#NOT USED ^^^^^^^^^^ NOT USED
 
 
 def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, pool, n_train_demos, BEC_depth, n_human_models, n_particles, prior, posterior, obj_func_proportion, hardcode_envs=False):
