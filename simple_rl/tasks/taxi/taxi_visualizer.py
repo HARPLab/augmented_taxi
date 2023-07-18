@@ -116,7 +116,7 @@ def _draw_augmented_state(screen,
         if augmented_inputs:
             top_left_point = (scr_width - ((3.0*witdth_buffer_right)/4.0), scr_height/2 -20)
             print(top_left_point)
-            pygame.draw.rect(screen, color_light, top_left_point)
+            pygame.draw.rect(screen, color_light, top_left_point + (10,25))
             screen.blit(aug_text, (top_left_point + (10,25)))
         # Draw walls.
         for w in taxi_oomdp.walls:
