@@ -240,28 +240,28 @@ class AugmentedTaxi2OOMDP(OOMDP):
         return "taxi_h-" + str(self.height) + "_w-" + str(self.width)
 
     # Visualize the agent's policy. --> Press <spacebar> to advance the agent.
-    def visualize_agent(self, agent, cur_state=None, width_scr_scale=180, height_scr_scale=180):
+    def visualize_agent(self, agent, cur_state=None, width_scr_scale=180, height_scr_scale=180, augmented_inputs=False):
         from simple_rl.utils.mdp_visualizer import visualize_agent
         from .taxi_visualizer import _draw_augmented_state
-        visualize_agent(self, agent, _draw_augmented_state, cur_state=cur_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='augmented_taxi2')
+        visualize_agent(self, agent, _draw_augmented_state, cur_state=cur_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='augmented_taxi2', augmented_inputs=augmented_inputs)
 
     # Press <1>, <2>, <3>, and so on to execute action 1, action 2, etc.
-    def visualize_interaction(self, interaction_callback=None, done_callback=None, keys_map=None, width_scr_scale=180, height_scr_scale=180):
+    def visualize_interaction(self, interaction_callback=None, done_callback=None, keys_map=None, width_scr_scale=180, height_scr_scale=180, augmented_inputs=False):
         from simple_rl.utils.mdp_visualizer import visualize_interaction
         from .taxi_visualizer import _draw_augmented_state
-        trajectory = visualize_interaction(self, _draw_augmented_state, interaction_callback=interaction_callback, done_callback=done_callback, keys_map=keys_map, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='augmented_taxi2')
+        trajectory = visualize_interaction(self, _draw_augmented_state, interaction_callback=interaction_callback, done_callback=done_callback, keys_map=keys_map, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='augmented_taxi2', augmented_inputs=augmented_inputs)
         return trajectory
 
     # Visualize the value of each of the grid cells. --> Color corresponds to higher value.
     # (Currently not very helpful - see first comment in taxi_visualizer.py)
-    def visualize_value(self, agent=None, width_scr_scale=180, height_scr_scale=180):
+    def visualize_value(self, agent=None, width_scr_scale=180, height_scr_scale=180, augmented_inputs=False):
         from simple_rl.utils.mdp_visualizer import visualize_value
         from .taxi_visualizer import _draw_augmented_state
-        visualize_value(self, _draw_augmented_state, agent, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
+        visualize_value(self, _draw_augmented_state, agent, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, augmented_inputs=augmented_inputs)
 
     # Visualize the optimal action for each of the grid cells
     # (Currently not very helpful - see first comment in taxi_visualizer.py)
-    def visualize_policy(self, policy, width_scr_scale=180, height_scr_scale=180):
+    def visualize_policy(self, policy, width_scr_scale=180, height_scr_scale=180, augmented_inputs=False):
         from simple_rl.utils.mdp_visualizer import visualize_policy
         from .taxi_visualizer import _draw_augmented_state
 
@@ -274,27 +274,27 @@ class AugmentedTaxi2OOMDP(OOMDP):
             "dropoff": "dp",  # u"\u2192"
             "refuel": "rf",  # u"\u2192"
         }
-        visualize_policy(self, policy, _draw_augmented_state, action_char_dict, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
+        visualize_policy(self, policy, _draw_augmented_state, action_char_dict, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, augmented_inputs=augmented_inputs)
 
-    def visualize_state(self, cur_state, width_scr_scale=180, height_scr_scale=180):
+    def visualize_state(self, cur_state, width_scr_scale=180, height_scr_scale=180, augmented_inputs=False):
         from simple_rl.utils.mdp_visualizer import visualize_state
         from .taxi_visualizer import _draw_augmented_state
 
-        visualize_state(self, _draw_augmented_state, cur_state=cur_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale)
+        visualize_state(self, _draw_augmented_state, cur_state=cur_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, augmented_inputs=augmented_inputs)
 
-    def visualize_trajectory(self, trajectory, marked_state_importances=None, width_scr_scale=180, height_scr_scale=180, counterfactual_traj=None):
+    def visualize_trajectory(self, trajectory, marked_state_importances=None, width_scr_scale=180, height_scr_scale=180, counterfactual_traj=None, augmented_inputs=False):
         from simple_rl.utils.mdp_visualizer import visualize_trajectory
         from .taxi_visualizer import _draw_augmented_state
 
-        visualize_trajectory(self, trajectory, _draw_augmented_state, marked_state_importances=marked_state_importances, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='augmented_taxi2', counterfactual_traj=counterfactual_traj)
+        visualize_trajectory(self, trajectory, _draw_augmented_state, marked_state_importances=marked_state_importances, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='augmented_taxi2', counterfactual_traj=counterfactual_traj, augmented_inputs=augmented_inputs)
 
     def visualize_trajectory_comparison(self, trajectory, trajectory_counterfactual, marked_state_importances=None,
-                                        width_scr_scale=180, height_scr_scale=180):
+                                        width_scr_scale=180, height_scr_scale=180, augmented_inputs=False):
         # for moving through two trajectories simultaneously
         from simple_rl.utils.mdp_visualizer import visualize_trajectory_comparison
         from .taxi_visualizer import _draw_augmented_state
 
-        visualize_trajectory_comparison(self, trajectory, trajectory_counterfactual, _draw_augmented_state, marked_state_importances=marked_state_importances, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='augmented_taxi2')
+        visualize_trajectory_comparison(self, trajectory, trajectory_counterfactual, _draw_augmented_state, marked_state_importances=marked_state_importances, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='augmented_taxi2', augmented_inputs=augmented_inputs)
 
     # ----------------------------
     # -- Action Implementations --

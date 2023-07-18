@@ -168,7 +168,7 @@ def _draw_rect_alpha(surface, color, rect):
     surface.blit(shape_surf, rect)
     return rect
 
-def visualize_state(mdp, draw_state, cur_state=None, scr_width=720, scr_height=720):
+def visualize_state(mdp, draw_state, cur_state=None, scr_width=720, scr_height=720, augmented_inputs=False):
     '''
     Args:
         mdp (MDP)
@@ -184,9 +184,8 @@ def visualize_state(mdp, draw_state, cur_state=None, scr_width=720, scr_height=7
 
     # Setup and draw initial state.
     cur_state = mdp.get_init_state() if cur_state is None else cur_state
-
-    dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, value=True)
-    draw_state(screen, mdp, cur_state, show_value=False, draw_statics=True)
+    dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, value=True, augmented_inputs=augmented_inputs) 
+    draw_state(screen, mdp, cur_state, show_value=False, draw_statics=True, augmented_inputs=augmented_inputs) #augmented inputs are only used for taxi will need to be altered to work for others
     _draw_lower_left_text(cur_state, screen)
     pygame.display.flip()
     while True:
@@ -200,7 +199,7 @@ def visualize_state(mdp, draw_state, cur_state=None, scr_width=720, scr_height=7
         time.sleep(0.1)
 
 
-def visualize_policy(mdp, policy, draw_state, action_char_dict, cur_state=None, scr_width=720, scr_height=720):
+def visualize_policy(mdp, policy, draw_state, action_char_dict, cur_state=None, scr_width=720, scr_height=720, augmented_inputs=False):
     '''
     Args:
         mdp (MDP)
@@ -221,8 +220,8 @@ def visualize_policy(mdp, policy, draw_state, action_char_dict, cur_state=None, 
     # Setup and draw initial state.
     cur_state = mdp.get_init_state() if cur_state is None else cur_state
 
-    dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, value=True)
-    draw_state(screen, mdp, cur_state, policy=policy, action_char_dict=action_char_dict, show_value=False, draw_statics=True)
+    dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, value=True, augmented_inputs=augmented_inputs)
+    draw_state(screen, mdp, cur_state, policy=policy, action_char_dict=action_char_dict, show_value=False, draw_statics=True, augmented_inputs=augmented_inputs)
     pygame.display.flip()
     while True:
         # Check for key presses.
@@ -234,7 +233,7 @@ def visualize_policy(mdp, policy, draw_state, action_char_dict, cur_state=None, 
 
         time.sleep(0.1)
 
-def visualize_value(mdp, draw_state, agent=None, cur_state=None, scr_width=720, scr_height=720):
+def visualize_value(mdp, draw_state, agent=None, cur_state=None, scr_width=720, scr_height=720, augmented_inputs=False):
     '''
     Args:
         mdp (MDP)
@@ -251,8 +250,8 @@ def visualize_value(mdp, draw_state, agent=None, cur_state=None, scr_width=720, 
     # Setup and draw initial state.
     cur_state = mdp.get_init_state() if cur_state is None else cur_state
 
-    dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, value=True)
-    draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True)
+    dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, value=True, augmented_inputs=augmented_inputs)
+    draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True, augmented_inputs=augmented_inputs)
     pygame.display.flip()
 
     while True:
@@ -274,7 +273,7 @@ def visualize_value(mdp, draw_state, agent=None, cur_state=None, scr_width=720, 
                 pygame.display.quit()
                 return
 
-def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_height=720, delay=0, num_ep=None, num_steps=None):
+def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_height=720, delay=0, num_ep=None, num_steps=None, augmented_inputs=False):
     '''
     Args:
         mdp (MDP)
@@ -298,7 +297,7 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
     rpl = 0
     score = 0
     default_goal_x, default_goal_y = mdp.width, mdp.height
-    dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
+    dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score, augmented_inputs=augmented_inputs)
 
     pygame.display.update()
     done = False
@@ -346,11 +345,11 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
                 cur_state = mdp.get_init_state()
                 mdp.reset()
                 agent.end_of_episode()
-                dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
+                dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score, augmented_inputs=augmented_inputs)
 
 
             reward, cur_state = mdp.execute_agent_action(action)
-            dynamic_shapes, _ = draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True)
+            dynamic_shapes, _ = draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True, augmented_inputs=augmented_inputs)
             pygame.display.update()
 
             if cur_state != prev_state:
@@ -380,7 +379,7 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
                 prev_state = cur_state.copy()
                 action = agent.act(cur_state, reward)
                 reward, cur_state = mdp.execute_agent_action(action)
-                dynamic_shapes, _ = draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True)
+                dynamic_shapes, _ = draw_state(screen, mdp, cur_state, agent=agent, show_value=True, draw_statics=True, augmented_inputs=augmented_inputs)
                 pygame.display.update()
                 if cur_state != prev_state:
                     score = round(rpl)
@@ -392,13 +391,13 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
                 if cur_state.is_terminal():
                     cur_state = mdp.get_init_state()
                     mdp.reset()
-                    dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
+                    dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score, augmented_inputs=augmented_inputs)
                     break
 
             i+=1
             cur_state = mdp.get_init_state()
             mdp.reset()
-            dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score)
+            dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, agent, score=score, augmented_inputs=augmented_inputs)
 
     pygame.display.flip()
 
@@ -411,7 +410,7 @@ def visualize_learning(mdp, agent, draw_state, cur_state=None, scr_width=720, sc
                 pygame.display.quit()
                 return
 
-def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=None, cur_state=None, scr_width=720, scr_height=720, mdp_class=None, counterfactual_traj=None, delay=0.1):
+def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=None, cur_state=None, scr_width=720, scr_height=720, mdp_class=None, counterfactual_traj=None, delay=0.1, augmented_inputs=False):
     '''
     Args:
         mdp (MDP)
@@ -430,7 +429,7 @@ def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=N
     cur_state = trajectory[0][0]
 
     # Setup and draw initial state.
-    dynamic_shapes, agent_history = _vis_init(screen, mdp, draw_state, cur_state, counterfactual_traj=counterfactual_traj)
+    dynamic_shapes, agent_history = _vis_init(screen, mdp, draw_state, cur_state, counterfactual_traj=counterfactual_traj, augmented_inputs=augmented_inputs)
     pygame.event.clear()
     step = 0
 
@@ -463,7 +462,7 @@ def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=N
                         # clear the text
                         _draw_lower_right_text('       ', screen)
 
-                dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, agent_history=agent_history, counterfactual_traj=counterfactual_traj)
+                dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, agent_history=agent_history, counterfactual_traj=counterfactual_traj, augmented_inputs=augmented_inputs)
                 # print("A: " + str(action))
 
                 # Update state text.
@@ -493,7 +492,7 @@ def visualize_trajectory(mdp, trajectory, draw_state, marked_state_importances=N
         time.sleep(delay)
 
 
-def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, draw_state, marked_state_importances=None, cur_state=None, scr_width=720, scr_height=720, mdp_class=None, delay=0.1):
+def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, draw_state, marked_state_importances=None, cur_state=None, scr_width=720, scr_height=720, mdp_class=None, delay=0.1, augmented_inputs=False):
     '''
     Args:
         mdp (MDP)
@@ -512,8 +511,8 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
     cur_state = trajectory[0][0]
 
     # Setup and draw initial state.
-    dynamic_shapes, agent_history = _vis_init(screen, mdp, draw_state, cur_state_counterfactual, offset_direction=-1, alpha=150)
-    dynamic_shapes_counterfactual, agent_history_counterfactual = draw_state(screen, mdp, cur_state, draw_statics=False, agent_history=[], offset_direction=1)
+    dynamic_shapes, agent_history = _vis_init(screen, mdp, draw_state, cur_state_counterfactual, offset_direction=-1, alpha=150, augmented_inputs=augmented_inputs)
+    dynamic_shapes_counterfactual, agent_history_counterfactual = draw_state(screen, mdp, cur_state, draw_statics=False, agent_history=[], offset_direction=1, augmented_inputs=augmented_inputs)
 
     pygame.event.clear()
     step = 0
@@ -571,7 +570,7 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
                 return
 
         time.sleep(delay)
-def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_height=720, mdp_class=None):
+def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_height=720, mdp_class=None, augmented_inputs=False):
     '''
     Args:
         mdp (MDP)
@@ -596,7 +595,7 @@ def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_h
     cumulative_reward = 0
     step = 0
     gamma = mdp.gamma
-    dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, agent)
+    dynamic_shapes, _ = _vis_init(screen, mdp, draw_state, cur_state, agent, augmented_inputs=augmented_inputs)
     pygame.event.clear()
 
     done = False
@@ -619,7 +618,7 @@ def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_h
                 print("A: " + str(action))
                 reward, cur_state = mdp.execute_agent_action(action)
 
-                dynamic_shapes, _ = draw_state(screen, mdp, cur_state)
+                dynamic_shapes, _ = draw_state(screen, mdp, cur_state, augmented_inputs=augmented_inputs)
                 # Update state text.
                 _draw_lower_left_text(cur_state, screen)
 
@@ -650,14 +649,14 @@ def interaction_reset(mdp, cur_state, screen, draw_state):
     # Setup and draw initial state.
     cur_state = mdp.get_init_state() if cur_state is None else cur_state
     mdp.set_curr_state(cur_state)
-    dynamic_shapes, agent_history = _vis_init(screen, mdp, draw_state, cur_state)
+    dynamic_shapes, agent_history = _vis_init(screen, mdp, draw_state, cur_state, augmented_inputs=augmented_inputs)
     pygame.event.clear()
     cumulative_reward = 0
     step = 0
 
     return mdp, cur_state, dynamic_shapes, agent_history, cumulative_reward, step
 
-def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=None, done_callback=None, keys_map=None, scr_width=720, scr_height=720, mdp_class=None):
+def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=None, done_callback=None, keys_map=None, scr_width=720, scr_height=720, mdp_class=None, augmented_inputs=False):
     '''
     Args:
         mdp (MDP)
@@ -715,7 +714,7 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
                         cur_state = prev_sequence[0]
                         mdp.set_curr_state(cur_state)
                         cumulative_reward -= current_reward
-                        dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, agent_history=agent_history)
+                        dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, agent_history=agent_history, augmented_inputs=augmented_inputs)
                         continue
                     else:
                         continue
@@ -728,7 +727,7 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
                 action = actions[keys.index(event.key)]
                 reward, cur_state = mdp.execute_agent_action(action=action)
 
-                dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, agent_history=agent_history)
+                dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, agent_history=agent_history, augmented_inputs=augmented_inputs)
                 # Update state text.
                 _draw_lower_left_text(cur_state, screen)
 
@@ -761,7 +760,7 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
                 pygame.display.quit()
                 return trajectory, agent_history
 
-def _vis_init(screen, mdp, draw_state, cur_state, agent=None, value=False, score=-1, counterfactual_traj=None, offset_direction=0, alpha=255):
+def _vis_init(screen, mdp, draw_state, cur_state, agent=None, value=False, score=-1, counterfactual_traj=None, offset_direction=0, alpha=255, augmented_inputs=False):
     # Pygame setup.
     pygame.init()
     screen.fill((255, 255, 255))
@@ -773,7 +772,7 @@ def _vis_init(screen, mdp, draw_state, cur_state, agent=None, value=False, score
     else:
         _draw_lower_left_text(cur_state, screen)
 
-    dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, agent=agent, draw_statics=True, agent_history=[], counterfactual_traj=counterfactual_traj, offset_direction=offset_direction, alpha=alpha)
+    dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, agent=agent, draw_statics=True, agent_history=[], counterfactual_traj=counterfactual_traj, offset_direction=offset_direction, alpha=alpha, augmented_inputs=augmented_inputs)
 
     return dynamic_shapes, agent_history
 

@@ -25,7 +25,7 @@ def _draw_augmented_state(screen,
                 draw_statics=True,
                 agent_history=[],
                 counterfactual_traj=None,
-                alpha=255, offset_direction=0, visualize_history=True):
+                alpha=255, offset_direction=0, visualize_history=True, augmented_inputs=False):
     '''
     Args:
         screen (pygame.Surface)
@@ -82,8 +82,12 @@ def _draw_augmented_state(screen,
 
     # Prep some dimensions to make drawing easier.
     scr_width, scr_height = screen.get_width(), screen.get_height()
-    width_buffer_left = scr_width / 20.0
-    witdth_buffer_right = scr_width / 5.0
+    if augmented_inputs:
+        width_buffer_left = scr_width / 20.0
+        witdth_buffer_right = scr_width / 5.0
+    else:
+        width_buffer_left = scr_width / 10.0
+        witdth_buffer_right = scr_width / 10.0
     height_buffer = 30 + (scr_height / 10.0) # Add 30 for title.
     cell_width = (scr_width - width_buffer_left - witdth_buffer_right) / taxi_oomdp.width
     cell_height = (scr_height - height_buffer * 2) / taxi_oomdp.height
