@@ -82,9 +82,9 @@ def _draw_augmented_state(screen,
 
     # Prep some dimensions to make drawing easier.
     scr_width, scr_height = screen.get_width(), screen.get_height()
-    width_buffer = scr_width / 10.0
+    width_buffer_left = scr_width / 20.0
     height_buffer = 30 + (scr_height / 10.0) # Add 30 for title.
-    cell_width = (scr_width - width_buffer * 2) / taxi_oomdp.width
+    cell_width = (scr_width - width_buffer_left * 2) / taxi_oomdp.width
     cell_height = (scr_height - height_buffer * 2) / taxi_oomdp.height
     objects = state.get_objects()
     agent_x, agent_y = objects["agent"][0]["x"], objects["agent"][0]["y"]
@@ -107,14 +107,14 @@ def _draw_augmented_state(screen,
         # Draw walls.
         for w in taxi_oomdp.walls:
             w_x, w_y = w["x"], w["y"]
-            top_left_point = width_buffer + cell_width * (w_x - 1) + 5, height_buffer + cell_height * (
+            top_left_point = width_buffer_left + cell_width * (w_x - 1) + 5, height_buffer + cell_height * (
                     taxi_oomdp.height - w_y) + 5
             pygame.draw.rect(screen, (46, 49, 49), top_left_point + (cell_width - 10, cell_height - 10), 0)
 
         # Draw tolls.
         for t in taxi_oomdp.tolls:
             t_x, t_y = t["x"], t["y"]
-            top_left_point = width_buffer + cell_width * (t_x - 1) + 5, height_buffer + cell_height * (
+            top_left_point = width_buffer_left + cell_width * (t_x - 1) + 5, height_buffer + cell_height * (
                     taxi_oomdp.height - t_y) + 5
             # Clear the space and redraw with correct transparency (instead of simply adding a new layer which would
             # affect the transparency
@@ -124,7 +124,7 @@ def _draw_augmented_state(screen,
         # Draw traffic cells.
         for t in taxi_oomdp.traffic_cells:
             t_x, t_y = t["x"], t["y"]
-            top_left_point = width_buffer + cell_width * (t_x - 1) + 5, height_buffer + cell_height * (
+            top_left_point = width_buffer_left + cell_width * (t_x - 1) + 5, height_buffer + cell_height * (
                     taxi_oomdp.height - t_y) + 5
             # Clear the space and redraw with correct transparency (instead of simply adding a new layer which would
             # affect the transparency
@@ -134,7 +134,7 @@ def _draw_augmented_state(screen,
         # Draw fuel stations.
         for f in taxi_oomdp.fuel_stations:
             f_x, f_y = f["x"], f["y"]
-            top_left_point = width_buffer + cell_width * (f_x - 1) + 5, height_buffer + cell_height * (
+            top_left_point = width_buffer_left + cell_width * (f_x - 1) + 5, height_buffer + cell_height * (
                     taxi_oomdp.height - f_y) + 5
             pygame.draw.rect(screen, (144, 0, 255), top_left_point + (cell_width - 10, cell_height - 10), 0)
 
@@ -142,7 +142,7 @@ def _draw_augmented_state(screen,
         for i, p in enumerate(objects["passenger"]):
             # Dest.
             dest_x, dest_y = p["dest_x"], p["dest_y"]
-            top_left_point = int(width_buffer + cell_width*(dest_x - 1) + 27), int(height_buffer + cell_height*(taxi_oomdp.height - dest_y) + 14)
+            top_left_point = int(width_buffer_left + cell_width*(dest_x - 1) + 27), int(height_buffer + cell_height*(taxi_oomdp.height - dest_y) + 14)
             dest_col = (int(max(color_ls[-i-1][0]-30, 0)), int(max(color_ls[-i-1][1]-30, 0)), int(max(color_ls[-i-1][2]-30, 0)))
             pygame.draw.rect(screen, dest_col, top_left_point + (cell_width / 6, cell_height / 6), 0)
 
@@ -150,7 +150,7 @@ def _draw_augmented_state(screen,
     if "hotswap_station" in objects.keys():
         for f in objects["hotswap_station"]:
             x, y = f["x"], f["y"]
-            top_left_point = int(width_buffer + cell_width * (x - 1) + 70 + offset_counterfactual), int(
+            top_left_point = int(width_buffer_left + cell_width * (x - 1) + 70 + offset_counterfactual), int(
                 height_buffer + cell_height * (taxi_oomdp.height - y) + 65)
             dest_col = (
             int(max(color_ls[0][0] - 30, 0)), int(max(color_ls[0][1] - 30, 0)), int(max(color_ls[0][2] - 30, 0)), alpha)
@@ -208,10 +208,10 @@ def _draw_augmented_state(screen,
         pass_x, pass_y = p["x"], p["y"]
         taxi_size = int(min(cell_width, cell_height) / 9.0)
         if p["in_taxi"]:
-            top_left_point = int(width_buffer + cell_width * (pass_x - 1) + taxi_size + 58 + offset_counterfactual), int(
+            top_left_point = int(width_buffer_left + cell_width * (pass_x - 1) + taxi_size + 58 + offset_counterfactual), int(
                 height_buffer + cell_height * (taxi_oomdp.height - pass_y) + taxi_size + 16)
         else:
-            top_left_point = int(width_buffer + cell_width * (pass_x - 1) + taxi_size + 26 + offset_counterfactual), int(
+            top_left_point = int(width_buffer_left + cell_width * (pass_x - 1) + taxi_size + 26 + offset_counterfactual), int(
                 height_buffer + cell_height * (taxi_oomdp.height - pass_y) + taxi_size + 38)
         dest_col = (max(color_ls[-i-1][0]-30, 0), max(color_ls[-i-1][1]-30, 0), max(color_ls[-i-1][2]-30, 0), alpha)
         passenger_shape = mdpv._draw_circle_alpha(screen, dest_col, top_left_point, taxi_size)
@@ -222,7 +222,7 @@ def _draw_augmented_state(screen,
         for i in range(taxi_oomdp.width):
             # For each column:
             for j in range(taxi_oomdp.height):
-                top_left_point = width_buffer + cell_width*i, height_buffer + cell_height*j
+                top_left_point = width_buffer_left + cell_width*i, height_buffer + cell_height*j
                 r = pygame.draw.rect(screen, (46, 49, 49), top_left_point + (cell_width, cell_height), 3)
 
                 # Show value of states.
