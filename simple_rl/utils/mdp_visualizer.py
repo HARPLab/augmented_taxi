@@ -645,7 +645,7 @@ def visualize_agent(mdp, agent, draw_state, cur_state=None, scr_width=720, scr_h
                 pygame.display.quit()
                 return
 
-def interaction_reset(mdp, cur_state, screen, draw_state):
+def interaction_reset(mdp, cur_state, screen, draw_state, augmented_inputs=False):
     # Setup and draw initial state.
     cur_state = mdp.get_init_state() if cur_state is None else cur_state
     mdp.set_curr_state(cur_state)
@@ -673,7 +673,7 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
 
     gamma = mdp.gamma
     actions = mdp.get_actions()
-    mdp, cur_state, dynamic_shapes, agent_history, cumulative_reward, step = interaction_reset(mdp, cur_state, screen, draw_state)
+    mdp, cur_state, dynamic_shapes, agent_history, cumulative_reward, step = interaction_reset(mdp, cur_state, screen, draw_state, augmented_inputs)
 
     if keys_map is None:
         keys = [K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, K_9, K_0]
@@ -698,7 +698,7 @@ def visualize_interaction(mdp, draw_state, cur_state=None, interaction_callback=
             if event.type == KEYDOWN and event.key in keys:
                 if event.key == eval('K_r'):
                     # 'r' == reset
-                    mdp, cur_state, dynamic_shapes, agent_history, cumulative_reward, step = interaction_reset(mdp, None, screen, draw_state)
+                    mdp, cur_state, dynamic_shapes, agent_history, cumulative_reward, step = interaction_reset(mdp, None, screen, draw_state, augmented_inputs)
                     current_reward = 0
                     trajectory = []
                     continue

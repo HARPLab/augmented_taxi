@@ -55,7 +55,7 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
     # Visualize agent
     if visualize:
         fixed_agent = FixedPolicyAgent(vi_agent.policy)
-        mdp_agent.visualize_agent(fixed_agent)
+        mdp_agent.visualize_agent(fixed_agent, augmented_inputs=True)
         mdp_agent.reset()  # reset the current state to the initial state
         mdp_agent.visualize_interaction()
 
