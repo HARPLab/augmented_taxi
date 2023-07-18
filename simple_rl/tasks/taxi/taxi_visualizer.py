@@ -168,14 +168,14 @@ def _draw_augmented_state(screen,
     if len(agent_history) > 0 and visualize_history:
         for i, position in enumerate(agent_history):
             if i == 0:
-                top_left_point = int(width_buffer + cell_width * (position[0] - 0.5)), int(
+                top_left_point = int(width_buffer_left + cell_width * (position[0] - 0.5)), int(
                     height_buffer + cell_height * (taxi_oomdp.height - position[1] + 0.5))
                 pygame.draw.circle(screen, (103, 115, 135), top_left_point, int(min(cell_width, cell_height) / 15))
-                top_left_point_rect = int(width_buffer + cell_width * (position[0] - 0.5) - cell_width/8), int(
+                top_left_point_rect = int(width_buffer_left + cell_width * (position[0] - 0.5) - cell_width/8), int(
                     height_buffer + cell_height * (taxi_oomdp.height - position[1] + 0.5) - 2)
                 pygame.draw.rect(screen, (103, 115, 135), top_left_point_rect + (cell_width / 4, cell_height / 20), 0)
             else:
-                top_left_point = int(width_buffer + cell_width * (position[0] - 0.5)), int(
+                top_left_point = int(width_buffer_left + cell_width * (position[0] - 0.5)), int(
                     height_buffer + cell_height * (taxi_oomdp.height - position[1] + 0.5))
                 pygame.draw.circle(screen, (103, 115, 135), top_left_point, int(min(cell_width, cell_height) / 15))
 
@@ -183,20 +183,20 @@ def _draw_augmented_state(screen,
     if counterfactual_traj is not None:
         for i, position in enumerate(counterfactual_traj):
             if i == 0:
-                top_left_point = int(width_buffer + cell_width * (position[0] - 0.5)), int(
+                top_left_point = int(width_buffer_left + cell_width * (position[0] - 0.5)), int(
                     height_buffer + cell_height * (taxi_oomdp.height - position[1] + 0.5))
                 pygame.draw.circle(screen, (255, 0, 0), top_left_point, int(min(cell_width, cell_height) / 15))
-                top_left_point_rect = int(width_buffer + cell_width * (position[0] - 0.5) - cell_width/8), int(
+                top_left_point_rect = int(width_buffer_left + cell_width * (position[0] - 0.5) - cell_width/8), int(
                     height_buffer + cell_height * (taxi_oomdp.height - position[1] + 0.5) - 2)
                 pygame.draw.rect(screen, (255, 0, 0), top_left_point_rect + (cell_width / 4, cell_height / 20), 0)
             else:
-                top_left_point = int(width_buffer + cell_width * (position[0] - 0.5)), int(
+                top_left_point = int(width_buffer_left + cell_width * (position[0] - 0.5)), int(
                     height_buffer + cell_height * (taxi_oomdp.height - position[1] + 0.5))
                 pygame.draw.circle(screen, (255, 0, 0), top_left_point, int(min(cell_width, cell_height) / 15))
 
 
     # Draw new agent.
-    top_left_point = width_buffer + cell_width * (agent_x - 1), height_buffer + cell_height * (
+    top_left_point = width_buffer_left + cell_width * (agent_x - 1), height_buffer + cell_height * (
                 taxi_oomdp.height - agent_y)
     agent_center = int(top_left_point[0] + cell_width / 2.0 + offset_counterfactual), int(top_left_point[1] + cell_height / 2.0)
     agent_shape = _draw_agent(agent_center, screen, base_size=min(cell_width, cell_height) / 2.5 - 4, alpha=alpha)
