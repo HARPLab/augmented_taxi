@@ -1,13 +1,22 @@
 #!/usr/bin/env python
+'''
+-----------HEADER-----------
+This variation of augmented taxi 2 is used to create an augmented taxi 2 
+with multiple passengers that a player can click on in order to choose which 
+one they would like to path plan towards.
 
+This code mainly uses the simple_rl framework
+most of the folders including BEC are not being used in this code and are only kept
+in case future development may require their use.
+'''
 # Python imports.
 import sys
 import dill as pickle
 import numpy as np
 import copy
 from termcolor import colored
-import sage.all
-import sage.geometry.polyhedron.base as Polyhedron
+#import sage.all
+#import sage.geometry.polyhedron.base as Polyhedron
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
@@ -23,20 +32,20 @@ import params
 from simple_rl.agents import FixedPolicyAgent
 from simple_rl.planning import ValueIteration
 from simple_rl.utils import make_mdp
-from policy_summarization import bayesian_IRL
-from policy_summarization import policy_summarization_helpers as ps_helpers
-from policy_summarization import BEC
-import policy_summarization.multiprocessing_helpers as mp_helpers
-from simple_rl.utils import mdp_helpers
-import policy_summarization.BEC_helpers as BEC_helpers
-import policy_summarization.BEC_visualization as BEC_viz
-from policy_summarization import particle_filter as pf
+#from policy_summarization import bayesian_IRL
+#from policy_summarization import policy_summarization_helpers as ps_helpers
+#from policy_summarization import BEC
+#import policy_summarization.multiprocessing_helpers as mp_helpers
+#from simple_rl.utils import mdp_helpers
+#import policy_summarization.BEC_helpers as BEC_helpers
+#import policy_summarization.BEC_visualization as BEC_viz
+#from policy_summarization import particle_filter as pf
 import matplotlib as mpl
 mpl.rcParams['figure.facecolor'] = '1.0'
 mpl.rcParams['axes.labelsize'] = 'x-large'
 mpl.rcParams['xtick.labelsize'] = 'large'
 
-#FUNCTION IS NOT USED IN CURRENT IMPLEMENTATION
+#currently only thing being used basically
 def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
     try:
         with open('models/' + data_loc + '/vi_agent.pickle', 'rb') as f:
@@ -57,11 +66,12 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
         fixed_agent = FixedPolicyAgent(vi_agent.policy)
         mdp_agent.visualize_agent(fixed_agent, augmented_inputs=True)
         mdp_agent.reset()  # reset the current state to the initial state
-        mdp_agent.visualize_interaction()
+        from simple_rl.tasks.taxi.taxi_visualizer import _draw_augmented_state
+        mdp_agent.visualize_interaction(keys_map=params.keys_map)
 
-#NOT USED ^^^^^^^^^^ NOT USED
 
-
+#functions from old code
+'''
 def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag, summary_variant, pool, n_train_demos, BEC_depth, n_human_models, n_particles, prior, posterior, obj_func_proportion, hardcode_envs=False):
     #print(f"data_loc: {data_loc}\nmdp_params: {mdp_parameters}\nweights: {weights}\nn_human_models: {n_human_models}\nn_train_demos: {n_train_demos}\n\n")
     if hardcode_envs:
@@ -287,13 +297,14 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
     #     plt.show()
     #     checking what is being returned
     return BEC_summary, visited_env_traj_idxs, particles
-
+'''
+'''
 def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_params, step_cost_flag, n_human_models, prior, posterior, summary=None, use_counterfactual=True, visualize_test_env=False):
-    '''
+    
     Summary: Correlate the difficulty of a test environment with the generalized area of the BEC region obtain by the
     corresponding optimal demonstration. Return the desired number and difficulty of test environments (to be given
     to the human to test his understanding of the agent's policy).
-    '''
+    
     # use generalized area of the BEC region to select test environments
     try:
         with open('models/' + data_loc + '/test_environments.pickle', 'rb') as f:
@@ -398,7 +409,8 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
         BEC.visualize_test_envs(posterior, test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, selected_env_traj_tracers, weights,
                                 step_cost_flag)
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints
-
+'''
+'''
 def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, n_human_models_precomputed, data_loc, weights, step_cost_flag, visualize_pf_transition=False):
     # todo: maybe pass in some of these objects later
     print(f"mdp_class: {mdp_class}\nvisited_env_traj_idxs: {visited_env_traj_idxs}\npool: {pool}\nprior: {prior}\nn_particles: {n_particles}\n n_human_models: {n_human_models}\nn_human_models_precomputed: {n_human_models_precomputed}\ndata_loc: {data_loc}\nweights: {weights}\nstep_cost_flag: {step_cost_flag}\nvisualize_pf_transition: {visualize_pf_transition}\n")
@@ -537,8 +549,8 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
                         particles.update([-failed_BEC_constraint])
                         if visualize_pf_transition:
                             BEC_viz.visualize_pf_transition([-failed_BEC_constraint], particles, mdp_class, weights)
-
-
+'''
+'''
 def analyze_prev_study_tests(domain, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, n_human_models_precomputed, data_loc, weights, step_cost_flag, visualize_pf_transition=True):
     with open('filtered_human_responses.pickle', 'rb') as f:
         filtered_human_traj_dict, filtered_mdp_dict, filtered_count_dict, filtered_opt_reward_dict, filtered_human_reward_dict, filtered_opt_traj_dict = pickle.load(
@@ -718,8 +730,8 @@ def analyze_prev_study_tests(domain, BEC_summary, visited_env_traj_idxs, particl
                             particles.update([-failed_remedial_constraint])
                             if visualize_pf_transition:
                                 BEC_viz.visualize_pf_transition([failed_BEC_constraint], particles, domain, weights)
-
-
+'''
+'''
 def contrast_PF_2_step_dev(domain, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, data_loc, weights, step_cost_flag, visualize_pf_transition=False):
     with open('filtered_human_responses.pickle', 'rb') as f:
         filtered_human_traj_dict, filtered_mdp_dict, filtered_count_dict, filtered_opt_reward_dict, filtered_human_reward_dict, filtered_opt_traj_dict = pickle.load(
@@ -987,9 +999,8 @@ def contrast_PF_2_step_dev(domain, BEC_summary, visited_env_traj_idxs, particles
         with open('models/' + data_loc + '/' + 'PF_2-step_dev_comparison.pickle', 'wb') as f:
             pickle.dump((overlap_counter, PF_best_idxs, VO_best_idxs, failed_constraints), f)
 def precompute_counterfactual_constraints(data_loc, mdp_parameters, weights, BEC_params, step_cost_flag, BEC_depth, n_human_models_precomputed):
-    '''
+
     Precompute constraints generated by a diversity of potential human beliefs for future quick, real-time inference
-    '''
     try:
         with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
             policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(f)
@@ -1023,17 +1034,18 @@ def precompute_counterfactual_constraints(data_loc, mdp_parameters, weights, BEC
                  traj_record[i], None, [], step_cost_flag, 'precomputed', np.array([[0, 0, 0]]),  mdp_features_record[i],
                  True) for i in range(n_processed_envs, len(traj_record))]
             _ = list(tqdm(pool.imap(BEC.compute_counterfactuals, args), total=len(args)))
+'''
 
 if __name__ == "__main__":
-    from numpy.random import seed
-    seed(0)
+    #from numpy.random import seed
+    #seed(0)
 
-    pool = Pool(min(params.n_cpu, 64))
-    os.makedirs('models/' + params.data_loc['base'], exist_ok=True)
-    os.makedirs('models/' + params.data_loc['BEC'], exist_ok=True)
+    #pool = Pool(min(params.n_cpu, 64))
+    #os.makedirs('models/' + params.data_loc['base'], exist_ok=True)
+    #os.makedirs('models/' + params.data_loc['BEC'], exist_ok=True)
 
-    with open('models/' + params.data_loc['BEC'] + '/params.pickle', 'wb') as f:
-        pickle.dump(params, f)
+    #with open('models/' + params.data_loc['BEC'] + '/params.pickle', 'wb') as f:
+    #    pickle.dump(params, f)
 
     # potential pre-step computation of counterfactual constraints generated by potential human beliefs
     # precompute_counterfactual_constraints(params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,
@@ -1043,14 +1055,15 @@ if __name__ == "__main__":
     generate_agent(params.mdp_class, params.data_loc['base'], params.mdp_parameters, visualize=True)
 
     # b) obtain a BEC summary of the agent's policy
+    '''
     BEC_summary, visited_env_traj_idxs, particles_summary = obtain_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
                             params.step_cost_flag, params.BEC['summary_variant'], pool, params.BEC['n_train_demos'], params.BEC['BEC_depth'],
                             params.BEC['n_human_models'], params.BEC['n_particles'], params.prior, params.posterior, params.BEC['obj_func_proportion'])
-
+    '''
     # c) run through the closed-loop teaching framework
-    simulate_teaching_loop(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.BEC['n_human_models_precomputed'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag)
+    #simulate_teaching_loop(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.BEC['n_human_models_precomputed'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag)
 
-    n_human_models_real_time = 8 #never used
+    #n_human_models_real_time = 8 #never used
 
     # d) run remedial demonstration and test selection on previous participant responses from IROS
     # analyze_prev_study_tests(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], n_human_models_real_time, params.BEC['n_human_models_precomputed'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, visualize_pf_transition=True)
@@ -1063,5 +1076,5 @@ if __name__ == "__main__":
     #                          params.step_cost_flag, params.BEC['n_human_models'], params.prior, params.posterior, summary=BEC_summary, visualize_test_env=True, use_counterfactual=True)
 
 
-    pool.close()
-    pool.join()
+    #pool.close()
+    #pool.join()

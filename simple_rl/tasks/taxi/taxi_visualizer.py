@@ -82,12 +82,15 @@ def _draw_augmented_state(screen,
 
     # Prep some dimensions to make drawing easier.
     scr_width, scr_height = screen.get_width(), screen.get_height()
+    """
+    abanodoned button code:
     if augmented_inputs:
         width_buffer_left = scr_width / 20.0
         witdth_buffer_right = scr_width / 5.0
-    else:
-        width_buffer_left = scr_width / 10.0
-        witdth_buffer_right = scr_width / 10.0
+    else:"""
+
+    width_buffer_left = scr_width / 10.0
+    witdth_buffer_right = scr_width / 10.0
     color_light = (170,170,170)
     color_dark = (100, 100, 100)
     height_buffer = 30 + (scr_height / 10.0) # Add 30 for title.
@@ -113,11 +116,14 @@ def _draw_augmented_state(screen,
 
     # Statics
     if draw_statics:
+        '''
+        start of button code (abandoned)
         #draw buttons: (and later another agent)
         if augmented_inputs:
             top_left_point = scr_width - ((3.0*witdth_buffer_right)/4.0), scr_height/2 -20
             pygame.draw.rect(screen, color_light, top_left_point + (witdth_buffer_right/2.0,40))
             screen.blit(aug_text, (top_left_point + (10,30)))
+        '''
         # Draw walls.
         for w in taxi_oomdp.walls:
             w_x, w_y = w["x"], w["y"]
