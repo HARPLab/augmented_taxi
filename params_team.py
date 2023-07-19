@@ -360,8 +360,8 @@ learning_goal = {'common_knowledge': np.array([0.5, 0.5, 0.5]), \
                   'joint_knowledge': np.array([0.95, 0.95, 0.95]), \
                   'individual_knowledge': np.array([0.7, 0.7, 0.7])}
 
-# demo_strategy = 'common_knowledge'
+demo_strategy = 'common_knowledge'
 # demo_strategy = 'joint_knowledge'
-demo_strategy = 'individual_knowledge_low'
+# demo_strategy = 'individual_knowledge_low'
 # demo_strategy = 'individual_knowledge_high'
 

@@ -1,7 +1,7 @@
 import dill as pickle
 import sys, os
 import policy_summarization.BEC_helpers as BEC_helpers
-import params
+import params_team as params
 import itertools
 import copy
 from policy_summarization import BEC
@@ -19,6 +19,12 @@ from termcolor import colored
 from sklearn import metrics
 
 import teams.teams_helpers as team_helpers
+from teams import particle_filter_team as pf_team
+
+import matplotlib as mpl
+mpl.rcParams['figure.facecolor'] = '1.0'
+mpl.rcParams['axes.labelsize'] = 'x-large'
+mpl.rcParams['xtick.labelsize'] = 'large'
 
 # # what does base_constraints.pickel contain?
 
@@ -463,13 +469,61 @@ if __name__ == "__main__":
     # #########################################
 
     
-    # plot BEC area and check
+    # plot BEC area and check (TODO)
 
+
+    # #########################################
+
+
+    # # check team particle filter
+    # particle_positions = BEC_helpers.sample_human_models_uniform([], 100)
+    # print(len(particle_positions))
+    # particles = pf_team.Particles_team(particle_positions)
+    # # particles.plot()
+    # # plt.show()
+
+    # mdp_class = 'augmented_taxi2'
+
+    # constraints = [np.array([-1, 0, 2]),np.array([1, 0, -4]), np.array([0, 1, 0]), np.array([0, 1, 2])]
+
+
+    # for constraint in constraints:
+
+    #     team_helpers.visualize_transition(constraint, particles, mdp_class, weights=None, fig=None)
+
+    # with open('models/augmented_taxi2/BEC_summary.pickle', 'rb') as f:
+    #    BEC_summary, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = pickle.load(f)
+
+    # with open('models/augmented_taxi2/BEC_summary.pickle', 'rb') as f:
+    #    BEC_summary, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = pickle.load(f)
+
+    # print(len(BEC_summary))
+
+    # unit_no = 0
+    # for unit_idx, unit in enumerate(BEC_summary):
+    #     subunit_no = 0
+    #     for subunit in unit:
+    #         # print('Subunit for unit no: ', unit_no, 'and subunit no: ', subunit_no, subunit)
+    #         print('Constraints for unit no', unit_no, ', subunit no', subunit_no, ',', subunit[3])                
+    #         subunit_no += 1
+    #     unit_no += 1
+
+
+    # #########################################
+
+    ## Check how the team knowledges are being aggregated
+
+    demo_constraints = [np.array([[-1, 0, 0]]), np.array([[-1, 0, 2]])]
+    # test_response = {'p1': np.array([[-1, 0, 2]]), 'p2': np.array([[3, 0, -2]])}
+
+    team_prior, particles_team = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_prior = params.team_prior)
     
+    print('Team prior: ', team_prior)
+    print('Team particles: ', particles_team)
+    print('Demo constraints:', demo_constraints)
 
-
-
-
-
-
+    particles_team['joint_knowledge'].update_jk(demo_constraints)
+    team_helpers.visualize_transition(demo_constraints, particles_team['joint_knowledge'], params.mdp_class, params.weights['val'], text='Demo 1 for JK Type 1')
+    particles_team['joint_knowledge_2'].update_jk(demo_constraints)
+    team_helpers.visualize_transition(demo_constraints, particles_team['joint_knowledge_2'], params.mdp_class, params.weights['val'], text = 'Demo 1 for JK Type 2')
 

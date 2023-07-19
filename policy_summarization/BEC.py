@@ -1458,6 +1458,7 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BE
 
     return remedial_demonstrations, visited_env_traj_idxs
 
+
 def obtain_diagnostic_tests(data_loc, previous_demos, visited_env_traj_idxs, min_BEC_constraints, min_subset_constraints_record, traj_record, traj_features_record, variable_filter, mdp_features_record, downsample_threshold=float("inf"), opt_simplicity=True, opt_similarity=True):
     preliminary_test_info = []
 
@@ -1539,6 +1540,8 @@ def obtain_diagnostic_tests(data_loc, previous_demos, visited_env_traj_idxs, min
 
     return preliminary_tests, visited_env_traj_idxs
 
+
+
 def obtain_SCOT_summaries(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag,downsample_threshold=float("inf")):
     min_BEC_summary = []
 
@@ -1586,6 +1589,7 @@ def obtain_SCOT_summaries(data_loc, summary_variant, min_BEC_constraints, BEC_le
         del BEC_lengths_record[best_idx]
 
     return min_BEC_summary
+
 
 def obtain_summary(data_loc, summary_variant, min_BEC_constraints, BEC_lengths_record, min_subset_constraints_record, env_record, traj_record, weights, step_cost_flag, n_train_demos=3, downsample_threshold=float("inf"), visited_env_traj_idxs=[]):
     '''
