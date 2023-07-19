@@ -46,28 +46,63 @@ mpl.rcParams['axes.labelsize'] = 'x-large'
 mpl.rcParams['xtick.labelsize'] = 'large'
 
 #currently only thing being used basically
-def generate_agent(mdp_class, data_loc, mdp_parameters, visualize=False):
-    try:
+def generate_agent(mdp_class, data_loc, mdp_parameters, passengers=[{'x': 4, 'y': 1, 'dest_x': 3, 'dest_y': 2, 'in_taxi': 0}], visualize=False):
+    '''try:
         with open('models/' + data_loc + '/vi_agent.pickle', 'rb') as f:
             mdp_agent, vi_agent = pickle.load(f)
     except:
         cf_data_dir = 'models/' + data_loc
         os.makedirs(cf_data_dir, exist_ok=True)
+    '''
 
-        mdp_agent = make_mdp.make_custom_mdp(mdp_class, mdp_parameters)
-        vi_agent = ValueIteration(mdp_agent, sample_rate=1)
-        vi_agent.run_vi()
+    width = mdp_parameters["width"]
+    height = mdp_parameters["height"]
+    print(width)
+    print(height)
 
+    mdp_list = []
+    vi_agent_list = []
+    combined_mdp_passengers = []
+    print(mdp_parameters['passengers'])
+    for i in passengers:
+        combined_mdp_passengers.append(i)
+        mdp_parameters['passengers'] = [i]
+        print(mdp_parameters['passengers'])
+        temp_mdp_agent = make_mdp.make_custom_mdp(mdp_class, mdp_parameters)
+        temp_vi_agent = ValueIteration(temp_mdp_agent, sample_rate=1)
+        temp_vi_agent.run_vi()
+        mdp_list.append(temp_mdp_agent)
+        vi_agent_list.append(temp_vi_agent)
+    print(mdp_list)
+    print(vi_agent_list)
+    '''
         with open('models/' + data_loc + '/vi_agent.pickle', 'wb') as f:
             pickle.dump((mdp_agent, vi_agent), f)
-
+    '''
     # Visualize agent
     if visualize:
-        fixed_agent = FixedPolicyAgent(vi_agent.policy)
-        mdp_agent.visualize_agent(fixed_agent, augmented_inputs=True)
-        mdp_agent.reset()  # reset the current state to the initial state
-        from simple_rl.tasks.taxi.taxi_visualizer import _draw_augmented_state
-        mdp_agent.visualize_interaction(keys_map=params.keys_map)
+        mdp_parameters['passengers'] = combined_mdp_passengers
+        print(mdp_parameters['passengers'])
+        combined_mdp_agent = make_mdp.make_custom_mdp(mdp_class, mdp_parameters)
+        combined_mdp_agent.visualize_state(combined_mdp_agent.cur_state)
+
+        #agent visualization:
+        '''
+        combined_vi_agent = ValueIteration(combined_mdp_agent, sample_rate=1)
+        combined_vi_agent.run_vi()
+        combined_fixed_agent = FixedPolicyAgent(combined_vi_agent.policy)
+        combined_mdp_agent.visualize_agent(combined_fixed_agent, augmented_inputs=True)
+        combined_mdp_agent.reset()  # reset the current state to the initial state
+        '''
+        
+        '''
+        for mdp,vi_agent in mdp_list,vi_agent_list:
+            fixed_agent = FixedPolicyAgent(vi_agent.policy)
+            mdp_agent.visualize_agent(fixed_agent, augmented_inputs=True)
+            mdp_agent.reset()  # reset the current state to the initial state
+            from simple_rl.tasks.taxi.taxi_visualizer import _draw_augmented_state
+            mdp_agent.visualize_interaction(keys_map=params.keys_map)
+        '''
 
 
 #functions from old code
@@ -1052,7 +1087,8 @@ if __name__ == "__main__":
     #                          params.step_cost_flag, params.BEC['BEC_depth'], params.BEC['n_human_models_precomputed'])
 
     # a) generate an agent if you want to explore the Augmented Taxi MDP
-    generate_agent(params.mdp_class, params.data_loc['base'], params.mdp_parameters, visualize=True)
+    passengers = [{'x': 4, 'y': 2, 'dest_x': 1, 'dest_y': 1, 'in_taxi': 0}, {'x': 3, 'y': 3, 'dest_x': 1, 'dest_y': 1, 'in_taxi': 0}]
+    generate_agent(params.mdp_class, params.data_loc['base'], params.mdp_parameters, passengers=passengers, visualize=True)
 
     # b) obtain a BEC summary of the agent's policy
     '''
