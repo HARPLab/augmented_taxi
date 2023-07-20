@@ -571,8 +571,14 @@ def normalize_trajs(opt_traj, human_traj, data_loc):
 
         #no normalization needed for this segment
         if (diff_opt == diff_human):
-            normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx, human_idx)]
-            normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx, opt_idx)]
+            if (len(m1) > 0) and (m1[-1]):
+                normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx + 1, human_idx)]
+            else:
+                normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx, human_idx)]
+            if (len(m2) > 0) and (m2[-1]):
+                normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx + 1, opt_idx)]
+            else:
+                normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx, opt_idx)]
             if ((human_idx + 1) not in anch_hum) and (human_idx != len(human_traj) - 1):
                 normalized_human_traj.append(human_traj[human_idx])
                 m1.append(True)
@@ -601,7 +607,7 @@ def normalize_trajs(opt_traj, human_traj, data_loc):
                     if j != opt_idx:
                         if (opt_traj[j][0].get_agent_x() == opt_traj[j + 1][0].get_agent_x()) and (opt_traj[j][0].get_agent_y() == opt_traj[j + 1][0].get_agent_y()):
                             continue
-                    if (len(m2) > 0) and not (m2[-1]) and j == prev_opt_idx:
+                    if (len(m2) > 0) and (m2[-1]) and j == prev_opt_idx:
                         continue
                     else:
                         new_cop.append((opt_traj[j][0].get_agent_x(), opt_traj[j][0].get_agent_y(), opt_traj[j][0]))
@@ -629,6 +635,9 @@ def normalize_trajs(opt_traj, human_traj, data_loc):
                     normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx + 1, human_idx)]
                 else:
                     normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx, human_idx)]
+                
+                m1.append(False)
+                m2.append(False)
 
             #need to expand human trajectory
             else:
@@ -642,7 +651,7 @@ def normalize_trajs(opt_traj, human_traj, data_loc):
                     if j != human_idx:
                         if (human_traj[j][0].get_agent_x() == human_traj[j + 1][0].get_agent_x()) and (human_traj[j][0].get_agent_y() == human_traj[j + 1][0].get_agent_y()):
                             continue
-                    if (len(m1) > 0) and not (m1[-1]):
+                    if (len(m1) > 0) and (m1[-1])  and j == prev_human_idx:
                         continue
                     else:
                         new_cop.append((human_traj[j][0].get_agent_x(), human_traj[j][0].get_agent_y(), human_traj[j][0]))
@@ -670,6 +679,8 @@ def normalize_trajs(opt_traj, human_traj, data_loc):
                 else:
                     normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx, opt_idx)]
 
+                m1.append(False)
+                m2.append(False)
 
     normalized_human_traj.append(human_traj[-1])
     normalized_opt_traj.append(opt_traj[-1])
