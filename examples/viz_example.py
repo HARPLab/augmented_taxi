@@ -27,7 +27,7 @@ def main():
     viz = parse_args()
 
     # Choose viz type.
-    viz = "policy"
+    viz = "agent"
 
     if viz == "value":
         # --> Color corresponds to higher value.

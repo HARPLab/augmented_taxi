@@ -51,6 +51,7 @@ class AugmentedTaxi2OOMDP(OOMDP):
         traffic_objs = self._make_oomdp_objs_from_list_of_dict(traffic, "traffic")
         fuel_station_objs = self._make_oomdp_objs_from_list_of_dict(fuel_stations, "fuel_station")
         hotswap_station_objs = self._make_oomdp_objs_from_list_of_dict(hotswap_stations, "hotswap_station")
+        self.passengers = passengers
         self.tolls = toll_objs
         self.traffic_cells = traffic_objs
         self.walls = wall_objs
@@ -68,6 +69,18 @@ class AugmentedTaxi2OOMDP(OOMDP):
         else:
             OOMDP.__init__(self, AugmentedTaxi2OOMDP.BASE_ACTIONS, self._taxi_transition_func, self._taxi_reward_func,
                            init_state=init_state, gamma=gamma, step_cost=step_cost, sample_rate=sample_rate)
+
+    def get_passengers(self):
+        return self.passengers
+    
+    def get_passengers_coords_list(self):
+        rtn = []
+        for i in self.passengers:
+            rtn.append((i['x'],i['y']))
+            print("rtn:")
+            print(rtn)
+        return rtn
+
 
     def _create_state(self, agent_oo_obj, passengers, hotswap_stations):
         '''
@@ -280,7 +293,7 @@ class AugmentedTaxi2OOMDP(OOMDP):
         from simple_rl.utils.mdp_visualizer import visualize_state
         from .taxi_visualizer import _draw_augmented_state
 
-        visualize_state(self, _draw_augmented_state, cur_state=cur_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, augmented_inputs=augmented_inputs)
+        return visualize_state(self, _draw_augmented_state, cur_state=cur_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, augmented_inputs=augmented_inputs)
 
     def visualize_trajectory(self, trajectory, marked_state_importances=None, width_scr_scale=180, height_scr_scale=180, counterfactual_traj=None, augmented_inputs=False):
         from simple_rl.utils.mdp_visualizer import visualize_trajectory

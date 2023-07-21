@@ -3,6 +3,7 @@ from __future__ import print_function
 import sys
 import time
 import copy
+import math
 try:
     import pygame
     from pygame.locals import *
@@ -168,6 +169,22 @@ def _draw_rect_alpha(surface, color, rect):
     surface.blit(shape_surf, rect)
     return rect
 
+def _get_cell(mdp, scr_width, scr_height, x_mouse, y_mouse, row_num, col_num):
+    #setting up const for clicking on passengers:
+    width_buffer = scr_width / 10.0
+    height_buffer = 30 + (scr_height / 10.0) # Add 30 for title.
+    cell_width = (scr_width - 2 * width_buffer) / mdp.width
+    cell_height = (scr_height - height_buffer * 2) / mdp.height
+    x_temp = x_mouse-width_buffer
+    y_temp = y_mouse-height_buffer
+    if (x_temp > 0 and y_temp > 0):
+        x_temp = math.ceil(x_temp/cell_width)
+        y_temp = col_num -math.floor(y_temp/cell_height)
+        if (x_temp<=row_num and y_temp<=col_num and y_temp>0):
+            return (x_temp, y_temp)
+    return None
+    
+
 def visualize_state(mdp, draw_state, cur_state=None, scr_width=720, scr_height=720, augmented_inputs=False):
     '''
     Args:
@@ -188,14 +205,25 @@ def visualize_state(mdp, draw_state, cur_state=None, scr_width=720, scr_height=7
     draw_state(screen, mdp, cur_state, show_value=False, draw_statics=True, augmented_inputs=augmented_inputs) #augmented inputs are only used for taxi will need to be altered to work for others
     _draw_lower_left_text(cur_state, screen)
     pygame.display.flip()
+    passenger_list = mdp.get_passengers_coords_list()
+    print("passenger:\n")
+    print(passenger_list)
     while True:
         # Check for key presses.
         for event in pygame.event.get():
             if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
                 # Quit.
                 pygame.display.quit()
-                return
-
+                return None
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse = pygame.mouse.get_pos()
+                cell_coords = _get_cell(mdp, scr_width, scr_height, mouse[0], mouse[1], mdp.width, mdp.height)
+                print(cell_coords)
+                if cell_coords in passenger_list:
+                    pygame.display.quit()
+                    print("this is what I am returning:\n")
+                    print(cell_coords)
+                    return cell_coords
         time.sleep(0.1)
 
 

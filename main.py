@@ -46,7 +46,8 @@ mpl.rcParams['axes.labelsize'] = 'x-large'
 mpl.rcParams['xtick.labelsize'] = 'large'
 
 #currently only thing being used basically
-def generate_agent(mdp_class, data_loc, mdp_parameters, passengers=[{'x': 4, 'y': 1, 'dest_x': 3, 'dest_y': 2, 'in_taxi': 0}], visualize=False):
+#=[{'x': 4, 'y': 1, 'dest_x': 3, 'dest_y': 2, 'in_taxi': 0}]
+def generate_agent(mdp_class, data_loc, mdp_parameters, passengers, visualize=False):
     '''try:
         with open('models/' + data_loc + '/vi_agent.pickle', 'rb') as f:
             mdp_agent, vi_agent = pickle.load(f)
@@ -55,36 +56,52 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, passengers=[{'x': 4, 'y'
         os.makedirs(cf_data_dir, exist_ok=True)
     '''
 
-    width = mdp_parameters["width"]
-    height = mdp_parameters["height"]
-    print(width)
-    print(height)
+    
 
-    mdp_list = []
-    vi_agent_list = []
+    mdp_vi_dict = {}
     combined_mdp_passengers = []
-    print(mdp_parameters['passengers'])
+    #print(mdp_parameters['passengers'])
     for i in passengers:
         combined_mdp_passengers.append(i)
         mdp_parameters['passengers'] = [i]
-        print(mdp_parameters['passengers'])
+        #print(mdp_parameters['passengers'])
         temp_mdp_agent = make_mdp.make_custom_mdp(mdp_class, mdp_parameters)
-        temp_vi_agent = ValueIteration(temp_mdp_agent, sample_rate=1)
-        temp_vi_agent.run_vi()
-        mdp_list.append(temp_mdp_agent)
-        vi_agent_list.append(temp_vi_agent)
-    print(mdp_list)
-    print(vi_agent_list)
+        mdp_vi_dict[(i['x'],i['y'])]=(temp_mdp_agent)
+        print("mdp_vi_dict:")
+        print((i['x'],i['y']))
+
+    #print(mdp_list)
+    #print(vi_agent_list)
     '''
         with open('models/' + data_loc + '/vi_agent.pickle', 'wb') as f:
             pickle.dump((mdp_agent, vi_agent), f)
     '''
+
+    
+
     # Visualize agent
     if visualize:
         mdp_parameters['passengers'] = combined_mdp_passengers
-        print(mdp_parameters['passengers'])
         combined_mdp_agent = make_mdp.make_custom_mdp(mdp_class, mdp_parameters)
-        combined_mdp_agent.visualize_state(combined_mdp_agent.cur_state)
+        #print(combined_mdp_agent.get_passengers())
+        cell_coords = combined_mdp_agent.visualize_state(combined_mdp_agent.cur_state)
+        combined_mdp_agent.reset()
+
+        print(cell_coords)
+        if not cell_coords == None:
+            print(cell_coords)
+            print("entered into here\n")
+            mdp_agent = mdp_vi_dict[cell_coords]
+            #test case: mdp_agent.visualize_state(mdp_agent.cur_state)
+            
+            vi_agent = ValueIteration(mdp_agent, sample_rate=1)
+            vi_agent.run_vi()
+            print(mdp_agent.get_passengers())
+            fixed_agent = FixedPolicyAgent(vi_agent.policy)
+            mdp_agent.visualize_agent(fixed_agent)
+            mdp_agent.reset()  # reset the current state to the initial state
+        
+        
 
         #agent visualization:
         '''

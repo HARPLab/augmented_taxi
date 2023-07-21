@@ -91,8 +91,8 @@ def _draw_augmented_state(screen,
 
     width_buffer_left = scr_width / 10.0
     witdth_buffer_right = scr_width / 10.0
-    color_light = (170,170,170)
-    color_dark = (100, 100, 100)
+    #color_light = (170,170,170)
+    #color_dark = (100, 100, 100)
     height_buffer = 30 + (scr_height / 10.0) # Add 30 for title.
     cell_width = (scr_width - width_buffer_left - witdth_buffer_right) / taxi_oomdp.width
     cell_height = (scr_height - height_buffer * 2) / taxi_oomdp.height
