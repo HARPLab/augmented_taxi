@@ -66,39 +66,64 @@ def calc_common_knowledge(team_knowledge, team_size, weights, step_cost_flag):
 
 
 
-def calc_joint_knowledge(team_knowledge, team_size, weights, step_cost_flag):
+def calc_joint_knowledge(team_knowledge, team_size, weights=None, step_cost_flag=None):
 
     # TODO: Calculate joint constraints
     # Joint constraints is normally expressed as the union of constraints of individuals. 
 
-    ## Method 1: Joint constraints expressed as inverse of the inverted and minimal constraints of individual members
-    for i in range(team_size):
-        member_id = 'p' + str(i+1)
-        if i==0:
-            inv_constraints = [-x for x in team_knowledge[member_id]]
-        else:
-            inv_constraints.extend([-x for x in team_knowledge[member_id]])
-
-    print('Team knowledge:', team_knowledge)
-    print('Inverted constraints:', inv_constraints)
-    inv_joint_constraints = BEC_helpers.remove_redundant_constraints(inv_constraints, weights, step_cost_flag)
-
-    joint_constraints = [-x for x in inv_joint_constraints]
-
-    # ## Method 2: Here we just represent the constraints of each individual as a separate list.
+    # ## Method 1: Joint constraints expressed as inverse of the inverted and minimal constraints of individual members
     # for i in range(team_size):
     #     member_id = 'p' + str(i+1)
     #     if i==0:
-    #         joint_constraints = [team_knowledge[member_id]]
+    #         inv_constraints = [-x for x in team_knowledge[member_id]]
     #     else:
-    #         joint_constraints.append(team_knowledge[member_id])
+    #         inv_constraints.extend([-x for x in team_knowledge[member_id]])
 
-    print('Team knowledge:', team_knowledge)
-    print('Joint constraints:', joint_constraints)
+    # print('Team knowledge:', team_knowledge)
+    # print('Inverted constraints:', inv_constraints)
+    # inv_joint_constraints = BEC_helpers.remove_redundant_constraints(inv_constraints, weights, step_cost_flag)
+
+    # joint_constraints = [-x for x in inv_joint_constraints]
+
+
+    ## Method 2: Here we just represent the constraints of each individual as a separate list.
+    for i in range(team_size):
+        member_id = 'p' + str(i+1)
+        if i==0:
+            joint_constraints = [team_knowledge[member_id]]
+        else:
+            joint_constraints.append(team_knowledge[member_id])
+
+    # print('Team knowledge:', team_knowledge)
+    # print('Joint constraints:', joint_constraints)
 
 
 
     return joint_constraints
+
+
+
+def update_team_knowledge(team_knowledge, new_constraints, team_size, weights, step_cost_flag):
+
+    team_knowledge_updated = {}
+
+    for knowledge_id, knowledge_type in enumerate(team_knowledge):
+        if knowledge_type != 'joint_knowledge':
+            knowledge = team_knowledge[knowledge_type].copy()
+            # print('Old_knowledge: ', knowledge)
+            knowledge.extend(new_constraints)
+            # print('New_knowledge: ', knowledge)
+            # print('New_knowledge: ', new_knowledge)
+            # print('New constraints: ', new_constraints)
+            new_knowledge = BEC_helpers.remove_redundant_constraints(knowledge, weights, step_cost_flag)
+
+            team_knowledge_updated[knowledge_type] = knowledge.copy()
+
+    
+    team_knowledge_updated['joint_knowledge'] = calc_joint_knowledge(team_knowledge_updated, team_size, weights=weights, step_cost_flag=step_cost_flag)
+
+
+    return team_knowledge_updated
 
 
 
@@ -164,12 +189,68 @@ def check_and_update_variable_filter(min_subset_constraints_record = None, varia
 
 
 
-def find_ascending_individual_knowledge(team_prior):
+def find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints):
 
-    # TODO for later;  currently hardcoded a random order)
+    # Sorts based on ascending order of knowledge
 
-    return ['p1', 'p3', 'p2']
+    team_knowledge_level = calc_knowledge_level(team_knowledge, min_BEC_constraints)
+    # sorted_kl = sorted(team_knowledge_level)
+    sorted_kl = dict(sorted(team_knowledge_level.items(), key=lambda item: item[1]))
+    print('sorted_kl: ', sorted_kl)
+    ascending_order_of_knowledge = []
+    for i, kl in enumerate(sorted_kl):
+        print(kl)
+        if 'p' in kl:
+            ascending_order_of_knowledge.append(kl)
 
+    return ascending_order_of_knowledge
+
+
+
+def calc_knowledge_level(team_knowledge, min_BEC_constraints):
+    # 
+    knowledge_level = {}
+
+    print('Calculating knowledge level...')
+    
+    for knowledge_id, knowledge_type in enumerate(team_knowledge):
+        if knowledge_type == 'joint_knowledge':
+            x=1
+
+        else:
+            # print('min_BEC_constraints: ', [min_BEC_constraints])
+            min_BEC_area = BEC_helpers.calc_solid_angles([min_BEC_constraints])
+            # print('knowledge: ', team_knowledge[knowledge_type])
+            knowledge_area = BEC_helpers.calc_solid_angles([team_knowledge[knowledge_type]])
+            
+            # n_particles = 5000
+            n_particles = 500
+            knowledge_particles = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform(team_knowledge[knowledge_type], n_particles))
+
+            const_id = []
+            for j, x in enumerate(knowledge_particles.positions):
+
+                all_constraints_satisfied = True
+                for constraint in min_BEC_constraints:
+                    dot = constraint.dot(x.T)
+
+                    if dot < 0:
+                        all_constraints_satisfied = False
+                
+                if all_constraints_satisfied:
+                    const_id.append(j)
+            
+            BEC_overlap_area = min(min_BEC_area, len(const_id)/n_particles * np.array(knowledge_area))
+            
+            # # Method 1: Calculates the knowledge level (0 to 1) based on two factors: ratio of BEC area to knowledge area and % of overlap of BEC area with knowledge area
+            # knowledge_spread = np.array(knowledge_area)/np.array(min_BEC_area)
+            # BEC_overlap_ratio = BEC_overlap_area/np.array(min_BEC_area)
+            # knowledge_level[knowledge_type] = 0.5*BEC_overlap_ratio + 0.5/knowledge_spread
+
+            # Method 2: Calculate knowledge level based on the ratio of BEC overlap area with the total knowledge area
+            knowledge_level[knowledge_type] = BEC_overlap_area/np.array(knowledge_area)
+
+    return knowledge_level
 
 
 
@@ -254,53 +335,54 @@ def optimize_visuals_team(data_loc, best_env_idxs, best_traj_idxs, chunked_traj_
 
 
 
-def particles_for_demo_strategy(demo_strategy, team_knowledge, team_size, weights, step_cost_flag, n_particles, min_BEC_constraints, teammate_idx=0):
+def particles_for_demo_strategy(demo_strategy, team_knowledge, team_particles, team_size, weights, step_cost_flag, n_particles, min_BEC_constraints, teammate_idx=0):
 
-    particles = []
-    # prior knowledge
-    if demo_strategy != 'joint_knowledge':
-        if demo_strategy =='individual_knowledge_low':
-            ind_knowledge_ascending = find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints)
-            prior = team_knowledge[ind_knowledge_ascending[teammate_idx]].copy()
-        elif demo_strategy == 'individual_knowledge_high':
-            ind_knowledge_ascending = find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints)
-            prior = team_knowledge[ind_knowledge_ascending[len(ind_knowledge_ascending) - teammate_idx - 1]].copy()
-        elif demo_strategy == 'common_knowledge':
-            prior = calc_common_knowledge(team_knowledge, team_size, weights, step_cost_flag)
+    # particles = []
+    # # prior knowledge
+    # if demo_strategy != 'joint_knowledge':
+    #     if demo_strategy =='individual_knowledge_low':
+    #         ind_knowledge_ascending = find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints)
+    #         prior = team_knowledge[ind_knowledge_ascending[teammate_idx]].copy()
+    #     elif demo_strategy == 'individual_knowledge_high':
+    #         ind_knowledge_ascending = find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints)
+    #         prior = team_knowledge[ind_knowledge_ascending[len(ind_knowledge_ascending) - teammate_idx - 1]].copy()
+    #     elif demo_strategy == 'common_knowledge':
+    #         prior = calc_common_knowledge(team_knowledge, team_size, weights, step_cost_flag)
         
-        # particles for human models
-        particle_positions = BEC_helpers.sample_human_models_uniform([], n_particles)
-        particles = pf_team.Particles_team(particle_positions)
-        particles.update(prior)
+    #     # particles for human models
+    #     particle_positions = BEC_helpers.sample_human_models_uniform([], n_particles)
+    #     particles = pf_team.Particles_team(particle_positions)
+    #     particles.update(prior)
     
-    elif demo_strategy == 'joint_knowledge':
-        prior = calc_joint_knowledge(team_knowledge, team_size, weights, step_cost_flag)
-        particle_positions = sample_human_models_uniform_joint_knowledge(prior, n_particles)
-        particles = pf_team.Particles_team(particle_positions)
+    # elif demo_strategy == 'joint_knowledge':
+    #     prior = calc_joint_knowledge(team_knowledge, team_size, weights, step_cost_flag)
+    #     particle_positions = sample_human_models_uniform_joint_knowledge(prior, n_particles)
+    #     particles = pf_team.Particles_team(particle_positions)
 
 
+    # else:
+    #     print('Unsupported demo strategy for sampling particles!')
+    # return prior, particles
+
+    ###########################################
+    
+    # particles to consider while generating demos
+    if demo_strategy =='individual_knowledge_low':
+        ind_knowledge_ascending = find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints)
+        particles = team_particles[ind_knowledge_ascending[teammate_idx]].copy()
+    
+    elif demo_strategy == 'individual_knowledge_high':
+        ind_knowledge_ascending = find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints)
+        particles = team_particles[ind_knowledge_ascending[len(ind_knowledge_ascending) - teammate_idx - 1]].copy()
+    
+    elif demo_strategy == 'common_knowledge' or demo_strategy == 'joint_knowledge':
+        particles = team_particles[demo_strategy]
+    
     else:
         print('Unsupported demo strategy for sampling particles!')
 
-    return prior, particles
+    return particles
 
-
-# def calc_knowledge_level(team_knowledge, min_BEC_constraints):
-        # TODO
-#     knowledge_level = {}
-    
-#     for knowledge_type, knowledge in enumerate(team_knowledge):
-#         if knowledge_type != 'joint_knowledge':
-
-
-#         else:
-
-
-
-
-
-
-#     return 1
 
 
 
@@ -465,11 +547,11 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_prior=N
         team_prior['joint_knowledge'] = calc_joint_knowledge(team_prior, team_size, weights, step_cost_flag)
         particles_team['joint_knowledge'].update_jk(team_prior['joint_knowledge'])
     
-    # method 2
-    if team_prior is not None:
-        team_prior['joint_knowledge'] = calc_joint_knowledge(team_prior, team_size, weights, step_cost_flag)
-        particle_positions = sample_human_models_uniform_joint_knowledge(team_prior['joint_knowledge'], n_particles)
-        particles_team['joint_knowledge_2'] = pf_team.Particles_team(particle_positions)
+    # # method 2
+    # if team_prior is not None:
+    #     team_prior['joint_knowledge'] = calc_joint_knowledge(team_prior, team_size, weights, step_cost_flag)
+    #     particle_positions = sample_human_models_uniform_joint_knowledge(team_prior['joint_knowledge'], n_particles)
+    #     particles_team['joint_knowledge_2'] = pf_team.Particles_team(particle_positions)
 
 
 
@@ -477,66 +559,66 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_prior=N
 
 
 
-def downsample_team_models_pf(particles_team, n_models):
+# def downsample_team_models_pf(particles_team, n_models):
 
     
-    sampled_team_models = {}
-    sampled_team_model_weights = {}
+#     sampled_team_models = {}
+#     sampled_team_model_weights = {}
 
-    for member_id in particles_team:
-        sampled_human_model_idxs = []
-        particles_team[member_id].cluster()
-        if len(particles_team[member_id].cluster_centers) > n_models:
-            # if there are more clusters than number of sought human models, return the spherical centroids of the top n
-            # most frequently counted cluster indexes selected by systematic resampling
-            while len(sampled_human_model_idxs) < n_models:
-                indexes = p_utils.systematic_resample(particles_team[member_id].cluster_weights)
-                unique_idxs, counts = np.unique(indexes, return_counts=True)
-                # order the unique indexes via their frequency
-                unique_idxs_sorted = [x for _, x in sorted(zip(counts, unique_idxs), reverse=True)]
+#     for member_id in particles_team:
+#         sampled_human_model_idxs = []
+#         particles_team[member_id].cluster()
+#         if len(particles_team[member_id].cluster_centers) > n_models:
+#             # if there are more clusters than number of sought human models, return the spherical centroids of the top n
+#             # most frequently counted cluster indexes selected by systematic resampling
+#             while len(sampled_human_model_idxs) < n_models:
+#                 indexes = p_utils.systematic_resample(particles_team[member_id].cluster_weights)
+#                 unique_idxs, counts = np.unique(indexes, return_counts=True)
+#                 # order the unique indexes via their frequency
+#                 unique_idxs_sorted = [x for _, x in sorted(zip(counts, unique_idxs), reverse=True)]
 
-                for idx in unique_idxs_sorted:
-                    # add new unique indexes to the human models that will be considered for counterfactual reasoning
-                    if idx not in sampled_human_model_idxs:
-                        sampled_human_model_idxs.append(idx)
+#                 for idx in unique_idxs_sorted:
+#                     # add new unique indexes to the human models that will be considered for counterfactual reasoning
+#                     if idx not in sampled_human_model_idxs:
+#                         sampled_human_model_idxs.append(idx)
 
-                    if len(sampled_human_model_idxs) == n_models:
-                        break
+#                     if len(sampled_human_model_idxs) == n_models:
+#                         break
 
-            sampled_human_models = [particles_team[member_id].cluster_centers[i] for i in sampled_human_model_idxs]
-            sampled_human_model_weights = np.array([particles_team[member_id].cluster_weights[i] for i in sampled_human_model_idxs])
-            sampled_human_model_weights /= np.sum(sampled_human_model_weights)  # normalize
-        elif len(particles_team[member_id].cluster_centers) == n_models:
-            sampled_human_models = particles_team[member_id].cluster_centers
-            sampled_human_model_weights = np.array(particles_team[member_id].cluster_weights) # should already be normalized
-        else:
-            # if there are fewer clusters than number of sought human models, use systematic sampling to determine how many
-            # particles from each cluster to return (using the k-cities algorithm to ensure that they are diverse)
-            indexes = p_utils.systematic_resample(particles_team[member_id].cluster_weights, N=n_models)
-            unique_idxs, counts = np.unique(indexes, return_counts=True)
+#             sampled_human_models = [particles_team[member_id].cluster_centers[i] for i in sampled_human_model_idxs]
+#             sampled_human_model_weights = np.array([particles_team[member_id].cluster_weights[i] for i in sampled_human_model_idxs])
+#             sampled_human_model_weights /= np.sum(sampled_human_model_weights)  # normalize
+#         elif len(particles_team[member_id].cluster_centers) == n_models:
+#             sampled_human_models = particles_team[member_id].cluster_centers
+#             sampled_human_model_weights = np.array(particles_team[member_id].cluster_weights) # should already be normalized
+#         else:
+#             # if there are fewer clusters than number of sought human models, use systematic sampling to determine how many
+#             # particles from each cluster to return (using the k-cities algorithm to ensure that they are diverse)
+#             indexes = p_utils.systematic_resample(particles_team[member_id].cluster_weights, N=n_models)
+#             unique_idxs, counts = np.unique(indexes, return_counts=True)
 
-            sampled_human_models = []
-            sampled_human_model_weights = []
-            for j, unique_idx in enumerate(unique_idxs):
-                # particles of this cluster
-                clustered_particles = particles_team[member_id].positions[np.where(particles_team[member_id].cluster_assignments == unique_idx)]
-                clustered_particles_weights = particles_team[member_id].weights[np.where(particles_team[member_id].cluster_assignments == unique_idx)]
+#             sampled_human_models = []
+#             sampled_human_model_weights = []
+#             for j, unique_idx in enumerate(unique_idxs):
+#                 # particles of this cluster
+#                 clustered_particles = particles_team[member_id].positions[np.where(particles_team[member_id].cluster_assignments == unique_idx)]
+#                 clustered_particles_weights = particles_team[member_id].weights[np.where(particles_team[member_id].cluster_assignments == unique_idx)]
 
-                # use the k-cities algorithm to obtain a diverse sample of weights from this cluster
-                pairwise = metrics.pairwise.euclidean_distances(clustered_particles.reshape(-1, 3))
-                select_idxs = BEC_helpers.selectKcities(pairwise.shape[0], pairwise, counts[j])
-                sampled_human_models.extend(clustered_particles[select_idxs])
-                sampled_human_model_weights.extend(clustered_particles_weights[select_idxs])
+#                 # use the k-cities algorithm to obtain a diverse sample of weights from this cluster
+#                 pairwise = metrics.pairwise.euclidean_distances(clustered_particles.reshape(-1, 3))
+#                 select_idxs = BEC_helpers.selectKcities(pairwise.shape[0], pairwise, counts[j])
+#                 sampled_human_models.extend(clustered_particles[select_idxs])
+#                 sampled_human_model_weights.extend(clustered_particles_weights[select_idxs])
 
-            sampled_human_model_weights = np.array(sampled_human_model_weights)
-            sampled_human_model_weights /= np.sum(sampled_human_model_weights)
+#             sampled_human_model_weights = np.array(sampled_human_model_weights)
+#             sampled_human_model_weights /= np.sum(sampled_human_model_weights)
 
-        # update member models
-        sampled_team_models[member_id] = sampled_human_models
-        sampled_team_model_weights[member_id] = sampled_human_model_weights
+#         # update member models
+#         sampled_team_models[member_id] = sampled_human_models
+#         sampled_team_model_weights[member_id] = sampled_human_model_weights
     
 
-    return sampled_team_models, sampled_team_model_weights
+#     return sampled_team_models, sampled_team_model_weights
 
 
 

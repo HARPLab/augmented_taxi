@@ -17,6 +17,7 @@ import numpy as np
 from policy_summarization import computational_geometry as cg
 from termcolor import colored
 from sklearn import metrics
+from policy_summarization import policy_summarization_helpers as ps_helpers
 
 import teams.teams_helpers as team_helpers
 from teams import particle_filter_team as pf_team
@@ -513,17 +514,114 @@ if __name__ == "__main__":
 
     ## Check how the team knowledges are being aggregated
 
-    demo_constraints = [np.array([[-1, 0, 0]]), np.array([[-1, 0, 2]])]
+    # demo_constraints = [[np.array([[-1, 0, 0]]), np.array([[-1, 0, 6]])]]
     # test_response = {'p1': np.array([[-1, 0, 2]]), 'p2': np.array([[3, 0, -2]])}
 
-    team_prior, particles_team = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_prior = params.team_prior)
+    # team_prior, particles_team = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_prior = params.team_prior)
     
-    print('Team prior: ', team_prior)
-    print('Team particles: ', particles_team)
-    print('Demo constraints:', demo_constraints)
+    # print('Team prior: ', team_prior)
+    # print('Team particles: ', particles_team)
+    # print('Demo constraints:', demo_constraints)
 
-    particles_team['joint_knowledge'].update_jk(demo_constraints)
-    team_helpers.visualize_transition(demo_constraints, particles_team['joint_knowledge'], params.mdp_class, params.weights['val'], text='Demo 1 for JK Type 1')
-    particles_team['joint_knowledge_2'].update_jk(demo_constraints)
-    team_helpers.visualize_transition(demo_constraints, particles_team['joint_knowledge_2'], params.mdp_class, params.weights['val'], text = 'Demo 1 for JK Type 2')
+    # particles_team['joint_knowledge'].update_jk(demo_constraints)
+    # team_helpers.visualize_transition(demo_constraints, particles_team['joint_knowledge'], params.mdp_class, params.weights['val'], text='Demo 1 for JK Type 1')
+    # particles_team['joint_knowledge_2'].update_jk(demo_constraints)
+    # team_helpers.visualize_transition(demo_constraints, particles_team['joint_knowledge_2'], params.mdp_class, params.weights['val'], text = 'Demo 1 for JK Type 2')
+
+
+    ######################################
+    # demo_constraints = [[np.array([[-1, 0, 0]]), np.array([[-1, 0, 6]])]]
+
+    # BEC_area = BEC_helpers.calc_solid_angles(demo_constraints)
+    # print('BEC area: ', BEC_area)
+
+    # for constraint_set in demo_constraints:
+    #     print(len(constraint_set))
+
+    # fig = plt.figure()
+    # ax1 = fig.add_subplot(1, 1, 1, projection='3d')
+    # for constraints in demo_constraints:
+    #     BEC_viz.visualize_planes(constraints, fig=fig, ax=ax1)
+    
+    # ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints)
+    # poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
+    # BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax1, plot_ref_sphere=False, alpha=0.75)
+
+    # plt.show()
+
+    ######################################
+
+    # get optimal policies
+    # ps_helpers.obtain_env_policies(params.mdp_class, params.data_loc['BEC'], np.expand_dims(params.weights['val'], axis=0), params.mdp_parameters, pool)
+
+    # with open('models/' + params.data_loc['BEC'] + '/team_base_constraints.pickle', 'rb') as f:
+    #         policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(f)
+
+    with open('models/' + params.data_loc['BEC'] + '/team_BEC_constraints.pickle', 'rb') as f:
+            min_BEC_constraints, BEC_lengths_record = pickle.load(f)
+    
+    demo_constraints = [np.array([[-1, 0, 0]]), np.array([[1, 1, 0]])]
+
+    fig = plt.figure()
+    ax1 = fig.add_subplot(1, 1, 1, projection='3d')
+    # for constraints in min_BEC_constraints:
+    #     BEC_viz.visualize_planes(min_BEC_constraints, fig=fig, ax=ax1)
+    
+    ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(min_BEC_constraints)
+    poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
+    BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax1, plot_ref_sphere=False, alpha=0.75)
+
+    ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(demo_constraints)
+    poly2 = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
+    BEC_viz.visualize_spherical_polygon(poly2, fig=fig, ax=ax1, plot_ref_sphere=False, alpha=0.5, color='r')
+
+    # plt.show()
+
+    print(min_BEC_constraints)
+    min_BEC_area = BEC_helpers.calc_solid_angles([min_BEC_constraints])
+    print('min BEC area: ', min_BEC_area)
+
+    print(demo_constraints)
+    knowledge_area = BEC_helpers.calc_solid_angles([demo_constraints])
+    print('knowledge area: ', knowledge_area)
+
+    knowledge_spread = np.array(knowledge_area)/np.array(min_BEC_area)
+
+    # sample particles from knowledge area
+    n_particles = 4500
+    knowledge_particles = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform(demo_constraints, n_particles))
+
+    # par_pos = knowledge_particles.positions.squeeze()
+
+    const_id = []
+    x_all = []
+    for j, x in enumerate(knowledge_particles.positions):
+
+        all_constraints_satisfied = True
+        for constraint in min_BEC_constraints:
+            dot = constraint.dot(x.T)
+
+            if dot < 0:
+                all_constraints_satisfied = False
+        
+        if all_constraints_satisfied:
+            const_id.append(j)
+            x_all.append(x)
+
+    BEC_overlap_ratio = min(min_BEC_area, len(const_id)/n_particles * np.array(knowledge_area))/np.array(min_BEC_area)
+
+    knowledge_level = 0.5*BEC_overlap_ratio + 0.5/knowledge_spread
+    BEC_overlap_particles = pf_team.Particles_team(np.array(x_all))
+
+    print('No of particles: ', n_particles)
+    print('Particles overlap: ', len(const_id)/n_particles * np.array(knowledge_area))
+    print('BEC overlap: ', BEC_overlap_ratio)
+    print('knowledge_spread: ', knowledge_spread)
+    print('knowledge_level: ', knowledge_level)
+
+    BEC_overlap_particles.plot(fig=fig, ax=ax1)
+    ax1.scatter(params.weights['val'][0, 0], params.weights['val'][0, 1], params.weights['val'][0, 2], marker='o', c='r', s=100/2)
+
+    plt.show()
+
 

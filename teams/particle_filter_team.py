@@ -29,7 +29,7 @@ class Particles_team(pf.Particles):
         self.reweight_jk(joint_constraints) # particles reweighted even if one of the original constraints is satisfied.
 
         if sum(self.weights) < reset_threshold_prob:
-            self.reset(joint_constraints[0]) # TODO: Check if the same reset procedure applies to the joint knowledge case. Reset particles based on the first constraint for now.
+            self.reset(joint_constraints[0][0]) # TODO: Check if the same reset procedure applies to the joint knowledge case. Reset particles based on the first constraint for now.
             print('Resetting weights JK...')
         else:
             # normalize weights and update particles
@@ -68,19 +68,32 @@ class Particles_team(pf.Particles):
         p = x.shape[1]
 
         # check if atleast one of the constraints is satisfied, i.e. none of the inverse constraints are satisfied
-        constraint_satisfied_flag = False
-        for joint_constraint in joint_constraints:
-            dot = joint_constraint.dot(x.T)
-            if dot >= 0:
-                constraint_satisfied_flag = True
-                
+        constraint_satisfied_flag = []
+        
+        
+        for individual_constraint in joint_constraints:
+            constraint_satisfied_flag.append(True)
+            # print('Individual constraint: ', individual_constraint)
+            # check if the constraints for each individual member are satisfied
+            # if len(individual_constraint) > 1:
+            for constraint in individual_constraint:
+                dot = constraint.dot(x.T)
+                if dot < 0:
+                    constraint_satisfied_flag[-1] = False
+            # else:
+            #     dot = individual_constraint.dot(x.T)
+            #     if dot < 0:
+            #         constraint_satisfied_flag[-1] = False
+        
+        # print('constraint_satisfied_flag: ', constraint_satisfied_flag)
+        # print(sum(np.array(constraint_satisfied_flag)))
 
-        # TODO: Update the pdf; this is from Mike's work which is applicable for half-spaces. Here the distribution should be for the union of constraints and thus pdf would vary.
-        if constraint_satisfied_flag:
+        # TODO: Update the pdf even if constraints are satisfied for one of the members; this is from Mike's work which is applicable for half-spaces. Here the distribution should be for the union of constraints and thus pdf would vary.
+        if sum(np.array(constraint_satisfied_flag)) > 0  :
             # use the uniform dist
             prob *= 0.12779
         else:
             # use the VMF dist
-            prob *= p_utils.VMF_pdf(joint_constraints[0], k, p, x, dot=dot) # TODO: Update the function. Currently only the first constraint is used.
+            prob *= p_utils.VMF_pdf(joint_constraints[0][0], k, p, x, dot=dot) # TODO: Update the function. Currently only the first constraint is used.
 
         return prob

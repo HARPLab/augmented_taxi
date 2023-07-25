@@ -347,9 +347,12 @@ human_learning_models = {'p1': np.array([0.9, 0.9, 0.9]), \
                          'p2': np.array([0.8, 0.8, 0.8]), \
                          'p3': np.array([0.7, 0.7, 0.7]) }
 
-team_prior = {'p1': prior, \
-              'p2': prior, \
-              'p3': prior}
+
+team_prior = {}
+for i in range(team_size):
+    member_id = 'p' + str(i+1)
+    team_prior[member_id] = prior
+
 
 
 knowledge = 'common_knowledge'
