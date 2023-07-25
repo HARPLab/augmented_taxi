@@ -1112,7 +1112,7 @@ if __name__ == "__main__":
         for line in lines:
             line = line.split(',')
             line = [i.strip() for i in line]
-            line = [int(i) for i in line]
+            line = [int(i) for i in line[1:]]
             new_list.append(line)
         
         #setting up agent
@@ -1122,7 +1122,7 @@ if __name__ == "__main__":
             y = chunk[1]
             has_passenger = chunk[2]
             params.mdp_parameters["agent"] = dict(x=x,y=y,has_passenger=has_passenger)
-            #print(params.mdp_parameters["agent"])
+            print(params.mdp_parameters["agent"])
 
         #setting up walls
         params.mdp_parameters["walls"] = []
@@ -1172,6 +1172,7 @@ if __name__ == "__main__":
         #print(params.mdp_parameters["height"])
 
     except:
+        print("failed other")
         passengers = [{'x': 6, 'y': 5, 'dest_x': 1, 'dest_y': 1, 'in_taxi': 0},{'x': 5, 'y': 2, 'dest_x': 1, 'dest_y': 1, 'in_taxi': 0}, {'x': 6, 'y': 7, 'dest_x': 1, 'dest_y': 1, 'in_taxi': 0}]
     finally:   
         generate_agent(params.mdp_class, params.data_loc['base'], params.mdp_parameters, passengers=passengers, visualize=True)

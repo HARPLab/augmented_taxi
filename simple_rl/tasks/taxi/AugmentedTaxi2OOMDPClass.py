@@ -77,8 +77,6 @@ class AugmentedTaxi2OOMDP(OOMDP):
         rtn = []
         for i in self.passengers:
             rtn.append((i['x'],i['y']))
-            print("rtn:")
-            print(rtn)
         return rtn
 
 
