@@ -97,16 +97,16 @@ elif mdp_class == 'augmented_taxi2':
 
     mdp_parameters = {
         'agent': {'x': 4, 'y': 1, 'has_passenger': 0},
-        'walls': [{'x': 1, 'y': 3}, {'x': 1, 'y': 2}],
+        'walls': [{'x': 2, 'y': 4},{'x': 1, 'y': 4},{'x': 1, 'y': 3}, {'x': 1, 'y': 2}],
         'passengers': [{'x': 4, 'y': 1, 'dest_x': 3, 'dest_y': 2, 'in_taxi': 0}],
         'tolls': [{'x': 3, 'y': 1}],
-        'available_tolls': [{"x": 3, "y": 3}, {"x": 2, "y": 2}, {"x": 3, "y": 2}, {"x": 4, "y": 2}, {"x": 3, "y": 1}],
+        'available_tolls': [{"x": 3, "y": 3}, {"x": 2, "y": 2}, {"x": 3, "y": 2}, {"x": 4, "y": 2}],
         'traffic': [],  # probability that you're stuck
         'fuel_station': [],
         'hotswap_station': [{'x': 4, 'y': 3}],
-        'available_hotswap_stations': [{'x': 4, 'y': 3}],
-        'width': 4,
-        'height': 3,
+        'available_hotswap_stations': [],
+        'width': 6,
+        'height': 7,
         'gamma': 1,
         'env_code': [],
         'weights': w_normalized,

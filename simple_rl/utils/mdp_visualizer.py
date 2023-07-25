@@ -143,7 +143,7 @@ def _draw_terminal_text(mdp_class, cur_state, scr_width, scr_height, title_font)
             goal_text = "Fail!"
 
     goal_text_rendered = title_font.render(goal_text, True, (75, 75, 75))
-    goal_text_point = scr_width / 2.0 - (len(goal_text) * 8), 18 * scr_height / 20.0
+    goal_text_point = scr_width / 2.0 - (len(goal_text) * 8), 19 * scr_height / 20.0
 
     return goal_text_rendered, goal_text_point
 
@@ -206,8 +206,6 @@ def visualize_state(mdp, draw_state, cur_state=None, scr_width=720, scr_height=7
     _draw_lower_left_text(cur_state, screen)
     pygame.display.flip()
     passenger_list = mdp.get_passengers_coords_list()
-    print("passenger:\n")
-    print(passenger_list)
     while True:
         # Check for key presses.
         for event in pygame.event.get():
@@ -218,11 +216,8 @@ def visualize_state(mdp, draw_state, cur_state=None, scr_width=720, scr_height=7
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse = pygame.mouse.get_pos()
                 cell_coords = _get_cell(mdp, scr_width, scr_height, mouse[0], mouse[1], mdp.width, mdp.height)
-                print(cell_coords)
                 if cell_coords in passenger_list:
                     pygame.display.quit()
-                    print("this is what I am returning:\n")
-                    print(cell_coords)
                     return cell_coords
         time.sleep(0.1)
 

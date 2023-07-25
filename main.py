@@ -47,7 +47,7 @@ mpl.rcParams['xtick.labelsize'] = 'large'
 
 #currently only thing being used basically
 #=[{'x': 4, 'y': 1, 'dest_x': 3, 'dest_y': 2, 'in_taxi': 0}]
-def generate_agent(mdp_class, data_loc, mdp_parameters, passengers, visualize=False):
+def generate_agent(mdp_class, data_loc, mdp_parameters, passengers=[{'x': 4, 'y': 1, 'dest_x': 3, 'dest_y': 2, 'in_taxi': 0}], visualize=False):
     '''try:
         with open('models/' + data_loc + '/vi_agent.pickle', 'rb') as f:
             mdp_agent, vi_agent = pickle.load(f)
@@ -67,8 +67,8 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, passengers, visualize=Fa
         #print(mdp_parameters['passengers'])
         temp_mdp_agent = make_mdp.make_custom_mdp(mdp_class, mdp_parameters)
         mdp_vi_dict[(i['x'],i['y'])]=(temp_mdp_agent)
-        print("mdp_vi_dict:")
-        print((i['x'],i['y']))
+        #print("mdp_vi_dict:")
+        #print((i['x'],i['y']))
 
     #print(mdp_list)
     #print(vi_agent_list)
@@ -89,14 +89,13 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, passengers, visualize=Fa
 
         print(cell_coords)
         if not cell_coords == None:
-            print(cell_coords)
-            print("entered into here\n")
+            #print(cell_coords)
             mdp_agent = mdp_vi_dict[cell_coords]
             #test case: mdp_agent.visualize_state(mdp_agent.cur_state)
             
             vi_agent = ValueIteration(mdp_agent, sample_rate=1)
             vi_agent.run_vi()
-            print(mdp_agent.get_passengers())
+            #print(mdp_agent.get_passengers())
             fixed_agent = FixedPolicyAgent(vi_agent.policy)
             mdp_agent.visualize_agent(fixed_agent)
             mdp_agent.reset()  # reset the current state to the initial state
@@ -1104,8 +1103,78 @@ if __name__ == "__main__":
     #                          params.step_cost_flag, params.BEC['BEC_depth'], params.BEC['n_human_models_precomputed'])
 
     # a) generate an agent if you want to explore the Augmented Taxi MDP
-    passengers = [{'x': 4, 'y': 2, 'dest_x': 1, 'dest_y': 1, 'in_taxi': 0}, {'x': 3, 'y': 3, 'dest_x': 1, 'dest_y': 1, 'in_taxi': 0}]
-    generate_agent(params.mdp_class, params.data_loc['base'], params.mdp_parameters, passengers=passengers, visualize=True)
+    try:
+        file = open('customizations.txt', mode = 'r')
+        lines = file.readlines()
+        lines = lines[0:7]
+        file.close()
+        new_list = []
+        for line in lines:
+            line = line.split(',')
+            line = [i.strip() for i in line]
+            line = [int(i) for i in line]
+            new_list.append(line)
+        
+        #setting up agent
+        for i in range(0, len(new_list[0]), 3):
+            chunk = new_list[0][i:i+3] #currently only will create the agent as the last agent provided
+            x = chunk[0]
+            y = chunk[1]
+            has_passenger = chunk[2]
+            params.mdp_parameters["agent"] = dict(x=x,y=y,has_passenger=has_passenger)
+            #print(params.mdp_parameters["agent"])
+
+        #setting up walls
+        params.mdp_parameters["walls"] = []
+        for i in range(0, len(new_list[1]), 2):
+            chunk = new_list[1][i:i+2] #currently only will create the agent as the last agent provided
+            x = chunk[0]
+            y = chunk[1]
+            params.mdp_parameters["walls"].append(dict(x=x,y=y))
+        #print(params.mdp_parameters["walls"])
+
+        #setting up passengers
+        passengers = []
+        for i in range(0, len(new_list[2]), 5):
+            chunk = new_list[2][i:i+5] #currently only will create the agent as the last agent provided
+            x = chunk[0]
+            y = chunk[1]
+            dest_x = chunk[2]
+            dest_y = chunk[3]
+            in_taxi = chunk[4]
+            passengers.append(dict(x=x,y=y,dest_x=dest_x,dest_y=dest_y,in_taxi=in_taxi))
+        #print(passengers)
+
+        #setting up tolls:
+        params.mdp_parameters["tolls"] = []
+        for i in range(0, len(new_list[3]), 2):
+            chunk = new_list[3][i:i+2] #currently only will create the agent as the last agent provided
+            x = chunk[0]
+            y = chunk[1]
+            params.mdp_parameters["tolls"].append(dict(x=x,y=y))
+        #print(params.mdp_parameters["tolls"])
+
+        #setting up hotswap_station:
+        params.mdp_parameters["hotswap_station"] = []
+        for i in range(0, len(new_list[4]), 2):
+            chunk = new_list[4][i:i+2] #currently only will create the agent as the last agent provided
+            x = chunk[0]
+            y = chunk[1]
+            params.mdp_parameters["hotswap_station"].append(dict(x=x,y=y))
+        #print(params.mdp_parameters["hotswap_station"])
+
+        #setting up width:
+        params.mdp_parameters["width"] = new_list[5][0]
+        #print(params.mdp_parameters["width"])
+
+        #setting up height:
+        params.mdp_parameters["height"] = new_list[6][0]
+        #print(params.mdp_parameters["height"])
+
+    except:
+        passengers = [{'x': 6, 'y': 5, 'dest_x': 1, 'dest_y': 1, 'in_taxi': 0},{'x': 5, 'y': 2, 'dest_x': 1, 'dest_y': 1, 'in_taxi': 0}, {'x': 6, 'y': 7, 'dest_x': 1, 'dest_y': 1, 'in_taxi': 0}]
+    finally:   
+        generate_agent(params.mdp_class, params.data_loc['base'], params.mdp_parameters, passengers=passengers, visualize=True)
 
     # b) obtain a BEC summary of the agent's policy
     '''
