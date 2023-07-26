@@ -9,6 +9,7 @@ import json
 from collections import defaultdict
 from simple_rl.utils import mdp_helpers
 import policy_summarization.multiprocessing_helpers as mp_helpers
+import os
 
 '''
 For managing data related to the user study 
@@ -1093,6 +1094,8 @@ def consolidate_counterfactual_constraints():
 
 
 if __name__ == "__main__":
+    os.chdir('../../..')
+
     data_loc = params.data_loc['BEC']
 
     # specify which potential pairs of demonstrations within each difficulty to use based on semantics (e.g. pair one

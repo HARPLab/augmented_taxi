@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+import random
 # Python imports.
 import sys
 import dill as pickle
@@ -16,10 +16,11 @@ import os
 import itertools
 from collections import defaultdict
 from multiprocessing import Process, Queue, Pool
+import difflib
 
 # Other imports.
 sys.path.append("simple_rl")
-import params
+import augmented_taxi.params as params
 from simple_rl.agents import FixedPolicyAgent
 from simple_rl.planning import ValueIteration
 from simple_rl.utils import make_mdp
@@ -397,7 +398,319 @@ def obtain_test_environments(mdp_class, data_loc, mdp_parameters, weights, BEC_p
                                 step_cost_flag)
     return test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints
 
-def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, n_human_models_precomputed, data_loc, weights, step_cost_flag, visualize_pf_transition=False):
+def calculate_new_pos (new_cop, pointer, step_size, currx, curry, currstate, counter, last):
+    if counter == 0:
+        (nextx, nexty, nextstate) = new_cop[pointer + 1]
+    elif counter == 1:
+        (nextx, nexty, nextstate) = new_cop[-1]
+    else:
+        (nextx, nexty, nextstate) = (last.get_agent_x(), last.get_agent_y(), last)
+
+    #going left
+    if nextx - currx < -0.01:#     nextx < currx:
+        action = "left"
+        (newx, newy) = (currx - step_size, curry)
+        #need to make changes if wrapping around
+        if   newx - nextx < -0.01: #(newx < nextx):
+            diff = nextx - newx
+            #this should only happen on not last part of this segment
+            if (counter == 0):
+                (twox, twoy, twostate) = new_cop[pointer + 2]
+            elif (counter == 1):
+                (twox, twoy, twostate) = (last.get_agent_x(), last.get_agent_y(), last)
+            new_direction = (twox - nextx, twoy - nexty)
+            if twox > nextx:
+                newx = nextx + diff
+            elif twoy > nexty:
+                newx = nextx
+                newy = nexty + diff
+            elif twoy < nexty:
+                newx = nextx
+                newy = nexty - diff
+            pointer += 1
+    #going right
+    elif   currx - nextx < -0.01: #currx < nextx:
+        action = "right"
+        (newx, newy) = (currx + step_size, curry)
+        #need to make changes if wrapping around
+        if  newx - nextx > 0.01: #(newx > nextx):
+            diff = newx - nextx
+            #this should only happen on not last part of this segment
+            if (counter == 0):
+                (twox, twoy, twostate) = new_cop[pointer + 2]
+            elif (counter == 1):
+                (twox, twoy, twostate) = (last.get_agent_x(), last.get_agent_y(), last)
+            new_direction = (twox - nextx, twoy - nexty)
+            if twox < nextx:
+                newx = nextx - diff
+            elif twoy > nexty:
+                newx = nextx
+                newy = nexty + diff
+            elif twoy < nexty:
+                newx = nextx
+                newy = nexty - diff
+            pointer += 1
+    #going up
+    elif  nexty - curry > 0.01:  #nexty > curry:
+        action = "up"
+        (newx, newy) = (currx, curry + step_size)
+        #need to make changes if wrapping around
+        if  newy - nexty > 0.01:  #(newy > nexty):
+            diff = newy - nexty
+            #this should only happen on not last part of this segment
+            if (counter == 0):
+                (twox, twoy, twostate) = new_cop[pointer + 2]
+            elif (counter == 1):
+                (twox, twoy, twostate) = (last.get_agent_x(), last.get_agent_y(), last)
+            new_direction = (twox - nextx, twoy - nexty)
+            if twox < nextx:
+                newy = nexty
+                newx = nextx - diff
+            elif twox > nextx:
+                newy = nexty
+                newx = nextx + diff
+            elif twoy < nexty:
+                newy = nexty - diff
+            pointer += 1
+    #going down
+    elif  curry - nexty > 0.01:  #curry > nexty:
+        action = "down"
+        (newx, newy) = (currx, curry - step_size)
+        #need to make changes if wrapping around
+        if  newy - nexty < -0.01: #(newy < nexty):
+            diff = nexty - newy
+            #this should only happen on not last part of this segment
+            if (counter == 0):
+                (twox, twoy, twostate) = new_cop[pointer + 2]
+            elif (counter == 1):
+                (twox, twoy, twostate) = (last.get_agent_x(), last.get_agent_y(), last)
+            new_direction = (twox - nextx, twoy - nexty)
+            if twox < nextx:
+                newy = nexty
+                newx = nextx - diff
+            elif twox > nextx:
+                newy = nexty
+                newx = nextx + diff
+            elif twoy > nexty:
+                newy = nexty + diff
+            pointer += 1
+    else:
+        newx = currx
+        newy = curry
+        #currstate = nextstate
+        action = "pickup"
+    editedstate = copy.deepcopy(currstate)
+    editedstate.objects["agent"][0]["x"] = newx
+    editedstate.objects["agent"][0]["y"] = newy
+
+    return newx, newy, editedstate, action, pointer
+
+def normalize_trajs(opt_traj, human_traj, data_loc):
+    #pdb.set_trace()
+    if data_loc == 'augmented_taxi2':
+        opt_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y(), currstate.objects["passenger"][0]["in_taxi"]) for (prevstate, action, currstate) in opt_traj]
+        human_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y(), currstate.objects["passenger"][0]["in_taxi"]) for (prevstate, action, currstate) in human_traj]
+    elif data_loc == 'colored_tiles':
+        print('colored_tiles!')
+        opt_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y()) for (prevstate, action, currstate) in opt_traj]
+        human_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y()) for (prevstate, action, currstate) in human_traj]
+    elif data_loc == 'skateboard2':
+        print('skateboard2!')
+        # opt_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y(), currstate.objects["skateboard"][0]["on_agent"]) for (prevstate, action, currstate) in opt_traj]
+        # human_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y(), currstate.objects["skateboard"][0]["on_agent"]) for (prevstate, action, currstate) in human_traj]
+        opt_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y(), currstate.objects["agent"][0]["has_skateboard"]) for (prevstate, action, currstate) in opt_traj]
+        human_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y(), currstate.objects["agent"][0]["has_skateboard"]) for (prevstate, action, currstate) in human_traj]
+
+    else:
+        raise AssertionError("Unrecognized domain.")
+
+    matcher = difflib.SequenceMatcher(None, opt_traj_currs, human_traj_currs, autojunk=False)
+    matches = matcher.get_matching_blocks()
+    anchor_points = []
+
+    for match in matches:
+        for i in range(match[2]):
+            anchor_points.append((match[0] + i, match[1] + i))
+
+    anch_opt = [opp for (opp, hummie) in anchor_points]
+    anch_hum = [hummie for (opp, hummie) in anchor_points]
+
+    normalized_opt_traj = []
+    normalized_human_traj = []
+
+    m1 = []
+    m2 = []
+
+    for i in range(len(anchor_points)):
+        opt_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y()) for (prevstate, action, currstate) in normalized_opt_traj]
+        human_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y()) for (prevstate, action, currstate) in normalized_human_traj]
+
+        #pdb.set_trace()
+        (opt_idx, human_idx) = anchor_points[i]
+
+        if i == 0:
+            prev_opt_idx = 0
+            prev_human_idx = 0
+        else:
+            (prev_opt_idx, prev_human_idx) = anchor_points[i - 1]
+
+        diff_opt = opt_idx - prev_opt_idx
+        diff_human = human_idx - prev_human_idx
+
+        if i == 0:
+            diff_opt += 1
+            diff_human += 1
+
+
+        #no normalization needed for this segment
+        if (diff_opt == diff_human):
+            normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx, human_idx)]
+            normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx, opt_idx)]
+            if ((human_idx + 1) not in anch_hum) and (human_idx != len(human_traj) - 1):
+                normalized_human_traj.append(human_traj[human_idx])
+                m1.append(True)
+            else:
+                m1.append(False)
+            if (((opt_idx + 1) not in anch_opt)) and (opt_idx != len(opt_traj) - 1):
+                normalized_opt_traj.append(opt_traj[opt_idx])
+                m2.append(True)
+            else:
+                m2.append(False)
+            continue
+
+        else:
+            new_cop = []
+            holder = []
+            pointer = 0
+            #need to expand optimal trajectory
+            if (diff_opt < diff_human):
+
+                step_size = diff_opt/diff_human
+
+                if (len(m2) > 0) and not (m2[-1]):
+                    normalized_opt_traj.append(opt_traj[prev_opt_idx])
+
+                if len(opt_traj) == opt_idx + 1:
+                    if (opt_traj[prev_opt_idx][2].get_agent_x() == opt_traj[opt_idx][2].get_agent_x()) and (opt_traj[prev_opt_idx][2].get_agent_y() == opt_traj[opt_idx][2].get_agent_y()):
+                        for i in range(diff_human - 1):
+                            normalized_opt_traj.append((opt_traj[prev_opt_idx][2], "pickup", opt_traj[prev_opt_idx][2]))
+                        if (len(m1) > 0) and (m1[-1]):
+                            normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx + 1, human_idx)]
+                        else:
+                            normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx, human_idx)]
+
+                        continue
+                else:
+                    if (opt_traj[anchor_points[i + 1][0]][2].get_agent_x() == opt_traj[opt_idx][2].get_agent_x()) and (opt_traj[anchor_points[i + 1][0]][2].get_agent_y() == opt_traj[opt_idx][2].get_agent_y()):
+                        for i in range(diff_human - 1):
+                            normalized_opt_traj.append((opt_traj[opt_idx][2], "pickup", opt_traj[opt_idx][2]))
+                        if (len(m1) > 0) and (m1[-1]):
+                            normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx + 1, human_idx)]
+                        else:
+                            normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx, human_idx)]
+
+                        continue
+
+                for j in range(prev_opt_idx, opt_idx + 1):
+                    if j != opt_idx:
+                        if (opt_traj[j][0].get_agent_x() == opt_traj[j + 1][0].get_agent_x()) and (opt_traj[j][0].get_agent_y() == opt_traj[j + 1][0].get_agent_y()):
+                            continue
+                    new_cop.append((opt_traj[j][0].get_agent_x(), opt_traj[j][0].get_agent_y(), opt_traj[j][0]))
+
+                counter = 0
+                last = opt_traj[opt_idx][2]
+
+                for k in range(diff_human - 1):
+                    if k == 0:
+                        (currx, curry, currstate) = new_cop[k]
+                    else:
+                        (currx, curry, currstate) = holder[-1]
+                    if (pointer == len(new_cop) - 2):
+                        counter = 1
+                        if (new_cop[pointer][0] == currx and new_cop[pointer][1] == curry):
+                            pointer += 1
+                    if (pointer == len(new_cop) - 1):
+                        counter = 2
+
+                    newx, newy, editedstate, action, pointer = calculate_new_pos(new_cop, pointer, step_size, currx, curry, currstate, counter, last)
+                    normalized_opt_traj.append((currstate, action, editedstate))
+                    holder.append((newx, newy, editedstate))
+
+                if (len(m1) > 0) and (m1[-1]):
+                    normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx + 1, human_idx)]
+                else:
+                    normalized_human_traj = normalized_human_traj + [human_traj[l] for l in range (prev_human_idx, human_idx)]
+
+            #need to expand human trajectory
+            else:
+                step_size = (diff_human)/diff_opt
+
+                if (len(m1) > 0) and not (m1[-1]):
+                    normalized_human_traj.append(opt_traj[prev_human_idx])
+
+                if len(human_traj) == human_idx + 1:
+                    if (human_traj[prev_human_idx][2].get_agent_x() == human_traj[human_idx][2].get_agent_x()) and (human_traj[prev_human_idx][2].get_agent_y() == human_traj[human_idx][2].get_agent_y()):
+                        for i in range(diff_opt - 1):
+                            normalized_human_traj.append((human_traj[prev_human_idx][2], "pickup", human_traj[prev_human_idx][2]))
+                        if (len(m2) > 0) and (m2[-1]):
+                            normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx + 1, opt_idx)]
+                        else:
+                            normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx, opt_idx)]
+
+                        continue
+                else:
+                    if (human_traj[prev_human_idx][2].get_agent_x() == human_traj[human_idx][2].get_agent_x()) and (human_traj[prev_human_idx][2].get_agent_y() == human_traj[human_idx][2].get_agent_y()):
+                        for i in range(diff_opt - 1):
+                            normalized_human_traj.append((human_traj[[i + 1][0]][2], "pickup", human_traj[[i + 1][0]][2]))
+                        if (len(m2) > 0) and (m2[-1]):
+                            normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx + 1, opt_idx)]
+                        else:
+                            normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx, opt_idx)]
+
+                        continue
+
+                for j in range(prev_human_idx, human_idx + 1):
+                    if j != human_idx:
+                        if (human_traj[j][0].get_agent_x() == human_traj[j + 1][0].get_agent_x()) and (human_traj[j][0].get_agent_y() == human_traj[j + 1][0].get_agent_y()):
+                            continue
+                    new_cop.append((human_traj[j][0].get_agent_x(), human_traj[j][0].get_agent_y(), human_traj[j][0]))
+
+                counter = 0
+                last = human_traj[human_idx][2]
+
+                for k in range(diff_opt - 1):
+                    if k == 0:
+                        (currx, curry, currstate) = new_cop[k]
+                    else:
+                        (currx, curry, currstate) = holder[-1]
+                    if (pointer == len(new_cop) - 2):
+                        counter = 1
+                        if (new_cop[pointer][0] == currx and new_cop[pointer][1] == curry):
+                            pointer += 1
+                    if (pointer == len(new_cop) - 1):
+                        counter = 2
+                    newx, newy, editedstate, action, pointer = calculate_new_pos(new_cop, pointer, step_size, currx, curry, currstate, counter, last)
+                    normalized_human_traj.append((currstate, action, editedstate))
+                    holder.append((newx, newy, editedstate))
+
+                if (len(m2) > 0) and (m2[-1]):
+                    normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx + 1, opt_idx)]
+                else:
+                    normalized_opt_traj = normalized_opt_traj + [opt_traj[l] for l in range (prev_opt_idx, opt_idx)]
+
+
+    normalized_human_traj.append(human_traj[-1])
+    normalized_opt_traj.append(opt_traj[-1])
+
+    opt_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y()) for (prevstate, action, currstate) in normalized_opt_traj]
+    human_traj_currs = [(currstate.get_agent_x(), currstate.get_agent_y()) for (prevstate, action, currstate) in normalized_human_traj]
+
+
+    #pdb.set_trace()
+
+    return normalized_opt_traj, normalized_human_traj
+
+def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, n_human_models_precomputed, data_loc, weights, step_cost_flag, keys_map, visualize_pf_transition=False):
     # todo: maybe pass in some of these objects later
     with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
         policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(
@@ -427,6 +740,7 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
 
         # obtain the constraints conveyed by the unit's demonstrations
         min_constraints = BEC_helpers.remove_redundant_constraints(unit_constraints, weights, step_cost_flag)
+        random.shuffle(min_constraints) # shuffle the order of the constraints so that it's not always the same
         # obtain the diagnostic tests that will test the human's understanding of the unit's constraints
         preliminary_tests, visited_env_traj_idxs = BEC.obtain_diagnostic_tests(data_loc, unit, visited_env_traj_idxs, min_constraints, min_subset_constraints_record, traj_record, traj_features_record, running_variable_filter, mdp_features_record)
         print(preliminary_tests[0])
@@ -444,7 +758,7 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
             test_history = [test] # to ensure that remedial demonstrations and tests are visually simple/similar and complex/different, respectively
 
             print("Here is a diagnostic test for this unit")
-            human_traj, human_history = test_mdp.visualize_interaction(keys_map=params.keys_map) # the latter is simply the gridworld locations of the agent
+            human_traj, human_history = test_mdp.visualize_interaction(keys_map=keys_map) # the latter is simply the gridworld locations of the agent
             # with open('models/' + data_loc + '/human_traj.pickle', 'wb') as f:
             #     pickle.dump((human_traj, human_history), f)
             # with open('models/' + data_loc + '/human_traj.pickle', 'rb') as f:
@@ -469,7 +783,8 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
                 if visualize_pf_transition:
                     BEC_viz.visualize_pf_transition([-failed_BEC_constraint], particles, mdp_class, weights)
 
-                test_mdp.visualize_trajectory_comparison(opt_traj, human_traj)
+                normalized_opt_traj, normalized_human_traj = normalize_trajs(opt_traj, human_traj, data_loc)
+                test_mdp.visualize_trajectory_comparison(normalized_opt_traj, normalized_human_traj)
 
                 print("Here is a remedial demonstration that might be helpful")
 
@@ -510,7 +825,7 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
                     test_history.extend(remedial_test)
 
                     human_traj, human_history = remedial_mdp.visualize_interaction(
-                        keys_map=params.keys_map)  # the latter is simply the gridworld locations of the agent
+                        keys_map=keys_map)  # the latter is simply the gridworld locations of the agent
                     # with open('models/' + data_loc + '/human_traj.pickle', 'wb') as f:
                     #     pickle.dump((human_traj, human_history), f)
                     # with open('models/' + data_loc + '/human_traj.pickle', 'rb') as f:
@@ -530,14 +845,15 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
                         failed_BEC_constraint = opt_feature_count - human_feature_count
                         print("You got the remedial test wrong. Here's the correct answer")
                         print("Failed BEC constraint: {}".format(failed_BEC_constraint))
-                        remedial_mdp.visualize_trajectory_comparison(remedial_traj, human_traj)
+                        normalized_remedial_traj, normalized_human_traj = normalize_trajs(remedial_traj, human_traj, data_loc)
+                        remedial_mdp.visualize_trajectory_comparison(normalized_remedial_traj, normalized_human_traj)
 
                         particles.update([-failed_BEC_constraint])
                         if visualize_pf_transition:
                             BEC_viz.visualize_pf_transition([-failed_BEC_constraint], particles, mdp_class, weights)
 
 
-def analyze_prev_study_tests(domain, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, n_human_models_precomputed, data_loc, weights, step_cost_flag, visualize_pf_transition=True):
+def analyze_prev_study_tests(domain, BEC_summary, visited_env_traj_idxs, particles_summary, pool, prior, n_particles, n_human_models, n_human_models_precomputed, data_loc, weights, step_cost_flag, keys_map, visualize_pf_transition=True):
     with open('filtered_human_responses.pickle', 'rb') as f:
         filtered_human_traj_dict, filtered_mdp_dict, filtered_count_dict, filtered_opt_reward_dict, filtered_human_reward_dict, filtered_opt_traj_dict = pickle.load(
             f)
@@ -607,7 +923,7 @@ def analyze_prev_study_tests(domain, BEC_summary, visited_env_traj_idxs, particl
 
                 # print("Here is a diagnostic test for this unit")
                 # human_traj, human_history = test_mdp.visualize_interaction(
-                #     keys_map=params.keys_map)  # the latter is simply the gridworld locations of the agent
+                #     keys_map=keys_map)  # the latter is simply the gridworld locations of the agent
 
                 human_feature_count = test_mdp.accumulate_reward_features(human_traj, discount=True)
                 opt_feature_count = test_mdp.accumulate_reward_features(opt_traj, discount=True)
@@ -691,7 +1007,7 @@ def analyze_prev_study_tests(domain, BEC_summary, visited_env_traj_idxs, particl
                         # test_history.extend(remedial_test)
 
                         human_traj, human_history = remedial_mdp.visualize_interaction(
-                            keys_map=params.keys_map)  # the latter is simply the gridworld locations of the agent
+                            keys_map=keys_map)  # the latter is simply the gridworld locations of the agent
                         # with open('models/' + data_loc + '/human_traj.pickle', 'wb') as f:
                         #     pickle.dump((human_traj, human_history), f)
                         # with open('models/' + data_loc + '/human_traj.pickle', 'rb') as f:
@@ -1022,10 +1338,8 @@ def precompute_counterfactual_constraints(data_loc, mdp_parameters, weights, BEC
                  True) for i in range(n_processed_envs, len(traj_record))]
             _ = list(tqdm(pool.imap(BEC.compute_counterfactuals, args), total=len(args)))
 
-if __name__ == "__main__":
-    from numpy.random import seed
-    seed(0)
 
+def run_scripts():
     pool = Pool(min(params.n_cpu, 64))
     os.makedirs('models/' + params.data_loc['base'], exist_ok=True)
     os.makedirs('models/' + params.data_loc['BEC'], exist_ok=True)
@@ -1048,23 +1362,29 @@ if __name__ == "__main__":
     # b) obtain a BEC summary of the agent's policy
     BEC_summary, visited_env_traj_idxs, particles_summary = obtain_summary(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'],
                             params.step_cost_flag, params.BEC['summary_variant'], pool, params.BEC['n_train_demos'], params.BEC['BEC_depth'],
-                            params.BEC['n_human_models'], params.BEC['n_particles'], params.prior, params.posterior, params.BEC['obj_func_proportion'], visited_env_traj_idxs)
+                            params.BEC['n_human_models'], params.BEC['n_particles'], params.prior, params.posterior, params.BEC['obj_func_proportion'], visited_env_traj_idxs=visited_env_traj_idxs)
 
     # c) run through the closed-loop teaching framework
-    simulate_teaching_loop(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.BEC['n_human_models_precomputed'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag)
-
-    n_human_models_real_time = 8
+    simulate_teaching_loop(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.BEC['n_human_models_precomputed'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, params.keys_map)
 
     # d) run remedial demonstration and test selection on previous participant responses from IROS
-    # analyze_prev_study_tests(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], n_human_models_real_time, params.BEC['n_human_models_precomputed'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, visualize_pf_transition=True)
+    # analyze_prev_study_tests(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.BEC['n_human_models_precomputed'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, params.keys_map, visualize_pf_transition=True)
 
     # e) compare the remedial demonstration selection when using 2-step dev/BEC vs. PF (assuming 3 static humans models for low, medium, and high difficulties)
-    # contrast_PF_2_step_dev(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], n_human_models_real_time, params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, visualize_pf_transition=False)
+    # contrast_PF_2_step_dev(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, visualize_pf_transition=False)
 
-    # c) obtain test environments
+    # f) obtain test environments
     # obtain_test_environments(params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,
     #                          params.step_cost_flag, params.BEC['n_human_models'], params.prior, params.posterior, summary=BEC_summary, visualize_test_env=True, use_counterfactual=True)
 
+    # g) expand a summary to the desired number of demonstrations (e.g. as a baseline condition for a user study)
+    # n_demos_desired = 14
+    # expanded_summary = ps_helpers.obtain_expanded_summary(BEC_summary, n_demos_desired, visited_env_traj_idxs, params.data_loc['BEC'])
+    # BEC.visualize_summary(expanded_summary)
 
     pool.close()
     pool.join()
+
+if __name__ == "__main__":
+    os.chdir('../../..')
+    run_scripts()
