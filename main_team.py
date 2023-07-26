@@ -46,7 +46,7 @@ import random
 
 def calc_expected_learning(team_knowledge_expected, particles_team_expected, min_BEC_constraints, new_constraints, params, summary_count):
 
-
+    
     team_knowledge_expected = team_helpers.update_team_knowledge(team_knowledge_expected, new_constraints, params.team_size,  params.weights['val'], params.step_cost_flag)
 
     p = 1
@@ -73,8 +73,125 @@ def calc_expected_learning(team_knowledge_expected, particles_team_expected, min
 
 
 
+def run_remedial_loop():
+
+        # Method 1: Generate remedial demonstration from the combined failed BEC constraints of the team
+        # print("Here is a remedial demonstration that might be helpful")
+        # min_failed_constraints = BEC_helpers.remove_redundant_constraints(failed_BEC_constraints_team, params.weights['val'], params.step_cost_flag)
+
+        # print('min_failed_constraints:', min_failed_constraints)
+        
+        # remedial_demos, visited_env_traj_idxs = team_helpers.obtain_remedial_demos_tests(params.data_loc['BEC'], BEC_summary[-1], visited_env_traj_idxs, min_failed_constraints, min_subset_constraints_record, traj_record, traj_features_record, running_variable_filter_unit, mdp_features_record)
+        # # print(remedial_demos[0])
+
+        # # TODO: Show remedial demonstration
+        # for demo in remedial_demos:
+        #     demo[0].visualize_trajectory(demo[1])
+        #     test_history.extend(demo)
+
+        #     particles_demo.update([demo[3]])
+        #     # print('remedial demo :', demo)
+        #     # print('remedial demo constraints:', demo[3])
+        #     if visualize_pf_transition:
+        #         team_helpers.visualize_transition(demo[3], particles_demo, params.mdp_class, params.weights['val'])
+
+        #     with open('models/' + params.data_loc['BEC'] + '/remedial_instruction.pickle', 'wb') as f:
+        #         pickle.dump(demo, f)
 
 
+        # # # Method 2: Generate remedial demonstration for each individual
+        # # p=1
+        # # for failed_BEC_cnst in failed_BEC_constraints_team:
+        # #     member_id = 'p' + str(p)
+        # #     remedial_demos, visited_env_traj_idxs = BEC.obtain_remedial_demonstrations(params.data_loc['BEC'], pool, particles_team[member_id], params.BEC['n_human_models'], failed_BEC_cnst, min_subset_constraints_record, env_record, traj_record, traj_features_record, test_history, visited_env_traj_idxs, running_variable_filter_unit, mdp_features_record, consistent_state_count, params.weights['val'], params.step_cost_flag, n_human_models_precomputed= params.BEC['n_human_models_precomputed'])
+
+        # #     # TODO: Show remedial demonstration
+        # #     for demo in remedial_demos:
+        # #         demo[0].visualize_trajectory(demo[1])
+        # #         test_history.extend(demo)
+
+        # #         particles_demo.update([demo[3]])
+        # #         # print('remedial demo :', demo)
+        # #         # print('remedial demo constraints:', demo[3])
+        # #         if visualize_pf_transition:
+        # #             team_helpers.visualize_transition(demo[3], particles_demo, params.mdp_class, params.weights['val'])
+
+        # #         with open('models/' + params.data_loc['BEC'] + '/remedial_instruction.pickle', 'wb') as f:
+        # #             pickle.dump(demo, f)
+
+
+
+
+        # # remedial_instruction, visited_env_traj_idxs = BEC.obtain_remedial_demonstrations(params.data_loc['BEC'], pool, particles_demo, params.BEC['n_human_models'], failed_BEC_constraint, min_subset_constraints_record, env_record, traj_record, traj_features_record, test_history, visited_env_traj_idxs, running_variable_filter_unit, mdp_features_record, consistent_state_count, params.weights['val'], params.step_cost_flag, n_human_models_precomputed= params.BEC['n_human_models_precomputed'])
+        # # remedial_mdp, remedial_traj, _, remedial_constraint, _ = remedial_instruction[0]
+        # # remedial_mdp.visualize_trajectory(remedial_traj)
+        # # test_history.extend(remedial_instruction)
+
+        # # particles_demo.update([remedial_constraint])
+        # # if visualize_pf_transition:
+        # #     BEC_viz.visualize_pf_transition([remedial_constraint], particles_demo, params.mdp_class, params.weights['val'])
+
+        # # with open('models/' + params.data_loc['BEC'] + '/remedial_instruction.pickle', 'wb') as f:
+        # #     pickle.dump(remedial_instruction, f)
+
+
+
+
+        #     # # TODO: Conduct remedial test
+        #     # remedial_test_correct = False
+
+        #     # print("Here is a remedial test to see if you've correctly learned the lesson")
+        #     # while not remedial_test_correct:
+
+        #     remedial_test, visited_env_traj_idxs = BEC.obtain_remedial_demonstrations(data_loc, pool,
+        #                                                                                     particles,
+        #                                                                                     n_human_models,
+        #                                                                                     failed_BEC_constraint,
+        #                                                                                     min_subset_constraints_record,
+        #                                                                                     env_record,
+        #                                                                                     traj_record,
+        #                                                                                     traj_features_record,
+        #                                                                                     test_history,
+        #                                                                                     visited_env_traj_idxs,
+        #                                                                                     running_variable_filter,
+        #                                                                                     mdp_features_record,
+        #                                                                                     consistent_state_count,
+        #                                                                                     weights,
+        #                                                                                     step_cost_flag, type='testing', n_human_models_precomputed=n_human_models_precomputed)
+
+        #     remedial_mdp, remedial_traj, _, _, _ = remedial_test[0]
+        #     test_history.extend(remedial_test)
+
+        #     human_traj, human_history = remedial_mdp.visualize_interaction(
+        #         keys_map=params.keys_map)  # the latter is simply the gridworld locations of the agent
+        #     # with open('models/' + data_loc + '/human_traj.pickle', 'wb') as f:
+        #     #     pickle.dump((human_traj, human_history), f)
+        #     # with open('models/' + data_loc + '/human_traj.pickle', 'rb') as f:
+        #     #     human_traj, human_history = pickle.load(f)
+
+        #     human_feature_count = remedial_mdp.accumulate_reward_features(human_traj, discount=True)
+        #     opt_feature_count = remedial_mdp.accumulate_reward_features(remedial_traj, discount=True)
+
+        #     if (human_feature_count == opt_feature_count).all():
+        #         print("You got the remedial test correct")
+        #         remedial_test_correct = True
+
+        #         particles.update([failed_BEC_constraint])
+        #         if visualize_pf_transition:
+        #             BEC_viz.visualize_pf_transition([failed_BEC_constraint], particles, mdp_class, weights)
+        #     else:
+        #         failed_BEC_constraint = opt_feature_count - human_feature_count
+        #         print("You got the remedial test wrong. Here's the correct answer")
+        #         print("Failed BEC constraint: {}".format(failed_BEC_constraint))
+        #         remedial_mdp.visualize_trajectory_comparison(remedial_traj, human_traj)
+
+        #         particles.update([-failed_BEC_constraint])
+        #         if visualize_pf_transition:
+        #             BEC_viz.visualize_pf_transition([-failed_BEC_constraint], particles, mdp_class, weights)
+
+        # # TODO: Update human models and checking if the learning goal is met; if not, loop back to remedial test loop
+
+    return 1
 
 
 
@@ -154,15 +271,32 @@ if __name__ == "__main__":
     demo_reset_flag = False
     team_knowledge = team_prior.copy() # team_prior calculated from team_helpers.sample_team_pf also has the aggregated knowledge from individual priors
     visualize_pf_transition = True
+    prev_summary_len = 0
 
     # for debugging
     particles_team_expected = particles_team.copy()
-    print('particles_team_expected: ', particles_team_expected)
     team_knowledge_expected = team_knowledge.copy()
+
+    # for testing design choices (is remedial demo needed)
+    remedial_test_flag = False
+    demo_vars_template = {'demo_strategy': None,
+                          'variable_filter': None,
+                          'event_type': None,
+                            'summary_count': None,
+                            'summary_constraints': None,
+                            'knowledge_id': None,
+                            'team_knowledge': None,
+                            'team_knowledge_expected': None,
+                            'particles_demo': None,
+                            'particles_team': None,
+                            'particles_team_expected': None,
+                            'knowldge_level': None,
+                            'knowldge_level_expected': None}
 
 
     # demo_strategy = params.demo_strategy
     
+    # for quick testing
     demo_strategy = 'common_knowledge'
     # demo_strategy = 'joint_knowledge'
     # demo_strategy = 'individual_knowledge_low'
@@ -171,33 +305,32 @@ if __name__ == "__main__":
     print('Demo strategy: ', demo_strategy)
 
 
-    # TODO: Unitwise teaching-testing loop
+    # Get the cached demo for the first unit, if available
+    knowledge_id, particles_demo = team_helpers.particles_for_demo_strategy(demo_strategy, team_knowledge, particles_team, params.team_size, params.weights['val'], params.step_cost_flag, params.BEC['n_particles'], min_BEC_constraints)
+
+    try:
+        with open('models/' + params.data_loc['BEC'] + '/BEC_summary.pickle', 'rb') as f:
+            BEC_summary, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = pickle.load(f)
+    except:
+        BEC_summary, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = team_helpers.obtain_team_summary(params.data_loc['BEC'], min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, params.weights['val'], params.step_cost_flag, 
+                                                                                                              pool, params.BEC['n_human_models'], consistent_state_count, params.BEC['n_train_demos'], particles_demo, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs)
+         
+
+
+    ################################################
+
+    # WIP: Unitwise teaching-testing loop
     while not teaching_complete_flag:
 
-        # TODO: Sample particles from the corresponding human/team knowledge based on the demo strategy
-        # print(team_knowledge)
-        if summary_count == 0 or demo_reset_flag == True:
-            particles_demo = team_helpers.particles_for_demo_strategy(demo_strategy, team_knowledge, particles_team, params.team_size, params.weights['val'], params.step_cost_flag, params.BEC['n_particles'], min_BEC_constraints)
+        # # Sample particles from the corresponding human/team knowledge based on the demo strategy
+        # if demo_reset_flag == True:
+        #     knowledge_id, particles_demo = team_helpers.particles_for_demo_strategy(demo_strategy, team_knowledge, particles_team, params.team_size, params.weights['val'], params.step_cost_flag, params.BEC['n_particles'], min_BEC_constraints)
 
-        # print(particles_demo)
-        # particles_test = particles_demo.copy()
 
-        prev_summary_len = len(BEC_summary)
-
-        #### Individual demos
-        # TODO: obtain a BEC demonstration for this unit
-        try:
-            with open('models/' + params.data_loc['BEC'] + '/BEC_summary.pickle', 'rb') as f:
-                BEC_summary, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = pickle.load(f)
-        except:
+        # Obtain BEC summary for new unit (skip if its the 1st unit)
+        if summary_count > 0:
             BEC_summary, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = team_helpers.obtain_team_summary(params.data_loc['BEC'], min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, params.weights['val'], params.step_cost_flag, 
-                                                                                                              pool, params.BEC['n_human_models'], consistent_state_count, params.BEC['n_train_demos'], prior, particles_demo, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs)
-            # # save the first set of summaries for quick testing
-            # if len(BEC_summary) > 0 and prev_summary_len == 0:
-            #     with open('models/' + params.data_loc['BEC'] + '/BEC_summary.pickle', 'wb') as f:
-            #         pickle.dump((BEC_summary, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo), f)    
-            # break
-        ###############
+                                                                                                                pool, params.BEC['n_human_models'], consistent_state_count, params.BEC['n_train_demos'], particles_demo, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs)
 
 
         # TODO: Demo-test-remedial-test loop if new summary is obtained
@@ -206,17 +339,18 @@ if __name__ == "__main__":
         if len(BEC_summary) > prev_summary_len:
             unit_constraints, running_variable_filter_unit = team_helpers.show_demonstrations(BEC_summary[-1], particles_demo, params.mdp_class, params.weights['val'], visualize_pf_transition, summary_count)
 
-
             print('Variable filter:', variable_filter)
             print('running variable filter:', running_variable_filter_unit)
 
-            # For debugging. Visualize the expected particles
-            team_knowledge_expected, particles_team_expected = calc_expected_learning(team_knowledge_expected, particles_team_expected, min_BEC_constraints, unit_constraints, params, summary_count)
-
-
-            # Conduct tests
             # obtain the constraints conveyed by the unit's demonstrations
-            min_constraints = BEC_helpers.remove_redundant_constraints(unit_constraints, params.weights['val'], params.step_cost_flag)
+            min_unit_constraints = BEC_helpers.remove_redundant_constraints(unit_constraints, params.weights['val'], params.step_cost_flag)
+
+
+            # For debugging. Visualize the expected particles
+            team_knowledge_expected, particles_team_expected = calc_expected_learning(team_knowledge_expected, particles_team_expected, min_BEC_constraints, min_unit_constraints, params, summary_count)
+
+
+            ## Conduct tests for the unit
             # obtain the diagnostic tests that will test the human's understanding of the unit's constraints
             preliminary_tests, visited_env_traj_idxs = BEC.obtain_diagnostic_tests(params.data_loc['BEC'], BEC_summary[-1], visited_env_traj_idxs, min_constraints, min_subset_constraints_record, traj_record, traj_features_record, running_variable_filter_unit, mdp_features_record)
             # print(preliminary_tests[0])
@@ -245,7 +379,9 @@ if __name__ == "__main__":
                     if (human_feature_count == opt_feature_count).all():
                         print("You got the diagnostic test right")
 
+                        test_constraints_team.append([test_constraints])
                         particles_team[member_id].update(test_constraints) # update individual knowledge based on test response
+                        
                         if visualize_pf_transition:
                             team_helpers.visualize_transition(test_constraints, particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Test of Unit ' + str(summary_count) + ' for player ' + member_id)
 
@@ -254,8 +390,8 @@ if __name__ == "__main__":
                         failed_BEC_constraint = opt_feature_count - human_feature_count
                         print("Failed BEC constraint: {}".format(failed_BEC_constraint))
                         test_constraints_team.append([-failed_BEC_constraint])
-
                         particles_team[member_id].update([-failed_BEC_constraint])
+                        
                         if visualize_pf_transition:
                             team_helpers.visualize_transition([-failed_BEC_constraint], particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Test of Unit ' + str(summary_count + 1) + ' for player ' + member_id)
 
@@ -268,172 +404,47 @@ if __name__ == "__main__":
                 print('test_constraints_team_expanded: ', test_constraints_team_expanded)
 
                 # Update common knowledge model
+                team_knowledge['common_knowledge'].append(test_constraints_team_expanded)
                 particles_team['common_knowledge'].update(test_constraints_team_expanded)
                 if visualize_pf_transition:
                     team_helpers.visualize_transition(test_constraints_team_expanded, particles_team['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Test of Unit ' + str(summary_count + 1) + ' for common knowledge')
                 
                 # Update joint knowledge model
+                team_knowledge['joint_knowledge'].append(test_constraints_team_expanded)
                 particles_team['joint_knowledge'].update_jk(test_constraints_team)
                 if visualize_pf_transition:
                     team_helpers.visualize_transition(test_constraints_team_expanded, particles_team['joint_knowledge'], params.mdp_class, params.weights['val'], text = 'Test of Unit ' + str(summary_count + 1) + ' for joint knowledge',  demo_strategy = 'joint_knowledge')
 
 
-                # # update knowledge for strategy
-                # particles_test.update( [-x for x in failed_BEC_constraints_team])
-                # if visualize_pf_transition:
-                #         team_helpers.visualize_transition([ -x for x in failed_BEC_constraints_team], particles_demo, params.mdp_class, params.weights['val'])
-
-
-
 
                 #####################################################################
-
                 # Remedial demo-test loop
-
-                # TODO: Generate remedial demonstration
-
                 # if remedial_test_flag: 
 
-                    # Method 1: Generate remedial demonstration from the combined failed BEC constraints of the team
-                    # print("Here is a remedial demonstration that might be helpful")
-                    # min_failed_constraints = BEC_helpers.remove_redundant_constraints(failed_BEC_constraints_team, params.weights['val'], params.step_cost_flag)
-
-                    # print('min_failed_constraints:', min_failed_constraints)
-                    
-                    # remedial_demos, visited_env_traj_idxs = team_helpers.obtain_remedial_demos_tests(params.data_loc['BEC'], BEC_summary[-1], visited_env_traj_idxs, min_failed_constraints, min_subset_constraints_record, traj_record, traj_features_record, running_variable_filter_unit, mdp_features_record)
-                    # # print(remedial_demos[0])
-
-                    # # TODO: Show remedial demonstration
-                    # for demo in remedial_demos:
-                    #     demo[0].visualize_trajectory(demo[1])
-                    #     test_history.extend(demo)
-
-                    #     particles_demo.update([demo[3]])
-                    #     # print('remedial demo :', demo)
-                    #     # print('remedial demo constraints:', demo[3])
-                    #     if visualize_pf_transition:
-                    #         team_helpers.visualize_transition(demo[3], particles_demo, params.mdp_class, params.weights['val'])
-
-                    #     with open('models/' + params.data_loc['BEC'] + '/remedial_instruction.pickle', 'wb') as f:
-                    #         pickle.dump(demo, f)
-
-
-                    # # # Method 2: Generate remedial demonstration for each individual
-                    # # p=1
-                    # # for failed_BEC_cnst in failed_BEC_constraints_team:
-                    # #     member_id = 'p' + str(p)
-                    # #     remedial_demos, visited_env_traj_idxs = BEC.obtain_remedial_demonstrations(params.data_loc['BEC'], pool, particles_team[member_id], params.BEC['n_human_models'], failed_BEC_cnst, min_subset_constraints_record, env_record, traj_record, traj_features_record, test_history, visited_env_traj_idxs, running_variable_filter_unit, mdp_features_record, consistent_state_count, params.weights['val'], params.step_cost_flag, n_human_models_precomputed= params.BEC['n_human_models_precomputed'])
-
-                    # #     # TODO: Show remedial demonstration
-                    # #     for demo in remedial_demos:
-                    # #         demo[0].visualize_trajectory(demo[1])
-                    # #         test_history.extend(demo)
-
-                    # #         particles_demo.update([demo[3]])
-                    # #         # print('remedial demo :', demo)
-                    # #         # print('remedial demo constraints:', demo[3])
-                    # #         if visualize_pf_transition:
-                    # #             team_helpers.visualize_transition(demo[3], particles_demo, params.mdp_class, params.weights['val'])
-
-                    # #         with open('models/' + params.data_loc['BEC'] + '/remedial_instruction.pickle', 'wb') as f:
-                    # #             pickle.dump(demo, f)
-
-
-
-
-                    # # remedial_instruction, visited_env_traj_idxs = BEC.obtain_remedial_demonstrations(params.data_loc['BEC'], pool, particles_demo, params.BEC['n_human_models'], failed_BEC_constraint, min_subset_constraints_record, env_record, traj_record, traj_features_record, test_history, visited_env_traj_idxs, running_variable_filter_unit, mdp_features_record, consistent_state_count, params.weights['val'], params.step_cost_flag, n_human_models_precomputed= params.BEC['n_human_models_precomputed'])
-                    # # remedial_mdp, remedial_traj, _, remedial_constraint, _ = remedial_instruction[0]
-                    # # remedial_mdp.visualize_trajectory(remedial_traj)
-                    # # test_history.extend(remedial_instruction)
-
-                    # # particles_demo.update([remedial_constraint])
-                    # # if visualize_pf_transition:
-                    # #     BEC_viz.visualize_pf_transition([remedial_constraint], particles_demo, params.mdp_class, params.weights['val'])
-
-                    # # with open('models/' + params.data_loc['BEC'] + '/remedial_instruction.pickle', 'wb') as f:
-                    # #     pickle.dump(remedial_instruction, f)
-
-
-
-
-                    #     # # TODO: Conduct remedial test
-                    #     # remedial_test_correct = False
-
-                    #     # print("Here is a remedial test to see if you've correctly learned the lesson")
-                    #     # while not remedial_test_correct:
-
-                    #     remedial_test, visited_env_traj_idxs = BEC.obtain_remedial_demonstrations(data_loc, pool,
-                    #                                                                                     particles,
-                    #                                                                                     n_human_models,
-                    #                                                                                     failed_BEC_constraint,
-                    #                                                                                     min_subset_constraints_record,
-                    #                                                                                     env_record,
-                    #                                                                                     traj_record,
-                    #                                                                                     traj_features_record,
-                    #                                                                                     test_history,
-                    #                                                                                     visited_env_traj_idxs,
-                    #                                                                                     running_variable_filter,
-                    #                                                                                     mdp_features_record,
-                    #                                                                                     consistent_state_count,
-                    #                                                                                     weights,
-                    #                                                                                     step_cost_flag, type='testing', n_human_models_precomputed=n_human_models_precomputed)
-
-                    #     remedial_mdp, remedial_traj, _, _, _ = remedial_test[0]
-                    #     test_history.extend(remedial_test)
-
-                    #     human_traj, human_history = remedial_mdp.visualize_interaction(
-                    #         keys_map=params.keys_map)  # the latter is simply the gridworld locations of the agent
-                    #     # with open('models/' + data_loc + '/human_traj.pickle', 'wb') as f:
-                    #     #     pickle.dump((human_traj, human_history), f)
-                    #     # with open('models/' + data_loc + '/human_traj.pickle', 'rb') as f:
-                    #     #     human_traj, human_history = pickle.load(f)
-
-                    #     human_feature_count = remedial_mdp.accumulate_reward_features(human_traj, discount=True)
-                    #     opt_feature_count = remedial_mdp.accumulate_reward_features(remedial_traj, discount=True)
-
-                    #     if (human_feature_count == opt_feature_count).all():
-                    #         print("You got the remedial test correct")
-                    #         remedial_test_correct = True
-
-                    #         particles.update([failed_BEC_constraint])
-                    #         if visualize_pf_transition:
-                    #             BEC_viz.visualize_pf_transition([failed_BEC_constraint], particles, mdp_class, weights)
-                    #     else:
-                    #         failed_BEC_constraint = opt_feature_count - human_feature_count
-                    #         print("You got the remedial test wrong. Here's the correct answer")
-                    #         print("Failed BEC constraint: {}".format(failed_BEC_constraint))
-                    #         remedial_mdp.visualize_trajectory_comparison(remedial_traj, human_traj)
-
-                    #         particles.update([-failed_BEC_constraint])
-                    #         if visualize_pf_transition:
-                    #             BEC_viz.visualize_pf_transition([-failed_BEC_constraint], particles, mdp_class, weights)
-
-                    # # TODO: Update human models and checking if the learning goal is met; if not, loop back to remedial test loop
-
+                    # run_remedial_loop()
                 #####################################################################
         
-
-
-        summary_count += 1
-
-        # Update demo particles for next iteration
-        if demo_strategy == 'common_knowledge' or 'joint_knowledge':
-            particles_demo = particles_team[demo_strategy]
         
 
-        print('particles_demo: ', particles_demo)
+            summary_count += 1
+            prev_summary_len = len(BEC_summary)
+
+            # Update demo particles for next iteration based on actual team knowledge and the demo strategu
+            particles_demo = particles_team[knowledge_id]
+            
+            unit_learning_goal_reached = team_helpers.check_unit_learning_goal_reached(team_knowledge, min_unit_constraints)
+
+            # TODO: Update variable filter
+            if unit_learning_goal_reached:
+                variable_filter, nonzero_counter, teaching_complete_flag = team_helpers.check_and_update_variable_filter(variable_filter = variable_filter, nonzero_counter = nonzero_counter, no_info_flag = no_info_flag)
 
 
-        # TODO: Update variable filter
-        if no_info_flag:
-            variable_filter, nonzero_counter, teaching_complete_flag = team_helpers.check_and_update_variable_filter(variable_filter = variable_filter, nonzero_counter = nonzero_counter, no_info_flag = no_info_flag)
-
-
-        # Temp to stop loop
-        teaching_complete_flag = True
-        print(colored('Teaching completed...', 'blue'))
+            if teaching_complete_flag:
+                print(colored('Teaching completed...', 'blue'))
         
-
+    
+        else:
+            print(colored('No new summaries...!!', 'red'))
 
 # save files
     # if len(BEC_summary) > 0:

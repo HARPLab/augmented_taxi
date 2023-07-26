@@ -150,6 +150,7 @@ def check_info_gain(info_gains_record, consistent_state_count):
 
 def check_and_update_variable_filter(min_subset_constraints_record = None, variable_filter = None, nonzero_counter = None, initialize_filter_flag = False, no_info_flag = False):
     
+    
     if initialize_filter_flag:
         # true constraints
         min_subset_constraints_record_flattened = [item for sublist in min_subset_constraints_record for item in sublist]
@@ -214,41 +215,67 @@ def calc_knowledge_level(team_knowledge, min_BEC_constraints):
     print('Calculating knowledge level...')
     
     for knowledge_id, knowledge_type in enumerate(team_knowledge):
-        if knowledge_type == 'joint_knowledge':
-            x=1
+        # if knowledge_type == 'joint_knowledge':
+        #     x=1
 
-        else:
-            # print('min_BEC_constraints: ', [min_BEC_constraints])
-            min_BEC_area = BEC_helpers.calc_solid_angles([min_BEC_constraints])
-            # print('knowledge: ', team_knowledge[knowledge_type])
-            knowledge_area = BEC_helpers.calc_solid_angles([team_knowledge[knowledge_type]])
+        # else:
+        #     # print('min_BEC_constraints: ', [min_BEC_constraints])
+        #     min_BEC_area = BEC_helpers.calc_solid_angles([min_BEC_constraints])
+        #     # print('knowledge: ', team_knowledge[knowledge_type])
+        #     knowledge_area = BEC_helpers.calc_solid_angles([team_knowledge[knowledge_type]])
             
-            # n_particles = 5000
-            n_particles = 500
-            knowledge_particles = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform(team_knowledge[knowledge_type], n_particles))
+        #     # n_particles = 5000
+        #     n_particles = 500
+        #     knowledge_particles = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform(team_knowledge[knowledge_type], n_particles))
 
-            const_id = []
-            for j, x in enumerate(knowledge_particles.positions):
+        #     const_id = []
+        #     for j, x in enumerate(knowledge_particles.positions):
 
-                all_constraints_satisfied = True
-                for constraint in min_BEC_constraints:
-                    dot = constraint.dot(x.T)
+        #         all_constraints_satisfied = True
+        #         for constraint in min_BEC_constraints:
+        #             dot = constraint.dot(x.T)
 
-                    if dot < 0:
-                        all_constraints_satisfied = False
+        #             if dot < 0:
+        #                 all_constraints_satisfied = False
                 
-                if all_constraints_satisfied:
-                    const_id.append(j)
+        #         if all_constraints_satisfied:
+        #             const_id.append(j)
             
-            BEC_overlap_area = min(min_BEC_area, len(const_id)/n_particles * np.array(knowledge_area))
+        #     BEC_overlap_area = min(min_BEC_area, len(const_id)/n_particles * np.array(knowledge_area))
             
-            # # Method 1: Calculates the knowledge level (0 to 1) based on two factors: ratio of BEC area to knowledge area and % of overlap of BEC area with knowledge area
-            # knowledge_spread = np.array(knowledge_area)/np.array(min_BEC_area)
-            # BEC_overlap_ratio = BEC_overlap_area/np.array(min_BEC_area)
-            # knowledge_level[knowledge_type] = 0.5*BEC_overlap_ratio + 0.5/knowledge_spread
+        #     # # Method 1: Calculates the knowledge level (0 to 1) based on two factors: ratio of BEC area to knowledge area and % of overlap of BEC area with knowledge area
+        #     # knowledge_spread = np.array(knowledge_area)/np.array(min_BEC_area)
+        #     # BEC_overlap_ratio = BEC_overlap_area/np.array(min_BEC_area)
+        #     # knowledge_level[knowledge_type] = 0.5*BEC_overlap_ratio + 0.5/knowledge_spread
 
-            # Method 2: Calculate knowledge level based on the ratio of BEC overlap area with the total knowledge area
-            knowledge_level[knowledge_type] = BEC_overlap_area/np.array(knowledge_area)
+        #     # Method 2: Calculate knowledge level based on the ratio of BEC overlap area with the total knowledge area
+        #     knowledge_level[knowledge_type] = BEC_overlap_area/np.array(knowledge_area)
+
+        ##############################################
+
+        # Method 3: Use Jaccard's index for set similarity (Intersection over Union)
+
+        # print('min_BEC_constraints: ', [min_BEC_constraints])
+        min_BEC_area = BEC_helpers.calc_solid_angles([min_BEC_constraints])
+        # print('knowledge: ', team_knowledge[knowledge_type])
+        knowledge_area = BEC_helpers.calc_solid_angles([team_knowledge[knowledge_type]])
+
+        min_BEC_constraints_copy = min_BEC_constraints.copy()
+        min_BEC_knowledge_intersection = BEC_helpers.calc_solid_angles([min_BEC_constraints_copy.append(team_knowledge[knowledge_type])])
+
+        if min_BEC_knowledge_intersection > 0:
+            min_BEC_knowledge_union = min_BEC_area + knowledge_area - min_BEC_knowledge_intersection
+        else:
+            min_BEC_knowledge_union = 1
+        
+        knowledge_level[knowledge_type] = min_BEC_knowledge_intersection/min_BEC_knowledge_union
+
+
+        # Method 4: An improved method for disjoint sets to see how close the disjoint is Generalized Intersection over Union (see https://giou.stanford.edu/)
+        # TODO: Later
+
+
+
 
     return knowledge_level
 
@@ -369,19 +396,23 @@ def particles_for_demo_strategy(demo_strategy, team_knowledge, team_particles, t
     # particles to consider while generating demos
     if demo_strategy =='individual_knowledge_low':
         ind_knowledge_ascending = find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints)
-        particles = team_particles[ind_knowledge_ascending[teammate_idx]].copy()
+        knowledge_id = 'p' + str(ind_knowledge_ascending[teammate_idx])
     
     elif demo_strategy == 'individual_knowledge_high':
         ind_knowledge_ascending = find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints)
-        particles = team_particles[ind_knowledge_ascending[len(ind_knowledge_ascending) - teammate_idx - 1]].copy()
+        knowledge_id = 'p' + str(ind_knowledge_ascending[len(ind_knowledge_ascending) - teammate_idx - 1])
     
     elif demo_strategy == 'common_knowledge' or demo_strategy == 'joint_knowledge':
         particles = team_particles[demo_strategy]
+        knowledge_id = demo_strategy
     
     else:
         print('Unsupported demo strategy for sampling particles!')
 
-    return particles
+    particles = team_particles[knowledge_id].copy()
+
+    
+    return knowledge_id, particles
 
 
 
@@ -496,7 +527,7 @@ def sample_human_models_uniform_joint_knowledge(joint_constraints, n_models):
 
 
 def obtain_team_summary(data_loc, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
-                        n_train_demos, prior, particles_demo, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs):
+                        n_train_demos, particles_demo, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs):
 
 
     summary_variant = 'counterfactual'
@@ -1370,6 +1401,19 @@ def obtain_remedial_demos_tests(data_loc, previous_demos, visited_env_traj_idxs,
         visited_env_traj_idxs.append((env_idx, traj_idx))
 
     return preliminary_tests, visited_env_traj_idxs
+
+
+def check_unit_learning_goal_reached(team_knowledge, min_unit_constraints):
+
+    
+    check_unit_learning_goal_reached = False
+    
+    knowledge_level = calc_knowledge_level(team_knowledge, min_unit_constraints)
+    if knowledge_level['common_knowledge'] > 0.4:
+        check_unit_learning_goal_reached = True
+    
+
+    return check_unit_learning_goal_reached
 
 
 
