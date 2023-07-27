@@ -14,7 +14,8 @@ from __future__ import print_function
 import random
 import copy
 import numpy as np
-
+import pyautogui
+(width,height) = pyautogui.size()
 # Other imports.
 from simple_rl.mdp.oomdp.OOMDPClass import OOMDP
 from simple_rl.mdp.oomdp.OOMDPObjectClass import OOMDPObject
@@ -254,7 +255,20 @@ class AugmentedTaxi2OOMDP(OOMDP):
     def visualize_agent(self, agent, cur_state=None, width_scr_scale=180, height_scr_scale=180, augmented_inputs=False):
         from simple_rl.utils.mdp_visualizer import visualize_agent
         from .taxi_visualizer import _draw_augmented_state
-        visualize_agent(self, agent, _draw_augmented_state, cur_state=cur_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='augmented_taxi2', augmented_inputs=augmented_inputs)
+        scr_width=self.width*width_scr_scale
+        scr_height=self.height*height_scr_scale
+        if scr_width > width:
+            scr_width = width*0.9
+            print("shrinking width")
+        if scr_height > height:
+            scr_height = height*0.85
+            print("shrinking height")
+        #correcting for strech:
+        streched_scale_width = scr_width/self.width
+        streched_scale_height = scr_height/self.height
+        scr_height = self.height*min(streched_scale_height,streched_scale_width)
+        scr_width = self.width*min(streched_scale_height,streched_scale_width)
+        visualize_agent(self, agent, _draw_augmented_state, cur_state=cur_state, scr_width=scr_width, scr_height=scr_height, mdp_class='augmented_taxi2', augmented_inputs=augmented_inputs)
 
     # Press <1>, <2>, <3>, and so on to execute action 1, action 2, etc.
     def visualize_interaction(self, interaction_callback=None, done_callback=None, keys_map=None, width_scr_scale=180, height_scr_scale=180, augmented_inputs=False):
@@ -289,9 +303,21 @@ class AugmentedTaxi2OOMDP(OOMDP):
 
     def visualize_state(self, cur_state, width_scr_scale=180, height_scr_scale=180, augmented_inputs=False):
         from simple_rl.utils.mdp_visualizer import visualize_state
-        from .taxi_visualizer import _draw_augmented_state
-
-        return visualize_state(self, _draw_augmented_state, cur_state=cur_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, augmented_inputs=augmented_inputs)
+        from .taxi_visualizer import _draw_augmented_state 
+        scr_width=self.width*width_scr_scale
+        scr_height=self.height*height_scr_scale
+        if scr_width > width:
+            scr_width = width*0.9
+            print("shrinking width")
+        if scr_height > height:
+            scr_height = height*0.85
+            print("shrinking height")
+        #correcting for strech:
+        streched_scale_width = scr_width/self.width
+        streched_scale_height = scr_height/self.height
+        scr_height = self.height*min(streched_scale_height,streched_scale_width)
+        scr_width = self.width*min(streched_scale_height,streched_scale_width)
+        return visualize_state(self, _draw_augmented_state, cur_state=cur_state, scr_width=scr_width, scr_height=scr_height, augmented_inputs=augmented_inputs)
 
     def visualize_trajectory(self, trajectory, marked_state_importances=None, width_scr_scale=180, height_scr_scale=180, counterfactual_traj=None, augmented_inputs=False):
         from simple_rl.utils.mdp_visualizer import visualize_trajectory

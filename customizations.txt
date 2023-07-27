@@ -1,6 +1,13 @@
-xxax
-pwwx
-wxdx
+xxxxxa
+xxxxxx
+xxwwxx
+xpwwxx
+ttxxdx
+ttxxxx
+
+xxa
+pwx
+txd
 
 Dictionary example: 
     'agent': {'x': 4, 'y': 1, 'has_passenger': 0},
