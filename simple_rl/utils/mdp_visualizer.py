@@ -143,7 +143,7 @@ def _draw_terminal_text(mdp_class, cur_state, scr_width, scr_height, title_font)
             goal_text = "Fail!"
 
     goal_text_rendered = title_font.render(goal_text, True, (75, 75, 75))
-    goal_text_point = scr_width / 2.0 - (len(goal_text) * 8), 19 * scr_height / 20.0
+    goal_text_point = scr_width / 2.0 - (len(goal_text) * 8), 18 * scr_height / 20.0
 
     return goal_text_rendered, goal_text_point
 

@@ -251,7 +251,7 @@ class AugmentedTaxi2OOMDP(OOMDP):
         return "taxi_h-" + str(self.height) + "_w-" + str(self.width)
 
     # Visualize the agent's policy. --> Press <spacebar> to advance the agent.
-    def visualize_agent(self, agent, cur_state=None, width_scr_scale=160, height_scr_scale=160, augmented_inputs=False):
+    def visualize_agent(self, agent, cur_state=None, width_scr_scale=180, height_scr_scale=180, augmented_inputs=False):
         from simple_rl.utils.mdp_visualizer import visualize_agent
         from .taxi_visualizer import _draw_augmented_state
         visualize_agent(self, agent, _draw_augmented_state, cur_state=cur_state, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, mdp_class='augmented_taxi2', augmented_inputs=augmented_inputs)
@@ -287,7 +287,7 @@ class AugmentedTaxi2OOMDP(OOMDP):
         }
         visualize_policy(self, policy, _draw_augmented_state, action_char_dict, scr_width=self.width*width_scr_scale, scr_height=self.height*height_scr_scale, augmented_inputs=augmented_inputs)
 
-    def visualize_state(self, cur_state, width_scr_scale=160, height_scr_scale=160, augmented_inputs=False):
+    def visualize_state(self, cur_state, width_scr_scale=180, height_scr_scale=180, augmented_inputs=False):
         from simple_rl.utils.mdp_visualizer import visualize_state
         from .taxi_visualizer import _draw_augmented_state
 
