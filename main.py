@@ -1103,8 +1103,9 @@ if __name__ == "__main__":
     #                          params.step_cost_flag, params.BEC['BEC_depth'], params.BEC['n_human_models_precomputed'])
 
     # a) generate an agent if you want to explore the Augmented Taxi MDP
-    '''new_parser = True
+    
     try:
+        '''
         if not new_parser:
             print("entered here")
             file = open('customizations.txt', mode = 'r')
@@ -1174,80 +1175,79 @@ if __name__ == "__main__":
             params.mdp_parameters["height"] = new_list[6][0]
             #print(params.mdp_parameters["height"])
         else:'''
-    file = open('customizations.txt', mode = 'r')
-    lines = file.readlines()
-    file.close()
-    #finding the first empty line and setting new_list to only contain the lines before that
-    new_list = []
-    for line in lines:
-        line = line.split(',')
-        if line == ['\n']:
-            break
-        line = [i.strip() for i in line]
-        new_list.append(line)
-    width = len(new_list[0][0])
-    height = len(new_list)
-    row = 0
-    col = 0
-    walls = []
-    passenger_loc = []
-    tolls = []
-    agent = None
-    battery = []
-    for line in new_list:
-        row += 1
-        print(line)
-        for character in line[0]:
-            print(character)
-            col += 1
-            if character == 'a':
-                agent = dict(x=col,y=height-row+1,has_passenger=0)
-            elif character == 'p':
-                passenger_loc.append((col,height-row+1))
-            elif character == 'w':
-                walls.append(dict(x=col,y=height-row+1))
-            elif character == 'd':
-                destination = (col,height-row+1) #will need to use this to help create passengers
-            elif character == 'b':
-                battery.append(dict(x=col,y=height-row+1)) # assuming only one battery station currently
-            elif character == 't':
-                tolls.append(dict(x=col,y=height-row+1))   
+        file = open('customizations.txt', mode = 'r')
+        lines = file.readlines()
+        file.close()
+        #finding the first empty line and setting new_list to only contain the lines before that
+        new_list = []
+        for line in lines:
+            line = line.split(',')
+            if line == ['\n']:
+                break
+            line = [i.strip() for i in line]
+            new_list.append(line)
+        width = len(new_list[0][0])
+        height = len(new_list)
+        row = 0
         col = 0
-    params.mdp_parameters["agent"] = agent
-    params.mdp_parameters["walls"] = walls
-    params.mdp_parameters["tolls"] = tolls
-    params.mdp_parameters["hotswap_station"] = battery
-    params.mdp_parameters["height"] = height
-    params.mdp_parameters["width"] = width
-    print("battery:")
-    print(params.mdp_parameters["hotswap_station"])
-    print("agent:")
-    print(params.mdp_parameters["agent"])
-    print("walls:")
-    print(params.mdp_parameters["walls"])
-    print("tolls:")
-    print(params.mdp_parameters["tolls"])
-    print("height:")
-    print(params.mdp_parameters["height"])
-    print("width:")
-    print(params.mdp_parameters["width"])
-    passengers = []
-    for passenger in passenger_loc:
-        (x,y) = passenger
-        (dest_x,dest_y) = destination
-        passengers.append(dict(x=x,y=y,dest_x=dest_x,dest_y=dest_y,in_taxi=0))
-    print(passengers)
+        walls = []
+        passenger_loc = []
+        tolls = []
+        agent = None
+        battery = []
+        for line in new_list:
+            row += 1
+            print(line)
+            for character in line[0]:
+                print(character)
+                col += 1
+                if character == 'a':
+                    agent = dict(x=col,y=height-row+1,has_passenger=0)
+                elif character == 'p':
+                    passenger_loc.append((col,height-row+1))
+                elif character == 'w':
+                    walls.append(dict(x=col,y=height-row+1))
+                elif character == 'd':
+                    destination = (col,height-row+1) #will need to use this to help create passengers
+                elif character == 'b':
+                    battery.append(dict(x=col,y=height-row+1)) # assuming only one battery station currently
+                elif character == 't':
+                    tolls.append(dict(x=col,y=height-row+1))   
+            col = 0
+        params.mdp_parameters["agent"] = agent
+        params.mdp_parameters["walls"] = walls
+        params.mdp_parameters["tolls"] = tolls
+        params.mdp_parameters["hotswap_station"] = battery
+        params.mdp_parameters["height"] = height
+        params.mdp_parameters["width"] = width
+        print("battery:")
+        print(params.mdp_parameters["hotswap_station"])
+        print("agent:")
+        print(params.mdp_parameters["agent"])
+        print("walls:")
+        print(params.mdp_parameters["walls"])
+        print("tolls:")
+        print(params.mdp_parameters["tolls"])
+        print("height:")
+        print(params.mdp_parameters["height"])
+        print("width:")
+        print(params.mdp_parameters["width"])
+        passengers = []
+        for passenger in passenger_loc:
+            (x,y) = passenger
+            (dest_x,dest_y) = destination
+            passengers.append(dict(x=x,y=y,dest_x=dest_x,dest_y=dest_y,in_taxi=0))
+        print(passengers)
 
         
 
 
 
-    '''except:
-        print("failed other")
+    except:
+        print("failed to parse loading default from params.py and custom passengers")
         passengers = [{'x': 6, 'y': 5, 'dest_x': 1, 'dest_y': 1, 'in_taxi': 0},{'x': 5, 'y': 2, 'dest_x': 1, 'dest_y': 1, 'in_taxi': 0}, {'x': 6, 'y': 7, 'dest_x': 1, 'dest_y': 1, 'in_taxi': 0}]
-    '''#finally:   
-    #exit(1)
-    generate_agent(params.mdp_class, params.data_loc['base'], params.mdp_parameters, passengers=passengers, visualize=True)
+    finally:   
+        generate_agent(params.mdp_class, params.data_loc['base'], params.mdp_parameters, passengers=passengers, visualize=True)
 
     # b) obtain a BEC summary of the agent's policy
     '''

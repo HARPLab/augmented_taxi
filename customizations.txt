@@ -2,15 +2,6 @@ xxax
 pwwx
 wxdx
 
-agent, 4,1,0
-walls, 2,4, 1,4, 1,3, 1,2, 4,2, 3,4
-passengers, 4,1,2,1,0, 3,3,2,1,0
-tolls, 3,1, 3,2
-hotswap_station, 4,3
-width, 4
-height, 4
-
-
 Dictionary example: 
     'agent': {'x': 4, 'y': 1, 'has_passenger': 0},
     'walls': [{'x': 2, 'y': 4},{'x': 1, 'y': 4},{'x': 1, 'y': 3}, {'x': 1, 'y': 2}],
@@ -20,7 +11,7 @@ Dictionary example:
     'width': 6,
     'height': 7,
 
-New Parser Key:
+Parser Key:
 
 x = empty space
 p = passenger
