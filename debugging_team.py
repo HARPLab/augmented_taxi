@@ -21,6 +21,7 @@ from policy_summarization import policy_summarization_helpers as ps_helpers
 
 import teams.teams_helpers as team_helpers
 from teams import particle_filter_team as pf_team
+import teams.utils_teams as utils_teams
 
 import matplotlib as mpl
 mpl.rcParams['figure.facecolor'] = '1.0'
@@ -557,71 +558,265 @@ if __name__ == "__main__":
     # with open('models/' + params.data_loc['BEC'] + '/team_base_constraints.pickle', 'rb') as f:
     #         policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(f)
 
-    with open('models/' + params.data_loc['BEC'] + '/team_BEC_constraints.pickle', 'rb') as f:
-            min_BEC_constraints, BEC_lengths_record = pickle.load(f)
+    # with open('models/' + params.data_loc['BEC'] + '/team_BEC_constraints.pickle', 'rb') as f:
+    #         min_BEC_constraints, BEC_lengths_record = pickle.load(f)
     
-    demo_constraints = [np.array([[-1, 0, 0]]), np.array([[1, 1, 0]])]
+    # demo_constraints = [np.array([[-1, 0, 0]]), np.array([[1, 1, 0]])]
 
-    fig = plt.figure()
-    ax1 = fig.add_subplot(1, 1, 1, projection='3d')
-    # for constraints in min_BEC_constraints:
-    #     BEC_viz.visualize_planes(min_BEC_constraints, fig=fig, ax=ax1)
+    # fig = plt.figure()
+    # ax1 = fig.add_subplot(1, 1, 1, projection='3d')
+    # # for constraints in min_BEC_constraints:
+    # #     BEC_viz.visualize_planes(min_BEC_constraints, fig=fig, ax=ax1)
     
-    ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(min_BEC_constraints)
-    poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
-    BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax1, plot_ref_sphere=False, alpha=0.75)
+    # ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(min_BEC_constraints)
+    # poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
+    # BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax1, plot_ref_sphere=False, alpha=0.75)
 
-    ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(demo_constraints)
-    poly2 = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
-    BEC_viz.visualize_spherical_polygon(poly2, fig=fig, ax=ax1, plot_ref_sphere=False, alpha=0.5, color='r')
+    # ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(demo_constraints)
+    # poly2 = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
+    # BEC_viz.visualize_spherical_polygon(poly2, fig=fig, ax=ax1, plot_ref_sphere=False, alpha=0.5, color='r')
+
+    # # plt.show()
+
+    # print(min_BEC_constraints)
+    # min_BEC_area = BEC_helpers.calc_solid_angles([min_BEC_constraints])
+    # print('min BEC area: ', min_BEC_area)
+
+    # print(demo_constraints)
+    # knowledge_area = BEC_helpers.calc_solid_angles([demo_constraints])
+    # print('knowledge area: ', knowledge_area)
+
+    # knowledge_spread = np.array(knowledge_area)/np.array(min_BEC_area)
+
+    # # sample particles from knowledge area
+    # n_particles = 4500
+    # knowledge_particles = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform(demo_constraints, n_particles))
+
+    # # par_pos = knowledge_particles.positions.squeeze()
+
+    # const_id = []
+    # x_all = []
+    # for j, x in enumerate(knowledge_particles.positions):
+
+    #     all_constraints_satisfied = True
+    #     for constraint in min_BEC_constraints:
+    #         dot = constraint.dot(x.T)
+
+    #         if dot < 0:
+    #             all_constraints_satisfied = False
+        
+    #     if all_constraints_satisfied:
+    #         const_id.append(j)
+    #         x_all.append(x)
+
+    # BEC_overlap_ratio = min(min_BEC_area, len(const_id)/n_particles * np.array(knowledge_area))/np.array(min_BEC_area)
+
+    # knowledge_level = 0.5*BEC_overlap_ratio + 0.5/knowledge_spread
+    # BEC_overlap_particles = pf_team.Particles_team(np.array(x_all))
+
+    # print('No of particles: ', n_particles)
+    # print('Particles overlap: ', len(const_id)/n_particles * np.array(knowledge_area))
+    # print('BEC overlap: ', BEC_overlap_ratio)
+    # print('knowledge_spread: ', knowledge_spread)
+    # print('knowledge_level: ', knowledge_level)
+
+    # BEC_overlap_particles.plot(fig=fig, ax=ax1)
+    # ax1.scatter(params.weights['val'][0, 0], params.weights['val'][0, 1], params.weights['val'][0, 2], marker='o', c='r', s=100/2)
 
     # plt.show()
 
-    print(min_BEC_constraints)
-    min_BEC_area = BEC_helpers.calc_solid_angles([min_BEC_constraints])
-    print('min BEC area: ', min_BEC_area)
 
-    print(demo_constraints)
-    knowledge_area = BEC_helpers.calc_solid_angles([demo_constraints])
-    print('knowledge area: ', knowledge_area)
+############
 
-    knowledge_spread = np.array(knowledge_area)/np.array(min_BEC_area)
+    # w = np.array([[-3, 3.5, -1]]) # toll, hotswap station, step cost
+    # w_normalized = w / np.linalg.norm(w[0, :], ord=2)
 
-    # sample particles from knowledge area
-    n_particles = 4500
-    knowledge_particles = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform(demo_constraints, n_particles))
+    # print(w_normalized)
 
-    # par_pos = knowledge_particles.positions.squeeze()
+###################
 
-    const_id = []
-    x_all = []
-    for j, x in enumerate(knowledge_particles.positions):
-
-        all_constraints_satisfied = True
-        for constraint in min_BEC_constraints:
-            dot = constraint.dot(x.T)
-
-            if dot < 0:
-                all_constraints_satisfied = False
+    def label_axes(ax, weights=None):
+        ax.set_facecolor('white')
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
+        if weights is not None:
+            ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100/2)
         
-        if all_constraints_satisfied:
-            const_id.append(j)
-            x_all.append(x)
+        ax.set_xlabel('$\mathregular{w_0}$: Mud')
+        ax.set_ylabel('$\mathregular{w_1}$: Recharge')
+        ax.set_zlabel('$\mathregular{w_2}$: Action')
 
-    BEC_overlap_ratio = min(min_BEC_area, len(const_id)/n_particles * np.array(knowledge_area))/np.array(min_BEC_area)
+        ax.view_init(elev=16, azim=-160)
 
-    knowledge_level = 0.5*BEC_overlap_ratio + 0.5/knowledge_spread
-    BEC_overlap_particles = pf_team.Particles_team(np.array(x_all))
+    # 1) 
+    # team_knowledge = params.team_prior.copy()
+    # team_knowledge['common_knowledge'] = team_helpers.calc_common_knowledge(team_knowledge, 2, params.weights['val'], params.step_cost_flag)
+    # team_knowledge['joint_knowledge'] = team_helpers.calc_joint_knowledge(team_knowledge, 2, params.weights['val'], params.step_cost_flag)
 
-    print('No of particles: ', n_particles)
-    print('Particles overlap: ', len(const_id)/n_particles * np.array(knowledge_area))
-    print('BEC overlap: ', BEC_overlap_ratio)
-    print('knowledge_spread: ', knowledge_spread)
-    print('knowledge_level: ', knowledge_level)
+    # min_unit_constraints = params.prior
 
-    BEC_overlap_particles.plot(fig=fig, ax=ax1)
-    ax1.scatter(params.weights['val'][0, 0], params.weights['val'][0, 1], params.weights['val'][0, 2], marker='o', c='r', s=100/2)
-
-    plt.show()
+    # min_BEC_constraints =  [np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
 
 
+    # # 2)
+    # min_BEC_constraints =  [np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
+
+    # min_unit_constraints = [np.array([[-1,  0,  0]]), np.array([[-1,  0,  2]])]
+    # # min_unit_constraints = [np.array([[-1,  0,  0]])]
+
+    # team_knowledge = {'p1': [np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]])], 
+    #                 'p2': [np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]])], 
+    #                 'common_knowledge': [np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]])], 
+    #                 'joint_knowledge': [[np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]])]]}
+    
+    # # knowledge_level = team_helpers.calc_knowledge_level(team_knowledge, min_unit_constraints)
+
+
+    # # inv_constraints = []
+    # # for k_id, k_type in enumerate(team_knowledge):
+    # #     if 'p' in k_type:
+    # #         inv_constraints.extend([-x for x in team_knowledge[k_type]])
+
+    # # inv_joint_constraints = BEC_helpers.remove_redundant_constraints(inv_constraints, params.weights['val'], params.step_cost_flag)
+
+    # joint_constraints = []
+    # for k_id, k_type in enumerate(team_knowledge):
+    #     if 'p' in k_type:
+    #         joint_constraints.extend(team_knowledge[k_type])
+
+
+    # min_unit_intersection_constraints = min_unit_constraints.copy()
+    # min_unit_intersection_constraints.extend(joint_constraints)
+
+    # print('min_unit_intersection_constraints: ', min_unit_intersection_constraints)
+
+    # opposing_constraints = False
+    # for cnst in min_unit_intersection_constraints:
+    #     for cnst2 in min_unit_intersection_constraints:
+    #         print(np.array_equal(-cnst, cnst2))
+    #         print(-cnst, cnst2)
+    #         if (np.array_equal(-cnst, cnst2)):
+    #             opposing_constraints = True                
+    
+    # if opposing_constraints:
+    #     min_unit_BEC_knowledge_intersection = 0
+    # else:
+    #     min_unit_intersection_constraints = BEC_helpers.remove_redundant_constraints(min_unit_intersection_constraints, params.weights['val'], params.step_cost_flag)
+    #     min_unit_BEC_knowledge_intersection = np.array(BEC_helpers.calc_solid_angles([min_unit_intersection_constraints]))
+    
+    
+    # print('opposing_constraints: ', opposing_constraints)
+
+    # min_BEC_area = np.array(BEC_helpers.calc_solid_angles([min_BEC_constraints]))
+    # min_unit_area = np.array(BEC_helpers.calc_solid_angles([min_unit_constraints]))
+
+    # knowledge_area = 0
+    # for ind_constraints in team_knowledge['joint_knowledge']:
+    #     ind_intersection_constraints = min_unit_constraints.copy()
+    #     ind_intersection_constraints.extend(ind_constraints)
+    #     ind_intersection_constraints = BEC_helpers.remove_redundant_constraints(ind_intersection_constraints, params.weights['val'], params.step_cost_flag)
+    #     print('ind_intersection_constraints: ', ind_intersection_constraints)
+    #     knowledge_area += np.array(BEC_helpers.calc_solid_angles([ind_intersection_constraints]))
+
+    # min_unit_BEC_knowledge_union = min_unit_area + knowledge_area - min_unit_BEC_knowledge_intersection
+    
+    # # check if the knowledge area is a subset of the BEC area
+    # if min_unit_BEC_knowledge_intersection == knowledge_area/2:
+    #     knowledge_level_unit = 1
+    # else:
+    #     knowledge_level_unit = min_unit_BEC_knowledge_intersection/min_unit_BEC_knowledge_union
+
+    # # ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(min_intersection_constraints)
+    # # poly = Polyhedron.Polyhedron(ieqs=ieqs)
+    # # hrep = np.array(poly.Hrepresentation())
+
+    # # fig = plt.figure()
+    # # ax1 = fig.add_subplot(1, 1, 1, projection='3d')
+    # # utils_teams.visualize_planes_team(min_intersection_constraints, fig=fig, ax=ax1)
+    # # BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax1, plot_ref_sphere=False, alpha=0.75)
+    # # label_axes(ax1, params.weights['val'])
+    # # plt.show()
+
+    # # # remove boundary constraints/facets from consideration
+    # # boundary_facet_idxs = np.where(hrep[:, 0] != 0)
+    # # hrep_constraints = np.delete(hrep, boundary_facet_idxs, axis=0)
+    # # # remove the first column since these constraints goes through the origin
+    # # nonredundant_constraints = hrep_constraints[:, 1:]
+    # # # reshape so that each element is a valid weight vector
+    # # nonredundant_constraints = nonredundant_constraints.reshape(nonredundant_constraints.shape[0], 1, nonredundant_constraints.shape[1])
+
+
+    # # print('min_BEC_constraints: ', min_BEC_constraints)
+    # # print('min_unit_constraints: ', min_unit_constraints)
+    # # print('team_knowledge: ', team_knowledge)
+    # # print('inv_joint_constraints: ', inv_joint_constraints)
+    # # print('min_intersection_constraints: ', min_intersection_constraints)
+    # # print('ieqs: ', ieqs)
+    # # print('hrep: ', hrep)
+    # # print('nonredundant_constraints: ', nonredundant_constraints)
+
+    # print('min_unit_intersection_constraints: ', min_unit_intersection_constraints)
+    # print('min BEC area: ', min_BEC_area)
+    # print('min unit area: ', min_unit_area)
+    # print('knowledge_area: ', knowledge_area)
+    # print('min_unit_BEC_knowledge_intersection: ', min_unit_BEC_knowledge_intersection)
+    # print('min_unit_BEC_knowledge_union: ', min_unit_BEC_knowledge_union)
+    # print('knowledge_level_unit: ', knowledge_level_unit)
+
+    # # plot
+    # fig = plt.figure()
+    # ax1 = fig.add_subplot(1, 4, 1, projection='3d')
+    # ax2 = fig.add_subplot(1, 4, 2, projection='3d')
+    # ax3 = fig.add_subplot(1, 4, 3, projection='3d')
+    # ax4 = fig.add_subplot(1, 4, 4, projection='3d')
+
+    
+    # ax1.title.set_text('min_unit_constraints')    
+    # utils_teams.visualize_planes_team(min_unit_constraints, fig=fig, ax=ax1)
+    # ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(min_unit_constraints)
+    # poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
+    # BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax1, plot_ref_sphere=False, alpha=0.75)
+    
+    # ax2.title.set_text('knowledge_constraints')
+    # for ind_constraints in team_knowledge['joint_knowledge']:
+    #     utils_teams.visualize_planes_team(ind_constraints, fig=fig, ax=ax2)
+    #     ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(ind_constraints)
+    #     poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
+    #     BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax3, plot_ref_sphere=False, alpha=0.75)
+
+    # ax3.title.set_text('min_intersection_constraints')    
+    # utils_teams.visualize_planes_team(min_unit_intersection_constraints, fig=fig, ax=ax3)
+    # ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(min_unit_intersection_constraints)
+    # poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
+    # BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax2, plot_ref_sphere=False, alpha=0.75)
+
+
+    # label_axes(ax1, params.weights['val'])
+    # label_axes(ax2, params.weights['val'])
+    # label_axes(ax3, params.weights['val'])
+
+    # plt.show()
+
+    ##############
+
+    import copy
+
+    l = [0, 1, [2, 3]]
+    l_assign = l                   # assignment
+    l_copy = l.copy()              # shallow copy
+    l_deepcopy = copy.deepcopy(l)  # deep copy
+
+    l[1] = 100
+    l[2][0] = 200
+    print(l)
+    # [0, 100, [200, 3]]
+
+    print(l_assign)
+    # [0, 100, [200, 3]]
+
+    print(l_copy)
+    # [0, 1, [200, 3]]
+
+    print(l_deepcopy)
+    # [0, 1, [2, 3]]

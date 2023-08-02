@@ -31,6 +31,7 @@ from simple_rl.utils import mdp_helpers
 import policy_summarization.BEC_helpers as BEC_helpers
 import policy_summarization.BEC_visualization as BEC_viz
 from teams import particle_filter_team as pf_team
+import teams.utils_teams as utils_teams
 from policy_summarization import probability_utils as p_utils
 from policy_summarization import computational_geometry as cg
 import matplotlib as mpl
@@ -99,31 +100,48 @@ def calc_joint_knowledge(team_knowledge, team_size, weights=None, step_cost_flag
 
 
 
+
+
+
+
+
+
+
+
     return joint_constraints
 
 
 
-def update_team_knowledge(team_knowledge, new_constraints, team_size, weights, step_cost_flag):
+def update_team_knowledge(team_knowledge, new_constraints, team_size, weights, step_cost_flag, knowledge_to_update = 'all'):
 
-    team_knowledge_updated = {}
+    team_knowledge_updated = team_knowledge.copy()
 
-    for knowledge_id, knowledge_type in enumerate(team_knowledge):
-        if knowledge_type != 'joint_knowledge':
+    if knowledge_to_update == 'all':
+        knowledge_types = list(team_knowledge.keys())
+    else:
+        knowledge_types = knowledge_to_update.copy()
+
+
+    for knowledge_type in knowledge_types:
+        if knowledge_type != 'joint_knowledge' and  knowledge_type != 'common_knowledge':
             knowledge = team_knowledge[knowledge_type].copy()
-            # print('Old_knowledge: ', knowledge)
+            print('Old_knowledge: ', knowledge)
             knowledge.extend(new_constraints)
-            # print('New_knowledge: ', knowledge)
+            print('New_knowledge: ', knowledge)
             # print('New_knowledge: ', new_knowledge)
             # print('New constraints: ', new_constraints)
             new_knowledge = BEC_helpers.remove_redundant_constraints(knowledge, weights, step_cost_flag)
 
-            team_knowledge_updated[knowledge_type] = knowledge.copy()
-
-    
-    team_knowledge_updated['joint_knowledge'] = calc_joint_knowledge(team_knowledge_updated, team_size, weights=weights, step_cost_flag=step_cost_flag)
-
+            team_knowledge_updated[knowledge_type] = new_knowledge.copy()
+        elif  knowledge_type == 'joint_knowledge':
+            team_knowledge_updated[knowledge_type] = calc_joint_knowledge(team_knowledge_updated, team_size, weights=weights, step_cost_flag=step_cost_flag)
+        elif  knowledge_type == 'common_knowledge':
+            team_knowledge_updated[knowledge_type] = calc_common_knowledge(team_knowledge_updated, team_size, weights=weights, step_cost_flag=step_cost_flag)
+        else:
+            print(colored('Unknow knowledge type to update.', 'red'))
 
     return team_knowledge_updated
+
 
 
 
@@ -150,6 +168,7 @@ def check_info_gain(info_gains_record, consistent_state_count):
 
 def check_and_update_variable_filter(min_subset_constraints_record = None, variable_filter = None, nonzero_counter = None, initialize_filter_flag = False, no_info_flag = False):
     
+    teaching_complete_flag = True
     
     if initialize_filter_flag:
         # true constraints
@@ -208,17 +227,96 @@ def find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints):
 
 
 
-def calc_knowledge_level(team_knowledge, min_BEC_constraints):
+def calc_knowledge_level(team_knowledge, min_unit_constraints, weights = None, step_cost_flag = False):
     # 
     knowledge_level = {}
+    
 
     print('Calculating knowledge level...')
-    
-    for knowledge_id, knowledge_type in enumerate(team_knowledge):
-        # if knowledge_type == 'joint_knowledge':
-        #     x=1
 
-        # else:
+
+    def calc_inverse_constraints():
+        inv_constraints = []
+        for k_id, k_type in enumerate(team_knowledge):
+            if 'p' in k_type:
+                inv_constraints.extend([-x for x in team_knowledge[k_type]])
+
+        inv_joint_constraints = BEC_helpers.remove_redundant_constraints(inv_constraints, weights, step_cost_flag)
+
+        return inv_constraints, inv_joint_constraints
+
+    def label_axes(ax, weights=None):
+        ax.set_facecolor('white')
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
+        if weights is not None:
+            ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100/2)
+        
+        ax.set_xlabel('$\mathregular{w_0}$: Mud')
+        ax.set_ylabel('$\mathregular{w_1}$: Recharge')
+        ax.set_zlabel('$\mathregular{w_2}$: Action')
+
+        ax.view_init(elev=16, azim=-160)
+    
+
+    for knowledge_id, knowledge_type in enumerate(team_knowledge):
+
+        print('Calculating knowledge level for: ', knowledge_type)
+
+        if knowledge_type == 'joint_knowledge':
+            # TODO: Knowledge metric for joint knowledge
+            
+            ## Method 1: Joint constraints expressed as inverse of the inverted and minimal constraints of individual members
+            
+            joint_constraints = []
+            for k_id, k_type in enumerate(team_knowledge):
+                if 'p' in k_type:
+                    joint_constraints.extend(team_knowledge[k_type])
+
+            min_unit_intersection_constraints = min_unit_constraints.copy()
+            min_unit_intersection_constraints.extend(joint_constraints)
+
+
+            opposing_constraints = False
+            for cnst in min_unit_intersection_constraints:
+                for cnst2 in min_unit_intersection_constraints:
+                    # print(np.array_equal(-cnst, cnst2))
+                    # print(-cnst, cnst2)
+                    if (np.array_equal(-cnst, cnst2)):
+                        opposing_constraints = True                
+            
+            if opposing_constraints:
+                min_unit_BEC_knowledge_intersection = 0
+            else:
+                min_unit_intersection_constraints = BEC_helpers.remove_redundant_constraints(min_unit_intersection_constraints, params.weights['val'], params.step_cost_flag)
+                min_unit_BEC_knowledge_intersection = np.array(BEC_helpers.calc_solid_angles([min_unit_intersection_constraints]))
+            
+            print('min_unit_intersection_constraints: ', min_unit_intersection_constraints)
+            print('opposing_constraints: ', opposing_constraints)
+
+            min_unit_area = np.array(BEC_helpers.calc_solid_angles([min_unit_constraints]))
+
+            knowledge_area = 0
+            for ind_constraints in team_knowledge['joint_knowledge']:
+                ind_intersection_constraints = min_unit_constraints.copy()
+                ind_intersection_constraints.extend(ind_constraints)
+                ind_intersection_constraints = BEC_helpers.remove_redundant_constraints(ind_intersection_constraints, params.weights['val'], params.step_cost_flag)
+                print('ind_intersection_constraints: ', ind_intersection_constraints)
+                knowledge_area += np.array(BEC_helpers.calc_solid_angles([ind_intersection_constraints]))
+
+            min_unit_BEC_knowledge_union = min_unit_area + knowledge_area - min_unit_BEC_knowledge_intersection
+            
+            # check if the knowledge area is a subset of the BEC area
+            # TODO: Check this joint knowledge metric
+            if min_unit_BEC_knowledge_intersection == knowledge_area/2:   #TODO: Update this checker!
+                knowledge_level[knowledge_type] = 1
+            else:
+                knowledge_level[knowledge_type] = min_unit_BEC_knowledge_intersection/min_unit_BEC_knowledge_union
+
+            
+
+        else:
         #     # print('min_BEC_constraints: ', [min_BEC_constraints])
         #     min_BEC_area = BEC_helpers.calc_solid_angles([min_BEC_constraints])
         #     # print('knowledge: ', team_knowledge[knowledge_type])
@@ -251,28 +349,39 @@ def calc_knowledge_level(team_knowledge, min_BEC_constraints):
         #     # Method 2: Calculate knowledge level based on the ratio of BEC overlap area with the total knowledge area
         #     knowledge_level[knowledge_type] = BEC_overlap_area/np.array(knowledge_area)
 
-        ##############################################
+            ##############################################
 
-        # Method 3: Use Jaccard's index for set similarity (Intersection over Union)
+            # Method 3: Use Jaccard's index for set similarity (Intersection over Union)
 
-        # print('min_BEC_constraints: ', [min_BEC_constraints])
-        min_BEC_area = BEC_helpers.calc_solid_angles([min_BEC_constraints])
-        # print('knowledge: ', team_knowledge[knowledge_type])
-        knowledge_area = BEC_helpers.calc_solid_angles([team_knowledge[knowledge_type]])
+            # print('min_BEC_constraints: ', [min_BEC_constraints])
+            min_unit_area = np.array(BEC_helpers.calc_solid_angles([min_unit_constraints]))
+            
+            knowledge_area = np.array(BEC_helpers.calc_solid_angles([team_knowledge[knowledge_type]]))
 
-        min_BEC_constraints_copy = min_BEC_constraints.copy()
-        min_BEC_knowledge_intersection = BEC_helpers.calc_solid_angles([min_BEC_constraints_copy.append(team_knowledge[knowledge_type])])
+            min_unit_intersection_constraints = min_unit_constraints.copy()
+            min_unit_intersection_constraints.extend(team_knowledge[knowledge_type])
+            print('min_unit_intersection_constraints: ', min_unit_intersection_constraints)
+            min_unit_intersection_constraints = BEC_helpers.remove_redundant_constraints(min_unit_intersection_constraints, weights, step_cost_flag)
 
-        if min_BEC_knowledge_intersection > 0:
-            min_BEC_knowledge_union = min_BEC_area + knowledge_area - min_BEC_knowledge_intersection
-        else:
-            min_BEC_knowledge_union = 1
-        
-        knowledge_level[knowledge_type] = min_BEC_knowledge_intersection/min_BEC_knowledge_union
+            min_unit_BEC_knowledge_intersection = np.array(BEC_helpers.calc_solid_angles([min_unit_intersection_constraints]))
+
+            print('min_BEC_knowledge_intersection: ', min_unit_BEC_knowledge_intersection)
 
 
-        # Method 4: An improved method for disjoint sets to see how close the disjoint is Generalized Intersection over Union (see https://giou.stanford.edu/)
-        # TODO: Later
+            if min_unit_BEC_knowledge_intersection > 0:
+                min_unit_BEC_knowledge_union = min_unit_area + knowledge_area - min_unit_BEC_knowledge_intersection
+            else:
+                min_unit_BEC_knowledge_union = 1
+            
+            # check if the knowledge area is a subset of the BEC area
+            if min_unit_BEC_knowledge_intersection == knowledge_area:
+                knowledge_level[knowledge_type] = 1
+            else:
+                knowledge_level[knowledge_type] = min_unit_BEC_knowledge_intersection/min_unit_BEC_knowledge_union
+
+
+            # Method 4: An improved method for disjoint sets to see how close the disjoint is Generalized Intersection over Union (see https://giou.stanford.edu/)
+            # TODO: Later
 
 
 
@@ -409,7 +518,7 @@ def particles_for_demo_strategy(demo_strategy, team_knowledge, team_particles, t
     else:
         print('Unsupported demo strategy for sampling particles!')
 
-    particles = team_particles[knowledge_id].copy()
+    particles = team_particles[knowledge_id]
 
     
     return knowledge_id, particles
@@ -563,6 +672,7 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_prior=N
 
         if team_prior is not None:
             particles_team[member_id].update(team_prior[member_id])
+
     
     # particles for aggregated team knowledge - common knowledge
     particles_team['common_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles))
@@ -653,7 +763,7 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_prior=N
 
 
 
-def show_demonstrations(unit, particles_demo, mdp_class, weights, visualize_pf_transition=False, summary_count=0):
+def show_demonstrations(unit, particles_demo, mdp_class, weights, visualize_pf_transition=False, unit_count=0):
     # TODO: WIP
     
     # print('Summary:', summary)
@@ -678,7 +788,7 @@ def show_demonstrations(unit, particles_demo, mdp_class, weights, visualize_pf_t
         
         # visualize the updated particle filter
         if visualize_pf_transition:
-            visualize_transition(subunit[3], particles_demo, mdp_class, weights, text='Demo ' + str(n) + 'for Summary/Unit ' + str(summary_count+1))
+            visualize_transition(subunit[3], particles_demo, mdp_class, weights, text='Demo ' + str(n) + 'for Summary/Unit ' + str(unit_count+1))
 
         n += 1
 
@@ -833,9 +943,15 @@ def visualize_transition(constraints, particles, mdp_class, weights=None, fig=No
         BEC_viz.visualize_planes(constraints, fig=fig, ax=ax1)
     for constraints in [constraints]:
         BEC_viz.visualize_planes(constraints, fig=fig, ax=ax3)
+    
     if demo_strategy == 'joint_knowledge':
-        visualize_spherical_polygon_jk(poly, fig=fig, ax=ax2, plot_ref_sphere=False, alpha=0.75)
+        for ind_constraints in constraints:
+            ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(ind_constraints)
+            poly = Polyhedron.Polyhedron(ieqs=ieqs)
+            BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax2, plot_ref_sphere=False, alpha=0.75)
     else:
+        ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints)
+        poly = Polyhedron.Polyhedron(ieqs=ieqs)
         BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax2, plot_ref_sphere=False, alpha=0.75)
 
     label_axes(ax1, mdp_class, weights)
@@ -872,6 +988,40 @@ def visualize_transition(constraints, particles, mdp_class, weights=None, fig=No
 
 
 
+def visualize_team_knowledge(particles_team, mdp_class, fig=None, weights=None, text=None):
+
+
+    if fig == None:
+       fig = plt.figure()
+    
+    def label_axes(ax, mdp_class, weights=None):
+        ax.set_facecolor('white')
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
+        if weights is not None:
+            ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100/2)
+        if mdp_class == 'augmented_taxi2':
+            ax.set_xlabel('$\mathregular{w_0}$: Mud')
+            ax.set_ylabel('$\mathregular{w_1}$: Recharge')
+
+    
+    n_subplots = len(particles_team)
+    i = 1
+    for knowledge_id, knowledge_type  in enumerate(particles_team):
+        ax = fig.add_subplot(1, n_subplots, i, projection='3d')
+        ax.title.set_text('Particles for knowledge: \n ' + str(knowledge_type))
+        particles_team[knowledge_type].plot(fig=fig, ax=ax)
+        label_axes(ax, mdp_class, weights)
+        i += 1
+
+    fig.suptitle(text, fontsize=30)
+
+    plt.show()
+
+
+
+
 
 
 def visualize_BEC_area(constraints):
@@ -883,6 +1033,45 @@ def visualize_BEC_area(constraints):
         BEC_viz.visualize_planes(constraints, fig=fig, ax=ax1)
 
     plt.show()
+
+
+
+# def visualize_planes_team(constraints, fig=None, ax=None, alpha=0.5, color=None):
+#     '''
+#     Plot the planes associated with the normal vectors contained within 'constraints'
+#     '''
+#     if fig == None:
+#         fig = plt.figure()
+#     if ax == None:
+#         ax = fig.add_subplot(projection='3d')
+
+#     x = np.linspace(-1, 1, 10)
+#     y = np.linspace(-1, 1, 10)
+#     z = np.linspace(-1, 1, 10)
+
+#     X_xy, Y_xy, = np.meshgrid(x, y)
+
+#     for constraint in constraints:
+#         if constraint[0, 2] != 0:
+#             Z = (-constraint[0, 0] * X_xy - constraint[0, 1] * Y_xy) / constraint[0, 2]
+#             if color is not None:
+#                 ax.plot_surface(X_xy, Y_xy, Z, alpha=alpha, color=color)
+#             else:
+#                 ax.plot_surface(X_xy, Y_xy, Z, alpha=alpha)
+#         elif constraint[0, 1] != 0:
+#             X_xz, Z_xz, = np.meshgrid(x, z)
+#             Y = (-constraint[0, 0] * X_xz - constraint[0, 2] * Z_xz) / constraint[0, 1]
+#             if color is not None:
+#                 ax.plot_surface(X_xz, Y, Z_xz, alpha=alpha, color=color)
+#             else:
+#                 ax.plot_surface(X_xz, Y, Z_xz, alpha=alpha)
+#         else:
+#             Y_yz, Z_yz, = np.meshgrid(y, z)
+#             X = (-constraint[0, 1] * Y_yz - constraint[0, 2] * Z_yz) / constraint[0, 0]
+#             if color is not None:
+#                 ax.plot_surface(X, Y_yz, Z_yz, alpha=alpha, color=color)
+#             else:
+#                 ax.plot_surface(X, Y_yz, Z_yz, alpha=alpha)
 
 
 
@@ -917,6 +1106,7 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, variable_filter
     open('models/' + data_loc + '/demo_gen_log.txt', 'w').close()
 
     while summary_count < n_train_demos:
+        
         # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(summary_count) + '.png', just_save=True)
 
         # (approximately) uniformly divide up the valid BEC area along 2-sphere
@@ -924,7 +1114,7 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, variable_filter
 
         if len(sample_human_models) == 0:
             print(colored("Likely cannot reduce the BEC further through additional demonstrations. Returning.", 'red'))
-            return summary
+            return summary, summary_count, visited_env_traj_idxs, min_BEC_constraints_running, particles_demo
 
         info_gains_record = []
         overlap_in_opt_and_counterfactual_traj_record = []
@@ -992,7 +1182,8 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, variable_filter
         
         if no_info_flag:
             print(colored('Did not find any informative demonstrations. Moving onto next unit, if applicable.', 'red'))
-            return summary, summary_count, visited_env_traj_idxs, min_BEC_constraints_running, particles_demo
+            summary.append(unit)
+            return summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo
 
         if consider_human_models_jointly:
             print("Combining the most limiting constraints across human models:")
@@ -1165,8 +1356,8 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, variable_filter
 
             if no_info_flag:
                 print(colored('Did not find any informative demonstrations. Moving onto next unit, if applicable.', 'red'))
-                
-                return summary, summary_count, visited_env_traj_idxs, min_BEC_constraints_running, particles_demo
+                summary.append(unit)
+                return summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo
             
 
             best_traj = traj_record[best_env_idx][best_traj_idx]
@@ -1178,112 +1369,120 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, variable_filter
             best_mdp.set_init_state(best_traj[0][0]) # for completeness
             min_BEC_constraints_running.extend(min_env_constraints_record[best_env_idx][best_traj_idx])
             min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
+            
+            visited_env_traj_idxs.append((best_env_idx, best_traj_idx))
+            
+            # This is just an additionla check. Variable filter should not be changing within this function
             if (running_variable_filter == variable_filter).all():
                 unit.append([best_mdp, best_traj, (best_env_idx, best_traj_idx), min_env_constraints_record[best_env_idx][best_traj_idx], variable_filter, sample_human_models])
                 summary_count += 1
             else:
-                summary.append(unit)
+                
+                print(colored('This should not happen! Variable filter is getting updated within obtain_counterfactual_demo', 'red'))
+                
+                # summary.append(unit)
 
-                unit = [[best_mdp, best_traj, (best_env_idx, best_traj_idx), min_env_constraints_record[best_env_idx][best_traj_idx], variable_filter, sample_human_models]]
-                running_variable_filter = variable_filter.copy()
-                summary_count += 1
-            visited_env_traj_idxs.append((best_env_idx, best_traj_idx))
-        else:
-            # todo: this section of code is no longer supported (e.g. doesn't try to provide demonstrations that convey
-            #  one new constraint at a time if possible) and should be deprecated
+                # unit = [[best_mdp, best_traj, (best_env_idx, best_traj_idx), min_env_constraints_record[best_env_idx][best_traj_idx], variable_filter, sample_human_models]]
+                # running_variable_filter = variable_filter.copy()
+                # summary_count += 1
             
-            print(colored('Running into a supposedly unsupported section', 'red'))
             
-            # b) consider each human model separately
-            if consistent_state_count:
-                info_gains = np.array(info_gains_record)
-                traj_overlap_pcts = np.array(overlap_in_opt_and_counterfactual_traj_record)
+        # else:
+        #     # todo: this section of code is no longer supported (e.g. doesn't try to provide demonstrations that convey
+        #     #  one new constraint at a time if possible) and should be deprecated
+            
+        #     print(colored('Running into a supposedly unsupported section', 'red'))
+            
+        #     # b) consider each human model separately
+        #     if consistent_state_count:
+        #         info_gains = np.array(info_gains_record)
+        #         traj_overlap_pcts = np.array(overlap_in_opt_and_counterfactual_traj_record)
 
-                # obj_function = info_gains * (traj_overlap_pcts + c)                  # objective 2: scaled
-                obj_function = info_gains
+        #         # obj_function = info_gains * (traj_overlap_pcts + c)                  # objective 2: scaled
+        #         obj_function = info_gains
 
-                obj_function[info_gains == 1] = 0
+        #         obj_function[info_gains == 1] = 0
 
-                select_model, best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
+        #         select_model, best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
 
-                if max(info_gains.flatten()) == 1:
-                    no_info_flag = True
-                else:
-                    best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
-                    best_env_idxs, best_traj_idxs = np.where(obj_function == max(obj_function.flatten()))
-                    max_info_gain = np.max(info_gains)
+        #         if max(info_gains.flatten()) == 1:
+        #             no_info_flag = True
+        #         else:
+        #             best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
+        #             best_env_idxs, best_traj_idxs = np.where(obj_function == max(obj_function.flatten()))
+        #             max_info_gain = np.max(info_gains)
 
-                    best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
-            else:
-                best_obj = float('-inf')
-                select_model = best_env_idx = best_traj_idx = 0
-                for model_idx, info_gains_per_model in enumerate(info_gains_record):
-                    for env_idx, info_gains_per_env in enumerate(info_gains_per_model):
-                        for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
-                            if info_gain_per_traj > 1:
-                                # obj = info_gain_per_traj * (overlap_in_opt_and_counterfactual_traj_record[model_idx][env_idx][traj_idx] + c)
-                                obj = info_gain_per_traj
+        #             best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
+        #     else:
+        #         best_obj = float('-inf')
+        #         select_model = best_env_idx = best_traj_idx = 0
+        #         for model_idx, info_gains_per_model in enumerate(info_gains_record):
+        #             for env_idx, info_gains_per_env in enumerate(info_gains_per_model):
+        #                 for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
+        #                     if info_gain_per_traj > 1:
+        #                         # obj = info_gain_per_traj * (overlap_in_opt_and_counterfactual_traj_record[model_idx][env_idx][traj_idx] + c)
+        #                         obj = info_gain_per_traj
 
-                                if np.isclose(obj, best_obj):
-                                    best_env_idxs.append(env_idx)
-                                    best_traj_idxs.append(traj_idx)
-                                elif obj > best_obj:
-                                    best_obj = obj
-                                    max_info_gain = info_gain_per_traj
+        #                         if np.isclose(obj, best_obj):
+        #                             best_env_idxs.append(env_idx)
+        #                             best_traj_idxs.append(traj_idx)
+        #                         elif obj > best_obj:
+        #                             best_obj = obj
+        #                             max_info_gain = info_gain_per_traj
 
-                                    best_env_idxs = [env_idx]
-                                    best_traj_idxs = [traj_idx]
-                                    select_model = model_idx
+        #                             best_env_idxs = [env_idx]
+        #                             best_traj_idxs = [traj_idx]
+        #                             select_model = model_idx
 
-                                if info_gain_per_traj > max_info_gain:
-                                    max_info_gain = info_gain_per_traj
+        #                         if info_gain_per_traj > max_info_gain:
+        #                             max_info_gain = info_gain_per_traj
 
-                if max_info_gain == 1:
-                    no_info_flag = True
-                else:
-                    best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
+        #         if max_info_gain == 1:
+        #             no_info_flag = True
+        #         else:
+        #             best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
 
-            if no_info_flag:
-                if variable_filter is None:
-                    break
-                else:
-                    # no more informative demonstrations with this variable filter, so update it
-                    variable_filter, nonzero_counter = BEC_helpers.update_variable_filter(nonzero_counter)
-                    print(colored('Did not find any informative demonstrations.', 'red'))
-                    print('variable filter: {}'.format(variable_filter))
-                    continue
+        #     if no_info_flag:
+        #         if variable_filter is None:
+        #             break
+        #         else:
+        #             # no more informative demonstrations with this variable filter, so update it
+        #             variable_filter, nonzero_counter = BEC_helpers.update_variable_filter(nonzero_counter)
+        #             print(colored('Did not find any informative demonstrations.', 'red'))
+        #             print('variable filter: {}'.format(variable_filter))
+        #             continue
 
-            with open('models/' + data_loc + '/counterfactual_data_' + str(summary_count) + '/model' + str(
-                    select_model) + '/cf_data_env' + str(
-                    best_env_idx).zfill(5) + '.pickle', 'rb') as f:
-                constraints_env = pickle.load(f)
+        #     with open('models/' + data_loc + '/counterfactual_data_' + str(summary_count) + '/model' + str(
+        #             select_model) + '/cf_data_env' + str(
+        #             best_env_idx).zfill(5) + '.pickle', 'rb') as f:
+        #         constraints_env = pickle.load(f)
 
-            # best_human_trajs = best_human_trajs_record_env[best_traj_idx]
-            best_traj = traj_record[best_env_idx][best_traj_idx]
+        #     # best_human_trajs = best_human_trajs_record_env[best_traj_idx]
+        #     best_traj = traj_record[best_env_idx][best_traj_idx]
 
-            filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
-            with open(filename, 'rb') as f:
-                wt_vi_traj_env = pickle.load(f)
-            best_mdp = wt_vi_traj_env[0][1].mdp
-            best_mdp.set_init_state(best_traj[0][0]) # for completeness
-            min_BEC_constraints_running.extend(constraints_env[best_traj_idx])
+        #     filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
+        #     with open(filename, 'rb') as f:
+        #         wt_vi_traj_env = pickle.load(f)
+        #     best_mdp = wt_vi_traj_env[0][1].mdp
+        #     best_mdp.set_init_state(best_traj[0][0]) # for completeness
+        #     min_BEC_constraints_running.extend(constraints_env[best_traj_idx])
 
-            particles_demo.update(constraints_env[best_traj_idx])
+        #     particles_demo.update(constraints_env[best_traj_idx])
 
-            min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
-            if (running_variable_filter == variable_filter).all():
-                unit.append([best_mdp, best_traj, (best_env_idx, best_traj_idx), constraints_env[best_traj_idx], variable_filter,
-                            sample_human_models, select_model])
-                summary_count += 1
-            else:
-                summary.append(unit)
+        #     min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
+        #     if (running_variable_filter == variable_filter).all():
+        #         unit.append([best_mdp, best_traj, (best_env_idx, best_traj_idx), constraints_env[best_traj_idx], variable_filter,
+        #                     sample_human_models, select_model])
+        #         summary_count += 1
+        #     else:
+        #         summary.append(unit)
 
-                unit = [[best_mdp, best_traj, (best_env_idx, best_traj_idx), constraints_env[best_traj_idx], variable_filter,
-                            sample_human_models, select_model]]
-                running_variable_filter = variable_filter.copy()
-                summary_count += 1
+        #         unit = [[best_mdp, best_traj, (best_env_idx, best_traj_idx), constraints_env[best_traj_idx], variable_filter,
+        #                     sample_human_models, select_model]]
+        #         running_variable_filter = variable_filter.copy()
+        #         summary_count += 1
 
-            visited_env_traj_idxs.append((best_env_idx, best_traj_idx))
+        #     visited_env_traj_idxs.append((best_env_idx, best_traj_idx))
 
         print(colored('Max infogain: {}'.format(max_info_gain), 'blue'))
         with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
@@ -1301,7 +1500,7 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, variable_filter
     with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
         pickle.dump((summary, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo), f)
 
-    return summary, summary_count, visited_env_traj_idxs, min_BEC_constraints_running, particles_demo
+    return summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo
 
 
 
@@ -1401,6 +1600,7 @@ def obtain_remedial_demos_tests(data_loc, previous_demos, visited_env_traj_idxs,
         visited_env_traj_idxs.append((env_idx, traj_idx))
 
     return preliminary_tests, visited_env_traj_idxs
+
 
 
 def check_unit_learning_goal_reached(team_knowledge, min_unit_constraints):

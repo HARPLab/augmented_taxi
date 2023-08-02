@@ -20,7 +20,7 @@ import difflib
 
 # Other imports.
 sys.path.append("simple_rl")
-import augmented_taxi.params as params
+import params as params
 from simple_rl.agents import FixedPolicyAgent
 from simple_rl.planning import ValueIteration
 from simple_rl.utils import make_mdp

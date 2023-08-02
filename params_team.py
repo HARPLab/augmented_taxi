@@ -94,6 +94,7 @@ elif mdp_class == 'skateboard':
 elif mdp_class == 'augmented_taxi2':
     w = np.array([[-3, 3.5, -1]]) # toll, hotswap station, step cost
     w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order)
+    # w_normalized = [[-0.63599873  0.74199852 -0.21199958]] # actual values fpr reference
 
     mdp_parameters = {
         'agent': {'x': 4, 'y': 1, 'has_passenger': 0},
@@ -293,9 +294,9 @@ BEC = {
 
     'test_difficulty': 'high',                # expected ease for human to correctly predict the agent's actions in this test environment (low, medium, high)
 
-    'n_human_models': 6,                      # number of human beliefs to actively consider
+    'n_human_models': 4,                      # number of human beliefs to actively consider
 
-    'n_particles': 200,                      # number of particles in particle filter
+    'n_particles': 500,                      # number of particles in particle filter
 
     'obj_func_proportion': 1,                 # proportion of the max objective function (i.e. info gain) to aim for
                                               # when selecting the next demonstration (range: 0 - 1). selecting a value

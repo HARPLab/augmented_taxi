@@ -44,28 +44,32 @@ import random
 
 
 
-def calc_expected_learning(team_knowledge_expected, particles_team_expected, min_BEC_constraints, new_constraints, params, summary_count):
+def calc_expected_learning(team_knowledge_expected, particles_team_expected, min_BEC_constraints, new_constraints, params, loop_count):
 
-    
+    print('Current expected team knowledge: ', team_knowledge_expected)
+    print('New constraints: ', new_constraints)
     team_knowledge_expected = team_helpers.update_team_knowledge(team_knowledge_expected, new_constraints, params.team_size,  params.weights['val'], params.step_cost_flag)
+
+    print('Updated expected team knowledge: ', team_knowledge_expected)
 
     p = 1
     while p <= params.team_size:
         member_id = 'p' + str(p)
         particles_team_expected[member_id].update(new_constraints)
-        team_helpers.visualize_transition(new_constraints, particles_team_expected[member_id], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for unit ' + str(summary_count+1) + ' for player ' + member_id)  
+        team_helpers.visualize_transition(new_constraints, particles_team_expected[member_id], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set ' + str(loop_count+1) + ' for player ' + member_id)  
         p += 1
             
     # Update common knowledge model
     particles_team_expected['common_knowledge'].update(new_constraints)
-    team_helpers.visualize_transition(new_constraints, particles_team_expected['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for unit' + str(summary_count+1) + ' for common knowledge')
+    team_helpers.visualize_transition(new_constraints, particles_team_expected['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set' + str(loop_count+1) + ' for common knowledge')
     
     # Update joint knowledge model
     particles_team_expected['joint_knowledge'].update_jk(team_knowledge_expected['joint_knowledge'])
-    team_helpers.visualize_transition(new_constraints, particles_team_expected['joint_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for unit ' + str(summary_count+1) + ' for joint knowledge',  demo_strategy = 'joint_knowledge')
+    team_helpers.visualize_transition(new_constraints, particles_team_expected['joint_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set ' + str(loop_count+1) + ' for joint knowledge',  demo_strategy = 'joint_knowledge')
 
-
-    print('Expected knowledge after seeing unit demonstrations: ', team_helpers.calc_knowledge_level(team_knowledge_expected, min_BEC_constraints) )
+    print('min_BEC_constraints: ', min_BEC_constraints)
+    print('Expected unit knowledge after seeing unit demonstrations: ', team_helpers.calc_knowledge_level(team_knowledge_expected, new_constraints) )
+    print('Expected absolute knowledge after seeing unit demonstrations: ', team_helpers.calc_knowledge_level(team_knowledge_expected, min_BEC_constraints) )
 
 
     return team_knowledge_expected, particles_team_expected
@@ -238,18 +242,17 @@ if __name__ == "__main__":
     # print('Base constraints optimal trajectories:', traj_record)
 
 
-    print('Value for consistent state count is: ', consistent_state_count)
+    # print('Value for consistent state count is: ', consistent_state_count)
 
 
     # sample particles for human models
     team_prior, particles_team = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_prior = params.team_prior)
     
     print('Team prior: ', team_prior)
+    team_helpers.visualize_team_knowledge(particles_team, params.mdp_class, weights=params.weights['val'], text='Team prior')
 
-    n = 1
     for member_id in particles_team:
-        print(colored('entropy of p' + str(n) + ': {}'.format(particles_team[member_id].calc_entropy()), 'blue'))
-        n += 1
+        print(colored('entropy of ' + str(member_id) + ': {}'.format(particles_team[member_id].calc_entropy()), 'blue'))
     
         # debug: visualize particles
         # BEC_viz.visualize_pf_transition(params.team_prior[member_id], particles_team[member_id], params.mdp_class, params.weights['val'])
@@ -269,13 +272,15 @@ if __name__ == "__main__":
     summary_id = 0
     no_info_flag = False
     demo_reset_flag = False
-    team_knowledge = team_prior.copy() # team_prior calculated from team_helpers.sample_team_pf also has the aggregated knowledge from individual priors
+    team_knowledge = copy.deepcopy(team_prior) # team_prior calculated from team_helpers.sample_team_pf also has the aggregated knowledge from individual priors
     visualize_pf_transition = True
     prev_summary_len = 0
 
+    plt.rcParams['figure.figsize'] = [10, 6]
+
     # for debugging
-    particles_team_expected = particles_team.copy()
-    team_knowledge_expected = team_knowledge.copy()
+    particles_team_expected = copy.deepcopy(particles_team)
+    team_knowledge_expected = copy.deepcopy(team_knowledge)
 
     # for testing design choices (is remedial demo needed)
     remedial_test_flag = False
@@ -304,21 +309,13 @@ if __name__ == "__main__":
 
     print('Demo strategy: ', demo_strategy)
 
-
-    # Get the cached demo for the first unit, if available
+    # initialize human models for demo generation
     knowledge_id, particles_demo = team_helpers.particles_for_demo_strategy(demo_strategy, team_knowledge, particles_team, params.team_size, params.weights['val'], params.step_cost_flag, params.BEC['n_particles'], min_BEC_constraints)
-
-    try:
-        with open('models/' + params.data_loc['BEC'] + '/BEC_summary.pickle', 'rb') as f:
-            BEC_summary, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = pickle.load(f)
-    except:
-        BEC_summary, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = team_helpers.obtain_team_summary(params.data_loc['BEC'], min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, params.weights['val'], params.step_cost_flag, 
-                                                                                                              pool, params.BEC['n_human_models'], consistent_state_count, params.BEC['n_train_demos'], particles_demo, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs)
-         
 
 
     ################################################
-
+    loop_count = 0
+    next_unit_loop_id = 0
     # WIP: Unitwise teaching-testing loop
     while not teaching_complete_flag:
 
@@ -327,17 +324,39 @@ if __name__ == "__main__":
         #     knowledge_id, particles_demo = team_helpers.particles_for_demo_strategy(demo_strategy, team_knowledge, particles_team, params.team_size, params.weights['val'], params.step_cost_flag, params.BEC['n_particles'], min_BEC_constraints)
 
 
-        # Obtain BEC summary for new unit (skip if its the 1st unit)
-        if summary_count > 0:
-            BEC_summary, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = team_helpers.obtain_team_summary(params.data_loc['BEC'], min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, params.weights['val'], params.step_cost_flag, 
+        # Obtain BEC summary for a new unit (skip if its the 1st unit)
+        print('Summary count: ', summary_count)
+        if summary_count == 0:
+            print(params.data_loc['BEC'] )
+            try:
+                print('Trying to open existing BEC summary file...')
+                with open('models/' + params.data_loc['BEC'] + '/BEC_summary_initial.pickle', 'rb') as f:
+                    BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = pickle.load(f)
+            except:
+                print('Starting summary generation for 1st unit..')
+                BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = team_helpers.obtain_team_summary(params.data_loc['BEC'], min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, params.weights['val'], params.step_cost_flag, 
+                                                                                                                    pool, params.BEC['n_human_models'], consistent_state_count, params.BEC['n_train_demos'], particles_demo, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs)
+                print('Ended summary generation for 1st unit..')
+                if len(BEC_summary) > 0:
+                    with open('models/' + params.data_loc['BEC'] + '/BEC_summary_initial.pickle', 'wb') as f:
+                        pickle.dump((BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo), f)
+            
+            
+        else:
+            print('Starting summary generation for unit no.  ' + str(loop_count + 1) )
+            BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = team_helpers.obtain_team_summary(params.data_loc['BEC'], min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, params.weights['val'], params.step_cost_flag, 
                                                                                                                 pool, params.BEC['n_human_models'], consistent_state_count, params.BEC['n_train_demos'], particles_demo, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs)
+            print('Ended summary generation for unit no.  ' + str(loop_count + 1) )
+        
 
 
         # TODO: Demo-test-remedial-test loop if new summary is obtained
-        # print(BEC_summary)
+        print('BEC summary length: ', len(BEC_summary))
+        print('Previous summary length: ', prev_summary_len)
 
+        # check for any new summary
         if len(BEC_summary) > prev_summary_len:
-            unit_constraints, running_variable_filter_unit = team_helpers.show_demonstrations(BEC_summary[-1], particles_demo, params.mdp_class, params.weights['val'], visualize_pf_transition, summary_count)
+            unit_constraints, running_variable_filter_unit = team_helpers.show_demonstrations(BEC_summary[-1], particles_demo, params.mdp_class, params.weights['val'], visualize_pf_transition, loop_count)
 
             print('Variable filter:', variable_filter)
             print('running variable filter:', running_variable_filter_unit)
@@ -346,27 +365,29 @@ if __name__ == "__main__":
             min_unit_constraints = BEC_helpers.remove_redundant_constraints(unit_constraints, params.weights['val'], params.step_cost_flag)
 
 
-            # For debugging. Visualize the expected particles
-            team_knowledge_expected, particles_team_expected = calc_expected_learning(team_knowledge_expected, particles_team_expected, min_BEC_constraints, min_unit_constraints, params, summary_count)
+            # For debugging. Visualize the expected particles transition
+            team_knowledge_expected, particles_team_expected = calc_expected_learning(team_knowledge_expected, particles_team_expected, min_BEC_constraints, min_unit_constraints, params, loop_count)
 
+            # team_helpers.visualize_team_knowledge(particles_team_expected, params.mdp_class, weights=params.weights['val'], text='Team expected knowledge after unit ' + str(loop_count))
 
             ## Conduct tests for the unit
             # obtain the diagnostic tests that will test the human's understanding of the unit's constraints
-            preliminary_tests, visited_env_traj_idxs = BEC.obtain_diagnostic_tests(params.data_loc['BEC'], BEC_summary[-1], visited_env_traj_idxs, min_constraints, min_subset_constraints_record, traj_record, traj_features_record, running_variable_filter_unit, mdp_features_record)
-            # print(preliminary_tests[0])
-
-            test_constraints_team = []
+            print('Getting diagnostic tests for unit ' + str(loop_count) + '...')
+            print('visited_env_traj_idxs: ', visited_env_traj_idxs)
+            preliminary_tests, visited_env_traj_idxs = BEC.obtain_diagnostic_tests(params.data_loc['BEC'], BEC_summary[-1], visited_env_traj_idxs, min_unit_constraints, min_subset_constraints_record, traj_record, traj_features_record, running_variable_filter_unit, mdp_features_record)
 
             
             # query the human's response to the diagnostic tests
+            test_no = 1
             for test in preliminary_tests:
-                
+                test_constraints_team = []
+
                 test_mdp = test[0]
                 opt_traj = test[1]
                 test_constraints = test[3]
                 test_history = [test] # to ensure that remedial demonstrations and tests are visually simple/similar and complex/different, respectively
 
-                # TEMP: show the same test for each person and get test responses of each person in the team
+                # Show the same test for each person and get test responses of each person in the team
                 p = 1
                 while p <= params.team_size:
                     member_id = 'p' + str(p)
@@ -379,21 +400,25 @@ if __name__ == "__main__":
                     if (human_feature_count == opt_feature_count).all():
                         print("You got the diagnostic test right")
 
-                        test_constraints_team.append([test_constraints])
+                        test_constraints_team.extend(test_constraints)
+                        team_knowledge = team_helpers.update_team_knowledge(team_knowledge, test_constraints, params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
                         particles_team[member_id].update(test_constraints) # update individual knowledge based on test response
                         
                         if visualize_pf_transition:
-                            team_helpers.visualize_transition(test_constraints, particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Test of Unit ' + str(summary_count) + ' for player ' + member_id)
+                            team_helpers.visualize_transition(test_constraints, particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Test of Unit ' + str(loop_count) + ' for player ' + member_id)
 
                     else:
                         print("You got the diagnostic test wrong. Here's the correct answer")
                         failed_BEC_constraint = opt_feature_count - human_feature_count
                         print("Failed BEC constraint: {}".format(failed_BEC_constraint))
-                        test_constraints_team.append([-failed_BEC_constraint])
+
+                        test_constraints_team.extend([-failed_BEC_constraint])
+                        print('Current team knowledge: ', team_knowledge)
+                        team_knowledge = team_helpers.update_team_knowledge(team_knowledge, [-failed_BEC_constraint], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
                         particles_team[member_id].update([-failed_BEC_constraint])
                         
                         if visualize_pf_transition:
-                            team_helpers.visualize_transition([-failed_BEC_constraint], particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Test of Unit ' + str(summary_count + 1) + ' for player ' + member_id)
+                            team_helpers.visualize_transition([-failed_BEC_constraint], particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Test ' + str(test_no) + ' of Unit ' + str(loop_count) + ' for player ' + member_id)
 
                         test_mdp.visualize_trajectory_comparison(opt_traj, human_traj)
                     
@@ -403,48 +428,81 @@ if __name__ == "__main__":
                 test_constraints_team_expanded = [x for x in test_constraints_team]
                 print('test_constraints_team_expanded: ', test_constraints_team_expanded)
 
-                # Update common knowledge model
-                team_knowledge['common_knowledge'].append(test_constraints_team_expanded)
+                # Update common knowledge and joint knowledge
+                team_knowledge = team_helpers.update_team_knowledge(team_knowledge, [], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
                 particles_team['common_knowledge'].update(test_constraints_team_expanded)
-                if visualize_pf_transition:
-                    team_helpers.visualize_transition(test_constraints_team_expanded, particles_team['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Test of Unit ' + str(summary_count + 1) + ' for common knowledge')
-                
-                # Update joint knowledge model
-                team_knowledge['joint_knowledge'].append(test_constraints_team_expanded)
                 particles_team['joint_knowledge'].update_jk(test_constraints_team)
                 if visualize_pf_transition:
-                    team_helpers.visualize_transition(test_constraints_team_expanded, particles_team['joint_knowledge'], params.mdp_class, params.weights['val'], text = 'Test of Unit ' + str(summary_count + 1) + ' for joint knowledge',  demo_strategy = 'joint_knowledge')
+                    print('test_constraints_team_expanded: ', test_constraints_team_expanded)
+                    team_helpers.visualize_transition(test_constraints_team_expanded, particles_team['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Test ' + str(test_no) + ' of Unit ' + str(loop_count) + ' for common knowledge')
+                    team_helpers.visualize_transition(test_constraints_team_expanded, particles_team['joint_knowledge'], params.mdp_class, params.weights['val'], text = 'Test ' + str(test_no) + ' of Unit ' + str(loop_count) + ' for joint knowledge',  demo_strategy = 'joint_knowledge')
 
-
-
-                #####################################################################
+                
+                test_no += 1
+                
+                ####################################################################
                 # Remedial demo-test loop
-                # if remedial_test_flag: 
-
+                if remedial_test_flag: 
+                    
+                    x = 1
                     # run_remedial_loop()
-                #####################################################################
+                ####################################################################
         
-        
-
-            summary_count += 1
-            prev_summary_len = len(BEC_summary)
-
-            # Update demo particles for next iteration based on actual team knowledge and the demo strategu
-            particles_demo = particles_team[knowledge_id]
             
-            unit_learning_goal_reached = team_helpers.check_unit_learning_goal_reached(team_knowledge, min_unit_constraints)
+            ## Alternate method that does not use remedial demo-test loop
+            if not remedial_test_flag:               
+                
+                loop_count += 1
 
+                # TODO: check if unit knowledge is sufficient to move on to the next unit (unit learning goal reached)
+                # unit_learning_goal_reached = team_helpers.check_unit_learning_goal_reached(team_knowledge, min_unit_constraints)
+
+
+                # Temp: Arbitarily set when next unit should be checked
+                unit_learning_goal_reached = False
+                if loop_count - next_unit_loop_id > 2:
+                    unit_learning_goal_reached = True
+                    next_unit_loop_id = loop_count
+                
+                # Update variable filter
+                if unit_learning_goal_reached:
+                    variable_filter, nonzero_counter, teaching_complete_flag = team_helpers.check_and_update_variable_filter(variable_filter = variable_filter, nonzero_counter = nonzero_counter, no_info_flag = no_info_flag)
+
+
+                if teaching_complete_flag:
+                    print(colored('Teaching completed...', 'blue'))
+                    break
+                
+                else:
+                
+                    # update variables
+                    prev_summary_len = len(BEC_summary)
+
+                    # Update demo particles for next iteration based on actual team knowledge and the demo strategy
+                    particles_demo = copy.deepcopy(particles_team[knowledge_id])
+
+                    # Update expected knowledge with actual knowledge for next iteration
+                    particles_team_expected = copy.deepcopy(particles_team)
+                    team_knowledge_expected = copy.deepcopy(team_knowledge)
+
+
+        else:
+            # Update Variable filter and move to next unit, if applicable, if no demos are available for this unit.
+            print(colored('No new summaries for this unit...!!', 'red'))
+            unit_learning_goal_reached = True
+
+            # maybe double check knowledge metric
+            # unit_learning_goal_reached2 = team_helpers.check_unit_learning_goal_reached(team_knowledge, min_unit_constraints)
+            # print('Measured unit learning goal staus: ', unit_learning_goal_reached2)
+            
             # TODO: Update variable filter
             if unit_learning_goal_reached:
                 variable_filter, nonzero_counter, teaching_complete_flag = team_helpers.check_and_update_variable_filter(variable_filter = variable_filter, nonzero_counter = nonzero_counter, no_info_flag = no_info_flag)
 
-
             if teaching_complete_flag:
                 print(colored('Teaching completed...', 'blue'))
-        
-    
-        else:
-            print(colored('No new summaries...!!', 'red'))
+                break
+
 
 # save files
     # if len(BEC_summary) > 0:
