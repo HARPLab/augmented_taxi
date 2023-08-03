@@ -296,7 +296,7 @@ BEC = {
 
     'n_human_models': 4,                      # number of human beliefs to actively consider
 
-    'n_particles': 500,                      # number of particles in particle filter
+    'n_particles': 40,                      # number of particles in particle filter
 
     'obj_func_proportion': 1,                 # proportion of the max objective function (i.e. info gain) to aim for
                                               # when selecting the next demonstration (range: 0 - 1). selecting a value

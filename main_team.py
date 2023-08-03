@@ -63,8 +63,19 @@ def calc_expected_learning(team_knowledge_expected, particles_team_expected, min
     particles_team_expected['common_knowledge'].update(new_constraints)
     team_helpers.visualize_transition(new_constraints, particles_team_expected['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set' + str(loop_count+1) + ' for common knowledge')
     
+
+
     # Update joint knowledge model
-    particles_team_expected['joint_knowledge'].update_jk(team_knowledge_expected['joint_knowledge'])
+    # Method 1: Use complete joint knowledge of team
+    # particles_team_expected['joint_knowledge'].update_jk(team_knowledge_expected['joint_knowledge'])
+
+    # Method 2: Use new joint knowledge of team
+    new_constraints_team = []
+    for p in range(params.team_size):
+        new_constraints_team.append(new_constraints)
+    particles_team_expected['joint_knowledge'].update_jk(new_constraints_team)
+
+
     team_helpers.visualize_transition(new_constraints, particles_team_expected['joint_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set ' + str(loop_count+1) + ' for joint knowledge',  demo_strategy = 'joint_knowledge')
 
     print('min_BEC_constraints: ', min_BEC_constraints)
@@ -400,7 +411,7 @@ if __name__ == "__main__":
                     if (human_feature_count == opt_feature_count).all():
                         print("You got the diagnostic test right")
 
-                        test_constraints_team.extend(test_constraints)
+                        test_constraints_team.append(test_constraints)
                         team_knowledge = team_helpers.update_team_knowledge(team_knowledge, test_constraints, params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
                         particles_team[member_id].update(test_constraints) # update individual knowledge based on test response
                         
@@ -412,7 +423,7 @@ if __name__ == "__main__":
                         failed_BEC_constraint = opt_feature_count - human_feature_count
                         print("Failed BEC constraint: {}".format(failed_BEC_constraint))
 
-                        test_constraints_team.extend([-failed_BEC_constraint])
+                        test_constraints_team.append([-failed_BEC_constraint])
                         print('Current team knowledge: ', team_knowledge)
                         team_knowledge = team_helpers.update_team_knowledge(team_knowledge, [-failed_BEC_constraint], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
                         particles_team[member_id].update([-failed_BEC_constraint])
@@ -425,7 +436,9 @@ if __name__ == "__main__":
                     p += 1
                 
                 print('test_constraints_team: ', test_constraints_team)
-                test_constraints_team_expanded = [x for x in test_constraints_team]
+                test_constraints_team_expanded = []
+                for test_constraints in test_constraints_team:
+                    test_constraints_team_expanded.extend(test_constraints)
                 print('test_constraints_team_expanded: ', test_constraints_team_expanded)
 
                 # Update common knowledge and joint knowledge

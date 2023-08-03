@@ -101,15 +101,21 @@ class Particles_team(pf.Particles):
             ax1 = fig.add_subplot(1, 2, 1, projection='3d')
             ax2 = fig.add_subplot(1, 2, 2, projection='3d')
 
+            constraints_expanded = []
+            for cnst in constraints:
+                constraints_expanded.extend(cnst)
+
             ax1.title.set_text('Particles before update')
             self.plot(fig=fig, ax=ax1, plot_prev=True)
             ax1.scatter(x[0, 0], x[0, 1], x[0, 2], marker='o', c='r', s=100/2)
-            utils_teams.visualize_planes_team(constraints[0], fig=fig, ax=ax1)
+            utils_teams.visualize_planes_team(constraints_expanded, fig=fig, ax=ax1)
+            # utils_teams.visualize_planes_team(constraints[0], fig=fig, ax=ax1)
+
             
             ax2.title.set_text('Particles after update')
             self.plot(fig=fig, ax=ax2)
             ax2.scatter(x[0, 0], x[0, 1], x[0, 2], marker='o', c='r', s=100/2)
-            utils_teams.visualize_planes_team(constraints[0], fig=fig, ax=ax2)
+            utils_teams.visualize_planes_team(constraints_expanded, fig=fig, ax=ax2)
 
             print('Particle ', j, 'with weights ', x)
             print('Current weight: ', self.weights_prev[j])
@@ -144,43 +150,62 @@ class Particles_team(pf.Particles):
         p = x.shape[1]
 
         # check if atleast one of the constraints is satisfied, i.e. none of the inverse constraints are satisfied
-        constraint_satisfied_flag = []
+        team_constraint_satisfied_flag = []
+        prob_individual = np.ones([1, len(joint_constraints)])
         
-        
+        ind_id = 0
         for individual_constraint in joint_constraints:
             # print('Individual constraints: ', individual_constraint)
-            constraint_satisfied_flag.append(True)
+            team_constraint_satisfied_flag.append(True)
             
             # check if the constraints for each individual member are satisfied
             for constraint in individual_constraint:
                 dot = constraint.dot(x.T)
 
                 if dot < 0:
-                    constraint_satisfied_flag[-1] = False
+                    team_constraint_satisfied_flag[-1] = False
+                    prob_individual[0, ind_id] *= p_utils.VMF_pdf(constraint, k, p, x, dot=dot) # use the von Mises dist
+                else:
+                    prob_individual[0, ind_id] *= 0.12779 # use the uniform dist
+
+            ind_id += 1
 
 
         
+        ## Update the pdf even if constraints are satisfied for one of the members; 
+        
+        # # Method 1: Use product of pdfs; this is from Mike's work which is applicable for half-spaces. Here the distribution should be for the union of constraints and thus pdf for uniform distribution ould vary.
+        # if sum(np.array(team_constraint_satisfied_flag)) > 0  :
+          
+        #     # use the uniform dist
+        #     prob *=  0.12779
+        # else:
+        #     # use the VMF dist for each of the constraints for all individuals (Design choice).
+            
+        #     # vm = []
+        #     for individual_constraint in joint_constraints:
+        #         for i in range(len(individual_constraint)):
+        #             dot = individual_constraint[i].dot(x.T)
+        #             # vm.append(p_utils.VMF_pdf(individual_constraint[i], k, p, x, dot=dot))
+        #             prob *= p_utils.VMF_pdf(individual_constraint[i], k, p, x, dot=dot)
+            
+        #     # print('Von mises probabilities for each constraint: ', vm)
+        #     # debug
+        #     if prob > 0.13 or plot_particles_flag:
+        #         print('All constraints: ', joint_constraints)
+        #         print('Von mises joint prob: ', prob)
+        #         print('final constraint_satisfied_flag: ', team_constraint_satisfied_flag)
 
-        # Update the pdf even if constraints are satisfied for one of the members; this is from Mike's work which is applicable for half-spaces. Here the distribution should be for the union of constraints and thus pdf for uniform distribution would vary.
-        if sum(np.array(constraint_satisfied_flag)) > 0  :
-            # use the uniform dist
-            prob *= 0.12779
-        else:
-            # use the VMF dist for each of the constraints for all individuals (Design choice).
-            
-            # vm = []
-            for individual_constraint in joint_constraints:
-                for i in range(len(individual_constraint)):
-                    dot = individual_constraint[i].dot(x.T)
-                    # vm.append(p_utils.VMF_pdf(individual_constraint[i], k, p, x, dot=dot))
-                    prob *= p_utils.VMF_pdf(individual_constraint[i], k, p, x, dot=dot)
-            
-            # print('Von mises probabilities for each constraint: ', vm)
-            # debug
-            if prob > 0.13 or plot_particles_flag:
-                print('All constraints: ', joint_constraints)
-                print('Von mises joint prob: ', prob)
-                print('final constraint_satisfied_flag: ', constraint_satisfied_flag)
+
+
+        # Method 2: Use maximum probability distribution
+        prob = np.max(prob_individual)
+
+        if plot_particles_flag:
+            print('Individual probabilities: ', prob_individual)
+            print('All constraints: ', joint_constraints)
+            print('final constraint_satisfied_flag: ', team_constraint_satisfied_flag)
+            print('Prob: ', prob)
 
 
         return prob
