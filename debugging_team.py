@@ -649,14 +649,14 @@ if __name__ == "__main__":
 
         ax.view_init(elev=16, azim=-160)
 
-    # 1) 
-    # team_knowledge = params.team_prior.copy()
-    # team_knowledge['common_knowledge'] = team_helpers.calc_common_knowledge(team_knowledge, 2, params.weights['val'], params.step_cost_flag)
-    # team_knowledge['joint_knowledge'] = team_helpers.calc_joint_knowledge(team_knowledge, 2, params.weights['val'], params.step_cost_flag)
+    # # 1) 
+    # # team_knowledge = params.team_prior.copy()
+    # # team_knowledge['common_knowledge'] = team_helpers.calc_common_knowledge(team_knowledge, 2, params.weights['val'], params.step_cost_flag)
+    # # team_knowledge['joint_knowledge'] = team_helpers.calc_joint_knowledge(team_knowledge, 2, params.weights['val'], params.step_cost_flag)
 
-    # min_unit_constraints = params.prior
+    # # min_unit_constraints = params.prior
 
-    # min_BEC_constraints =  [np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
+    # # min_BEC_constraints =  [np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
 
 
     # # 2)
@@ -711,18 +711,21 @@ if __name__ == "__main__":
     # min_BEC_area = np.array(BEC_helpers.calc_solid_angles([min_BEC_constraints]))
     # min_unit_area = np.array(BEC_helpers.calc_solid_angles([min_unit_constraints]))
 
-    # knowledge_area = 0
+    # ind_knowledge = []
+    # ind_intersection_constraints = min_unit_constraints.copy()
     # for ind_constraints in team_knowledge['joint_knowledge']:
-    #     ind_intersection_constraints = min_unit_constraints.copy()
+    #     ind_knowledge.append(BEC_helpers.calc_solid_angles([ind_constraints]))
     #     ind_intersection_constraints.extend(ind_constraints)
-    #     ind_intersection_constraints = BEC_helpers.remove_redundant_constraints(ind_intersection_constraints, params.weights['val'], params.step_cost_flag)
-    #     print('ind_intersection_constraints: ', ind_intersection_constraints)
-    #     knowledge_area += np.array(BEC_helpers.calc_solid_angles([ind_intersection_constraints]))
+        
+    # ind_intersection_constraints = BEC_helpers.remove_redundant_constraints(ind_intersection_constraints, params.weights['val'], params.step_cost_flag)
+    # print('min_ind_intersection_constraints: ', ind_intersection_constraints)
+    # knowledge_area = sum(np.array(ind_knowledge)) - np.array(BEC_helpers.calc_solid_angles([ind_intersection_constraints]))
+
 
     # min_unit_BEC_knowledge_union = min_unit_area + knowledge_area - min_unit_BEC_knowledge_intersection
     
     # # check if the knowledge area is a subset of the BEC area
-    # if min_unit_BEC_knowledge_intersection == knowledge_area/2:
+    # if min_unit_BEC_knowledge_intersection == knowledge_area:
     #     knowledge_level_unit = 1
     # else:
     #     knowledge_level_unit = min_unit_BEC_knowledge_intersection/min_unit_BEC_knowledge_union
@@ -798,25 +801,26 @@ if __name__ == "__main__":
 
     # plt.show()
 
-    ##############
+    # ############################
 
-    import copy
+    # Remedial demo
 
-    l = [0, 1, [2, 3]]
-    l_assign = l                   # assignment
-    l_copy = l.copy()              # shallow copy
-    l_deepcopy = copy.deepcopy(l)  # deep copy
+    # team_knowledge = {'p1': [np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]])], 
+    #                 'p2': [np.array([[3,  0,  -2]]), np.array([[ 0,  0, -1]])], 
+    #                 'common_knowledge': [np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]]), np.array([[3,  0,  -2]])], 
+    #                 'joint_knowledge': [[np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]])]]}
 
-    l[1] = 100
-    l[2][0] = 200
-    print(l)
-    # [0, 100, [200, 3]]
+    team_knowledge = {'p1' :[np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]]), np.array([[1,  0,  0]])]}
 
-    print(l_assign)
-    # [0, 100, [200, 3]]
+    min_const = BEC_helpers.remove_redundant_constraints(team_knowledge['p1'],  params.weights['val'], params.step_cost_flag)
 
-    print(l_copy)
-    # [0, 1, [200, 3]]
+    fig = plt.figure()
+    ax1 = fig.add_subplot(1, 1, 1, projection='3d')
+    # utils_teams.visualize_planes_team(team_knowledge['common_knowledge'], fig=fig, ax=ax1)
+    utils_teams.visualize_planes_team(min_const, fig=fig, ax=ax1)
 
-    print(l_deepcopy)
-    # [0, 1, [2, 3]]
+    ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(min_const)
+    poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
+    BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax1, plot_ref_sphere=False, alpha=0.75)
+    label_axes(ax1, params.weights['val'])
+    plt.show()

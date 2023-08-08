@@ -35,6 +35,7 @@ mpl.rcParams['axes.labelsize'] = 'x-large'
 mpl.rcParams['xtick.labelsize'] = 'large'
 
 import random
+import pandas as pd
 
 
 ############################################
@@ -209,8 +210,6 @@ def run_remedial_loop():
     return 1
 
 
-
-
 if __name__ == "__main__":
     pool = Pool(min(params.n_cpu, 60))
     os.makedirs('models/' + params.data_loc['base'], exist_ok=True)
@@ -279,8 +278,7 @@ if __name__ == "__main__":
     BEC_summary = []
     visited_env_traj_idxs = []
     min_BEC_constraints_running = []
-    summary_count = 0
-    summary_id = 0
+    summary_count = 0 # this is actually the number of demos and not the number of units
     no_info_flag = False
     demo_reset_flag = False
     team_knowledge = copy.deepcopy(team_prior) # team_prior calculated from team_helpers.sample_team_pf also has the aggregated knowledge from individual priors
@@ -298,17 +296,22 @@ if __name__ == "__main__":
     demo_vars_template = {'demo_strategy': None,
                           'variable_filter': None,
                           'event_type': None,
+                          'loop_count': None,  
                             'summary_count': None,
-                            'summary_constraints': None,
-                            'knowledge_id': None,
-                            'team_knowledge': None,
+                            'unit_constraints': None,
                             'team_knowledge_expected': None,
-                            'particles_demo': None,
-                            'particles_team': None,
                             'particles_team_expected': None,
-                            'knowldge_level': None,
-                            'knowldge_level_expected': None}
+                            'unit_knowledge_level_expected': None,
+                            'BEC_knowledge_level_expected': None,
+                            'test_constraints': None,
+                            'team_knowledge': None,
+                            'particles_team': None,
+                            'unit_knowledge_level': None,
+                            'BEC_knowledge_level': None
+                            }
+    
 
+    vars_to_save = pd.DataFrame(columns=demo_vars_template.keys())
 
     # demo_strategy = params.demo_strategy
     
@@ -327,6 +330,7 @@ if __name__ == "__main__":
     ################################################
     loop_count = 0
     next_unit_loop_id = 0
+    unit_learning_goal_reached = True
     # WIP: Unitwise teaching-testing loop
     while not teaching_complete_flag:
 
@@ -416,12 +420,14 @@ if __name__ == "__main__":
                         particles_team[member_id].update(test_constraints) # update individual knowledge based on test response
                         
                         if visualize_pf_transition:
-                            team_helpers.visualize_transition(test_constraints, particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Test of Unit ' + str(loop_count) + ' for player ' + member_id)
+                            team_helpers.visualize_transition(test_constraints, particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Test ' + str(test_no) + ' of Unit ' + str(loop_count) + ' for player ' + member_id)
 
                     else:
                         print("You got the diagnostic test wrong. Here's the correct answer")
                         failed_BEC_constraint = opt_feature_count - human_feature_count
                         print("Failed BEC constraint: {}".format(failed_BEC_constraint))
+
+                        unit_learning_goal_reached = False
 
                         test_constraints_team.append([-failed_BEC_constraint])
                         print('Current team knowledge: ', team_knowledge)
@@ -442,7 +448,7 @@ if __name__ == "__main__":
                 print('test_constraints_team_expanded: ', test_constraints_team_expanded)
 
                 # Update common knowledge and joint knowledge
-                team_knowledge = team_helpers.update_team_knowledge(team_knowledge, [], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
+                team_knowledge = team_helpers.update_team_knowledge(team_knowledge, [], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = ['common_knowledge', 'joint_knowledge'])
                 particles_team['common_knowledge'].update(test_constraints_team_expanded)
                 particles_team['joint_knowledge'].update_jk(test_constraints_team)
                 if visualize_pf_transition:
@@ -472,15 +478,42 @@ if __name__ == "__main__":
 
 
                 # Temp: Arbitarily set when next unit should be checked
-                unit_learning_goal_reached = False
-                if loop_count - next_unit_loop_id > 2:
+                if loop_count - next_unit_loop_id > 1:
                     unit_learning_goal_reached = True
                     next_unit_loop_id = loop_count
                 
+
+                print('unit_learning_goal_reached: ', unit_learning_goal_reached)
+
+
+                # update variables
+                loop_vars = copy.deepcopy(demo_vars_template)
+                loop_vars['demo_strategy'] = demo_strategy
+                loop_vars['variable_filter'] = variable_filter
+                loop_vars['loop_count'] = loop_count
+                loop_vars['summary_count'] = summary_count
+                loop_vars['unit_constraints'] = unit_constraints
+                loop_vars['team_knowledge_expected'] = team_knowledge_expected
+                loop_vars['particles_team_expected'] = particles_team_expected
+                loop_vars['unit_knowledge_level_expected'] = team_helpers.calc_knowledge_level(team_knowledge_expected, unit_constraints)
+                loop_vars['BEC_knowledge_level_expected'] = team_helpers.calc_knowledge_level(team_knowledge_expected, min_BEC_constraints)
+                loop_vars['test_constraints'] = test_constraints
+                loop_vars['team_knowledge'] = team_knowledge
+                loop_vars['particles_team'] = particles_team
+                loop_vars['unit_knowledge_level'] = team_helpers.calc_knowledge_level(team_knowledge, unit_constraints)
+                loop_vars['BEC_knowledge_level'] = team_helpers.calc_knowledge_level(team_knowledge, min_BEC_constraints)           
+
+                vars_to_save = vars_to_save.append(loop_vars, ignore_index=True)
+                print('unit_knowledge_level_expected: ', loop_vars['unit_knowledge_level_expected'])
+                print('unit_knowledge_level: ', loop_vars['unit_knowledge_level'])
+                # save vars so far
+                vars_to_save.to_csv('models/' + params.data_loc['BEC'] + '/vars_to_save.csv', index=False)
+
+                
                 # Update variable filter
                 if unit_learning_goal_reached:
-                    variable_filter, nonzero_counter, teaching_complete_flag = team_helpers.check_and_update_variable_filter(variable_filter = variable_filter, nonzero_counter = nonzero_counter, no_info_flag = no_info_flag)
-
+                    variable_filter, nonzero_counter, teaching_complete_flag = team_helpers.check_and_update_variable_filter(variable_filter = variable_filter, nonzero_counter = nonzero_counter)
+                    print('Should be the updated variable filter: ', variable_filter)
 
                 if teaching_complete_flag:
                     print(colored('Teaching completed...', 'blue'))
@@ -510,7 +543,7 @@ if __name__ == "__main__":
             
             # TODO: Update variable filter
             if unit_learning_goal_reached:
-                variable_filter, nonzero_counter, teaching_complete_flag = team_helpers.check_and_update_variable_filter(variable_filter = variable_filter, nonzero_counter = nonzero_counter, no_info_flag = no_info_flag)
+                variable_filter, nonzero_counter, teaching_complete_flag = team_helpers.check_and_update_variable_filter(variable_filter = variable_filter, nonzero_counter = nonzero_counter)
 
             if teaching_complete_flag:
                 print(colored('Teaching completed...', 'blue'))
