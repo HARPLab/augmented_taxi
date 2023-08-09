@@ -190,87 +190,104 @@ def check_training_testing_overlap():
                 if policy_summarization_helpers._in_summary(test_tuple[1].mdp, summary, test_tuple[2][0][0]):
                     print('Overlap, Test difficulty: {}, Test #: {}'.format(test_difficulty, j))
 
-def extract_mdp_dict(test_wt_vi_traj_tuple, data_loc, element=-1, test_difficulty='none', optimal_traj=None):
+def extract_mdp_dict(vi, mdp, optimal_traj, mdp_dict, data_loc, element=-1, test_difficulty='none', normalized_opt_traj=None, normalized_human_traj=None):
     '''
     Extract the MDP information from the test environment tuple (e.g. to be later put into a json)
     '''
 
-    vi = test_wt_vi_traj_tuple[1]
-    mdp = test_wt_vi_traj_tuple[1].mdp
-    if optimal_traj is None:
-        optimal_traj = test_wt_vi_traj_tuple[2]
-    test_mdp_dict = test_wt_vi_traj_tuple[3]
-
     # update the MDP parameters to begin with the desired start state
     if data_loc == 'augmented_taxi2':
-        test_mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
-        test_mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
-        test_mdp_dict['agent']['has_passenger'] = mdp.init_state.get_objects_of_class("agent")[
+        mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
+        mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
+        mdp_dict['agent']['has_passenger'] = mdp.init_state.get_objects_of_class("agent")[
             0].get_attribute('has_passenger')
 
-        test_mdp_dict['passengers'][0]['x'] = mdp.init_state.get_objects_of_class("passenger")[
+        mdp_dict['passengers'][0]['x'] = mdp.init_state.get_objects_of_class("passenger")[
             0].get_attribute('x')
-        test_mdp_dict['passengers'][0]['y'] = mdp.init_state.get_objects_of_class("passenger")[
+        mdp_dict['passengers'][0]['y'] = mdp.init_state.get_objects_of_class("passenger")[
             0].get_attribute('y')
-        test_mdp_dict['passengers'][0]['dest_x'] = mdp.init_state.get_objects_of_class("passenger")[
+        mdp_dict['passengers'][0]['dest_x'] = mdp.init_state.get_objects_of_class("passenger")[
             0].get_attribute('dest_x')
-        test_mdp_dict['passengers'][0]['dest_y'] = mdp.init_state.get_objects_of_class("passenger")[
+        mdp_dict['passengers'][0]['dest_y'] = mdp.init_state.get_objects_of_class("passenger")[
             0].get_attribute('dest_y')
-        test_mdp_dict['passengers'][0]['in_taxi'] = mdp.init_state.get_objects_of_class("passenger")[
+        mdp_dict['passengers'][0]['in_taxi'] = mdp.init_state.get_objects_of_class("passenger")[
             0].get_attribute('in_taxi')
 
         if (len(mdp.init_state.get_objects_of_class("hotswap_station")) > 0):
-            test_mdp_dict['hotswap_station'][0]['x'] = mdp.init_state.get_objects_of_class("hotswap_station")[
+            mdp_dict['hotswap_station'][0]['x'] = mdp.init_state.get_objects_of_class("hotswap_station")[
                 0].get_attribute('x')
-            test_mdp_dict['hotswap_station'][0]['y'] = mdp.init_state.get_objects_of_class("hotswap_station")[
+            mdp_dict['hotswap_station'][0]['y'] = mdp.init_state.get_objects_of_class("hotswap_station")[
                 0].get_attribute('y')
         else:
-            test_mdp_dict['hotswap_station'] = []
+            mdp_dict['hotswap_station'] = []
 
 
     elif data_loc == 'colored_tiles':
-        test_mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
-        test_mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
+        mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
+        mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
     else:
-        test_mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
-        test_mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
-        test_mdp_dict['agent']['has_skateboard'] = mdp.init_state.get_objects_of_class("agent")[
+        mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
+        mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
+        mdp_dict['agent']['has_skateboard'] = mdp.init_state.get_objects_of_class("agent")[
             0].get_attribute('has_skateboard')
 
-        test_mdp_dict['skateboard'][0]['x'] = mdp.init_state.get_objects_of_class("skateboard")[
-            0].get_attribute('x')
-        test_mdp_dict['skateboard'][0]['y'] = mdp.init_state.get_objects_of_class("skateboard")[
-            0].get_attribute('y')
-        test_mdp_dict['skateboard'][0]['on_agent'] = mdp.init_state.get_objects_of_class("skateboard")[
-            0].get_attribute('on_agent')
+        if len(mdp.init_state.get_objects_of_class("skateboard")) > 0:
+            mdp_dict['skateboard'][0]['x'] = mdp.init_state.get_objects_of_class("skateboard")[
+                0].get_attribute('x')
+            mdp_dict['skateboard'][0]['y'] = mdp.init_state.get_objects_of_class("skateboard")[
+                0].get_attribute('y')
+            mdp_dict['skateboard'][0]['on_agent'] = mdp.init_state.get_objects_of_class("skateboard")[
+                0].get_attribute('on_agent')
+        else:
+            mdp_dict['skateboard'] = []
 
-    test_mdp_dict['opt_actions'] = [sas[1] for sas in optimal_traj]
-    test_mdp_dict['opt_traj_length'] = len(optimal_traj)
-    test_mdp_dict['opt_traj_reward'] = mdp.weights.dot(mdp.accumulate_reward_features(optimal_traj).T)[0][0]
-    test_mdp_dict['test_difficulty'] = test_difficulty
-    # to be able to trace the particular environment (0-5)
-    test_mdp_dict['tag'] = element
+    mdp_dict['opt_actions'] = [sas[1] for sas in optimal_traj]
+    mdp_dict['opt_traj_length'] = len(optimal_traj)
+    mdp_dict['opt_traj_reward'] = mdp.weights.dot(mdp.accumulate_reward_features(optimal_traj).T)[0][0]
+    mdp_dict['test_difficulty'] = test_difficulty
+    # to be able to trace the particular environment (0-5), or know if it's a training demonstration (-1),
+    # or if it's a test demonstration whose normalized trajectory should be shown (-2), or a diagnostic test (-3)
+    mdp_dict['tag'] = element
 
-    # also obtain all possible optimal trajectories
+    # also obtain all possible optimal trajectories if value iteration object is provided
     all_opt_trajs = mdp_helpers.rollout_policy_recursive(mdp, vi, optimal_traj[0][0], [])
     # extract all of the actions
     all_opt_actions = []
     for opt_traj in all_opt_trajs:
         all_opt_actions.append([sas[1] for sas in opt_traj])
-    test_mdp_dict['all_opt_actions'] = all_opt_actions
+    mdp_dict['all_opt_actions'] = all_opt_actions
+
+    # store the normalized trajectories, if relevant
+    if normalized_opt_traj is not None:
+        mdp_dict['normalized_opt_actions'] = [sas[1] for sas in normalized_opt_traj]
+        normalized_agent_locations = [(sas[0].get_agent_x(), sas[0].get_agent_y()) for sas in normalized_opt_traj]
+        normalized_agent_locations.append((normalized_opt_traj[-1][2].get_agent_x(), normalized_opt_traj[-1][2].get_agent_y()))
+        mdp_dict['normalized_opt_locations'] = normalized_agent_locations
+    else:
+        mdp_dict['normalized_opt_actions'] = []
+        mdp_dict['normalized_opt_locations'] = []
+
+    if normalized_human_traj is not None:
+        mdp_dict['normalized_human_actions'] = [sas[1] for sas in normalized_human_traj]
+        normalized_human_locations = [(sas[0].get_agent_x(), sas[0].get_agent_y()) for sas in normalized_human_traj]
+        normalized_human_locations.append((normalized_human_traj[-1][2].get_agent_x(), normalized_human_traj[-1][2].get_agent_y()))
+        mdp_dict['normalized_human_locations'] = normalized_human_locations
+    else:
+        mdp_dict['normalized_human_actions'] = []
+        mdp_dict['normalized_human_locations'] = []
 
     # delete unserializable numpy arrays that aren't necessary
     try:
-        del test_mdp_dict['weights_lb']
-        del test_mdp_dict['weights_ub']
-        del test_mdp_dict['weights']
+        del mdp_dict['weights_lb']
+        del mdp_dict['weights_ub']
+        del mdp_dict['weights']
     except:
         pass
 
-    # print(test_mdp_dict)
-    # print(test_mdp_dict['env_code'])
+    # print(mdp_dict)
+    # print(mdp_dict['env_code'])
 
-    return test_mdp_dict
+    return mdp_dict
 
 def create_testing_dictionaries(test_env_dict, mapping):
     '''
@@ -292,7 +309,13 @@ def create_testing_dictionaries(test_env_dict, mapping):
             for pair in pairs:
                 pair_mdp_dict = []
                 for element in pair:
-                    test_mdp_dict = extract_mdp_dict(test_wt_vi_traj_tuples[element], data_loc, element=element, test_difficulty=test_difficulty)
+                    test_wt_vi_traj_tuple = test_wt_vi_traj_tuples[element]
+                    vi = test_wt_vi_traj_tuple[1]
+                    mdp = test_wt_vi_traj_tuple[1].mdp
+                    optimal_traj = test_wt_vi_traj_tuple[2]
+                    test_mdp_dict = test_wt_vi_traj_tuple[3]
+
+                    test_mdp_dict = extract_mdp_dict(vi, mdp, optimal_traj, test_mdp_dict, data_loc, element=element, test_difficulty=test_difficulty)
                     pair_mdp_dict.append(test_mdp_dict)
 
                 test_difficulty_dicts.append(pair_mdp_dict)
@@ -1064,7 +1087,7 @@ def view_trajectories(visualize=False):
 
 def consolidate_counterfactual_constraints():
     '''
-    Consolidate counterfactual constraints into a single file
+    Consolidate counterfactual constraints into a single file (testing if this is quicker than loading individually from multiple files)
     '''
     data_loc = 'augmented_taxi2'
     from multiprocessing import Pool
@@ -1092,6 +1115,99 @@ def consolidate_counterfactual_constraints():
     with open('models/' + data_loc + '/' + 'precomputed_PF_constraints.pickle', 'wb') as f:
         pickle.dump(precomputed_PF_constraints, f)
 
+
+def save_user_study_json(mapping):
+    '''
+    Save the demonstrations, diagnostic tests, and final tests to be used in the user study as a json
+    '''
+
+    import random
+    from policy_summarization import BEC
+
+    user_study_dict = {
+            'augmented_taxi2': {"demo": {}, "diagnostic test": {}, "final test": {}},
+            'colored_tiles': {"demo": {}, "diagnostic test": {}, "final test": {}},
+            'skateboard2': {"demo": {}, "diagnostic test": {}, "final test": {}}
+    }
+
+    for data_loc in mapping.keys():
+        print(data_loc)
+
+        # a) save the teaching demonstrations
+        demo_idx = 0
+        diagnostic_test_idx = 0
+        with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
+            policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(f)
+
+        with open('models/' + data_loc + '/BEC_summary.pickle', 'rb') as f:
+            BEC_summary, visited_env_traj_idxs, particles = pickle.load(f)
+
+        for unit_idx, unit in enumerate(BEC_summary):
+            unit_constraints = []
+            running_variable_filter = unit[0][4]
+
+            # save the information for each demonstration that is part of this unit into a dictionary
+            for subunit_idx, subunit in enumerate(unit):
+                print("Unit {}/{}, demo {}/{}:".format(unit_idx + 1, len(BEC_summary), subunit_idx + 1,
+                                                       len(unit)))
+                unit_constraints.extend(subunit[3])
+
+                best_env_idx = subunit[2][0]
+                filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
+                with open(filename, 'rb') as f:
+                    wt_vi_traj_env = pickle.load(f)
+                vi = wt_vi_traj_env[0][1]
+                mdp_dict = wt_vi_traj_env[0][3]
+
+                user_study_dict[data_loc]["demo"][str(demo_idx)] = extract_mdp_dict(vi, subunit[0], subunit[1], mdp_dict, data_loc)
+                demo_idx += 1
+
+            # b) save the diagnostic tests
+            # obtain the constraints conveyed by the unit's demonstrations
+            min_constraints = BEC_helpers.remove_redundant_constraints(unit_constraints)
+            random.shuffle(min_constraints) # shuffle the order of the constraints so that it's not always the same
+            # obtain the diagnostic tests that will test the human's understanding of the unit's constraints
+            preliminary_tests, visited_env_traj_idxs = BEC.obtain_diagnostic_tests(data_loc, unit, visited_env_traj_idxs, min_constraints, min_subset_constraints_record, traj_record, traj_features_record, running_variable_filter, mdp_features_record)
+
+            best_env_idx = preliminary_tests[0][2][0]
+            filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
+            with open(filename, 'rb') as f:
+                wt_vi_traj_env = pickle.load(f)
+            vi = wt_vi_traj_env[0][1]
+            mdp_dict = wt_vi_traj_env[0][3]
+
+            user_study_dict[data_loc]["diagnostic test"][str(diagnostic_test_idx)] = extract_mdp_dict(vi, preliminary_tests[0][0], preliminary_tests[0][1], mdp_dict, data_loc, element=-3)
+            diagnostic_test_idx += 1
+
+        # c) save the final, held-out set of tests
+        for test_difficulty in mapping[data_loc].keys():
+            data_loc_test = 'models/' + data_loc + '/testing/test_' + test_difficulty + '/test_environments.pickle'
+
+            with open(data_loc_test, 'rb') as f:
+                test_wt_vi_traj_tuples, test_BEC_lengths, test_BEC_constraints, selected_env_traj_tracers = pickle.load(f)
+
+            pairs = mapping[data_loc][test_difficulty]
+
+            test_difficulty_dicts = []
+
+            for pair in pairs:
+                pair_mdp_dict = []
+                for element in pair:
+                    test_wt_vi_traj_tuple = test_wt_vi_traj_tuples[element]
+                    vi = test_wt_vi_traj_tuple[1]
+                    mdp = test_wt_vi_traj_tuple[1].mdp
+                    optimal_traj = test_wt_vi_traj_tuple[2]
+                    test_mdp_dict = test_wt_vi_traj_tuple[3]
+
+                    test_mdp_dict = extract_mdp_dict(vi, mdp, optimal_traj, test_mdp_dict, data_loc, element=element, test_difficulty=test_difficulty)
+                    pair_mdp_dict.append(test_mdp_dict)
+
+                test_difficulty_dicts.append(pair_mdp_dict)
+
+            user_study_dict[data_loc]["final test"][test_difficulty] = test_difficulty_dicts
+
+        with open('models/user_study_dict.json', 'w') as f:
+            json.dump(user_study_dict, f)
 
 if __name__ == "__main__":
     os.chdir('../../..')
@@ -1156,33 +1272,5 @@ if __name__ == "__main__":
     # view_trajectories(visualize=False)
 
 
-    # # todo: getting initial training demonstrations and diagnostic test in augmented taxi domain for rithika
-    # training_demos = {'augmented_taxi2': [(8,0), (10, 15)], 'colored_tiles': [(160, 10), (416, 10)], 'skateboard2': [(1, 376), (1, 383)]}
-    # diagnostic_tests = {(25, 190)}
-    #
-    # train_env_dict = {
-    #     'augmented_taxi2': {},
-    #     'colored_tiles': {},
-    #     'skateboard2': {}
-    # }
-    #
-    # for data_loc in training_demos.keys():
-    #     with open('models/' + data_loc + '/base_constraints.pickle', 'rb') as f:
-    #         policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, consistent_state_count = pickle.load(
-    #             f)
-    #
-    #     env_traj_pairs = training_demos[data_loc]
-    #     for j, env_traj_pair in enumerate(env_traj_pairs):
-    #         env_idx = env_traj_pair[0]
-    #         traj_idx = env_traj_pair[1]
-    #         filename = mp_helpers.lookup_env_filename(data_loc, env_idx)
-    #         with open(filename, 'rb') as f:
-    #             wt_vi_traj_env = pickle.load(f)
-    #
-    #         optimal_traj = traj_record[env_idx][traj_idx]
-    #         wt_vi_traj_env[0][1].mdp.set_init_state(optimal_traj[0][0])
-    #         train_env_dict[data_loc][j] = extract_mdp_dict(wt_vi_traj_env[0], data_loc, optimal_traj=optimal_traj)
-    #
-    # # save the training mdp information as a json
-    # with open('train_env_dict.json', 'w') as f:
-    #     json.dump(train_env_dict, f)
+    # preparing for closed-loop teaching user study
+    save_user_study_json(mapping)

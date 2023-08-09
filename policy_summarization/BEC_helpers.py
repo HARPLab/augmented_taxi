@@ -123,7 +123,7 @@ def remove_redundant_constraints_lp(constraints, weights, step_cost_flag):
 
     return nonredundant_constraints, redundundant_constraints
 
-def remove_redundant_constraints(constraints, weights, step_cost_flag):
+def remove_redundant_constraints(constraints, weights=None, step_cost_flag=False):
     '''
     Summary: Remove redundant constraints
     '''

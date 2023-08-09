@@ -1400,7 +1400,7 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BE
             best_env_idxs, best_traj_idxs = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record,
                                                                       previous_demonstrations, type=type, return_all_equiv=True)
         else:
-            # rely on constraints generated via 2-step deviation
+            # rely on constraints generated via 1-step deviation
             # if you're looking for demonstrations that will convey the most constraining BEC region or will be employing scaffolding,
             # obtain the demos needed to convey the most constraining BEC region
             BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(BEC_constraints,

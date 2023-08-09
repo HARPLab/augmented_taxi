@@ -20,7 +20,7 @@ import difflib
 
 # Other imports.
 sys.path.append("simple_rl")
-import augmented_taxi.params as params
+import params
 from simple_rl.agents import FixedPolicyAgent
 from simple_rl.planning import ValueIteration
 from simple_rl.utils import make_mdp
@@ -136,7 +136,7 @@ def obtain_summary(mdp_class, data_loc, mdp_parameters, weights, step_cost_flag,
             with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
                 pickle.dump((BEC_summary, visited_env_traj_idxs, particles), f)
 
-    # BEC.visualize_summary(BEC_summary, weights, step_cost_flag)
+    # BEC.visualize_summary(BEC_summary)
     #
     # for summary in BEC_summary:
     #     best_mdp = summary[0]
