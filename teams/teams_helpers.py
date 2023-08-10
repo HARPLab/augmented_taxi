@@ -116,13 +116,15 @@ def update_team_knowledge(team_knowledge, new_constraints, team_size, weights, s
 
     team_knowledge_updated = team_knowledge.copy()
 
+    # checking what needs to be updated: common_knowledge, joint_knowledge, or both
     if knowledge_to_update == 'all':
         knowledge_types = list(team_knowledge.keys())
     else:
         knowledge_types = knowledge_to_update.copy()
 
-
+    # iterating throught the knowledge types
     for knowledge_type in knowledge_types:
+        # if the knowledge type is not one of the base knowledge types will simply add the new_constraints to that knowledge id
         if knowledge_type != 'joint_knowledge' and  knowledge_type != 'common_knowledge':
             knowledge = team_knowledge[knowledge_type].copy()
             print('Old_knowledge: ', knowledge)
@@ -138,13 +140,14 @@ def update_team_knowledge(team_knowledge, new_constraints, team_size, weights, s
         elif  knowledge_type == 'common_knowledge':
             team_knowledge_updated[knowledge_type] = calc_common_knowledge(team_knowledge_updated, team_size, weights=weights, step_cost_flag=step_cost_flag)
         else:
+            # I dont see how this would ever be reached
             print(colored('Unknow knowledge type to update.', 'red'))
 
     return team_knowledge_updated
 
 
 
-
+# seems like this fincution was from original framework
 def check_info_gain(info_gains_record, consistent_state_count):
     '''
     Do a quick check of whether there's any information to be gained from any of the trajectories.
@@ -165,7 +168,7 @@ def check_info_gain(info_gains_record, consistent_state_count):
     return no_info_flag
 
                 
-
+# seems like this fincution was from original framework
 def check_and_update_variable_filter(min_subset_constraints_record = None, variable_filter = None, nonzero_counter = None, initialize_filter_flag = False, no_info_flag = False):
     
     teaching_complete_flag = True
@@ -215,7 +218,13 @@ def find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints):
 
     team_knowledge_level = calc_knowledge_level(team_knowledge, min_BEC_constraints)
     # sorted_kl = sorted(team_knowledge_level)
-    sorted_kl = dict(sorted(team_knowledge_level.items(), key=lambda item: item[1]))
+    sorted_kl = dict(sorted(team_knowledge_level.items(), key=lambda item: item[1])) # why is this a dictionary when it is being changed to a list later
+    # I think the above line can be rewritten to:
+    # sorted_kl = sorted(team_knowledge_level.values)
+    # only issue I see with this is it doesnt remove the common or joint knowledge items 
+    # shouldn't it only sort the members?
+
+    #is this for debugging?
     print('sorted_kl: ', sorted_kl)
     ascending_order_of_knowledge = []
     for i, kl in enumerate(sorted_kl):
@@ -268,7 +277,7 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, weights = None, s
             # TODO: Knowledge metric for joint knowledge
             
             ## Method 1: Joint constraints expressed as inverse of the inverted and minimal constraints of individual members
-            
+            #basically doing calc_join_knowledge here would be much simplier with the members already being stored in a list
             joint_constraints = []
             for k_id, k_type in enumerate(team_knowledge):
                 if 'p' in k_type:
