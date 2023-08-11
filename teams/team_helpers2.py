@@ -53,21 +53,22 @@ import matplotlib.tri as mtri
 
 def calc_common_knowledge(team_knowledge, team_size, weights, step_cost_flag):
 
-
-    for i in range(team_size):
+    
+    ''''for i in range(team_size):
         member_id = 'p' + str(i+1)
         if i==0:
             constraints = team_knowledge[member_id].copy()
         else:
-            constraints.extend(team_knowledge[member_id])
+            constraints.extend(team_knowledge[member_id])''''
 
+    constraints = team_knowledge["members_list"].copy()
     common_constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
 
     return common_constraints
 
 
 
-def calc_joint_knowledge(team_knowledge, team_size, weights=None, step_cost_flag=None):
+''''def calc_joint_knowledge(team_knowledge, team_size, weights=None, step_cost_flag=None):
 
     # TODO: Calculate joint constraints
     # Joint constraints is normally expressed as the union of constraints of individuals. 
@@ -88,6 +89,7 @@ def calc_joint_knowledge(team_knowledge, team_size, weights=None, step_cost_flag
 
 
     ## Method 2: Here we just represent the constraints of each individual as a separate list.
+
     for i in range(team_size):
         member_id = 'p' + str(i+1)
         if i==0:
@@ -95,20 +97,11 @@ def calc_joint_knowledge(team_knowledge, team_size, weights=None, step_cost_flag
         else:
             joint_constraints.append(team_knowledge[member_id])
 
+
     # print('Team knowledge:', team_knowledge)
     # print('Joint constraints:', joint_constraints)
 
-
-
-
-
-
-
-
-
-
-
-    return joint_constraints
+    return team_knowledge["members_list"]''''
 
 
 
@@ -135,13 +128,14 @@ def update_team_knowledge(team_knowledge, new_constraints, team_size, weights, s
             new_knowledge = BEC_helpers.remove_redundant_constraints(knowledge, weights, step_cost_flag)
 
             team_knowledge_updated[knowledge_type] = new_knowledge.copy()
-        elif  knowledge_type == 'joint_knowledge':
-            team_knowledge_updated[knowledge_type] = calc_joint_knowledge(team_knowledge_updated, team_size, weights=weights, step_cost_flag=step_cost_flag)
+            '''
+            elif  knowledge_type == 'joint_knowledge':
+                team_knowledge_updated[knowledge_type] = calc_joint_knowledge(team_knowledge_updated, team_size, weights=weights, step_cost_flag=step_cost_flag)'''
         elif  knowledge_type == 'common_knowledge':
             team_knowledge_updated[knowledge_type] = calc_common_knowledge(team_knowledge_updated, team_size, weights=weights, step_cost_flag=step_cost_flag)
         else:
-            # I dont see how this would ever be reached
-            print(colored('Unknow knowledge type to update.', 'red'))
+            # would be reached in the case of joint_knowledge since this is now automatically updated
+            print(colored('Unknow knowledge type to update or joint_knowledge is being updated even though it is automatically updated', 'red'))
 
     return team_knowledge_updated
 
@@ -168,7 +162,7 @@ def check_info_gain(info_gains_record, consistent_state_count):
     return no_info_flag
 
                 
-# seems like this fincution was from original framework
+# seems like this function was from original framework
 def check_and_update_variable_filter(min_subset_constraints_record = None, variable_filter = None, nonzero_counter = None, initialize_filter_flag = False, no_info_flag = False):
     
     teaching_complete_flag = True
@@ -212,7 +206,8 @@ def check_and_update_variable_filter(min_subset_constraints_record = None, varia
 
 
 # use the member id list and just return the sorted variable
-def find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints):
+#going to try to not use this anymore
+'''def find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints):
 
     # Sorts based on ascending order of knowledge
 
@@ -231,8 +226,9 @@ def find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints):
         print(kl)
         if 'p' in kl:
             ascending_order_of_knowledge.append(kl)
+    ascending_order_of_knowledge = sorted(team_knowledge_level['members_list'])
 
-    return ascending_order_of_knowledge
+    return ascending_order_of_knowledge'''
 
 
 
@@ -273,16 +269,17 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, weights = None, s
 
         print('Calculating knowledge level for: ', knowledge_type)
 
-        if knowledge_type == 'joint_knowledge':
+        if knowledge_type == 'members_list':
             # TODO: Knowledge metric for joint knowledge
             
             ## Method 1: Joint constraints expressed as inverse of the inverted and minimal constraints of individual members
             #basically doing calc_join_knowledge here would be much simplier with the members already being stored in a list
             # can be optimized further with members being stored in list
-            joint_constraints = []
+            '''joint_constraints = []
             for k_id, k_type in enumerate(team_knowledge):
                 if 'p' in k_type:
-                    joint_constraints.extend(team_knowledge[k_type])
+                    joint_constraints.extend(team_knowledge[k_type])'''
+            joint_constraints = team_knowledge["members_list"]
 
             min_unit_intersection_constraints = min_unit_constraints.copy()
             min_unit_intersection_constraints.extend(joint_constraints)
@@ -308,7 +305,7 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, weights = None, s
             min_unit_area = np.array(BEC_helpers.calc_solid_angles([min_unit_constraints]))
 
             knowledge_area = 0
-            for ind_constraints in team_knowledge['joint_knowledge']:
+            for ind_constraints in team_knowledge['members_list']:
                 ind_intersection_constraints = min_unit_constraints.copy()
                 ind_intersection_constraints.extend(ind_constraints)
                 ind_intersection_constraints = BEC_helpers.remove_redundant_constraints(ind_intersection_constraints, params.weights['val'], params.step_cost_flag)
@@ -511,24 +508,24 @@ def particles_for_demo_strategy(demo_strategy, team_knowledge, team_particles, t
     # return prior, particles
 
     ###########################################
-    
+    team_knowledge_level = calc_knowledge_level(team_knowledge, min_BEC_constraints)['members_list']
     # particles to consider while generating demos
     if demo_strategy =='individual_knowledge_low':
-        ind_knowledge_ascending = find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints)
-        knowledge_id = 'p' + str(ind_knowledge_ascending[teammate_idx])
+        knowledge_id = np.argmin(team_knowledge_level)
     
     elif demo_strategy == 'individual_knowledge_high':
-        ind_knowledge_ascending = find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints)
-        knowledge_id = 'p' + str(ind_knowledge_ascending[len(ind_knowledge_ascending) - teammate_idx - 1])
+        knowledge_id = np.argmax(team_knowledge_level)
     
-    elif demo_strategy == 'common_knowledge' or demo_strategy == 'joint_knowledge':
-        particles = team_particles[demo_strategy]
+    elif demo_strategy == 'common_knowledge':
+        #particles = team_particles[demo_strategy]
         knowledge_id = demo_strategy
+    elif demo_strategy == 'joint_knowledge':
+        knowledge_id = 'members_list'
     
     else:
         print('Unsupported demo strategy for sampling particles!')
 
-    particles = team_particles[knowledge_id]
+    particles = team_particles['members_list'][knowledge_id]
 
     
     return knowledge_id, particles
@@ -674,14 +671,13 @@ def obtain_team_summary(data_loc, min_subset_constraints_record, min_BEC_constra
 def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_prior=None):
 
     particles_team = {}
-    
+    particles_team['members_list'] = []
     # particles for individual team members
     for i in range(team_size):
-        member_id = 'p' + str(i+1)
-        particles_team[member_id] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles))
+        particles_team['members_list'][i] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles))
 
         if team_prior is not None:
-            particles_team[member_id].update(team_prior[member_id])
+            particles_team['members_list'][i].update(team_prior['members_list'][i])
 
     
     # particles for aggregated team knowledge - common knowledge
@@ -693,10 +689,9 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_prior=N
 
     # particles for aggregated team knowledge - joint knowledge (both methods should produce similar particles; check and if they are similar method 1 is more streamlined)
     # method 1
-    particles_team['joint_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles))
+    '''particles_team['joint_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles))
     if team_prior is not None:
-        team_prior['joint_knowledge'] = calc_joint_knowledge(team_prior, team_size, weights, step_cost_flag)
-        particles_team['joint_knowledge'].update_jk(team_prior['joint_knowledge'])
+        particles_team['joint_knowledge'].update_jk(team_prior['members_list'])'''
     
     # # method 2
     # if team_prior is not None:
@@ -1015,15 +1010,22 @@ def visualize_team_knowledge(particles_team, mdp_class, fig=None, weights=None, 
             ax.set_xlabel('$\mathregular{w_0}$: Mud')
             ax.set_ylabel('$\mathregular{w_1}$: Recharge')
 
-    
+    #may need to add a case to plot each individual member (if needed)
     n_subplots = len(particles_team)
     i = 1
     for knowledge_id, knowledge_type  in enumerate(particles_team):
-        ax = fig.add_subplot(1, n_subplots, i, projection='3d')
-        ax.title.set_text('Particles for knowledge: \n ' + str(knowledge_type))
-        particles_team[knowledge_type].plot(fig=fig, ax=ax)
-        label_axes(ax, mdp_class, weights)
-        i += 1
+        if knowledge_type == 'members_list':
+            ax = fig.add_subplot(1, n_subplots, i, projection='3d')
+            ax.title.set_text('Particles for knowledge: \n ' + "joint_knowledge")
+            particles_team[knowledge_type].plot(fig=fig, ax=ax)
+            label_axes(ax, mdp_class, weights)
+            i += 1
+        else: 
+            ax = fig.add_subplot(1, n_subplots, i, projection='3d')
+            ax.title.set_text('Particles for knowledge: \n ' + str(knowledge_type))
+            particles_team[knowledge_type].plot(fig=fig, ax=ax)
+            label_axes(ax, mdp_class, weights)
+            i += 1
 
     fig.suptitle(text, fontsize=30)
 

@@ -350,9 +350,9 @@ human_learning_models = {'p1': np.array([0.9, 0.9, 0.9]), \
 
 
 team_prior = {}
+team_prior['members_list'] = []
 for i in range(team_size):
-    member_id = 'p' + str(i+1)
-    team_prior[member_id] = prior
+    team_prior['members_list'].append(prior)
 
 
 
