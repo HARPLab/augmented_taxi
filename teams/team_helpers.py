@@ -674,6 +674,7 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_prior=N
     particles_team['members_list'] = []
     # particles for individual team members
     for i in range(team_size):
+        particles_team['members_list'][i] = []
         particles_team['members_list'][i] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles))
 
         if team_prior is not None:
@@ -1010,7 +1011,7 @@ def visualize_team_knowledge(particles_team, mdp_class, fig=None, weights=None, 
             ax.set_xlabel('$\mathregular{w_0}$: Mud')
             ax.set_ylabel('$\mathregular{w_1}$: Recharge')
 
-    #may need to add a case to plot each individual member (if needed)
+    # add individual members
     n_subplots = len(particles_team)
     i = 1
     for knowledge_id, knowledge_type  in enumerate(particles_team):
