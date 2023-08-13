@@ -54,12 +54,12 @@ import matplotlib.tri as mtri
 def calc_common_knowledge(team_knowledge, team_size, weights, step_cost_flag):
 
     
-    ''''for i in range(team_size):
+    '''for i in range(team_size):
         member_id = 'p' + str(i+1)
         if i==0:
             constraints = team_knowledge[member_id].copy()
         else:
-            constraints.extend(team_knowledge[member_id])''''
+            constraints.extend(team_knowledge[member_id])'''
 
     constraints = team_knowledge["members_list"].copy()
     common_constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
@@ -68,7 +68,7 @@ def calc_common_knowledge(team_knowledge, team_size, weights, step_cost_flag):
 
 
 
-''''def calc_joint_knowledge(team_knowledge, team_size, weights=None, step_cost_flag=None):
+'''def calc_joint_knowledge(team_knowledge, team_size, weights=None, step_cost_flag=None):
 
     # TODO: Calculate joint constraints
     # Joint constraints is normally expressed as the union of constraints of individuals. 
@@ -101,7 +101,7 @@ def calc_common_knowledge(team_knowledge, team_size, weights, step_cost_flag):
     # print('Team knowledge:', team_knowledge)
     # print('Joint constraints:', joint_constraints)
 
-    return team_knowledge["members_list"]''''
+    return team_knowledge["members_list"]'''
 
 
 
