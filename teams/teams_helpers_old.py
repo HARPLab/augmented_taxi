@@ -60,7 +60,7 @@ def calc_common_knowledge(team_knowledge, team_size, weights, step_cost_flag):
             constraints = team_knowledge[member_id].copy()
         else:
             constraints.extend(team_knowledge[member_id])
-
+    print(constraints)
     common_constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
 
     return common_constraints
@@ -1017,7 +1017,7 @@ def visualize_team_knowledge(particles_team, mdp_class, fig=None, weights=None, 
 
     
     n_subplots = len(particles_team)
-    i = 1
+    i = 1 joint common p0 p1 p2 ...
     for knowledge_id, knowledge_type  in enumerate(particles_team):
         ax = fig.add_subplot(1, n_subplots, i, projection='3d')
         ax.title.set_text('Particles for knowledge: \n ' + str(knowledge_type))
