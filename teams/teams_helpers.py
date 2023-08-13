@@ -54,14 +54,11 @@ import matplotlib.tri as mtri
 def calc_common_knowledge(team_knowledge, team_size, weights, step_cost_flag):
 
     
-    '''for i in range(team_size):
-        member_id = 'p' + str(i+1)
+    for i in range(team_size):
         if i==0:
-            constraints = team_knowledge[member_id].copy()
+            constraints = team_knowledge['members_list'][i].copy()
         else:
-            constraints.extend(team_knowledge[member_id])'''
-
-    constraints = team_knowledge["members_list"].copy()
+            constraints.extend(team_knowledge['members_list'][i])
     print(constraints)
     common_constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
 
@@ -291,8 +288,12 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, weights = None, s
                 for cnst2 in min_unit_intersection_constraints:
                     # print(np.array_equal(-cnst, cnst2))
                     # print(-cnst, cnst2)
+                    print(cnst)
+                    print(-cnst)
+                    print(cnst2)
                     if (np.array_equal(-cnst, cnst2)):
-                        opposing_constraints = True                
+                        opposing_constraints = True   
+                        print("True")             
             
             if opposing_constraints:
                 min_unit_BEC_knowledge_intersection = 0
@@ -509,6 +510,7 @@ def particles_for_demo_strategy(demo_strategy, team_knowledge, team_particles, t
     # return prior, particles
 
     ###########################################
+    print(min_BEC_constraints)
     team_knowledge_level = calc_knowledge_level(team_knowledge, min_BEC_constraints)['members_list']
     # particles to consider while generating demos
     if demo_strategy =='individual_knowledge_low':
@@ -693,9 +695,9 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_prior=N
 
     # particles for aggregated team knowledge - joint knowledge (both methods should produce similar particles; check and if they are similar method 1 is more streamlined)
     # method 1
-    '''particles_team['joint_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles))
+    particles_team['members_list'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles))
     if team_prior is not None:
-        particles_team['joint_knowledge'].update_jk(team_prior['members_list'])'''
+        particles_team['members_list'].update_jk(team_prior['members_list'])
     
     # # method 2
     # if team_prior is not None:
@@ -1021,7 +1023,8 @@ def visualize_team_knowledge(particles_team, mdp_class, fig=None, weights=None, 
         if knowledge_type == 'members_list':
             ax = fig.add_subplot(1, n_subplots, i, projection='3d')
             ax.title.set_text('Particles for knowledge: \n ' + "joint_knowledge")
-            particles_team[knowledge_type].plot(fig=fig, ax=ax)
+            print(particles_team["members_list"])
+            particles_team["members_list"].plot(fig=fig, ax=ax)
             label_axes(ax, mdp_class, weights)
             i += 1
         else: 
