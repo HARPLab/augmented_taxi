@@ -115,7 +115,7 @@ elif mdp_class == 'augmented_taxi2':
         'weights_ub': w_normalized
     }
 
-    prior = [np.array([[0, 0, -1]])]
+    prior = np.array([[0, 0, -1]])
     posterior = [np.array([[-1, 0, 0]]), np.array([[0, 1, 0]]), np.array([[0, 0, -1]])]
 elif mdp_class == 'two_goal2':
     w = np.array([[7.25, 10.5, -1]])
