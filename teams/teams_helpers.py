@@ -675,9 +675,12 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_prior=N
     particles_team['members_list'] = []
     # particles for individual team members
     for i in range(team_size):
-        particles_team['members_list'].append(pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles)))
+        particles_team['members_list'].append(None)
+        particles_team['members_list'][i]=pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles))
 
         if team_prior is not None:
+            print(f"particles_team: {particles_team['members_list'][i]}")
+            print(f"team prior: {team_prior['members_list'][i]}")
             particles_team['members_list'][i].update(team_prior['members_list'][i])
 
     
