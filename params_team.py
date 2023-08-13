@@ -115,7 +115,7 @@ elif mdp_class == 'augmented_taxi2':
         'weights_ub': w_normalized
     }
 
-    prior = np.array([[0, 0, -1]])
+    prior = [np.array([[0, 0, -1]])]
     posterior = [np.array([[-1, 0, 0]]), np.array([[0, 1, 0]]), np.array([[0, 0, -1]])]
 elif mdp_class == 'two_goal2':
     w = np.array([[7.25, 10.5, -1]])
@@ -352,7 +352,9 @@ human_learning_models = {'p1': np.array([0.9, 0.9, 0.9]), \
 team_prior = {}
 team_prior['members_list'] = []
 for i in range(team_size):
-    team_prior['members_list'].append(prior)
+    team_prior['members_list'].append(None)
+    team_prior['members_list'][i]= prior
+print(team_prior['members_list'])
 
 
 
