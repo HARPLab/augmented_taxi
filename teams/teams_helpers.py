@@ -62,6 +62,7 @@ def calc_common_knowledge(team_knowledge, team_size, weights, step_cost_flag):
             constraints.extend(team_knowledge[member_id])'''
 
     constraints = team_knowledge["members_list"].copy()
+    print(constraints)
     common_constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
 
     return common_constraints
