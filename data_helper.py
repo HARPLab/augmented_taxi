@@ -221,10 +221,19 @@ def extract_mdp_dict(vi, mdp, optimal_traj, mdp_dict, data_loc, element=-1, test
         else:
             mdp_dict['hotswap_station'] = []
 
+        opt_locations = [[sas[0].get_agent_x(), sas[0].get_agent_y(), sas[0].objects["passenger"][0]["in_taxi"]] for sas in
+            optimal_traj]
+        opt_locations.append([optimal_traj[-1][-1].get_agent_x(), optimal_traj[-1][-1].get_agent_y(),
+                              optimal_traj[-1][-1].objects["passenger"][0]["in_taxi"]])
+        mdp_dict['opt_locations'] = opt_locations
 
     elif data_loc == 'colored_tiles':
         mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
         mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
+
+        opt_locations = [[sas[0].get_agent_x(), sas[0].get_agent_y()] for sas in optimal_traj]
+        opt_locations.append([optimal_traj[-1][-1].get_agent_x(), optimal_traj[-1][-1].get_agent_y()])
+        mdp_dict['opt_locations'] = opt_locations
     else:
         mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
         mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
@@ -240,6 +249,10 @@ def extract_mdp_dict(vi, mdp, optimal_traj, mdp_dict, data_loc, element=-1, test
                 0].get_attribute('on_agent')
         else:
             mdp_dict['skateboard'] = []
+
+        opt_locations = [[sas[0].get_agent_x(), sas[0].get_agent_y()] for sas in optimal_traj]
+        opt_locations.append([optimal_traj[-1][-1].get_agent_x(), optimal_traj[-1][-1].get_agent_y()])
+        mdp_dict['opt_locations'] = opt_locations
 
     mdp_dict['opt_actions'] = [sas[1] for sas in optimal_traj]
     mdp_dict['opt_traj_length'] = len(optimal_traj)
