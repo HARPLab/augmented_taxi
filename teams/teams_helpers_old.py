@@ -1019,7 +1019,7 @@ def visualize_team_knowledge(particles_team, mdp_class, fig=None, weights=None, 
 
     
     n_subplots = len(particles_team)
-    i = 1 joint common p0 p1 p2 ...
+    i = 1
     for knowledge_id, knowledge_type  in enumerate(particles_team):
         ax = fig.add_subplot(1, n_subplots, i, projection='3d')
         ax.title.set_text('Particles for knowledge: \n ' + str(knowledge_type))

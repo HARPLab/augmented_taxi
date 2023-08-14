@@ -674,16 +674,14 @@ def obtain_team_summary(data_loc, min_subset_constraints_record, min_BEC_constra
 def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_prior=None):
 
     particles_team = {}
-    particles_team['members_list'] = []
+    
     # particles for individual team members
     for i in range(team_size):
-        particles_team['members_list'].append(None)
-        particles_team['members_list'][i]=pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles))
+        member_id = 'p' + str(i+1)
+        particles_team[member_id] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles))
 
         if team_prior is not None:
-            print(f"particles_team: {particles_team['members_list'][i]}")
-            print(f"team prior: {team_prior['members_list'][i]}")
-            particles_team['members_list'][i].update(team_prior['members_list'][i])
+            particles_team[member_id].update(team_prior["members_list"][i])
 
     
     # particles for aggregated team knowledge - common knowledge
@@ -695,9 +693,9 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_prior=N
 
     # particles for aggregated team knowledge - joint knowledge (both methods should produce similar particles; check and if they are similar method 1 is more streamlined)
     # method 1
-    particles_team['members_list'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles))
+    particles_team['joint_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles))
     if team_prior is not None:
-        particles_team['members_list'].update_jk(team_prior['members_list'])
+        particles_team['joint_knowledge'].update_jk(team_prior['members_list'])
     
     # # method 2
     # if team_prior is not None:
@@ -1016,23 +1014,15 @@ def visualize_team_knowledge(particles_team, mdp_class, fig=None, weights=None, 
             ax.set_xlabel('$\mathregular{w_0}$: Mud')
             ax.set_ylabel('$\mathregular{w_1}$: Recharge')
 
-    # add individual members
+    
     n_subplots = len(particles_team)
     i = 1
     for knowledge_id, knowledge_type  in enumerate(particles_team):
-        if knowledge_type == 'members_list':
-            ax = fig.add_subplot(1, n_subplots, i, projection='3d')
-            ax.title.set_text('Particles for knowledge: \n ' + "joint_knowledge")
-            print(particles_team["members_list"])
-            particles_team["members_list"].plot(fig=fig, ax=ax)
-            label_axes(ax, mdp_class, weights)
-            i += 1
-        else: 
-            ax = fig.add_subplot(1, n_subplots, i, projection='3d')
-            ax.title.set_text('Particles for knowledge: \n ' + str(knowledge_type))
-            particles_team[knowledge_type].plot(fig=fig, ax=ax)
-            label_axes(ax, mdp_class, weights)
-            i += 1
+        ax = fig.add_subplot(1, n_subplots, i, projection='3d')
+        ax.title.set_text('Particles for knowledge: \n ' + str(knowledge_type))
+        particles_team[knowledge_type].plot(fig=fig, ax=ax)
+        label_axes(ax, mdp_class, weights)
+        i += 1
 
     fig.suptitle(text, fontsize=30)
 
