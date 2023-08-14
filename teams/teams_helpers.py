@@ -278,10 +278,11 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, weights = None, s
                 if 'p' in k_type:
                     joint_constraints.extend(team_knowledge[k_type])'''
             joint_constraints = team_knowledge["members_list"]
-
+            
             min_unit_intersection_constraints = min_unit_constraints.copy()
             min_unit_intersection_constraints.extend(joint_constraints)
-
+            print(team_knowledge["members_list"])
+            print(min_unit_intersection_constraints)
 
             opposing_constraints = False
             for cnst in min_unit_intersection_constraints:
