@@ -290,8 +290,8 @@ if __name__ == "__main__":
     plt.rcParams['figure.figsize'] = [10, 6]
 
     # for debugging
-    particles_team_expected = copy.deepcopy(particles_team)
-    team_knowledge_expected = copy.deepcopy(team_knowledge)
+    #particles_team_expected = copy.deepcopy(particles_team)
+    #team_knowledge_expected = copy.deepcopy(team_knowledge)
 
     # for testing design choices (is remedial demo needed)
     remedial_test_flag = False
@@ -377,7 +377,7 @@ if __name__ == "__main__":
 
 
             # For debugging. Visualize the expected particles transition
-            team_knowledge_expected, particles_team_expected = calc_expected_learning(team_knowledge_expected, particles_team_expected, min_BEC_constraints, min_unit_constraints, params, loop_count)
+            #team_knowledge_expected, particles_team_expected = calc_expected_learning(team_knowledge_expected, particles_team_expected, min_BEC_constraints, min_unit_constraints, params, loop_count)
 
             # team_helpers.visualize_team_knowledge(particles_team_expected, params.mdp_class, weights=params.weights['val'], text='Team expected knowledge after unit ' + str(loop_count))
 
@@ -412,7 +412,7 @@ if __name__ == "__main__":
                         print("You got the diagnostic test right")
 
                         test_constraints_team.append(test_constraints)
-                        team_knowledge = team_helpers.update_team_knowledge(team_knowledge, test_constraints, params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
+                        team_knowledge = team_helpers.update_team_knowledge(team_knowledge, test_constraints, params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [p-1])
                         particles_team[member_id].update(test_constraints) # update individual knowledge based on test response
                         
                         if visualize_pf_transition:
@@ -425,7 +425,7 @@ if __name__ == "__main__":
 
                         test_constraints_team.append([-failed_BEC_constraint])
                         print('Current team knowledge: ', team_knowledge)
-                        team_knowledge = team_helpers.update_team_knowledge(team_knowledge, [-failed_BEC_constraint], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
+                        team_knowledge = team_helpers.update_team_knowledge(team_knowledge, [-failed_BEC_constraint], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [p-1])
                         particles_team[member_id].update([-failed_BEC_constraint])
                         
                         if visualize_pf_transition:
@@ -442,7 +442,7 @@ if __name__ == "__main__":
                 print('test_constraints_team_expanded: ', test_constraints_team_expanded)
 
                 # Update common knowledge and joint knowledge
-                team_knowledge = team_helpers.update_team_knowledge(team_knowledge, [], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
+                team_knowledge = team_helpers.update_team_knowledge(team_knowledge, [], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [p-2])
                 particles_team['common_knowledge'].update(test_constraints_team_expanded)
                 particles_team['joint_knowledge'].update_jk(test_constraints_team)
                 if visualize_pf_transition:
@@ -495,8 +495,8 @@ if __name__ == "__main__":
                     particles_demo = copy.deepcopy(particles_team[knowledge_id])
 
                     # Update expected knowledge with actual knowledge for next iteration
-                    particles_team_expected = copy.deepcopy(particles_team)
-                    team_knowledge_expected = copy.deepcopy(team_knowledge)
+                    #particles_team_expected = copy.deepcopy(particles_team)
+                    #team_knowledge_expected = copy.deepcopy(team_knowledge)
 
 
         else:

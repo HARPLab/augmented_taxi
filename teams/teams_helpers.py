@@ -117,7 +117,8 @@ def update_team_knowledge(team_knowledge, new_constraints, team_size, weights, s
     for knowledge_type in knowledge_types:
         # if the knowledge type is not one of the base knowledge types will simply add the new_constraints to that knowledge id
         if knowledge_type != 'joint_knowledge' and  knowledge_type != 'common_knowledge':
-            knowledge = team_knowledge[knowledge_type].copy()
+            print(knowledge_type)
+            knowledge = team_knowledge["members_list"][int(knowledge_type)].copy()
             print('Old_knowledge: ', knowledge)
             knowledge.extend(new_constraints)
             print('New_knowledge: ', knowledge)
@@ -125,7 +126,7 @@ def update_team_knowledge(team_knowledge, new_constraints, team_size, weights, s
             # print('New constraints: ', new_constraints)
             new_knowledge = BEC_helpers.remove_redundant_constraints(knowledge, weights, step_cost_flag)
 
-            team_knowledge_updated[knowledge_type] = new_knowledge.copy()
+            team_knowledge_updated["members_list"][knowledge_type] = new_knowledge.copy()
             '''
             elif  knowledge_type == 'joint_knowledge':
                 team_knowledge_updated[knowledge_type] = calc_joint_knowledge(team_knowledge_updated, team_size, weights=weights, step_cost_flag=step_cost_flag)'''
@@ -511,13 +512,14 @@ def particles_for_demo_strategy(demo_strategy, team_knowledge, team_particles, t
     # return prior, particles
 
     ###########################################
-    print(min_BEC_constraints)
-    team_knowledge_level = calc_knowledge_level(team_knowledge, min_BEC_constraints)['members_list']
+    
     # particles to consider while generating demos
     if demo_strategy =='individual_knowledge_low':
+        team_knowledge_level = calc_knowledge_level(team_knowledge, min_BEC_constraints)['members_list']
         knowledge_id = np.argmin(team_knowledge_level)
     
     elif demo_strategy == 'individual_knowledge_high':
+        team_knowledge_level = calc_knowledge_level(team_knowledge, min_BEC_constraints)['members_list']
         knowledge_id = np.argmax(team_knowledge_level)
     
     elif demo_strategy == 'common_knowledge':
@@ -529,7 +531,7 @@ def particles_for_demo_strategy(demo_strategy, team_knowledge, team_particles, t
     else:
         print('Unsupported demo strategy for sampling particles!')
 
-    particles = team_particles['members_list'][knowledge_id]
+    particles = team_particles[knowledge_id]
 
     
     return knowledge_id, particles
