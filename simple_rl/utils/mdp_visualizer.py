@@ -527,8 +527,6 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
     step_traj = 0
     step_counter = 0
 
-    step = 0
-
     anchor_points_wait = []
 
     if mdp_class == 'augmented_taxi2':
@@ -557,7 +555,7 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
     anchor_points_wait.reverse()
     cur_anchor_point = anchor_points_wait.pop()
 
-    while (step_traj < len_traj or step_counter < len_counter) and (step < len_traj or step < len_counter):
+    while (step_traj < len_traj or step_counter < len_counter):
         # Check for key presses.
         for event in pygame.event.get():
             if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
@@ -583,32 +581,19 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
                     state = (cur_x_traj, cur_y_traj, cur_state_traj.objects["agent"][0]["has_passenger"])
                     counter_state = (
                     cur_x_counter, cur_y_counter, cur_state_counter.objects["agent"][0]["has_passenger"])
-
-                    # wait
-                    if (state == cur_anchor_point and state != counter_state):
-                        step_traj -= 1
-                    if (counter_state == cur_anchor_point and state != counter_state):
-                        step_counter -= 1
-
-                    # consider anchor points one at a time
-                    if (state == counter_state) and (state == cur_anchor_point):
-                        if len(anchor_points_wait) > 0:
-                            cur_anchor_point = anchor_points_wait.pop()
-
                 else:
                     state = (cur_x_traj, cur_y_traj)
                     counter_state = (cur_x_counter, cur_y_counter)
+                # wait
+                if (state == cur_anchor_point and state != counter_state):
+                    step_traj -= 1
+                if (counter_state == cur_anchor_point and state != counter_state):
+                    step_counter -= 1
 
-                    # wait
-                    if (state == cur_anchor_point and state != counter_state):
-                        step_traj -= 1
-                    if (counter_state == cur_anchor_point and state != counter_state):
-                        step_counter -= 1
-
-                    if (state == counter_state) and (state == cur_anchor_point):
-                        if len(anchor_points_wait) > 0:
-                            cur_anchor_point = anchor_points_wait.pop()
-
+                # consider anchor points one at a time
+                if (state == counter_state) and (state == cur_anchor_point):
+                    if len(anchor_points_wait) > 0:
+                        cur_anchor_point = anchor_points_wait.pop()
 
                 # print(cur_state_traj, cur_state_counter)
                 dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state_traj,

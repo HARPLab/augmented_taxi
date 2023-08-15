@@ -1182,15 +1182,16 @@ def save_user_study_json(mapping):
             # obtain the diagnostic tests that will test the human's understanding of the unit's constraints
             preliminary_tests, visited_env_traj_idxs = BEC.obtain_diagnostic_tests(data_loc, unit, visited_env_traj_idxs, min_constraints, min_subset_constraints_record, traj_record, traj_features_record, running_variable_filter, mdp_features_record)
 
-            best_env_idx = preliminary_tests[0][2][0]
-            filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
-            with open(filename, 'rb') as f:
-                wt_vi_traj_env = pickle.load(f)
-            vi = wt_vi_traj_env[0][1]
-            mdp_dict = wt_vi_traj_env[0][3]
+            for test in preliminary_tests:
+                best_env_idx = test[2][0]
+                filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
+                with open(filename, 'rb') as f:
+                    wt_vi_traj_env = pickle.load(f)
+                vi = wt_vi_traj_env[0][1]
+                mdp_dict = wt_vi_traj_env[0][3]
 
-            user_study_dict[data_loc]["diagnostic test"][str(diagnostic_test_idx)] = extract_mdp_dict(vi, preliminary_tests[0][0], preliminary_tests[0][1], mdp_dict, data_loc, element=-3)
-            diagnostic_test_idx += 1
+                user_study_dict[data_loc]["diagnostic test"][str(diagnostic_test_idx)] = extract_mdp_dict(vi, preliminary_tests[0][0], preliminary_tests[0][1], mdp_dict, data_loc, element=-3)
+                diagnostic_test_idx += 1
 
         # c) save the final, held-out set of tests
         for test_difficulty in mapping[data_loc].keys():
