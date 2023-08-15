@@ -3,6 +3,8 @@ from __future__ import print_function
 import sys
 import time
 import copy
+import difflib
+
 try:
     import pygame
     from pygame.locals import *
@@ -506,19 +508,56 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
     Summary:
         Visualizes the sequence of states and actions stored in the trajectory.
     '''
+    # counterfactual is user input
     screen = pygame.display.set_mode((scr_width, scr_height))
-    cur_state_counterfactual = trajectory_counterfactual[0][0]
-    cur_state = trajectory[0][0]
+    cur_state_traj = trajectory[0][0]
+    cur_state_counter = trajectory_counterfactual[0][0]
 
     # Setup and draw initial state.
-    dynamic_shapes, agent_history = _vis_init(screen, mdp, draw_state, cur_state_counterfactual, offset_direction=-1, alpha=150)
-    dynamic_shapes_counterfactual, agent_history_counterfactual = draw_state(screen, mdp, cur_state, draw_statics=False, agent_history=[], offset_direction=1)
+    dynamic_shapes, agent_history = _vis_init(screen, mdp, draw_state, cur_state_traj, offset_direction=1)
+    dynamic_shapes_counterfactual, agent_history_counterfactual = draw_state(screen, mdp, cur_state_counter,
+                                                                             draw_statics=False, agent_history=[],
+                                                                             offset_direction=-1, alpha=150)
 
     pygame.event.clear()
+
+    len_traj = len(trajectory)
+    len_counter = len(trajectory_counterfactual)
+
+    step_traj = 0
+    step_counter = 0
+
     step = 0
 
-    while True and (step < len(trajectory) or step < len(trajectory_counterfactual)):
+    anchor_points_wait = []
 
+    if mdp_class == 'augmented_taxi2':
+        traj_currs_coords = [
+            (currstate.get_agent_x(), currstate.get_agent_y(), currstate.objects["agent"][0]["has_passenger"]) for
+            (prevstate, action, currstate) in trajectory]
+        countertraj_currs_coords = [
+            (currstate.get_agent_x(), currstate.get_agent_y(), currstate.objects["agent"][0]["has_passenger"]) for
+            (prevstate, action, currstate) in trajectory_counterfactual]
+    else:
+        traj_currs_coords = [(currstate.get_agent_x(), currstate.get_agent_y()) for (prevstate, action, currstate)
+                             in trajectory]
+        countertraj_currs_coords = [(currstate.get_agent_x(), currstate.get_agent_y()) for
+                                    (prevstate, action, currstate) in trajectory_counterfactual]
+
+    matcher = difflib.SequenceMatcher(None, traj_currs_coords, countertraj_currs_coords, autojunk=False)
+    matches = matcher.get_matching_blocks()
+
+    for match in matches:
+        # add states in overlap
+        for i in range(match[2]):
+            anchor_points_wait.append(traj_currs_coords[match[0] + i])
+
+    # print(anchor_points_wait)
+
+    anchor_points_wait.reverse()
+    cur_anchor_point = anchor_points_wait.pop()
+
+    while (step_traj < len_traj or step_counter < len_counter) and (step < len_traj or step < len_counter):
         # Check for key presses.
         for event in pygame.event.get():
             if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
@@ -532,30 +571,67 @@ def visualize_trajectory_comparison(mdp, trajectory, trajectory_counterfactual, 
                 for shape in dynamic_shapes_counterfactual:
                     pygame.draw.rect(screen, (255, 255, 255), shape)
 
-                if step < len(trajectory_counterfactual):
-                    cur_state = trajectory_counterfactual[step][2]
+                cur_x_traj = trajectory[step_traj][2].get_agent_x()
+                cur_y_traj = trajectory[step_traj][2].get_agent_y()
+                cur_state_traj = trajectory[step_traj][2]
+
+                cur_x_counter = trajectory_counterfactual[step_counter][2].get_agent_x()
+                cur_y_counter = trajectory_counterfactual[step_counter][2].get_agent_y()
+                cur_state_counter = trajectory_counterfactual[step_counter][2]
+
+                if mdp_class == 'augmented_taxi2':
+                    state = (cur_x_traj, cur_y_traj, cur_state_traj.objects["agent"][0]["has_passenger"])
+                    counter_state = (
+                    cur_x_counter, cur_y_counter, cur_state_counter.objects["agent"][0]["has_passenger"])
+
+                    # wait
+                    if (state == cur_anchor_point and state != counter_state):
+                        step_traj -= 1
+                    if (counter_state == cur_anchor_point and state != counter_state):
+                        step_counter -= 1
+
+                    # consider anchor points one at a time
+                    if (state == counter_state) and (state == cur_anchor_point):
+                        if len(anchor_points_wait) > 0:
+                            cur_anchor_point = anchor_points_wait.pop()
+
                 else:
-                    cur_state = trajectory_counterfactual[-1][2]
+                    state = (cur_x_traj, cur_y_traj)
+                    counter_state = (cur_x_counter, cur_y_counter)
 
-                dynamic_shapes_counterfactual, agent_history_counterfactual = draw_state(screen, mdp, cur_state,agent_history=agent_history_counterfactual,
-                                                                                    offset_direction=-1, alpha=150, visualize_history=False)
+                    # wait
+                    if (state == cur_anchor_point and state != counter_state):
+                        step_traj -= 1
+                    if (counter_state == cur_anchor_point and state != counter_state):
+                        step_counter -= 1
 
-                if step < len(trajectory):
-                    cur_state = trajectory[step][2]
-                else:
-                    cur_state = trajectory[-1][2]
+                    if (state == counter_state) and (state == cur_anchor_point):
+                        if len(anchor_points_wait) > 0:
+                            cur_anchor_point = anchor_points_wait.pop()
 
-                dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state, draw_statics=False,
-                                                           agent_history=agent_history, offset_direction=1, visualize_history=False)
 
-                step += 1
+                # print(cur_state_traj, cur_state_counter)
+                dynamic_shapes, agent_history = draw_state(screen, mdp, cur_state_traj,
+                                                           agent_history=agent_history, offset_direction=1,
+                                                           visualize_history=False)
+
+                dynamic_shapes_counterfactual, agent_history_counterfactual = draw_state(screen, mdp,
+                                                                                         cur_state_counter,
+                                                                                         agent_history=agent_history_counterfactual,
+                                                                                         draw_statics=False,
+                                                                                         offset_direction=-1,
+                                                                                         alpha=150,
+                                                                                         visualize_history=False)
+
+                step_traj += 1
+                step_counter += 1
+        cur_state = cur_state_traj
 
         pygame.display.flip()
 
-        time.sleep(delay)
-
     if cur_state.is_terminal():
-        goal_text_rendered, goal_text_point = _draw_terminal_text(mdp_class, cur_state, scr_width, scr_height, title_font)
+        goal_text_rendered, goal_text_point = _draw_terminal_text(mdp_class, cur_state, scr_width, scr_height,
+                                                                  title_font)
         screen.blit(goal_text_rendered, goal_text_point)
 
     pygame.display.flip()
