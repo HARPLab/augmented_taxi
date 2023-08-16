@@ -52,45 +52,41 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, passengers=[{'x': 4, 'y'
 
     
     while len(passengers) != 0:
+        # following 4 variables used for switching start and end point for continous game type
         dest_x = passengers[0]['dest_x']
         dest_y = passengers[0]['dest_y']
         agent_start_x = mdp_parameters['agent']['x']
         agent_start_y = mdp_parameters['agent']['y']
+
         mdp_vi_dict = {}
         combined_mdp_passengers = []
-        #print(mdp_parameters['passengers'])
         for i in passengers:
+            #creates a combined mdp to show all the possible options the user can click on
             combined_mdp_passengers.append(i)
+            #creates a single mdp with a single passenger and creates the agent for it and stores it within mdp_vi_dict
             mdp_parameters['passengers'] = [i]
-            #print(mdp_parameters['passengers'])
             temp_mdp_agent = make_mdp.make_custom_mdp(mdp_class, mdp_parameters)
             mdp_vi_dict[(i['x'],i['y'])]=(temp_mdp_agent)
-            #print("mdp_vi_dict:")
-            #print((i['x'],i['y']))
 
-        #print(mdp_list)
-        #print(vi_agent_list)
-        '''
-            with open('models/' + data_loc + '/vi_agent.pickle', 'wb') as f:
-                pickle.dump((mdp_agent, vi_agent), f)
-        '''
-
-    
 
         # Visualize agent
         if visualize:
+            #first creates and runs combined agent to have user click on what passenger to go to first
             mdp_parameters['passengers'] = combined_mdp_passengers
             combined_mdp_agent = make_mdp.make_custom_mdp(mdp_class, mdp_parameters)
-            #print(combined_mdp_agent.get_passengers())
+            #function returns the cell_coords of the passenger that the user clicked on 
+            # function makes sure that the cell_coords contain a passenger
             cell_coords = combined_mdp_agent.visualize_state(combined_mdp_agent.cur_state)
             combined_mdp_agent.reset()
+            # following is used for both reset and continous game type 
+            # removes the passenger that was just clicked on
             for i in passengers:
                 if i['x'] == cell_coords[0] and i['y'] == cell_coords[1]:
                     passengers.remove(i)
-            mdp_parameters
+            # cell coords of the passenger that was clicked is printed for debugging purposes
             print(cell_coords)
             if not cell_coords == None:
-                #print(cell_coords)
+                #runs the single passenger mdp
                 mdp_agent = mdp_vi_dict[cell_coords]
                 
                 vi_agent = ValueIteration(mdp_agent, sample_rate=1)
@@ -99,6 +95,7 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, passengers=[{'x': 4, 'y'
                 fixed_agent = FixedPolicyAgent(vi_agent.policy)
                 mdp_agent.visualize_agent(fixed_agent)
                 mdp_agent.reset()  # reset the current state to the initial state
+            #changing the start and end point for the mdps
             if game_type == "continous":
                 for i in range(len(passengers)):
                     passengers[i]["dest_x"] = agent_start_x
