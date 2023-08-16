@@ -37,6 +37,8 @@ mpl.rcParams['figure.facecolor'] = '1.0'
 mpl.rcParams['axes.labelsize'] = 'x-large'
 mpl.rcParams['xtick.labelsize'] = 'large'
 
+# either "continous" or "reset" 
+game_type = 'continous'
 #currently only thing being used basically
 #=[{'x': 4, 'y': 1, 'dest_x': 3, 'dest_y': 2, 'in_taxi': 0}]
 def generate_agent(mdp_class, data_loc, mdp_parameters, passengers=[{'x': 4, 'y': 1, 'dest_x': 3, 'dest_y': 2, 'in_taxi': 0}], visualize=False):
@@ -97,6 +99,18 @@ def generate_agent(mdp_class, data_loc, mdp_parameters, passengers=[{'x': 4, 'y'
                 fixed_agent = FixedPolicyAgent(vi_agent.policy)
                 mdp_agent.visualize_agent(fixed_agent)
                 mdp_agent.reset()  # reset the current state to the initial state
+            if game_type == "continous":
+                for i in range(len(passengers)):
+                    passengers[i]["dest_x"] = agent_start_x
+                    passengers[i]["dest_y"] = agent_start_y
+                mdp_parameters["agent"]['x'] = dest_x
+                mdp_parameters['agent']["y"] = dest_y
+                temp_x = agent_start_x
+                temp_y = agent_start_y
+                agent_start_x = dest_x
+                agent_start_y = dest_y
+                dest_x = temp_x
+                dest_y = temp_y
             
             
 
