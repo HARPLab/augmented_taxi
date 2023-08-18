@@ -21,6 +21,7 @@ from spherical_geometry import polygon as sph_polygon
 import policy_summarization.BEC_visualization as BEC_viz
 from policy_summarization import computational_geometry as cg
 from sklearn.metrics.pairwise import haversine_distances
+from policy_summarization import flask_user_study_utils as flask_utils
 
 def extract_constraints_policy(args):
     env_idx, data_loc, BEC_depth, step_cost_flag = args
@@ -1271,7 +1272,7 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
 
     return summary, visited_env_traj_idxs, particles
 
-def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BEC_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, previous_demonstrations, visited_env_traj_idxs, variable_filter, mdp_features_record, consistent_state_count, weights, step_cost_flag, type='training', info_gain_tolerance=0.01, consider_human_models_jointly=True, n_human_models_precomputed=0, fallback='particle_filter'):
+def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BEC_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, previous_demonstrations, visited_env_traj_idxs, variable_filter, mdp_features_record, consistent_state_count, weights, step_cost_flag, type='training', info_gain_tolerance=0.01, consider_human_models_jointly=True, n_human_models_precomputed=0, fallback='particle_filter', return_dict_form=False):
     remedial_demonstrations = []
 
     remedial_demonstration_selected = False
@@ -1453,10 +1454,20 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BE
         wt_vi_traj_env = pickle.load(f)
     best_mdp = wt_vi_traj_env[0][1].mdp
     best_mdp.set_init_state(traj[0][0])  # for completeness
-    remedial_demonstrations.append([best_mdp, traj, (best_env_idx, best_traj_idx), BEC_constraints, variable_filter])
+    vi = wt_vi_traj_env[0][1]
+    mdp_dict = wt_vi_traj_env[0][3]
+
     visited_env_traj_idxs.append((best_env_idx, best_traj_idx))
 
-    return remedial_demonstrations, visited_env_traj_idxs
+    if return_dict_form:
+        if type == 'training':
+            remedial_mdp_dict = flask_utils.extract_mdp_dict(vi, best_mdp, traj, mdp_dict, data_loc, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=variable_filter)
+        else:
+            remedial_mdp_dict = flask_utils.extract_mdp_dict(vi, best_mdp, traj, mdp_dict, data_loc, element=-3, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=variable_filter)
+        return remedial_mdp_dict, visited_env_traj_idxs
+    else:
+        remedial_demonstrations.append([best_mdp, traj, (best_env_idx, best_traj_idx), BEC_constraints, variable_filter])
+        return remedial_demonstrations, visited_env_traj_idxs
 
 def obtain_diagnostic_tests(data_loc, previous_demos, visited_env_traj_idxs, min_BEC_constraints, min_subset_constraints_record, traj_record, traj_features_record, variable_filter, mdp_features_record, downsample_threshold=float("inf"), opt_simplicity=True, opt_similarity=True):
     preliminary_test_info = []

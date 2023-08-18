@@ -10,6 +10,7 @@ from collections import defaultdict
 from simple_rl.utils import mdp_helpers
 import policy_summarization.multiprocessing_helpers as mp_helpers
 import os
+from policy_summarization.flask_user_study_utils import extract_mdp_dict
 
 '''
 For managing data related to the user study 
@@ -189,118 +190,6 @@ def check_training_testing_overlap():
             for j, test_tuple in enumerate(test_wt_vi_traj_tuples):
                 if policy_summarization_helpers._in_summary(test_tuple[1].mdp, summary, test_tuple[2][0][0]):
                     print('Overlap, Test difficulty: {}, Test #: {}'.format(test_difficulty, j))
-
-def extract_mdp_dict(vi, mdp, optimal_traj, mdp_dict, data_loc, element=-1, test_difficulty='none', normalized_opt_traj=None, normalized_human_traj=None):
-    '''
-    Extract the MDP information from the test environment tuple (e.g. to be later put into a json)
-    '''
-
-    # update the MDP parameters to begin with the desired start state
-    if data_loc == 'augmented_taxi2':
-        mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
-        mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
-        mdp_dict['agent']['has_passenger'] = mdp.init_state.get_objects_of_class("agent")[
-            0].get_attribute('has_passenger')
-
-        mdp_dict['passengers'][0]['x'] = mdp.init_state.get_objects_of_class("passenger")[
-            0].get_attribute('x')
-        mdp_dict['passengers'][0]['y'] = mdp.init_state.get_objects_of_class("passenger")[
-            0].get_attribute('y')
-        mdp_dict['passengers'][0]['dest_x'] = mdp.init_state.get_objects_of_class("passenger")[
-            0].get_attribute('dest_x')
-        mdp_dict['passengers'][0]['dest_y'] = mdp.init_state.get_objects_of_class("passenger")[
-            0].get_attribute('dest_y')
-        mdp_dict['passengers'][0]['in_taxi'] = mdp.init_state.get_objects_of_class("passenger")[
-            0].get_attribute('in_taxi')
-
-        if (len(mdp.init_state.get_objects_of_class("hotswap_station")) > 0):
-            mdp_dict['hotswap_station'][0]['x'] = mdp.init_state.get_objects_of_class("hotswap_station")[
-                0].get_attribute('x')
-            mdp_dict['hotswap_station'][0]['y'] = mdp.init_state.get_objects_of_class("hotswap_station")[
-                0].get_attribute('y')
-        else:
-            mdp_dict['hotswap_station'] = []
-
-        opt_locations = [[sas[0].get_agent_x(), sas[0].get_agent_y(), sas[0].objects["passenger"][0]["in_taxi"]] for sas in
-            optimal_traj]
-        opt_locations.append([optimal_traj[-1][-1].get_agent_x(), optimal_traj[-1][-1].get_agent_y(),
-                              optimal_traj[-1][-1].objects["passenger"][0]["in_taxi"]])
-        mdp_dict['opt_locations'] = opt_locations
-
-    elif data_loc == 'colored_tiles':
-        mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
-        mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
-
-        opt_locations = [[sas[0].get_agent_x(), sas[0].get_agent_y()] for sas in optimal_traj]
-        opt_locations.append([optimal_traj[-1][-1].get_agent_x(), optimal_traj[-1][-1].get_agent_y()])
-        mdp_dict['opt_locations'] = opt_locations
-    else:
-        mdp_dict['agent']['x'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('x')
-        mdp_dict['agent']['y'] = mdp.init_state.get_objects_of_class("agent")[0].get_attribute('y')
-        mdp_dict['agent']['has_skateboard'] = mdp.init_state.get_objects_of_class("agent")[
-            0].get_attribute('has_skateboard')
-
-        if len(mdp.init_state.get_objects_of_class("skateboard")) > 0:
-            mdp_dict['skateboard'][0]['x'] = mdp.init_state.get_objects_of_class("skateboard")[
-                0].get_attribute('x')
-            mdp_dict['skateboard'][0]['y'] = mdp.init_state.get_objects_of_class("skateboard")[
-                0].get_attribute('y')
-            mdp_dict['skateboard'][0]['on_agent'] = mdp.init_state.get_objects_of_class("skateboard")[
-                0].get_attribute('on_agent')
-        else:
-            mdp_dict['skateboard'] = []
-
-        opt_locations = [[sas[0].get_agent_x(), sas[0].get_agent_y()] for sas in optimal_traj]
-        opt_locations.append([optimal_traj[-1][-1].get_agent_x(), optimal_traj[-1][-1].get_agent_y()])
-        mdp_dict['opt_locations'] = opt_locations
-
-    mdp_dict['opt_actions'] = [sas[1] for sas in optimal_traj]
-    mdp_dict['opt_traj_length'] = len(optimal_traj)
-    mdp_dict['opt_traj_reward'] = mdp.weights.dot(mdp.accumulate_reward_features(optimal_traj).T)[0][0]
-    mdp_dict['test_difficulty'] = test_difficulty
-    # to be able to trace the particular environment (0-5), or know if it's a training demonstration (-1),
-    # or if it's a test demonstration whose normalized trajectory should be shown (-2), or a diagnostic test (-3)
-    mdp_dict['tag'] = element
-
-    # also obtain all possible optimal trajectories if value iteration object is provided
-    all_opt_trajs = mdp_helpers.rollout_policy_recursive(mdp, vi, optimal_traj[0][0], [])
-    # extract all of the actions
-    all_opt_actions = []
-    for opt_traj in all_opt_trajs:
-        all_opt_actions.append([sas[1] for sas in opt_traj])
-    mdp_dict['all_opt_actions'] = all_opt_actions
-
-    # store the normalized trajectories, if relevant
-    if normalized_opt_traj is not None:
-        mdp_dict['normalized_opt_actions'] = [sas[1] for sas in normalized_opt_traj]
-        normalized_agent_locations = [(sas[0].get_agent_x(), sas[0].get_agent_y()) for sas in normalized_opt_traj]
-        normalized_agent_locations.append((normalized_opt_traj[-1][2].get_agent_x(), normalized_opt_traj[-1][2].get_agent_y()))
-        mdp_dict['normalized_opt_locations'] = normalized_agent_locations
-    else:
-        mdp_dict['normalized_opt_actions'] = []
-        mdp_dict['normalized_opt_locations'] = []
-
-    if normalized_human_traj is not None:
-        mdp_dict['normalized_human_actions'] = [sas[1] for sas in normalized_human_traj]
-        normalized_human_locations = [(sas[0].get_agent_x(), sas[0].get_agent_y()) for sas in normalized_human_traj]
-        normalized_human_locations.append((normalized_human_traj[-1][2].get_agent_x(), normalized_human_traj[-1][2].get_agent_y()))
-        mdp_dict['normalized_human_locations'] = normalized_human_locations
-    else:
-        mdp_dict['normalized_human_actions'] = []
-        mdp_dict['normalized_human_locations'] = []
-
-    # delete unserializable numpy arrays that aren't necessary
-    try:
-        del mdp_dict['weights_lb']
-        del mdp_dict['weights_ub']
-        del mdp_dict['weights']
-    except:
-        pass
-
-    # print(mdp_dict)
-    # print(mdp_dict['env_code'])
-
-    return mdp_dict
 
 def create_testing_dictionaries(test_env_dict, mapping):
     '''
@@ -1165,14 +1054,14 @@ def save_user_study_json(mapping):
                                                        len(unit)))
                 unit_constraints.extend(subunit[3])
 
-                best_env_idx = subunit[2][0]
+                best_env_idx, best_traj_idx = subunit[2]
                 filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
                 with open(filename, 'rb') as f:
                     wt_vi_traj_env = pickle.load(f)
                 vi = wt_vi_traj_env[0][1]
                 mdp_dict = wt_vi_traj_env[0][3]
 
-                user_study_dict[data_loc]["demo"][str(demo_idx)] = extract_mdp_dict(vi, subunit[0], subunit[1], mdp_dict, data_loc)
+                user_study_dict[data_loc]["demo"][str(demo_idx)] = extract_mdp_dict(vi, subunit[0], subunit[1], mdp_dict, data_loc, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=running_variable_filter)
                 demo_idx += 1
 
             # b) save the diagnostic tests
@@ -1183,14 +1072,14 @@ def save_user_study_json(mapping):
             preliminary_tests, visited_env_traj_idxs = BEC.obtain_diagnostic_tests(data_loc, unit, visited_env_traj_idxs, min_constraints, min_subset_constraints_record, traj_record, traj_features_record, running_variable_filter, mdp_features_record)
 
             for test in preliminary_tests:
-                best_env_idx = test[2][0]
+                best_env_idx, best_traj_idx = test[2]
                 filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
                 with open(filename, 'rb') as f:
                     wt_vi_traj_env = pickle.load(f)
                 vi = wt_vi_traj_env[0][1]
                 mdp_dict = wt_vi_traj_env[0][3]
 
-                user_study_dict[data_loc]["diagnostic test"][str(diagnostic_test_idx)] = extract_mdp_dict(vi, preliminary_tests[0][0], preliminary_tests[0][1], mdp_dict, data_loc, element=-3)
+                user_study_dict[data_loc]["diagnostic test"][str(diagnostic_test_idx)] = extract_mdp_dict(vi, preliminary_tests[0][0], preliminary_tests[0][1], mdp_dict, data_loc, element=-3, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=running_variable_filter)
                 diagnostic_test_idx += 1
 
         # c) save the final, held-out set of tests
@@ -1220,8 +1109,8 @@ def save_user_study_json(mapping):
 
             user_study_dict[data_loc]["final test"][test_difficulty] = test_difficulty_dicts
 
-        with open('models/user_study_dict.json', 'w') as f:
-            json.dump(user_study_dict, f)
+    with open('models/user_study_dict.json', 'w') as f:
+        json.dump(user_study_dict, f)
 
 if __name__ == "__main__":
     os.chdir('../../..')

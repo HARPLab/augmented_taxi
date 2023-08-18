@@ -472,8 +472,7 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
                 if visualize_pf_transition:
                     BEC_viz.visualize_pf_transition([-failed_BEC_constraint], particles, mdp_class, weights)
 
-                normalized_opt_traj, normalized_human_traj = normalize_trajs(opt_traj, human_traj, data_loc)
-                test_mdp.visualize_trajectory_comparison(normalized_opt_traj, normalized_human_traj)
+                test_mdp.visualize_trajectory_comparison(opt_traj, human_traj)
 
                 print("Here is a remedial demonstration that might be helpful")
 
@@ -534,8 +533,7 @@ def simulate_teaching_loop(mdp_class, BEC_summary, visited_env_traj_idxs, partic
                         failed_BEC_constraint = opt_feature_count - human_feature_count
                         print("You got the remedial test wrong. Here's the correct answer")
                         print("Failed BEC constraint: {}".format(failed_BEC_constraint))
-                        normalized_remedial_traj, normalized_human_traj = normalize_trajs(remedial_traj, human_traj, data_loc)
-                        remedial_mdp.visualize_trajectory_comparison(normalized_remedial_traj, normalized_human_traj)
+                        remedial_mdp.visualize_trajectory_comparison(remedial_traj, human_traj)
 
                         particles.update([-failed_BEC_constraint])
                         if visualize_pf_transition:
@@ -1056,10 +1054,10 @@ def run_scripts():
                             params.BEC['n_human_models'], params.BEC['n_particles'], params.prior, params.posterior, params.BEC['obj_func_proportion'], visited_env_traj_idxs=visited_env_traj_idxs)
 
     # c) run through the closed-loop teaching framework
-    # simulate_teaching_loop(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.BEC['n_human_models_precomputed'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, params.keys_map)
+    simulate_teaching_loop(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.BEC['n_human_models_precomputed'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, params.keys_map)
 
     # d) run remedial demonstration and test selection on previous participant responses from IROS
-    analyze_prev_study_tests(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.BEC['n_human_models_precomputed'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, params.keys_map, visualize_pf_transition=False)
+    # analyze_prev_study_tests(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.BEC['n_human_models_precomputed'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, params.keys_map, visualize_pf_transition=False)
 
     # e) compare the remedial demonstration selection when using 2-step dev/BEC vs. PF (assuming 3 static humans models for low, medium, and high difficulties)
     # contrast_PF_2_step_dev(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, visualize_pf_transition=False)
