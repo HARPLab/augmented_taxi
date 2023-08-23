@@ -71,6 +71,13 @@ def normalize_trajectories(trajectory, actions, trajectory_counterfactual, actio
     # print('Actions: {}'.format(normalized_actions))
     # print('C_Actions: {}'.format(normalized_actions_counterfactual))
 
+    # clean up for corner cases in which the counterfactual trajectory is very long and the tail of the counterfactual
+    # trajectory isn't initially incorporated into the normalized counterfactual trajectory
+    if len(actions_counterfactual) > len(normalized_actions_counterfactual):
+        diff = len(actions_counterfactual) - len(normalized_actions_counterfactual)
+        normalized_actions_counterfactual.extend(actions_counterfactual[-diff:])
+        normalized_actions.extend(['no-op'] * diff)
+
     return normalized_actions, normalized_actions_counterfactual
 
 def obtain_constraint(data_loc, mdp_parameters, opt_traj, opt_traj_features):

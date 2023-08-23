@@ -22,6 +22,9 @@ import policy_summarization.BEC_visualization as BEC_viz
 from policy_summarization import computational_geometry as cg
 from sklearn.metrics.pairwise import haversine_distances
 from policy_summarization import flask_user_study_utils as flask_utils
+import asyncio
+import websockets
+from tqdm import tqdm
 
 def extract_constraints_policy(args):
     env_idx, data_loc, BEC_depth, step_cost_flag = args
@@ -1272,7 +1275,59 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
 
     return summary, visited_env_traj_idxs, particles
 
-def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BEC_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, previous_demonstrations, visited_env_traj_idxs, variable_filter, mdp_features_record, consistent_state_count, weights, step_cost_flag, type='training', info_gain_tolerance=0.01, consider_human_models_jointly=True, n_human_models_precomputed=0, fallback='particle_filter', return_dict_form=False):
+async def process_and_send_progress(websocket, path, stop_event, pool, args, results_queue):
+    room = path.strip('/')  # Use the URL path as the room identifier
+    await websocket.send("Connected to room: " + room)
+
+    arg_length = len(args)
+
+    results = []
+    for i, result in enumerate(tqdm(pool.imap(combine_limiting_constraints_IG, args), total=arg_length)):
+        progress = int(100 * (i + 1) / arg_length)
+        await websocket.send(f"{progress}%")
+        results.append(result)
+
+    info_gains_record, min_env_constraints_record, n_diff_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(*results)
+
+    # Add the results to the shared queue
+    await results_queue.put((info_gains_record, min_env_constraints_record, n_diff_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs))
+
+    # Notify the client that progress updates are complete
+    await websocket.send("Progress updates complete")
+
+    # Set the stop event to signal the server to stop
+    stop_event.set()
+
+async def combine_limiting_constraints_IG_async(pool, args):
+    # Create an event to signal when the server should stop
+    stop_event = asyncio.Event()
+
+    # Create a queue to store the results
+    results_queue = asyncio.Queue()
+
+    # Start the WebSocket server
+    server = await websockets.serve(lambda ws, path: process_and_send_progress(ws, path, stop_event, pool, args, results_queue), "localhost", 8765)
+
+    print("WebSocket server started")
+
+    # Wait for the event to be set (indicating the server should stop)
+    await stop_event.wait()
+
+    # Close the WebSocket server
+    server.close()
+
+    # Wait for the server to close
+    await server.wait_closed()
+
+    print("WebSocket server closed")
+
+    # Get the processed values a and b from the shared queue
+    info_gains_record, min_env_constraints_record, n_diff_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = await results_queue.get()
+
+    return info_gains_record, min_env_constraints_record, n_diff_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs
+
+
+def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BEC_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, previous_demonstrations, visited_env_traj_idxs, variable_filter, mdp_features_record, consistent_state_count, weights, step_cost_flag, type='training', info_gain_tolerance=0.01, consider_human_models_jointly=True, n_human_models_precomputed=0, fallback='particle_filter', web_based=False):
     remedial_demonstrations = []
 
     remedial_demonstration_selected = False
@@ -1296,8 +1351,13 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BE
                      mdp_features_record[i],
                      traj_record[i], [], None, False, False) for
                     i in range(len(traj_record))]
-            info_gains_record, min_env_constraints_record, n_diff_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(
-                *pool.imap(combine_limiting_constraints_IG, tqdm(args)))
+
+            if web_based:
+                # create a socket connection to provide real-time updates to the client on the progress of combining limiting constraints
+                info_gains_record, min_env_constraints_record, n_diff_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = asyncio.run(combine_limiting_constraints_IG_async(pool, args))
+            else:
+                info_gains_record, min_env_constraints_record, n_diff_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(
+                    *tqdm(pool.imap(combine_limiting_constraints_IG, args), total=len(args)))
 
             # if you're looking for demonstrations that will convey the most constraining BEC region or will be employing scaffolding,
             # obtain the demos needed to convey the most constraining BEC region
@@ -1459,7 +1519,7 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BE
 
     visited_env_traj_idxs.append((best_env_idx, best_traj_idx))
 
-    if return_dict_form:
+    if web_based:
         if type == 'training':
             remedial_mdp_dict = flask_utils.extract_mdp_dict(vi, best_mdp, traj, mdp_dict, data_loc, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=variable_filter)
         else:
