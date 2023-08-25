@@ -1052,7 +1052,8 @@ def save_user_study_json(mapping):
             for subunit_idx, subunit in enumerate(unit):
                 print("Unit {}/{}, demo {}/{}:".format(unit_idx + 1, len(BEC_summary), subunit_idx + 1,
                                                        len(unit)))
-                unit_constraints.extend(subunit[3])
+                demo_constraints = subunit[3]
+                unit_constraints.extend(demo_constraints)
 
                 best_env_idx, best_traj_idx = subunit[2]
                 filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
@@ -1061,7 +1062,7 @@ def save_user_study_json(mapping):
                 vi = wt_vi_traj_env[0][1]
                 mdp_dict = wt_vi_traj_env[0][3]
 
-                user_study_dict[data_loc]["demo"][str(demo_idx)] = extract_mdp_dict(vi, subunit[0], subunit[1], mdp_dict, data_loc, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=running_variable_filter)
+                user_study_dict[data_loc]["demo"][str(demo_idx)] = extract_mdp_dict(vi, subunit[0], subunit[1], mdp_dict, data_loc, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=running_variable_filter, constraints=demo_constraints)
                 demo_idx += 1
 
             # b) save the diagnostic tests
@@ -1079,7 +1080,9 @@ def save_user_study_json(mapping):
                 vi = wt_vi_traj_env[0][1]
                 mdp_dict = wt_vi_traj_env[0][3]
 
-                user_study_dict[data_loc]["diagnostic test"][str(diagnostic_test_idx)] = extract_mdp_dict(vi, preliminary_tests[0][0], preliminary_tests[0][1], mdp_dict, data_loc, element=-3, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=running_variable_filter)
+                test_constraints = test[3]
+
+                user_study_dict[data_loc]["diagnostic test"][str(diagnostic_test_idx)] = extract_mdp_dict(vi, preliminary_tests[0][0], preliminary_tests[0][1], mdp_dict, data_loc, element=-3, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=running_variable_filter, constraints=test_constraints)
                 diagnostic_test_idx += 1
 
         # c) save the final, held-out set of tests

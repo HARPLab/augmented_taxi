@@ -71,10 +71,17 @@ def normalize_trajectories(trajectory, actions, trajectory_counterfactual, actio
     # print('Actions: {}'.format(normalized_actions))
     # print('C_Actions: {}'.format(normalized_actions_counterfactual))
 
-    # clean up for corner cases in which the counterfactual trajectory is very long and the tail of the counterfactual
+    # handle corner cases
+    # a) in which the counterfactual trajectory is very long and the tail of the counterfactual
     # trajectory isn't initially incorporated into the normalized counterfactual trajectory
     if len(actions_counterfactual) > len(normalized_actions_counterfactual):
         diff = len(actions_counterfactual) - len(normalized_actions_counterfactual)
+        normalized_actions_counterfactual.extend(actions_counterfactual[-diff:])
+        normalized_actions.extend(['no-op'] * diff)
+
+    # b) in which there still remains a portion of the counterfactual trajectory to incorporate
+    if step_counter_temp <= len_counter:
+        diff = (len_counter - step_counter_temp) + 1
         normalized_actions_counterfactual.extend(actions_counterfactual[-diff:])
         normalized_actions.extend(['no-op'] * diff)
 
@@ -98,7 +105,7 @@ def obtain_constraint(data_loc, mdp_parameters, opt_traj, opt_traj_features):
 
     return constraint
 
-def extract_mdp_dict(vi, mdp, optimal_traj, mdp_dict, data_loc, element=-1, test_difficulty='none', env_traj_idxs=None, variable_filter=None):
+def extract_mdp_dict(vi, mdp, optimal_traj, mdp_dict, data_loc, element=-1, test_difficulty='none', env_traj_idxs=None, variable_filter=None, constraints=None):
     '''
     Extract the MDP information from a demonstration / test tuple (e.g. to be later put into a json)
     '''
@@ -180,21 +187,29 @@ def extract_mdp_dict(vi, mdp, optimal_traj, mdp_dict, data_loc, element=-1, test
 
     # create placeholders for normalized trajectories actions (for user study)
     mdp_dict['normalized_opt_actions'] = []
-    mdp_dict['normalized_opt_locations'] = []
     mdp_dict['normalized_human_actions'] = []
-    mdp_dict['normalized_human_locations'] = []
     mdp_dict['human_actions'] = []
 
-    if variable_filter is not None:
-        mdp_dict['variable_filter'] = variable_filter.tolist()
-    else:
-        mdp_dict['variable_filter'] = []
-
+    # store the env and traj indices associated with this mdp parameter
     if env_traj_idxs is not None:
         env_idx, traj_idx = env_traj_idxs
         mdp_dict['env_traj_idxs'] = (int(env_idx), int(traj_idx)) # typecast into python int (e.g. from numpy int64) for future json serialization
     else:
         mdp_dict['env_traj_idxs'] = ()
+
+    # store misc information relevant to a particular point in the training process below
+    # store whether certain variables are to be filtered out
+    if variable_filter is not None:
+        mdp_dict['variable_filter'] = variable_filter.tolist()
+    else:
+        mdp_dict['variable_filter'] = []
+
+    # store the constraints associated with this demonstration or test
+    if constraints is not None:
+        constraint_list = [c.tolist() for c in constraints]
+        mdp_dict['constraints'] = constraint_list
+    else:
+        mdp_dict['constraints'] = []
 
     # delete unserializable numpy arrays that aren't necessary
     try:

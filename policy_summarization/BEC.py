@@ -1521,9 +1521,9 @@ def obtain_remedial_demonstrations(data_loc, pool, particles, n_human_models, BE
 
     if web_based:
         if type == 'training':
-            remedial_mdp_dict = flask_utils.extract_mdp_dict(vi, best_mdp, traj, mdp_dict, data_loc, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=variable_filter)
+            remedial_mdp_dict = flask_utils.extract_mdp_dict(vi, best_mdp, traj, mdp_dict, data_loc, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=variable_filter, constraints=[BEC_constraints])
         else:
-            remedial_mdp_dict = flask_utils.extract_mdp_dict(vi, best_mdp, traj, mdp_dict, data_loc, element=-3, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=variable_filter)
+            remedial_mdp_dict = flask_utils.extract_mdp_dict(vi, best_mdp, traj, mdp_dict, data_loc, element=-3, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=variable_filter, constraints=[BEC_constraints])
         return remedial_mdp_dict, visited_env_traj_idxs
     else:
         remedial_demonstrations.append([best_mdp, traj, (best_env_idx, best_traj_idx), BEC_constraints, variable_filter])
