@@ -144,9 +144,9 @@ def toll_weight(pool, data_loc, step_cost_flag, weights):
 
     pool.restart()
     results = list(tqdm(pool.imap(solve_policy, args), total=len(sample_human_models)))
-    pool.close()
-    pool.join()
-    pool.terminate()
+    # pool.close()
+    # pool.join()
+    # pool.terminate()
 
     for result in results:
         min_subset_constraints_record.extend(result)

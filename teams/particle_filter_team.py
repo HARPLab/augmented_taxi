@@ -31,7 +31,7 @@ class Particles_team(pf.Particles):
 
         if sum(self.weights) < reset_threshold_prob:
             self.reset(joint_constraints[0][0]) # TODO: Check if the same reset procedure applies to the joint knowledge case. Reset particles based on the first constraint for now.
-            print(colored('Resetting weights JK. The reset process is currently incorrect', 'red'))
+            print(colored('Resetting weights JK. The reset process is currently incomplete.', 'red'))
         else:
             # normalize weights and update particles
             self.weights /= sum(self.weights)
@@ -53,7 +53,7 @@ class Particles_team(pf.Particles):
     
     def reset_jk(self, constraint):
         
-        # TODO: Currently, just copied ober the reset function from the single constraint case. Need to modify this to work for the joint knowledge case.
+        # TODO: Currently, just copied over the reset function from the single constraint case. Need to modify this to work for the joint knowledge case.
         
         '''
         Reset the particle filter to conservative include a set of new particles that are consistent with the specified constraint
@@ -126,9 +126,12 @@ class Particles_team(pf.Particles):
 
 
 
-        plot_particles_input = input('Plot particles? (y/n)')
-        if plot_particles_input == 'y':
-            plot_particles_flag = True
+        # plot_particles_input = input('Plot particles? (y/n)')
+        # if plot_particles_input == 'y':
+        #     plot_particles_flag = True
+        
+        plot_particles_flag = False
+        # cnt = 0
         
         for j, x in enumerate(self.positions):
             
@@ -139,7 +142,7 @@ class Particles_team(pf.Particles):
             if prob > 0.13 or plot_particles_flag:
                 plot_particles()
                 
-            
+        # print('Number of particles with high probability: ', cnt)
             
 
     

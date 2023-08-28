@@ -124,10 +124,13 @@ def visualize_planes(constraints, fig=None, ax=None, alpha=0.5):
             X_xz, Z_xz, = np.meshgrid(x, z)
             Y = (-constraint[0, 0] * X_xz - constraint[0, 2] * Z_xz) / constraint[0, 1]
             ax.plot_surface(X_xz, Y, Z_xz, alpha=alpha)
-        else:
+        # Changes for teams case when there are no intersecting constraints
+        elif constraint[0, 0] != 0:
             Y_yz, Z_yz, = np.meshgrid(y, z)
             X = (-constraint[0, 1] * Y_yz - constraint[0, 2] * Z_yz) / constraint[0, 0]
             ax.plot_surface(X, Y_yz, Z_yz, alpha=alpha)
+        else:
+            print('Constraint {} cannot be plotted'.format(constraint))
 
 
 def visualize_projection(constraints, weights, proj_type, plot_lim=[(-1, 1), (-1, 1)], scale=1.0, title=None, xlabel=None, ylabel=None, fig_name=None, just_save=False):

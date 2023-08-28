@@ -133,6 +133,7 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
         try:
             BEC_length_all_constraints, nonredundant_constraint_idxs = calculate_BEC_length(constraints, weights,
                                                                                             step_cost_flag)
+            
         except:
             # a subset of these constraints aren't numerically stable (e.g. you can have a constraint that's ever so slightly
             # over the ground truth reward weight and thus fail to yield a proper polygonal convex hull. remove the violating constraints
@@ -144,6 +145,7 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
 
             BEC_length_all_constraints, nonredundant_constraint_idxs = calculate_BEC_length(constraints, weights,
                                                                                             step_cost_flag)
+            
 
         nonredundant_constraints = [constraints[x] for x in nonredundant_constraint_idxs]
 
@@ -170,14 +172,16 @@ def remove_redundant_constraints(constraints, weights, step_cost_flag):
         ieqs = constraints_to_halfspace_matrix_sage(constraints)
         poly = Polyhedron.Polyhedron(ieqs=ieqs)
         hrep = np.array(poly.Hrepresentation())
-
+        
         # remove boundary constraints/facets from consideration
         boundary_facet_idxs = np.where(hrep[:, 0] != 0)
         hrep_constraints = np.delete(hrep, boundary_facet_idxs, axis=0)
         # remove the first column since these constraints goes through the origin
         nonredundant_constraints = hrep_constraints[:, 1:]
+
         # reshape so that each element is a valid weight vector
         nonredundant_constraints = nonredundant_constraints.reshape(nonredundant_constraints.shape[0], 1, nonredundant_constraints.shape[1])
+
 
     return list(nonredundant_constraints)
 
@@ -277,6 +281,7 @@ def perform_nn_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraint
         if np.any(variable_filter):
             if variable_filter.dot(mdp_features_record[env_idx].T) > 0:
                 # conveys information about feature designated to be filtered out, so skip this demonstration
+                # print('variable_filter: ', variable_filter, '. Skipping env_idx: ', env_idx) # To Debug: Variable filtering issue for remedial demos
                 continue
 
         for traj_idx, constraints_traj in enumerate(constraints_env):

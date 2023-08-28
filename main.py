@@ -1383,8 +1383,8 @@ def run_scripts():
     # expanded_summary = ps_helpers.obtain_expanded_summary(BEC_summary, n_demos_desired, visited_env_traj_idxs, params.data_loc['BEC'])
     # BEC.visualize_summary(expanded_summary)
 
-    pool.close()
-    pool.join()
+    # pool.close()
+    # pool.join()
 
 if __name__ == "__main__":
     os.chdir('../../..')

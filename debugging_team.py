@@ -22,11 +22,20 @@ from policy_summarization import policy_summarization_helpers as ps_helpers
 import teams.teams_helpers as team_helpers
 from teams import particle_filter_team as pf_team
 import teams.utils_teams as utils_teams
+from simple_rl.agents import FixedPolicyAgent
+from simple_rl.utils import mdp_helpers
 
 import matplotlib as mpl
 mpl.rcParams['figure.facecolor'] = '1.0'
 mpl.rcParams['axes.labelsize'] = 'x-large'
 mpl.rcParams['xtick.labelsize'] = 'large'
+
+from collections import Counter
+import operator
+from simple_rl.agents import FixedPolicyAgent
+from simple_rl.planning import ValueIteration
+import random
+import pygame
 
 # # what does base_constraints.pickel contain?
 
@@ -397,6 +406,19 @@ def sample_human_models_uniform_common(constraints, n_models):
     return sample_human_models
 
 
+def label_axes(ax, weights=None):
+    ax.set_facecolor('white')
+    ax.xaxis.pane.fill = False
+    ax.yaxis.pane.fill = False
+    ax.zaxis.pane.fill = False
+    if weights is not None:
+        ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100/2)
+    
+    ax.set_xlabel('$\mathregular{w_0}$: Mud')
+    ax.set_ylabel('$\mathregular{w_1}$: Recharge')
+    ax.set_zlabel('$\mathregular{w_2}$: Action')
+
+    ax.view_init(elev=16, azim=-160)
 
 ##############################################
 
@@ -515,7 +537,7 @@ if __name__ == "__main__":
 
     ## Check how the team knowledges are being aggregated
 
-    # demo_constraints = [[np.array([[-1, 0, 0]]), np.array([[-1, 0, 6]])]]
+    # demo_constraints = [[np.array([[-1, 0, 0]]), np.array([[-1, 0, 2]])]]
     # test_response = {'p1': np.array([[-1, 0, 2]]), 'p2': np.array([[3, 0, -2]])}
 
     # team_prior, particles_team = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_prior = params.team_prior)
@@ -524,6 +546,31 @@ if __name__ == "__main__":
     # print('Team particles: ', particles_team)
     # print('Demo constraints:', demo_constraints)
 
+    # team_knowledge = copy.deepcopy(team_prior)
+
+
+
+    # for member_id in particles_team:
+    #     if 'p' in member_id:
+    #         team_knowledge = team_helpers.update_team_knowledge(team_knowledge, [test_response[member_id]], params.team_size,  params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
+    #         particles_team[member_id].update([test_response[member_id]])
+    #     elif member_id == 'common_knowledge':
+    #         test_common_constraints = []
+    #         for idx, cnt in enumerate(test_response):
+    #             test_common_constraints.extend([test_response[cnt]])
+    #         print('test_common_constraints: ', test_common_constraints)
+    #         team_knowledge = team_helpers.update_team_knowledge(team_knowledge, [], params.team_size,  params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])      
+    #         particles_team[member_id].update(test_common_constraints)
+    #     elif member_id == 'joint_knowledge':
+    #         test_joint_constraints = []
+    #         for idx, cnt in enumerate(test_response):
+    #             test_joint_constraints.append([test_response[cnt]])
+    #         print('test_joint_constraints: ', test_joint_constraints)
+    #         particles_team[member_id].update_jk(test_joint_constraints)
+
+    # team_helpers.visualize_team_knowledge(particles_team, test_response, params.mdp_class, weights=params.weights['val'], text='Updated team knowledge after test')
+    
+    
     # particles_team['joint_knowledge'].update_jk(demo_constraints)
     # team_helpers.visualize_transition(demo_constraints, particles_team['joint_knowledge'], params.mdp_class, params.weights['val'], text='Demo 1 for JK Type 1')
     # particles_team['joint_knowledge_2'].update_jk(demo_constraints)
@@ -635,19 +682,7 @@ if __name__ == "__main__":
 
 ###################
 
-    def label_axes(ax, weights=None):
-        ax.set_facecolor('white')
-        ax.xaxis.pane.fill = False
-        ax.yaxis.pane.fill = False
-        ax.zaxis.pane.fill = False
-        if weights is not None:
-            ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100/2)
-        
-        ax.set_xlabel('$\mathregular{w_0}$: Mud')
-        ax.set_ylabel('$\mathregular{w_1}$: Recharge')
-        ax.set_zlabel('$\mathregular{w_2}$: Action')
 
-        ax.view_init(elev=16, azim=-160)
 
     # # 1) 
     # # team_knowledge = params.team_prior.copy()
@@ -810,17 +845,410 @@ if __name__ == "__main__":
     #                 'common_knowledge': [np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]]), np.array([[3,  0,  -2]])], 
     #                 'joint_knowledge': [[np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]])]]}
 
-    team_knowledge = {'p1' :[np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]]), np.array([[1,  0,  0]])]}
+    # team_knowledge = {'p1' :[np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]]), np.array([[1,  0,  0]])]}
 
-    min_const = BEC_helpers.remove_redundant_constraints(team_knowledge['p1'],  params.weights['val'], params.step_cost_flag)
+    # min_const = BEC_helpers.remove_redundant_constraints(team_knowledge['p1'],  params.weights['val'], params.step_cost_flag)
 
-    fig = plt.figure()
-    ax1 = fig.add_subplot(1, 1, 1, projection='3d')
-    # utils_teams.visualize_planes_team(team_knowledge['common_knowledge'], fig=fig, ax=ax1)
-    utils_teams.visualize_planes_team(min_const, fig=fig, ax=ax1)
+    # fig = plt.figure()
+    # ax1 = fig.add_subplot(1, 1, 1, projection='3d')
+    # # utils_teams.visualize_planes_team(team_knowledge['common_knowledge'], fig=fig, ax=ax1)
+    # utils_teams.visualize_planes_team(min_const, fig=fig, ax=ax1)
 
-    ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(min_const)
-    poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
-    BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax1, plot_ref_sphere=False, alpha=0.75)
-    label_axes(ax1, params.weights['val'])
-    plt.show()
+    # ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(min_const)
+    # poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
+    # BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax1, plot_ref_sphere=False, alpha=0.75)
+    # label_axes(ax1, params.weights['val'])
+    # plt.show()
+
+    #############################
+
+    # ## Simulate human response
+
+
+    # cnst_limit = 1 # limit how many similar constraints to add
+    # counter = 0
+    # state_count = 0
+
+    # BEC_depth_list = [1]
+    # # BEC_depth_list = [1, 2, 3]  # more higher than this does not make sense
+
+
+    # constraints_env_list = []
+    # human_trajs_env_list = []
+    # env_list = []
+
+    # for env_idx in range(64):
+    # # for env_idx in range(1):
+        
+    #     filename = 'models/augmented_taxi2/gt_policies/wt_vi_traj_params_env' + str(env_idx).zfill(5) + '.pickle'
+
+    #     print(filename)
+
+    
+    #     with open(filename, 'rb') as f:
+    #         wt_vi_traj_env = pickle.load(f)
+
+    #     mdp = wt_vi_traj_env[0][1].mdp
+    #     agent = FixedPolicyAgent(wt_vi_traj_env[0][1].policy)
+    #     weights = mdp.weights
+
+    #     constraints_list = []
+    #     human_trajs_list = []
+
+    #     for BEC_depth in BEC_depth_list:
+    #         # print('BEC_depth: ', BEC_depth)
+    #         action_seq_list = list(itertools.product(mdp.actions, repeat=BEC_depth))
+
+    #         # print('action_seq_list: ', action_seq_list)
+
+    #         for state in mdp.states:
+    #             # print('State: ', state)
+    #             state_count += 1
+    #             # constraints = []
+    #             # human_trajs = []
+    #             traj_opt = mdp_helpers.rollout_policy(mdp, agent, cur_state=state)
+
+    #             for sas_idx in range(len(traj_opt)):
+    #                 # reward features of optimal action
+    #                 mu_sa = mdp.accumulate_reward_features(traj_opt[sas_idx:], discount=True)
+
+    #                 sas = traj_opt[sas_idx]
+    #                 cur_state = sas[0]
+
+    #                 # currently assumes that all actions are executable from all states
+    #                 for action_seq in action_seq_list:
+    #                     traj_hyp = mdp_helpers.rollout_policy(mdp, agent, cur_state=cur_state, action_seq=action_seq)
+    #                     mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
+
+    #                     new_constraint = mu_sa - mu_sb
+    #                     # new_constraint = mu_sb
+
+    #                     count = sum(np.array_equal(new_constraint, arr) for arr in constraints_list)
+
+    #                     if count < cnst_limit:
+    #                         constraints_list.append(new_constraint)
+    #                         human_trajs_list.append(traj_hyp)
+    #                         counter += 1
+
+
+    #     constraints_env_list.append(constraints_list)
+    #     human_trajs_env_list.append(human_trajs_list)
+    #     env_list.append(env_idx)
+
+
+    #     print('state_count: ', state_count)
+
+    # # print('constraints_env_list: ', constraints_env_list)
+
+    # # print('Set of all constraints: ', list(set(constraints_env_list)))
+
+    # set_env_constraints_traj = list(zip(env_list, constraints_env_list, human_trajs_env_list))
+
+    # # print('set_env_constraints_traj: ', set_env_constraints_traj)
+
+    # with open('models/augmented_taxi2/human_trajs_env_constraints_2.pickle', 'wb') as f:
+    #     pickle.dump(set_env_constraints_traj, f)
+
+
+    # # visualize trajectories
+    # traj_id = 1
+    # for traj_hyp in traj_hyp_list:
+    #     print('Visualizing trajecory no ', traj_id, ' ....')
+    #     print('Trajectory constraints: ', constraints[traj_id-1])
+    #     mdp.visualize_trajectory(traj_hyp)
+    #     traj_id += 1
+
+
+## Load the saved files and visualize trajectories
+
+    # with open('models/augmented_taxi2/human_trajs_env_constraints_2.pickle', 'rb') as f:
+    #     set_env_constraints_traj = pickle.load(f)
+
+    
+    # for env_constraints_traj in set_env_constraints_traj:
+    #     env_id = env_constraints_traj[0]
+    #     env_constraints = env_constraints_traj[1]
+    #     env_trajectories = env_constraints_traj[2]
+    #     traj_id = 1
+    
+
+    #     filename = 'models/augmented_taxi2/gt_policies/wt_vi_traj_params_env' + str(env_id).zfill(5) + '.pickle'
+
+    #     # print(len(env_trajectories))
+    #     # print(len(env_constraints))
+
+    #     for traj in env_trajectories:
+    #         print('For environment ', env_id, 'visualize trajectory ', traj_id, 'with constraints: ', env_constraints[traj_id-1])
+
+    #         with open(filename, 'rb') as f:
+    #             wt_vi_traj_env = pickle.load(f)
+
+    #         mdp = wt_vi_traj_env[0][1].mdp
+    #         mdp.visualize_trajectory(traj)
+
+    #         traj_id += 1
+
+
+#############################################
+
+    # # new_constraint = [1, 0, 2]
+    # new_constraint = [0, 0, 0]
+
+    # if (new_constraint == np.array([0, 0, 0])).all():
+    #     print('Constraint is zero')
+    # else:
+    #     print('Constraint is not zero')
+            
+
+#############################################################3
+
+# # Check human response simulation integration
+
+#     env_idx = 3
+#     response_distribution = 'mixed'
+
+#     human_history = []
+
+#     team_size = 2
+    
+#     with open('models/augmented_taxi2/team_base_constraints.pickle', 'rb') as f:
+#             policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(f)
+
+    
+#     human_traj = []
+#     cnst = []
+
+#     # a) find the sub_optimal responses
+#     BEC_depth_list = [1]
+
+#     filename = 'models/augmented_taxi2/gt_policies/wt_vi_traj_params_env' + str(env_idx).zfill(5) + '.pickle'
+    
+#     with open(filename, 'rb') as f:
+#         wt_vi_traj_env = pickle.load(f)
+
+#     mdp = wt_vi_traj_env[0][1].mdp
+#     agent = FixedPolicyAgent(wt_vi_traj_env[0][1].policy)
+
+
+#     opt_traj = traj_record[env_idx][0]
+
+
+
+#     mdp.set_init_state(opt_traj[0][0])
+    
+#     weights = mdp.weights
+
+#     constraints_list_correct = []
+#     human_trajs_list_correct = []
+#     constraints_list_incorrect = []
+#     human_trajs_list_incorrect = []
+
+
+
+#     for BEC_depth in BEC_depth_list:
+#         # print('BEC_depth: ', BEC_depth)
+#         action_seq_list = list(itertools.product(mdp.actions, repeat=BEC_depth))
+
+#         traj_opt = mdp_helpers.rollout_policy(mdp, agent)
+#         print('Optimal Trajectory length: ', len(traj_opt))
+#         traj_hyp = []
+
+#         for sas_idx in range(len(traj_opt)):
+        
+#             # reward features of optimal action
+#             mu_sa = mdp.accumulate_reward_features(traj_opt[sas_idx:], discount=True)
+
+#             sas = traj_opt[sas_idx]
+#             cur_state = sas[0]
+#             # if sas_idx > 0:
+#             #     traj_hyp = traj_opt[:sas_idx-1]
+
+#             # currently assumes that all actions are executable from all states
+#             for action_seq in action_seq_list:
+#                 traj_hyp = []
+#                 if sas_idx > 0:
+#                     traj_hyp = traj_opt[:sas_idx-1]
+
+#                 traj_hyp_human = mdp_helpers.rollout_policy(mdp, agent, cur_state=cur_state, action_seq=action_seq)
+#                 traj_hyp.extend(traj_hyp_human)
+                
+#                 mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
+
+#                 new_constraint = mu_sa - mu_sb
+
+#                 count = sum(np.array_equal(new_constraint, arr) for arr in constraints_list_correct) + sum(np.array_equal(new_constraint, arr) for arr in constraints_list_incorrect)
+
+#                 if count < team_size: # one sample trajectory for each constriant is sufficient; but just for a variety gather one trajectory for each person for each constraint, if possible
+#                     print('Hyp traj len: ', len(traj_hyp))
+#                     print('new_constraint: ', new_constraint)
+#                     if (new_constraint == np.array([0, 0, 0])).all():
+#                         constraints_list_correct.append(new_constraint)
+#                         human_trajs_list_correct.append(traj_hyp) 
+#                     else:
+#                         constraints_list_incorrect.append(new_constraint)
+#                         human_trajs_list_incorrect.append(traj_hyp)
+
+           
+    
+#     print('Constraints list correct: ', constraints_list_correct)
+#     print('Constraints list incorrect: ', constraints_list_incorrect)
+    
+#     # b) find the counterfactual human responses
+#     sample_human_models = BEC_helpers.sample_human_models_uniform([], 8)
+
+#     for model_idx, human_model in enumerate(sample_human_models):
+
+#         mdp.weights = human_model
+#         vi_human = ValueIteration(mdp, sample_rate=1)
+#         vi_human.run_vi()
+
+#         if not vi_human.stabilized:
+#             skip_human_model = True
+        
+#         if not skip_human_model:
+#             human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
+#             for human_opt_traj in human_opt_trajs:
+#                 human_traj_rewards = mdp.accumulate_reward_features(human_opt_traj, discount=True)
+#                 mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
+#                 new_constraint = mu_sa - human_traj_rewards
+
+#                 count = sum(np.array_equal(new_constraint, arr) for arr in constraints_list_correct) + sum(np.array_equal(new_constraint, arr) for arr in constraints_list_incorrect)
+
+#                 if count < team_size:
+#                     print('Hyp traj len: ', len(traj_hyp))
+#                     print('new_constraint: ', new_constraint)
+#                     if (new_constraint == np.array([0, 0, 0])).all():
+#                         constraints_list_correct.append(new_constraint)
+#                         human_trajs_list_correct.append(human_opt_traj) 
+#                     else:
+#                         constraints_list_incorrect.append(new_constraint)
+#                         human_trajs_list_incorrect.append(human_opt_traj)
+
+#     print('Constraints list correct after human models: ', constraints_list_correct)
+#     print('Constraints list incorrect after human models: ', constraints_list_incorrect)
+
+#     # Currently coded for a team size of 2
+#     if response_distribution == 'correct':
+
+#         for i in range(team_size):
+#             random_index = random.randint(0, len(constraints_list_correct)-1)
+#             human_traj.append(human_trajs_list_correct[random_index])
+#             cnst.append(constraints_list_correct[random_index])
+
+#             constraints_list_correct.pop(random_index)
+#             human_trajs_list_correct.pop(random_index)
+        
+#     elif response_distribution == 'incorrect':
+#         for i in range(team_size):
+#             random_index = random.randint(0, len(constraints_list_incorrect)-1)
+#             human_traj.append(human_trajs_list_incorrect[random_index])
+#             cnst.append(constraints_list_incorrect[random_index])
+
+#             constraints_list_incorrect.pop(random_index)
+#             human_trajs_list_incorrect.pop(random_index)
+
+#     elif response_distribution == 'mixed':
+#         for i in range(team_size):
+#             if i%2 == 0:
+#                 random_index = random.randint(0, len(constraints_list_correct)-1)
+#                 human_traj.append(human_trajs_list_correct[random_index])
+#                 cnst.append(constraints_list_correct[random_index])
+
+#                 constraints_list_correct.pop(random_index)
+#                 human_trajs_list_correct.pop(random_index)
+#             else:
+#                 random_index = random.randint(0, len(constraints_list_incorrect)-1)
+#                 human_traj.append(human_trajs_list_incorrect[random_index])
+#                 cnst.append(constraints_list_incorrect[random_index])
+
+#                 constraints_list_incorrect.pop(random_index)
+#                 human_trajs_list_incorrect.pop(random_index)
+
+#     human_history.append((env_idx, human_traj))
+
+#     print('N of human_traj: ', len(human_traj))
+
+#     print('Visualizing human trajectory ....')
+#     for ht in human_traj:
+#         print('human_traj len: ', len(ht))
+#         print('constraint: ', cnst[human_traj.index(ht)])
+#         mdp.visualize_trajectory(ht)
+#     pygame.quit()
+
+##########################
+    # min_intersection_constraints = [np.zeros((params.team_size), dtype=int)]
+    # # min_BEC_constraints =  [np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
+    # print(min_intersection_constraints)
+    # fig = plt.figure()
+    # ax1 = fig.add_subplot(1, 1, 1, projection='3d')
+    # utils_teams.visualize_planes_team(min_intersection_constraints, fig=fig, ax=ax1)
+    # plt.show()
+
+#####################
+    # ck = np.zeros((3, 1), dtype=int)
+    # print(ck.shape)
+    # team_knowledge = [ck.reshape(ck.shape[1], ck.shape[0])]
+    # print(team_knowledge)
+
+    # if (team_knowledge[0] == 0).all():
+    #     print('All zeros!')
+
+    # knowledge_particles = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], 500))
+
+
+    # # team constraints
+    # min_unit_constraints = [[np.array([[-1,  0,  2]])], [np.array([[1,  0,  -2]])]]
+    # print(min_unit_constraints)
+
+    # # knowledge_particles_prev = copy.deepcopy(knowledge_particles)
+
+    # knowledge_particles.update([np.array([[0,  0,  -1]])])
+
+    # knowledge_particles.update_jk(min_unit_constraints)
+
+    # team_helpers.visualize_transition(min_unit_constraints, knowledge_particles, params.mdp_class, weights=params.weights['val'], demo_strategy = 'joint_knowledge')
+
+#####################
+# Debug knowledge calculation
+
+    # team_knowledge = {'p1': [np.array([[0,  0,  -1]])], 'p2': [np.array([[ 0,  0, -1]])], 'common_knowledge': [np.array([[ 0,  0, -1]])], 'joint_knowledge': [[np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])]]}
+
+    team_knowledge, particles_team = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_prior = params.team_prior)
+        
+    min_BEC_constraints:  [np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
+    
+    min_unit_constraints = [ [np.array([[-1,  0,  0]]), np.array([[-1,  0,  2]])], 
+                             [np.array([[0, 1, 2]])] ]
+    
+
+    actual_team_constraints = [ [  [[np.array([[-1,  0,  2]])], [np.array([[ 0,  0, -1]])]],   [[np.array([[-1,  0,  0]])], [np.array([[ 0,  0, -1]])]]  ], 
+                                [  [[np.array([[0, 1, 2]])], [np.array([[0, 0, 1]])]]  ]  ] 
+    
+
+    for actual_cnst_idx, actual_cnst in enumerate(actual_team_constraints):
+        print('actual_cnst: ', actual_cnst)
+        team_cnsts = []
+        for cnst in actual_cnst:
+            for m_id in range(1, 3):
+                member_id = 'p' + str(m_id)
+                team_knowledge = team_helpers.update_team_knowledge(team_knowledge, cnst[m_id-1], 2, params.weights['val'], params.step_cost_flag, knowledge_to_update=[member_id])
+                particles_team[member_id].update(cnst[m_id-1])
+                team_helpers.visualize_transition(cnst[m_id-1], particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Knowledge change for set for ' + member_id)
+                team_cnsts.extend(cnst[m_id-1])
+            team_knowledge = team_helpers.update_team_knowledge(team_knowledge, [], 2, params.weights['val'], params.step_cost_flag, knowledge_to_update=['common_knowledge', 'joint_knowledge'])
+
+            particles_team['common_knowledge'].update([team_cnsts])
+            team_helpers.visualize_transition(team_cnsts, particles_team['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Knowledge change for set for common knowledge')
+
+            particles_team['joint_knowledge'].update_jk(cnst)
+            team_helpers.visualize_transition([cnst], particles_team['joint_knowledge'], params.mdp_class, params.weights['val'], text = 'Knowledge change for set for joint knowledge')
+
+
+
+            print('constraints: ', cnst)
+            print('team_knowledge: ', team_knowledge)
+            print('unit knowledge_level: ', team_helpers.calc_knowledge_level(team_knowledge, min_unit_constraints[actual_cnst_idx]))
+
+
+
+ 
