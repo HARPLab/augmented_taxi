@@ -535,13 +535,12 @@ def particles_for_demo_strategy(demo_strategy, team_knowledge, team_particles, t
         knowledge_id = 'p' + str(ind_knowledge_ascending[len(ind_knowledge_ascending) - teammate_idx - 1])
     
     elif demo_strategy == 'common_knowledge' or demo_strategy == 'joint_knowledge':
-        particles = team_particles[demo_strategy]
         knowledge_id = demo_strategy
     
     else:
         print('Unsupported demo strategy for sampling particles!')
 
-    particles = team_particles[knowledge_id]
+    particles = copy.deepcopy(team_particles[knowledge_id])
 
     
     return knowledge_id, particles
@@ -773,7 +772,7 @@ def visualize_spherical_polygon_jk(poly, fig=None, ax=None, alpha=1.0, color='y'
 
 
 
-def visualize_transition(constraints, particles, mdp_class, weights=None, fig=None, text=None, demo_strategy = 'common_knowledge'):
+def visualize_transition(constraints, particles, mdp_class, weights=None, fig=None, text=None, knowledge_type = 'common_knowledge'):
 
     # From BEC_viz.visualize_pf_transition function
    
@@ -783,6 +782,7 @@ def visualize_transition(constraints, particles, mdp_class, weights=None, fig=No
     if fig == None:
         fig = plt.figure()
     def label_axes(ax, mdp_class, weights=None):
+        fs = 16
         ax.set_facecolor('white')
         ax.xaxis.pane.fill = False
         ax.yaxis.pane.fill = False
@@ -790,15 +790,15 @@ def visualize_transition(constraints, particles, mdp_class, weights=None, fig=No
         if weights is not None:
             ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100/2)
         if mdp_class == 'augmented_taxi2':
-            ax.set_xlabel('$\mathregular{w_0}$: Mud')
-            ax.set_ylabel('$\mathregular{w_1}$: Recharge')
+            ax.set_xlabel('$\mathregular{w_0}$: Mud', fontsize = fs)
+            ax.set_ylabel('$\mathregular{w_1}$: Recharge', fontsize = fs)
         elif mdp_class == 'colored_tiles':
             ax.set_xlabel('X: Tile A (brown)')
             ax.set_ylabel('Y: Tile B (green)')
         else:
             ax.set_xlabel('X: Goal')
             ax.set_ylabel('Y: Skateboard')
-        ax.set_zlabel('$\mathregular{w_2}$: Action')
+        ax.set_zlabel('$\mathregular{w_2}$: Action', fontsize = fs)
 
         ax.view_init(elev=16, azim=-160)
 
@@ -823,38 +823,41 @@ def visualize_transition(constraints, particles, mdp_class, weights=None, fig=No
     # for constraints in [constraints]:
     #     BEC_viz.visualize_planes(constraints, fig=fig, ax=ax3)
 
-    for ax_n in [ax1, ax2, ax3]:
-        if demo_strategy == 'joint_knowledge':
-            for constraint in constraints:
-                BEC_viz.visualize_planes(constraint, fig=fig, ax=ax_n)
-        else:
-            for constraints in [constraints]:
-                BEC_viz.visualize_planes(constraints, fig=fig, ax=ax_n)
+    if len(constraints) > 0:
+        for ax_n in [ax1, ax2, ax3]:
+            if knowledge_type == 'joint_knowledge':
+                for constraint in constraints:
+                    BEC_viz.visualize_planes(constraint, fig=fig, ax=ax_n)
+            else:
+                for constraints in [constraints]:
+                    BEC_viz.visualize_planes(constraints, fig=fig, ax=ax_n)
 
     
     # plot the spherical polygon corresponding to the constraints
-    if demo_strategy == 'joint_knowledge':
-        for ind_constraints in constraints:
-            ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(ind_constraints)
+    if len(constraints) > 0:
+        if knowledge_type == 'joint_knowledge':
+            for ind_constraints in constraints:
+                ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(ind_constraints)
+                poly = Polyhedron.Polyhedron(ieqs=ieqs)
+                BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax2, plot_ref_sphere=False, alpha=0.75)
+                print('Plotting joint knowledge spherical polygon..')
+        else:
+            ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints)
             poly = Polyhedron.Polyhedron(ieqs=ieqs)
             BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax2, plot_ref_sphere=False, alpha=0.75)
-            print('Plotting joint knowledge spherical polygon..')
-    else:
-        ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints)
-        poly = Polyhedron.Polyhedron(ieqs=ieqs)
-        BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax2, plot_ref_sphere=False, alpha=0.75)
 
     label_axes(ax1, mdp_class, weights)
     label_axes(ax2, mdp_class, weights)
     label_axes(ax3, mdp_class, weights)
 
     # New: Add what constraints are being shown in the demo to the plot
-    x_loc = 0.5
-    y_loc = 0.1
-    fig.text(0.2, y_loc, 'Constraints in this demo: ', fontsize=20)
-    for cnst in constraints:
-        fig.text(x_loc, y_loc, str(cnst), fontsize=20)
-        y_loc -= 0.05
+    if len(constraints) > 0:
+        x_loc = 0.5
+        y_loc = 0.1
+        fig.text(0.2, y_loc, 'Constraints in this demo: ', fontsize=20)
+        for cnst in constraints:
+            fig.text(x_loc, y_loc, str(cnst), fontsize=20)
+            y_loc -= 0.05
 
 
     # https://stackoverflow.com/questions/41167196/using-matplotlib-3d-axes-how-to-drag-two-axes-at-once
