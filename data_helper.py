@@ -1080,9 +1080,11 @@ def save_user_study_json(mapping):
                 vi = wt_vi_traj_env[0][1]
                 mdp_dict = wt_vi_traj_env[0][3]
 
+                test_mdp = test[0]
+                opt_traj = test[1]
                 test_constraints = test[3]
 
-                user_study_dict[data_loc]["diagnostic test"][str(diagnostic_test_idx)] = extract_mdp_dict(vi, preliminary_tests[0][0], preliminary_tests[0][1], mdp_dict, data_loc, element=-3, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=running_variable_filter, constraints=test_constraints)
+                user_study_dict[data_loc]["diagnostic test"][str(diagnostic_test_idx)] = extract_mdp_dict(vi, test_mdp, opt_traj, mdp_dict, data_loc, element=-3, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=running_variable_filter, constraints=test_constraints)
                 diagnostic_test_idx += 1
 
         # c) save the final, held-out set of tests
