@@ -23,6 +23,12 @@ def normalize_trajectories(trajectory, actions, trajectory_counterfactual, actio
     len_traj = len(trajectory) - 1
     len_counter = len(trajectory_counterfactual) - 1
 
+    # keep track of actions that have been added
+    actions_copy = actions.copy()
+    actions_copy.reverse()
+    actions_counterfactual_copy = actions_counterfactual.copy()
+    actions_counterfactual_copy.reverse()
+
     anchor_points_wait = []
     matcher = difflib.SequenceMatcher(None, trajectory, trajectory_counterfactual, autojunk=False)
     matches = matcher.get_matching_blocks()
@@ -53,12 +59,14 @@ def normalize_trajectories(trajectory, actions, trajectory_counterfactual, actio
             normalized_actions.append('no-op')
         else:
             normalized_actions.append(actions[step_traj_temp])
+            actions_copy.pop()
 
         if (counter_state == cur_anchor_point and state != counter_state):
             step_counter_temp -= 1
             normalized_actions_counterfactual.append('no-op')
         else:
             normalized_actions_counterfactual.append(actions_counterfactual[step_counter_temp])
+            actions_counterfactual_copy.pop()
 
         # consider anchor points one at a time
         if (state == counter_state) and (state == cur_anchor_point):
@@ -71,18 +79,16 @@ def normalize_trajectories(trajectory, actions, trajectory_counterfactual, actio
     # print('Actions: {}'.format(normalized_actions))
     # print('C_Actions: {}'.format(normalized_actions_counterfactual))
 
-    # handle corner cases
-    # a) in which the counterfactual trajectory is very long and the tail of the counterfactual
-    # trajectory isn't initially incorporated into the normalized counterfactual trajectory
-    if len(actions_counterfactual) > len(normalized_actions_counterfactual):
-        diff = len(actions_counterfactual) - len(normalized_actions_counterfactual)
-        normalized_actions_counterfactual.extend(actions_counterfactual[-diff:])
-        normalized_actions.extend(['no-op'] * diff)
-
-    # b) in which there still remains a portion of the counterfactual trajectory to incorporate
-    if step_counter_temp <= len_counter:
-        diff = (len_counter - step_counter_temp) + 1
-        normalized_actions_counterfactual.extend(actions_counterfactual[-diff:])
+    # append any remaining actions
+    if len(actions_copy) > 0:
+        diff = len(actions_copy)
+        actions_copy.reverse()
+        normalized_actions.extend(actions_copy)
+        normalized_actions_counterfactual.extend(['no-op'] * diff)
+    elif len(actions_counterfactual_copy) > 0:
+        diff = len(actions_counterfactual_copy)
+        actions_counterfactual_copy.reverse()
+        normalized_actions.extend(actions_counterfactual_copy)
         normalized_actions.extend(['no-op'] * diff)
 
     return normalized_actions, normalized_actions_counterfactual

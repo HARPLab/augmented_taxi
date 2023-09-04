@@ -221,8 +221,8 @@ if __name__ == "__main__":
     # mu_constraint = [0, 1, 0]
     mu_constraint = [1, 0, 2]
     mu_constraint = mu_constraint / np.linalg.norm(mu_constraint)
-    kappa_constraint = 4   # 4 seems reasonable as a constraint approximation (k = 0 is uniform)
-    data_constraint = p_utils.rand_von_mises_fisher(mu_constraint, kappa=kappa_constraint, N=Nsim, halfspace=False)
+    kappa_constraint = 2   # 2 seems to work well as a conservative constraint approximation (k = 0 is uniform)
+    data_constraint = p_utils.rand_von_mises_fisher(mu_constraint, kappa=kappa_constraint, N=Nsim, halfspace=True)
 
     fig = plt.figure(figsize=(10,10))
     ax = plt.axes(projection='3d')

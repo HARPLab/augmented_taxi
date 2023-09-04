@@ -148,8 +148,8 @@ class Particles():
         self.bin_particle_mapping = None
         self.bin_weight_mapping = None
 
-        self.integral_prob_uniform = 0.8029412189847138   # the total probability on the uniform half of the custom uniform + VMF distribution
-        self.integral_prob_VMF = 0.19705878101528612      # the total probability on the VMF half of the custom uniform + VMF distribution
+        self.integral_prob_uniform = 0.698161845396882    # the total probability on the uniform half of the custom uniform + VMF distribution
+        self.integral_prob_VMF = 0.3018381546031181       # the total probability on the VMF half of the custom uniform + VMF distribution
         self.VMF_kappa = 4                                # the concentration parameter of the VMF distribution
 
     def reinitialize(self, positions):
@@ -760,7 +760,7 @@ class Particles():
         self.binned = False
 
     @staticmethod
-    def observation_probability(x, constraints, k=4):
+    def observation_probability(x, constraints, k=2):
         prob = 1
         p = x.shape[1]
 
