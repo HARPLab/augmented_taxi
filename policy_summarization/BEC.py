@@ -23,7 +23,6 @@ from policy_summarization import computational_geometry as cg
 from sklearn.metrics.pairwise import haversine_distances
 from policy_summarization import flask_user_study_utils as flask_utils
 import asyncio
-import websockets
 from tqdm import tqdm
 
 def extract_constraints_policy(args):
@@ -1275,16 +1274,23 @@ def obtain_summary_particle_filter(data_loc, particles, summary_variant, min_sub
 
     return summary, visited_env_traj_idxs, particles
 
-async def process_and_send_progress(websocket, path, stop_event, pool, args, results_queue):
-    room = path.strip('/')  # Use the URL path as the room identifier
-    await websocket.send("Connected to room: " + room)
+# @socketio.on('connect')
+# def handle_connect():
+#     print("Client connected")
+#
+# @socketio.on('disconnect')
+# def handle_disconnect():
+#     print("Client disconnected")
+
+async def process_and_send_progress(stop_event, pool, args, results_queue):
+    from app import socketio
 
     arg_length = len(args)
 
     results = []
     for i, result in enumerate(tqdm(pool.imap(combine_limiting_constraints_IG, args), total=arg_length)):
         progress = int(100 * (i + 1) / arg_length)
-        await websocket.send(f"{progress}%")
+        socketio.emit('message', f"{progress}%")
         results.append(result)
 
     info_gains_record, min_env_constraints_record, n_diff_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(*results)
@@ -1293,7 +1299,7 @@ async def process_and_send_progress(websocket, path, stop_event, pool, args, res
     await results_queue.put((info_gains_record, min_env_constraints_record, n_diff_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs))
 
     # Notify the client that progress updates are complete
-    await websocket.send("Progress updates complete")
+    socketio.emit('message', "Progress updates complete")
 
     # Set the stop event to signal the server to stop
     stop_event.set()
@@ -1305,19 +1311,13 @@ async def combine_limiting_constraints_IG_async(pool, args):
     # Create a queue to store the results
     results_queue = asyncio.Queue()
 
-    # Start the WebSocket server
-    server = await websockets.serve(lambda ws, path: process_and_send_progress(ws, path, stop_event, pool, args, results_queue), "localhost", 8765)
+    # Start processing and sending progress updates
+    asyncio.ensure_future(process_and_send_progress(stop_event, pool, args, results_queue))
 
     print("WebSocket server started")
 
     # Wait for the event to be set (indicating the server should stop)
     await stop_event.wait()
-
-    # Close the WebSocket server
-    server.close()
-
-    # Wait for the server to close
-    await server.wait_closed()
 
     print("WebSocket server closed")
 
