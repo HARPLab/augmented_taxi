@@ -150,7 +150,7 @@ class Particles():
 
         self.integral_prob_uniform = 0.698161845396882    # the total probability on the uniform half of the custom uniform + VMF distribution
         self.integral_prob_VMF = 0.3018381546031181       # the total probability on the VMF half of the custom uniform + VMF distribution
-        self.VMF_kappa = 4                                # the concentration parameter of the VMF distribution
+        self.VMF_kappa = 2                                # the concentration parameter of the VMF distribution
 
     def reinitialize(self, positions):
         self.positions = np.array(positions)
@@ -515,7 +515,7 @@ class Particles():
         :return: probability of x under this composite distribution (uniform + VMF)
         '''
         for j, x in enumerate(self.positions):
-            self.weights[j] = self.weights[j] * self.observation_probability(x, constraints)
+            self.weights[j] = self.weights[j] * self.observation_probability(x, constraints, self.VMF_kappa)
 
     def plot(self, centroid=None, fig=None, ax=None, cluster_centers=None, cluster_weights=None,
                        cluster_assignments=None, plot_prev=False):
@@ -760,7 +760,7 @@ class Particles():
         self.binned = False
 
     @staticmethod
-    def observation_probability(x, constraints, k=2):
+    def observation_probability(x, constraints, k):
         prob = 1
         p = x.shape[1]
 
