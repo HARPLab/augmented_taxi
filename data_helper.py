@@ -1118,7 +1118,7 @@ def save_user_study_json(mapping):
         json.dump(user_study_dict, f)
 
 if __name__ == "__main__":
-    os.chdir('../../..')
+    os.chdir('..')
 
     data_loc = params.data_loc['BEC']
 

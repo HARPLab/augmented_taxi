@@ -199,9 +199,9 @@ def extract_mdp_dict(vi, mdp, optimal_traj, mdp_dict, data_loc, element=-1, test
     # store the env and traj indices associated with this mdp parameter
     if env_traj_idxs is not None:
         env_idx, traj_idx = env_traj_idxs
-        mdp_dict['env_traj_idxs'] = (int(env_idx), int(traj_idx)) # typecast into python int (e.g. from numpy int64) for future json serialization
+        mdp_dict['env_traj_idxs'] = [int(env_idx), int(traj_idx)] # typecast into python int (e.g. from numpy int64) for future json serialization
     else:
-        mdp_dict['env_traj_idxs'] = ()
+        mdp_dict['env_traj_idxs'] = []
 
     # store misc information relevant to a particular point in the training process below
     # store whether certain variables are to be filtered out

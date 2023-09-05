@@ -293,7 +293,7 @@ BEC = {
 
     'test_difficulty': 'high',                # expected ease for human to correctly predict the agent's actions in this test environment (low, medium, high)
 
-    'n_human_models': 8,                      # number of human beliefs to actively consider
+    'n_human_models': 25,                      # number of human beliefs to actively consider
 
     'n_particles': 200,                      # number of particles in particle filter
 
