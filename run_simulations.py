@@ -47,11 +47,11 @@ if __name__ == "__main__":
     os.makedirs('models/' + params.data_loc['base'], exist_ok=True)
     os.makedirs('models/' + params.data_loc['BEC'], exist_ok=True)
 
-    N_runs = 20
+    N_runs = 30
 
     # weights_list = [[0.6, 0.15, 0.25], [0.5, 0.25, 0.25], [0.4, 0.3, 0.3], [0.8, 0.05, 0.1], [0.2, 0.6, 0.2], [0.2, 0.2, 0.6], [0.5, 0.1, 0.4], [0, 0, 1], [1, 0, 0], [0, 1, 0]]
     
-    weights_list = [[0.0, 0.0, 1.0]]
+    weights_list = [[0.2, 0.0, 0.8]]
 
     # try:
     #     with open('models/augmented_taxi2/vars_to_save.pickle', 'rb') as f:
@@ -67,16 +67,16 @@ if __name__ == "__main__":
         j = 0
         resp_dist_list = []
         while len(resp_dist_list) == 0 or (resp_dist_list in resp_dist_list_history and (1 not in weights_list[j])):
-            resp_dist_list = random.choices(['correct', 'incorrect', 'mixed'], weights = weights_list[j], k=20)
+            resp_dist_list = random.choices(['correct', 'incorrect', 'mixed'], weights = weights_list[j], k=40)
                 
         resp_dist_list_history.append(resp_dist_list)
-        # dem_strategy = random.choice(['common_knowledge', 'joint_knowledge'])
-        dem_strategy = 'common_knowledge'
+        dem_strategy = random.choice(['common_knowledge', 'joint_knowledge', 'individual_knowledge_low', 'individual_knowledge_high'])
+        # dem_strategy = 'common_knowledge'
         # print('resp_dist_list_history: ', resp_dist_list_history)
         print('Simulation run: ', i, '. Demo strategy: ', dem_strategy)
         print('resp_dist_list: ', resp_dist_list)
         # vars_to_save = run_reward_teaching(params, pool, demo_strategy = dem_strategy, response_type = 'simulated', response_distribution_list= resp_dist_list, run_no = i, vars_to_save = vars_to_save)
-        run_reward_teaching(params, pool, demo_strategy = dem_strategy, response_type = 'simulated', response_distribution_list= resp_dist_list, run_no = i, vars_filename='sim_run_ck_maj')
+        run_reward_teaching(params, pool, demo_strategy = dem_strategy, response_type = 'simulated', viz_flag=[False, False, False], response_distribution_list= resp_dist_list, run_no = i, vars_filename='sim_run_mixed_maj')
 
 
     # # save all the variables

@@ -36,6 +36,7 @@ from simple_rl.agents import FixedPolicyAgent
 from simple_rl.planning import ValueIteration
 import random
 import pygame
+from numpy import linalg as LA
 
 # # what does base_constraints.pickel contain?
 
@@ -1209,46 +1210,149 @@ if __name__ == "__main__":
     # team_helpers.visualize_transition(min_unit_constraints, knowledge_particles, params.mdp_class, weights=params.weights['val'], demo_strategy = 'joint_knowledge')
 
 #####################
-# Debug knowledge calculation
+# # Debug knowledge calculation
 
-    # team_knowledge = {'p1': [np.array([[0,  0,  -1]])], 'p2': [np.array([[ 0,  0, -1]])], 'common_knowledge': [np.array([[ 0,  0, -1]])], 'joint_knowledge': [[np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])]]}
+#     # team_knowledge = {'p1': [np.array([[0,  0,  -1]])], 'p2': [np.array([[ 0,  0, -1]])], 'common_knowledge': [np.array([[ 0,  0, -1]])], 'joint_knowledge': [[np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])]]}
 
-    team_knowledge, particles_team = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_prior = params.team_prior)
+#     team_knowledge, particles_team = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_prior = params.team_prior)
         
-    min_BEC_constraints:  [np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
+#     min_BEC_constraints:  [np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
     
-    min_unit_constraints = [ [np.array([[-1,  0,  0]]), np.array([[-1,  0,  2]])], 
-                             [np.array([[0, 1, 2]])] ]
-    
-
-    actual_team_constraints = [ [  [[np.array([[-1,  0,  2]])], [np.array([[ 0,  0, -1]])]],   [[np.array([[-1,  0,  0]])], [np.array([[ 0,  0, -1]])]]  ], 
-                                [  [[np.array([[0, 1, 2]])], [np.array([[0, 0, 1]])]]  ]  ] 
+#     min_unit_constraints = [ [np.array([[-1,  0,  0]]), np.array([[-1,  0,  2]])], 
+#                              [np.array([[0, 1, 2]])] ]
     
 
-    for actual_cnst_idx, actual_cnst in enumerate(actual_team_constraints):
-        print('actual_cnst: ', actual_cnst)
-        team_cnsts = []
-        for cnst in actual_cnst:
-            for m_id in range(1, 3):
-                member_id = 'p' + str(m_id)
-                team_knowledge = team_helpers.update_team_knowledge(team_knowledge, cnst[m_id-1], 2, params.weights['val'], params.step_cost_flag, knowledge_to_update=[member_id])
-                particles_team[member_id].update(cnst[m_id-1])
-                team_helpers.visualize_transition(cnst[m_id-1], particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Knowledge change for set for ' + member_id)
-                team_cnsts.extend(cnst[m_id-1])
-            team_knowledge = team_helpers.update_team_knowledge(team_knowledge, [], 2, params.weights['val'], params.step_cost_flag, knowledge_to_update=['common_knowledge', 'joint_knowledge'])
+#     actual_team_constraints = [ [  [[np.array([[-1,  0,  2]])], [np.array([[ 0,  0, -1]])]],   [[np.array([[-1,  0,  0]])], [np.array([[ 0,  0, -1]])]]  ], 
+#                                 [  [[np.array([[0, 1, 2]])], [np.array([[0, 0, 1]])]]  ]  ] 
+    
 
-            particles_team['common_knowledge'].update([team_cnsts])
-            team_helpers.visualize_transition(team_cnsts, particles_team['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Knowledge change for set for common knowledge')
+#     for actual_cnst_idx, actual_cnst in enumerate(actual_team_constraints):
+#         print('actual_cnst: ', actual_cnst)
+#         team_cnsts = []
+#         for cnst in actual_cnst:
+#             for m_id in range(1, 3):
+#                 member_id = 'p' + str(m_id)
+#                 team_knowledge = team_helpers.update_team_knowledge(team_knowledge, cnst[m_id-1], 2, params.weights['val'], params.step_cost_flag, knowledge_to_update=[member_id])
+#                 particles_team[member_id].update(cnst[m_id-1])
+#                 team_helpers.visualize_transition(cnst[m_id-1], particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Knowledge change for set for ' + member_id)
+#                 team_cnsts.extend(cnst[m_id-1])
+#             team_knowledge = team_helpers.update_team_knowledge(team_knowledge, [], 2, params.weights['val'], params.step_cost_flag, knowledge_to_update=['common_knowledge', 'joint_knowledge'])
 
-            particles_team['joint_knowledge'].update_jk(cnst)
-            team_helpers.visualize_transition([cnst], particles_team['joint_knowledge'], params.mdp_class, params.weights['val'], text = 'Knowledge change for set for joint knowledge')
+#             particles_team['common_knowledge'].update([team_cnsts])
+#             team_helpers.visualize_transition(team_cnsts, particles_team['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Knowledge change for set for common knowledge')
 
-
-
-            print('constraints: ', cnst)
-            print('team_knowledge: ', team_knowledge)
-            print('unit knowledge_level: ', team_helpers.calc_knowledge_level(team_knowledge, min_unit_constraints[actual_cnst_idx]))
+#             particles_team['joint_knowledge'].update_jk(cnst)
+#             team_helpers.visualize_transition([cnst], particles_team['joint_knowledge'], params.mdp_class, params.weights['val'], text = 'Knowledge change for set for joint knowledge')
 
 
 
- 
+#             print('constraints: ', cnst)
+#             print('team_knowledge: ', team_knowledge)
+#             print('unit knowledge_level: ', team_helpers.calc_knowledge_level(team_knowledge, min_unit_constraints[actual_cnst_idx]))
+
+    ###########################
+
+    # ## Majority Rules
+    # # opp_constraints = [np.array([[-1, 0, 2]]), np.array([[ 1, 0, -2]])]
+    # # opp_idx_unique = [1, 2]
+    # # resp_cat = ['incorrect', 'correct']
+    # test_constraints_team_expanded =   [np.array([[ -1,  0, 2]]), np.array([[-1,  0,  2]]), np.array([[ 1,  0, -2]])]
+    # opposing_idx =  [[0, 2], [2, 0], [1, 2], [2, 1]]
+    # response_category_team = ['correct', 'correct', 'incorrect']
+
+    # opp_idx_unique = []
+    # for i in range(len(opposing_idx)):
+    #     opp_idx_unique.extend(x for x in opposing_idx[i] if x not in opp_idx_unique)
+
+    # print('opp_idx_unique: ', opp_idx_unique)
+    # opp_constraints = [test_constraints_team_expanded[x] for x in opp_idx_unique]
+    # print('opp_constraints: ', opp_constraints)
+    # resp_cat = [response_category_team[x] for x in opp_idx_unique]
+    # print('resp_cat: ', resp_cat)
+    # opp_set = []
+    # count_opp_set = []
+    # resp_cat_set = []
+    # for j in range(len(opp_constraints)):
+    #     opp_c = opp_constraints[j]
+    #     if len(opp_set) > 0:
+    #         in_minimal_set = False
+    #         for i in range(len(opp_set)):
+    #             opp_c_set = opp_set[i]
+    #             if (opp_c == opp_c_set).all():
+    #                 in_minimal_set = True
+    #                 count_opp_set[i] += 1
+
+    #         if not in_minimal_set:
+    #             opp_set.append(opp_c)
+    #             count_opp_set.append(1)
+    #             resp_cat_set.append(resp_cat[j])
+    #     else:
+    #         opp_set.append(opp_c)
+    #         count_opp_set.append(1)
+    #         resp_cat_set.append(resp_cat[j])
+            
+    # # print('minimal opposing constraints: ', opp_set)
+    # # print('count_opp_set: ', count_opp_set)
+    # # print('response set: ', resp_cat_set)
+
+    # max_count_idx = [i for i in range(len(count_opp_set)) if count_opp_set[i] == max(count_opp_set)]
+
+    # # print('max_count_idx: ', max_count_idx)
+    # if len(max_count_idx) == 1:
+    #     # print('Majority response: ', resp_cat_set[max_count_idx[0]])
+    #     maj_cnst = opp_set[max_count_idx[0]]
+    # else:        
+    #     # print('Checking when there are multiple max counts')
+    #     # print('Majority response: ', 'incorrect')
+    #     maj_cnst = [opp_set[x] for x in max_count_idx if resp_cat_set[x] == 'incorrect']
+        
+    # # print('Majority constraint: ', maj_cnst)
+
+
+    # # # Option 3: Assign common knowledge as the knowledge of the person(s) who got it incorrect, even if majority got it correct
+    # alternate_team_constraints = [opp_set[i] for i in range(len(resp_cat_set)) if resp_cat_set[i] == 'incorrect'] #incorrect constraint. Assume that no one learned even if one person did not get it correct. Logical for the common knowledge where everyone is expected to know something about the robot.
+    # print('Incorrect_team_constraints: ', alternate_team_constraints)
+
+
+
+#########################################################
+
+    # constraints = [np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]]), np.array([[ 0,  0, -1]]), np.array([[ 3,  0, -2]]), np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]])]
+    constraints = [np.array([[-1,  0,  2]]), np.array([[3,  0,  -2]]), np.array([[ 0,  0, -1]])]
+
+    # print(BEC_helpers.remove_redundant_constraints(constraints, params.weights['val'], params.step_cost_flag))
+    # common_constraints = BEC_helpers.remove_redundant_constraints(constraints, params.weights['val'], params.step_cost_flag)
+
+    # unit_constraint_flag = True
+    # for constraint in common_constraints:
+    #     print('Constraint: ', constraint, 'norm: ', LA.norm(constraint,1))
+    #     if LA.norm(constraint,1) !=1:
+    #         unit_constraint_flag = False
+    # if unit_constraint_flag:
+    #     utils_teams.visualize_planes_team(common_constraints)
+    #     plt.show()
+    
+    unit_constraint_flag = True
+    unit_common_constraint_flag = True
+    constraints_copy = constraints.copy()
+    
+    while not unit_constraint_flag and unit_common_constraint_flag:
+        
+        common_constraints = BEC_helpers.remove_redundant_constraints(constraints_copy, params.weights['val'], params.step_cost_flag)
+        print('Origninal common knowledge: ', constraints_copy)
+        print('Remove redundant common knowledge: ', common_constraints)
+
+        for constraint in common_constraints:
+            if LA.norm(constraint,1) !=1:
+                unit_constraint_flag = False
+
+        for constraint in common_constraints:
+            if LA.norm(constraint,1) !=1:
+                unit_common_constraint_flag = False
+
+        if not unit_constraint_flag and unit_common_constraint_flag:
+            constraints_copy.pop(0)  # remove the first constraint
+
+
+
+

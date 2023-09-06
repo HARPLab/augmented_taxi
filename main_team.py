@@ -36,6 +36,7 @@ mpl.rcParams['xtick.labelsize'] = 'large'
 
 import random
 import pandas as pd
+from numpy.linalg import norm
 
 
 ############################################
@@ -45,7 +46,7 @@ import pandas as pd
 
 
 
-def calc_expected_learning(team_knowledge_expected, particles_team_expected, min_BEC_constraints, new_constraints, params, loop_count):
+def calc_expected_learning(team_knowledge_expected, particles_team_expected, min_BEC_constraints, new_constraints, params, loop_count, viz_flag = False):
 
     print('Current expected team knowledge: ', team_knowledge_expected)
     print('New constraints: ', new_constraints)
@@ -56,13 +57,18 @@ def calc_expected_learning(team_knowledge_expected, particles_team_expected, min
     p = 1
     while p <= params.team_size:
         member_id = 'p' + str(p)
+        print('PF update of ', member_id)
         particles_team_expected[member_id].update(new_constraints)
-        team_helpers.visualize_transition(new_constraints, particles_team_expected[member_id], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set ' + str(loop_count+1) + ' for player ' + member_id)  
+        
+        if viz_flag:
+            team_helpers.visualize_transition(new_constraints, particles_team_expected[member_id], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set ' + str(loop_count+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(loop_count+1))
         p += 1
             
     # Update common knowledge model
+    print('PF update of common_knowledge')
     particles_team_expected['common_knowledge'].update(new_constraints)
-    team_helpers.visualize_transition(new_constraints, particles_team_expected['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set' + str(loop_count+1) + ' for common knowledge')
+    if viz_flag:
+        team_helpers.visualize_transition(new_constraints, particles_team_expected['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set' + str(loop_count+1) + ' for common knowledge', plot_filename ='ek_ck_loop_' + str(loop_count+1))
     
 
 
@@ -74,9 +80,11 @@ def calc_expected_learning(team_knowledge_expected, particles_team_expected, min
     new_constraints_team = []
     for p in range(params.team_size):
         new_constraints_team.append(new_constraints)
+    print('PF update of common_knowledge')
     particles_team_expected['joint_knowledge'].update_jk(new_constraints_team)
 
-    team_helpers.visualize_transition(new_constraints_team, particles_team_expected['joint_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set ' + str(loop_count+1) + ' for joint knowledge',  knowledge_type = 'joint_knowledge')
+    if viz_flag:
+        team_helpers.visualize_transition(new_constraints_team, particles_team_expected['joint_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set ' + str(loop_count+1) + ' for joint knowledge',  knowledge_type = 'joint_knowledge', plot_filename ='ek_jk_loop_' + str(loop_count+1))
 
     print('min_BEC_constraints: ', min_BEC_constraints)
     print('Expected unit knowledge after seeing unit demonstrations: ', team_helpers.calc_knowledge_level(team_knowledge_expected, new_constraints) )
@@ -171,7 +179,7 @@ def run_remedial_loop(failed_BEC_constraints_tuple, particles_team, team_knowled
                     remedial_response = 'correct'
                 else:
                     remedial_response = 'mixed' # Note: We assume that one person always gets the remedial test correct and the other person gets it wrong (only for N=2)
-                human_traj_team, human_history = get_human_response(remedial_env_traj_tuple[0], remedial_constraint, remedial_traj, human_history, team_size = params.team_size, response_distribution = remedial_response)
+                human_traj_team, human_history = get_human_response(remedial_env_traj_tuple[0], remedial_constraint, remedial_traj, human_history, team_knowledge, team_size = params.team_size, response_distribution = remedial_response)
                 remedial_resp_no += 1
                 print('Simulating human response for remedial test... Remedial Response no: ', remedial_resp_no, '. Response type: ', remedial_response)
 
@@ -248,7 +256,7 @@ def run_remedial_loop(failed_BEC_constraints_tuple, particles_team, team_knowled
 
 
 
-def get_human_response(env_idx, env_cnst, opt_traj, human_history, team_size = 2, response_distribution = 'correct'):
+def get_human_response(env_idx, env_cnst, opt_traj, human_history, team_knowledge, team_size = 2, response_distribution = 'correct'):
 
     human_traj = []
     cnst = []
@@ -366,9 +374,16 @@ def get_human_response(env_idx, env_cnst, opt_traj, human_history, team_size = 2
         
     elif response_distribution == 'incorrect':
         for i in range(team_size):
+            member_id = 'p' + str(i+1)
             random_index = random.randint(0, len(constraints_list_incorrect)-1)
+            while len([x for x in team_knowledge[member_id] if (x == constraints_list_incorrect[random_index]).all()]) or norm(constraints_list_incorrect[random_index], 1) > 8:  # additional check to ensure constraints are different from existing knowledge (just for generating examples for papers)
+                random_index = random.randint(0, len(constraints_list_incorrect)-1)
+
             human_traj.append(human_trajs_list_incorrect[random_index])
             cnst.append(constraints_list_incorrect[random_index])
+
+            constraints_list_correct.append(env_cnst)
+            human_trajs_list_correct.append(traj_opt)
 
             constraints_list_incorrect.pop(random_index)
             human_trajs_list_incorrect.pop(random_index)
@@ -389,10 +404,16 @@ def get_human_response(env_idx, env_cnst, opt_traj, human_history, team_size = 2
                 print('constraints_list_correct_used: ', constraints_list_correct_used)
                 print('opposing indices: ', indices, 'for constraint: ', constraints_list_correct_used[-1])
                 print('constraints_list_incorrect: ', constraints_list_incorrect)
-                if len(indices) > 0:    
-                    random_index = random.choice(indices)    # opposing incorrect response
+                if len(indices) > 0: 
+                    member_id = 'p' + str(i+1)
+                    random_index = random.choice(indices) 
+                    while len([x for x in team_knowledge[member_id] if (x == constraints_list_incorrect[random_index]).all()]) or norm(constraints_list_incorrect[random_index], 1) > 8:  # additional check to ensure constraints are different from existing knowledge (just for generating examples for papers)
+                        random_index = random.choice(indices)    # opposing incorrect response
                 else:
-                    random_index = random.randint(0, len(constraints_list_incorrect)-1)  # random incorrect response
+                    member_id = 'p' + str(i+1)
+                    random_index = random.randint(0, len(constraints_list_incorrect)-1)
+                    while len([x for x in team_knowledge[member_id] if (x == constraints_list_incorrect[random_index]).all()]) or norm(constraints_list_incorrect[random_index], 1) > 8:  # additional check to ensure constraints are different from existing knowledge (just for generating examples for papers)
+                        random_index = random.randint(0, len(constraints_list_incorrect)-1)  # random incorrect response
                 
                 human_traj.append(human_trajs_list_incorrect[random_index])
                 cnst.append(constraints_list_incorrect[random_index])
@@ -421,7 +442,9 @@ def get_human_response(env_idx, env_cnst, opt_traj, human_history, team_size = 2
 
 
 # def run_reward_teaching(params, pool, demo_strategy = 'common', response_type = 'simulated', response_distribution_list = ['correct']*10, run_no = 1, vars_to_save = None):
-def run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', response_type = 'simulated', response_distribution_list = ['correct']*10, run_no = 1, viz_flag=False, vars_filename = 'var_to_save'):
+def run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', response_type = 'simulated', response_distribution_list = ['correct']*10, run_no = 1, viz_flag=[False, False, False], vars_filename = 'var_to_save'):
+
+    demo_viz_flag, test_viz_flag, knowledge_viz_flag = viz_flag
 
     #### Individual demos
     # get optimal policies
@@ -452,11 +475,11 @@ def run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', respon
     # sample particles for human models
     team_prior, particles_team = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_prior = params.team_prior)
     
-    if viz_flag:
-        print('Team prior: ', team_prior)
-        # team_helpers.visualize_team_knowledge(particles_team, [], params.mdp_class, weights=params.weights['val'], text='Team prior')
-        for know_id, know_type in enumerate(team_prior):
-            team_helpers.visualize_transition([], particles_team[know_type], params.mdp_class, weights=params.weights['val'], knowledge_type = know_type)
+    # if knowledge_viz_flag:
+    #     print('Team prior: ', team_prior)
+    #     # team_helpers.visualize_team_knowledge(particles_team, [], params.mdp_class, weights=params.weights['val'], text='Team prior')
+    #     for know_id, know_type in enumerate(team_prior):
+    #         team_helpers.visualize_transition([], particles_team[know_type], params.mdp_class, weights=params.weights['val'], knowledge_type = know_type, plot_filename ='ak_prior_' + know_type)
                 
 
     # unit (set of knowledge components) selection
@@ -474,13 +497,17 @@ def run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', respon
     plt.rcParams['figure.figsize'] = [10, 6]
 
     # for debugging
-    particles_team_expected = copy.deepcopy(particles_team)
-    team_knowledge_expected = copy.deepcopy(team_knowledge)
+    # particles_team_expected = copy.deepcopy(particles_team)
+    # team_knowledge_expected = copy.deepcopy(team_knowledge)
+
+    particles_team_expected = particles_team
+    team_knowledge_expected = team_knowledge
 
     # for testing design choices (is remedial demo needed)
     remedial_test_flag = False
     demo_vars_template = {'run_no': 1,
                          'demo_strategy': None,
+                         'knowledge_id': None,
                           'variable_filter': None,
                           'loop_count': None,  
                             'summary_count': None,
@@ -500,6 +527,7 @@ def run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', respon
                             'particles_team': None,
                             'unit_knowledge_level': None,
                             'BEC_knowledge_level': None,
+                            'pf_reset_count': np.zeros(params.team_size+2, dtype=int)
                             }
     
     # Variables to save for subsequent analysis
@@ -539,6 +567,16 @@ def run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', respon
         # if demo_reset_flag == True:
         #     knowledge_id, particles_demo = team_helpers.particles_for_demo_strategy(demo_strategy, team_knowledge, particles_team, params.team_size, params.weights['val'], params.step_cost_flag, params.BEC['n_particles'], min_BEC_constraints)
 
+        if 'individual' in demo_strategy:
+            ind_knowledge_ascending = team_helpers.find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints)
+            if demo_strategy =='individual_knowledge_low':
+                knowledge_id_new = ind_knowledge_ascending[0]
+            elif demo_strategy == 'individual_knowledge_high':
+                knowledge_id_new = ind_knowledge_ascending[len(ind_knowledge_ascending) - 1]
+
+            if knowledge_id_new != knowledge_id:
+                knowledge_id = knowledge_id_new
+                particles_demo = copy.deepcopy(particles_team[knowledge_id])
 
         # Obtain BEC summary for a new unit (skip if its the 1st unit)
         print('Summary count: ', summary_count)
@@ -572,7 +610,7 @@ def run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', respon
 
         # check for any new summary
         if len(BEC_summary) > prev_summary_len:
-            unit_constraints, running_variable_filter_unit = team_helpers.show_demonstrations(BEC_summary[-1], particles_demo, params.mdp_class, params.weights['val'], visualize_pf_transition, loop_count)
+            unit_constraints, running_variable_filter_unit = team_helpers.show_demonstrations(BEC_summary[-1], particles_demo, params.mdp_class, params.weights['val'], loop_count, viz_flag = demo_viz_flag)
 
             # print('Variable filter:', variable_filter)
             # print('running variable filter:', running_variable_filter_unit)
@@ -582,23 +620,23 @@ def run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', respon
 
 
             # For debugging. Visualize the expected particles transition
-            team_knowledge_expected, particles_team_expected = calc_expected_learning(team_knowledge_expected, particles_team_expected, min_BEC_constraints, min_unit_constraints, params, loop_count)
+            team_knowledge_expected, particles_team_expected = calc_expected_learning(team_knowledge_expected, particles_team_expected, min_BEC_constraints, min_unit_constraints, params, loop_count, viz_flag=knowledge_viz_flag)
             
-            if viz_flag and min_unit_constraints is not None:
-                for know_id, know_type in enumerate(team_knowledge_expected):
-                    if know_type == 'joint_knowledge':
-                        p = 1
-                        plot_constraints = []
-                        while p <= params.team_size:
-                            p += 1
-                            print(plot_constraints)
-                            plot_constraints.append(min_unit_constraints)
-                            print(plot_constraints)
-                    else:
-                        plot_constraints = min_unit_constraints.copy()
+            # if viz_flag and min_unit_constraints is not None:
+            #     for know_id, know_type in enumerate(team_knowledge_expected):
+            #         if know_type == 'joint_knowledge':
+            #             p = 1
+            #             plot_constraints = []
+            #             while p <= params.team_size:
+            #                 p += 1
+            #                 print(plot_constraints)
+            #                 plot_constraints.append(min_unit_constraints)
+            #                 print(plot_constraints)
+            #         else:
+            #             plot_constraints = min_unit_constraints.copy()
                     
-                    team_helpers.visualize_transition(plot_constraints, particles_team_expected[know_type], params.mdp_class, weights=params.weights['val'], knowledge_type = know_type)
-                # team_helpers.visualize_team_knowledge(particles_team_expected, params.mdp_class, weights=params.weights['val'], text='Team expected knowledge after unit ' + str(loop_count))
+            #         team_helpers.visualize_transition(plot_constraints, particles_team_expected[know_type], params.mdp_class, weights=params.weights['val'], knowledge_type = know_type)
+            #     # team_helpers.visualize_team_knowledge(particles_team_expected, params.mdp_class, weights=params.weights['val'], text='Team expected knowledge after unit ' + str(loop_count))
 
             ## Conduct tests for the unit
             # obtain the diagnostic tests that will test the human's understanding of the unit's constraints
@@ -624,7 +662,7 @@ def run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', respon
                 if response_type == 'simulated':
                     # print('response_distribution_list: ', response_distribution_list)
                     print('Simulating human response... Response no: ', resp_no, '. Response type: ', response_distribution_list[resp_no])
-                    human_traj_team, human_history = get_human_response(env_idx, test_constraints, opt_traj, human_history, team_size = params.team_size, response_distribution = response_distribution_list[resp_no])
+                    human_traj_team, human_history = get_human_response(env_idx, test_constraints, opt_traj, human_history, team_knowledge, team_size = params.team_size, response_distribution = response_distribution_list[resp_no])
                     resp_no += 1
                     print('Opt traj len: ', len(opt_traj))
                     for i in range(len(human_traj_team)):
@@ -647,32 +685,53 @@ def run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', respon
 
                     if (human_feature_count == opt_feature_count).all():
                         test_constraints_team.append(test_constraints)
-                        response_category_team.extend('correct')
+                        response_category_team.append('correct')
                         team_knowledge = team_helpers.update_team_knowledge(team_knowledge, test_constraints, params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
+                        
+                        prev_pf_reset_count = particles_team[member_id].pf_reset_count
                         particles_team[member_id].update(test_constraints) # update individual knowledge based on test response
+                        # if particles_team[member_id].pf_reset_count > prev_pf_reset_count:
+                        #     # reset knowledge to mirror particle reset
+                        #     print('Resetting constraints.. Previous constraints: ', team_knowledge[member_id])
+                        #     reset_index = team_knowledge[member_id].index(particles_team[member_id].reset_constraint.all())
+                        #     team_knowledge[member_id] = team_knowledge[member_id][reset_index:]
+                        #     print('New constraints: ', team_knowledge[member_id])
+                        
                         print("You got the diagnostic test right")
-                        if viz_flag:
-                            team_helpers.visualize_transition(test_constraints, particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Test ' + str(test_no) + ' of Unit ' + str(loop_count) + ' for player ' + member_id)
+                        if knowledge_viz_flag:
+                            team_helpers.visualize_transition(test_constraints, particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Test ' + str(test_no) + ' of Unit ' + str(loop_count) + ' for player ' + member_id, plot_filename = 'ak_test_' + str(test_no) + '_p' + member_id)
 
                     else:
                         failed_BEC_constraint = opt_feature_count - human_feature_count
                         failed_BEC_constraints_tuple.append([member_id, failed_BEC_constraint])
                         unit_learning_goal_reached = False
                         test_constraints_team.append([-failed_BEC_constraint])
-                        response_category_team.extend('incorrect')
+                        response_category_team.append('incorrect')
                     
                         # print('Current team knowledge: ', team_knowledge)
                         team_knowledge = team_helpers.update_team_knowledge(team_knowledge, [-failed_BEC_constraint], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
-                        particles_team[member_id].update([-failed_BEC_constraint])
                         
-                        if viz_flag:
-                            print("You got the diagnostic test wrong. Here's the correct answer")
-                            print("Failed BEC constraint: {}".format(failed_BEC_constraint))
-                            team_helpers.visualize_transition([-failed_BEC_constraint], particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Test ' + str(test_no) + ' of Unit ' + str(loop_count) + ' for player ' + member_id)
-                            # Correct trajectory
+                        prev_pf_reset_count = particles_team[member_id].pf_reset_count
+                        
+                        particles_team[member_id].update([-failed_BEC_constraint])
+
+                        # if particles_team[member_id].pf_reset_count > prev_pf_reset_count:
+                        #     # reset knowledge to mirror particle reset
+                        #     print('Resetting constraints.. Previous constraints: ', team_knowledge[member_id])
+                        #     reset_index = team_knowledge[member_id].index(particles_team[member_id].reset_constraint.all())
+                        #     team_knowledge[member_id] = team_knowledge[member_id][reset_index:]
+                        #     print('New constraints: ', team_knowledge[member_id])
+                        
+                        print("You got the diagnostic test wrong. Failed BEC constraint: {}".format(failed_BEC_constraint))
+
+                        if knowledge_viz_flag:
+                            team_helpers.visualize_transition([-failed_BEC_constraint], particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Test ' + str(test_no) + ' of Unit ' + str(loop_count) + ' for player ' + member_id, plot_filename = 'ak_test_' + str(test_no) + '_p' + member_id)
+                        
+                        # Correct trajectory
+                        if demo_viz_flag:
+                            print('Here is the correct trajectory')
                             test_mdp.visualize_trajectory_comparison(opt_traj, human_traj)
-                        else:
-                            print("You got the diagnostic test wrong.")
+
                         
                         # print('Opt traj: ', opt_traj)
                         # print('Human traj: ', human_traj)
@@ -695,12 +754,30 @@ def run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', respon
                 if not opposing_constraints_flag:  # Note: indicates that there is no common knowledge and entire sphere is the joint knowledge
                     # Update common knowledge and joint knowledge (only if there are no opposing constraints)
                     team_knowledge = team_helpers.update_team_knowledge(team_knowledge, [], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = ['common_knowledge', 'joint_knowledge'])
+                    
+                    prev_pf_reset_count = particles_team['common_knowledge'].pf_reset_count
                     particles_team['common_knowledge'].update(test_constraints_team_expanded)
+                    # if particles_team['common_knowledge'].pf_reset_count > prev_pf_reset_count:
+                    #     # reset knowledge to mirror particle reset
+                    #     print('Resetting constraints.. Previous constraints common knowledge: ', team_knowledge['common_knowledge'])
+                    #     reset_index = team_knowledge['common_knowledge'].index(particles_team['common_knowledge'].reset_constraint.all())
+                    #     team_knowledge['common_knowledge'] = team_knowledge['common_knowledge'][reset_index:]
+                    #     print('New constraints: ', team_knowledge['common_knowledge'])
+                    
+                    prev_pf_reset_count = particles_team['joint_knowledge'].pf_reset_count
                     particles_team['joint_knowledge'].update_jk(test_constraints_team)
-                    if viz_flag:
+                    # if particles_team['joint_knowledge'].pf_reset_count > prev_pf_reset_count:
+                    #     # reset knowledge to mirror particle reset
+                    #     print('Resetting constraints.. Previous constraints joint knowledge: ', team_knowledge['joint_knowledge'])
+                    #     reset_index = team_knowledge['joint_knowledge'].index(particles_team['joint_knowledge'].reset_constraint.all())
+                    #     team_knowledge['joint_knowledge'] = team_knowledge['joint_knowledge'][reset_index:]
+                    #     print('New constraints: ', team_knowledge['joint_knowledge'])
+
+
+                    if knowledge_viz_flag:
                         print('test_constraints_team_expanded: ', test_constraints_team_expanded)
-                        team_helpers.visualize_transition(test_constraints_team_expanded, particles_team['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Test ' + str(test_no) + ' of Unit ' + str(loop_count) + ' for common knowledge')
-                        team_helpers.visualize_transition(test_constraints_team, particles_team['joint_knowledge'], params.mdp_class, params.weights['val'], text = 'Test ' + str(test_no) + ' of Unit ' + str(loop_count) + ' for joint knowledge',  knowledge_type = 'joint_knowledge')
+                        team_helpers.visualize_transition(test_constraints_team_expanded, particles_team['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Test ' + str(test_no) + ' of Unit ' + str(loop_count) + ' for common knowledge', plot_filename = 'ak_test_' + str(test_no) + '_ck')
+                        team_helpers.visualize_transition(test_constraints_team, particles_team['joint_knowledge'], params.mdp_class, params.weights['val'], text = 'Test ' + str(test_no) + ' of Unit ' + str(loop_count) + ' for joint knowledge',  knowledge_type = 'joint_knowledge', plot_filename = 'ak_test_' + str(test_no) + '_jk')
                 else:
                     
                     ##########################################################################
@@ -718,31 +795,64 @@ def run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', respon
                     
                     ##########################################################################
                     # Option 2: Assign majority rules and update common knowledge and joint knowledge accordingly
+                    # In case of tie, go for a constraint that is most incorrect!
                     opp_idx_unique = []
                     for i in range(len(opposing_idx)):
                         opp_idx_unique.extend(x for x in opposing_idx[i] if x not in opp_idx_unique)
 
-                    print('opp_idx_unique: ', opp_idx_unique)
-                    opp_constraints = test_constraints_team_expanded[opp_idx_unique]
+                    # print('opp_idx_unique: ', opp_idx_unique)
+                    opp_constraints = [test_constraints_team_expanded[x] for x in opp_idx_unique]
                     print('opp_constraints: ', opp_constraints)
-                    resp_cat = response_category_team[opp_idx_unique]
+                    resp_cat = [response_category_team[x] for x in opp_idx_unique]
                     print('resp_cat: ', resp_cat)
-                    opp_set = set(opp_constraints)
-                    max_count = 0
-                    max_c = []
-                    for opp_c in opp_set:
-                        count_c = opp_constraints.count(opp_c)
-                        if count_c > max_count:
-                            max_count = count_c
-                            max_c = opp_c
-                        elif count_c == max_count:
-                            max_c.extend(opp_c)
+                    opp_set = []
+                    count_opp_set = []
+                    resp_cat_set = []
+                    for j in range(len(opp_constraints)):
+                        opp_c = opp_constraints[j]
+                        if len(opp_set) > 0:
+                            in_minimal_set = False
+                            for i in range(len(opp_set)):
+                                opp_c_set = opp_set[i]
+                                if (opp_c == opp_c_set).all():
+                                    in_minimal_set = True
+                                    count_opp_set[i] += 1
 
-                    alternate_team_constraints = max_c  # majority rules
-                    print('Majority_team_constraints: ', alternate_team_constraints, ' count: ', max_count)
+                            if not in_minimal_set:
+                                opp_set.append(opp_c)
+                                count_opp_set.append(1)
+                                resp_cat_set.append(resp_cat[j])
+                        else:
+                            opp_set.append(opp_c)
+                            count_opp_set.append(1)
+                            resp_cat_set.append(resp_cat[j])
+                            
+                    # print('minimal opposing constraints: ', opp_set)
+                    # print('count_opp_set: ', count_opp_set)
+                    # print('response set: ', resp_cat_set)
 
-                    # alternate_team_constraints = [opp_constraints[i] for i in len(range(resp_cat)) if resp_cat[i] == 'correct'] # correct constraint
-                    # print('Correct_team_constraints: ', alternate_team_constraints)
+                    max_count_idx = [i for i in range(len(count_opp_set)) if count_opp_set[i] == max(count_opp_set)]
+
+                    # print('max_count_idx: ', max_count_idx)
+                    if len(max_count_idx) == 1:
+                        # print('Majority response: ', resp_cat_set[max_count_idx[0]])
+                        maj_cnst = opp_set[max_count_idx[0]]
+                    else:        
+                        # print('Checking when there are multiple max counts')
+                        # print('Majority response: ', 'incorrect')
+                        maj_cnst = [opp_set[x] for x in max_count_idx if resp_cat_set[x] == 'incorrect']
+                        
+                    # print('Majority constraint: ', maj_cnst)
+
+                    alternate_team_constraints = maj_cnst.copy()  # majority rules
+                    print('Majority_team_constraints: ', alternate_team_constraints, ' count: ', count_opp_set[max_count_idx[0]])
+
+
+                    # # # Option 3: Assign common knowledge as the knowledge of the person(s) who got it incorrect, even if majority got it correct
+                    # alternate_team_constraints = [opp_set[i] for i in range(len(resp_cat_set)) if resp_cat_set[i] == 'incorrect'] #incorrect constraint. Assume that no one learned even if one person did not get it correct. Logical for the common knowledge where everyone is expected to know something about the robot.
+                    # print('Incorrect_team_constraints: ', alternate_team_constraints)
+
+
 
                     team_constraints = team_knowledge['common_knowledge'].copy()
                     team_constraints.extend(alternate_team_constraints)
@@ -750,10 +860,26 @@ def run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', respon
                     team_knowledge['common_knowledge'] = team_constraints.copy()
 
                     team_knowledge = team_helpers.update_team_knowledge(team_knowledge, [], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = ['joint_knowledge'])
-                    particles_team['common_knowledge'].reset(team_knowledge['common_knowledge'][0]) # Note that the common knowledge is updated based on the minimum common constraint which is [0, 0, 0]
+                    
+                    # particles_team['common_knowledge'].reset(team_knowledge['common_knowledge'][0]) # Note that the common knowledge is updated based on the minimum common constraint which is [0, 0, 0]
+                    
+                    prev_pf_reset_count = particles_team['common_knowledge'].pf_reset_count
                     particles_team['common_knowledge'].update(team_knowledge['common_knowledge'][1:])
+                    # if particles_team['common_knowledge'].pf_reset_count > prev_pf_reset_count:
+                    #     # reset knowledge to mirror particle reset
+                    #     print('Resetting constraints.. Previous constraints common knowledge: ', team_knowledge['common_knowledge'])
+                    #     reset_index = team_knowledge['common_knowledge'].index(particles_team['common_knowledge'].reset_constraint.all())
+                    #     team_knowledge['common_knowledge'] = team_knowledge['common_knowledge'][reset_index:]
+                    #     print('New constraints: ', team_knowledge['common_knowledge'])
+                    
+                    prev_pf_reset_count = particles_team['joint_knowledge'].pf_reset_count
                     particles_team['joint_knowledge'].update_jk(test_constraints_team) # Note that the joint knowledge is updated based on the opposing constraints which in this case is the entire space.
-                
+                    # if particles_team['joint_knowledge'].pf_reset_count > prev_pf_reset_count:
+                    #         # reset knowledge to mirror particle reset
+                    #         print('Resetting constraints.. Previous constraints joint knowledge: ', team_knowledge['joint_knowledge'])
+                    #         reset_index = team_knowledge['joint_knowledge'].index(particles_team['joint_knowledge'].reset_constraint.all())
+                    #         team_knowledge['joint_knowledge'] = team_knowledge['joint_knowledge'][reset_index:]
+                    #         print('New constraints: ', team_knowledge['joint_knowledge'])
                 
                 test_no += 1
                 
@@ -777,6 +903,7 @@ def run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', respon
             loop_vars = copy.deepcopy(demo_vars_template)
             loop_vars['run_no'] = run_no
             loop_vars['demo_strategy'] = demo_strategy
+            loop_vars['knowledge_id'] = knowledge_id
             loop_vars['variable_filter'] = variable_filter
             loop_vars['loop_count'] = loop_count
             loop_vars['summary_count'] = summary_count
@@ -795,7 +922,17 @@ def run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', respon
             loop_vars['team_knowledge'] = team_knowledge
             loop_vars['particles_team'] = particles_team
             loop_vars['unit_knowledge_level'] = team_helpers.calc_knowledge_level(team_knowledge, min_unit_constraints)
-            loop_vars['BEC_knowledge_level'] = team_helpers.calc_knowledge_level(team_knowledge, min_BEC_constraints)    
+            loop_vars['BEC_knowledge_level'] = team_helpers.calc_knowledge_level(team_knowledge, min_BEC_constraints)
+
+            for i in range(len(team_knowledge)):
+                if i < params.team_size:
+                    loop_vars['pf_reset_count'][i] = particles_team['p' + str(i+1)].pf_reset_count
+                elif i == len(team_knowledge) - 2:
+                    loop_vars['pf_reset_count'][i] = particles_team['common_knowledge'].pf_reset_count
+                elif i == len(team_knowledge) - 1:
+                    loop_vars['pf_reset_count'][i] = particles_team['joint_knowledge'].pf_reset_count
+                else:
+                    print('Wrong index for pf_reset_count!')
                  
             vars_to_save = vars_to_save.append(loop_vars, ignore_index=True)
             print('unit_knowledge_level_expected: ', loop_vars['unit_knowledge_level_expected'])
@@ -807,7 +944,14 @@ def run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', respon
             with open('models/augmented_taxi2/' + vars_filename + '.pickle', 'wb') as f:
                 pickle.dump(vars_to_save, f)
 
-            
+
+            # debug - plot loop variables
+            print('Visualizing team knowledge constraints for this teaching loop...')
+            if knowledge_viz_flag:
+                team_helpers.visualize_team_knowledge_constraints(min_BEC_constraints, team_knowledge, loop_vars['unit_knowledge_level'], loop_vars['BEC_knowledge_level'], params.mdp_class, fig=None, weights=None, text=None)
+
+
+
             # Update variable filter
             if next_unit_flag:
                 variable_filter, nonzero_counter, teaching_complete_flag = team_helpers.check_and_update_variable_filter(variable_filter = variable_filter, nonzero_counter = nonzero_counter)
@@ -848,7 +992,7 @@ def run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', respon
             # unit_learning_goal_reached2 = team_helpers.check_unit_learning_goal_reached(team_knowledge, min_unit_constraints)
             # print('Measured unit learning goal staus: ', unit_learning_goal_reached2)
             
-            # TODO: Update variable filter
+            # Update variable filter
             if unit_learning_goal_reached:
                 variable_filter, nonzero_counter, teaching_complete_flag = team_helpers.check_and_update_variable_filter(variable_filter = variable_filter, nonzero_counter = nonzero_counter)
 
@@ -877,8 +1021,10 @@ if __name__ == "__main__":
 
 
     ## run_reward_teaching
-    run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', response_type = 'simulated', response_distribution_list = ['mixed', 'correct', 'mixed', 'incorrect', 'correct', 'correct', 'correct', 'correct'], run_no = 1, viz_flag=True, vars_filename = 'workshop_data')
+    # run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', response_type = 'simulated', response_distribution_list = ['mixed', 'correct', 'mixed', 'incorrect', 'correct', 'correct', 'correct', 'correct'], run_no = 1, viz_flag=True, vars_filename = 'workshop_data')
     # vars_to_save = run_reward_teaching(params, pool)
+    # viz_flag = [demo_viz, test_viz, pf_knowledge_viz]
+    run_reward_teaching(params, pool, demo_strategy = 'individual_knowledge_low', response_type = 'manual', run_no = 1, viz_flag=[False, True, True], vars_filename = 'workshop_data_jk')
 
     
     pool.close()

@@ -43,7 +43,7 @@ import random
 from scipy.spatial import geometric_slerp
 import matplotlib.tri as mtri
 from sklearn.metrics.pairwise import haversine_distances
-
+from numpy import linalg as LA
 
 
 
@@ -66,11 +66,35 @@ def calc_common_knowledge(team_knowledge, team_size, weights, step_cost_flag):
 
     opposing_constraints_flag, _, _ = check_opposing_constraints(constraints)
 
-    if not opposing_constraints_flag:
-        common_constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
-    else:
-        ck = np.zeros((3,1), dtype=int)
-        common_constraints = [ck.reshape(ck.shape[1], ck.shape[0])]
+    # if not opposing_constraints_flag:
+    unit_constraint_flag = True
+    unit_common_constraint_flag = True
+    constraints_copy = constraints.copy()
+
+    common_constraints = BEC_helpers.remove_redundant_constraints(constraints_copy, weights, step_cost_flag)
+
+    
+    # while unit_constraint_flag:
+        
+    #     common_constraints = BEC_helpers.remove_redundant_constraints(constraints_copy, weights, step_cost_flag)
+    #     print('Origninal common knowledge: ', constraints_copy)
+    #     print('Remove redundant common knowledge: ', common_constraints)
+
+    #     for constraint in common_constraints:
+    #         if LA.norm(constraint,1) !=1:
+    #             unit_constraint_flag = False
+
+    #     for constraint in common_constraints:
+    #         if LA.norm(constraint,1) !=1:
+    #             unit_common_constraint_flag = False
+
+    #     if not unit_constraint_flag and unit_common_constraint_flag:
+    #         constraints_copy.pop(0)  # remove the first constraint
+
+    # else:
+    #     print('Opposing constraints found for common knowledge! Constraints: ', constraints, '.Reset constraints to [0, 0, 0].')
+    #     ck = np.zeros((3,1), dtype=int)
+    #     common_constraints = [ck.reshape(ck.shape[1], ck.shape[0])]
 
     return common_constraints
 
@@ -144,8 +168,21 @@ def update_team_knowledge(team_knowledge, new_constraints, team_size, weights, s
             # print('New_knowledge: ', knowledge)
             # print('New_knowledge: ', new_knowledge)
             # print('New constraints: ', new_constraints)
-            new_knowledge = BEC_helpers.remove_redundant_constraints(knowledge, weights, step_cost_flag)
 
+            # check for opposing constraints (since remove redundant constraints gives the perpendicular axes for opposing constraints)
+            
+            # opposing_constraints_flag, _, opposing_idx = check_opposing_constraints(knowledge)
+            # if not opposing_constraints_flag:
+            #     new_knowledge = BEC_helpers.remove_redundant_constraints(knowledge, weights, step_cost_flag)
+            # else:
+            #     while opposing_constraints_flag:
+            #         opp_idx_unique = []
+            #         for i in range(len(opposing_idx)):
+            #             opp_idx_unique.extend(x for x in opposing_idx[i] if x not in opp_idx_unique)
+            #         knowledge.pop(min(opp_idx_unique))
+            #         opposing_constraints_flag, _, opposing_idx = check_opposing_constraints(knowledge)
+            
+            new_knowledge = BEC_helpers.remove_redundant_constraints(knowledge, weights, step_cost_flag)
             team_knowledge_updated[knowledge_type] = new_knowledge.copy()
         elif  knowledge_type == 'joint_knowledge':
             team_knowledge_updated[knowledge_type] = calc_joint_knowledge(team_knowledge_updated, team_size, weights=weights, step_cost_flag=step_cost_flag)
@@ -366,18 +403,30 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, weights = None, s
             # print('unit_intersection_constraints before update: ', min_unit_intersection_constraints)
             min_unit_intersection_constraints.extend(team_knowledge[knowledge_type])
             # print('unit_intersection_constraints: ', min_unit_intersection_constraints)
-            min_unit_intersection_constraints = BEC_helpers.remove_redundant_constraints(min_unit_intersection_constraints, weights, step_cost_flag)
 
-            min_unit_BEC_knowledge_intersection = np.array(BEC_helpers.calc_solid_angles([min_unit_intersection_constraints]))
+            # check for opposing constraints (since remove redundant constraints gives the perpendicular axes for opposing constraints)
+            opposing_constraints = False
+            for cnst in min_unit_intersection_constraints:
+                for cnst2 in min_unit_intersection_constraints:
+                    if (np.array_equal(-cnst, cnst2)):
+                        opposing_constraints = True
+            
+            if not opposing_constraints:
+                min_unit_intersection_constraints = BEC_helpers.remove_redundant_constraints(min_unit_intersection_constraints, weights, step_cost_flag)
+                min_unit_BEC_knowledge_intersection = np.array(BEC_helpers.calc_solid_angles([min_unit_intersection_constraints]))
+            else:
+                print('Opposing contraints with unit knowledge found for ', knowledge_type )
+                print('Extended unit constraints: ', min_unit_intersection_constraints)
+                min_unit_BEC_knowledge_intersection = 0
 
             zero_cnst = False
             for knwlg_cnst in team_knowledge[knowledge_type]:
                 if (knwlg_cnst == 0).all():
                     zero_cnst = True
             
-            # if zero_cnst:
-            # print('min_unit_intersection_constraints: ', min_unit_intersection_constraints)
-            # print('min_BEC_knowledge_intersection: ', min_unit_BEC_knowledge_intersection)
+            if zero_cnst:
+                print('min_unit_intersection_constraints: ', min_unit_intersection_constraints)
+                print('min_BEC_knowledge_intersection: ', min_unit_BEC_knowledge_intersection)
 
 
             if min_unit_BEC_knowledge_intersection > 0:
@@ -528,11 +577,11 @@ def particles_for_demo_strategy(demo_strategy, team_knowledge, team_particles, t
     # particles to consider while generating demos
     if demo_strategy =='individual_knowledge_low':
         ind_knowledge_ascending = find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints)
-        knowledge_id = 'p' + str(ind_knowledge_ascending[teammate_idx])
+        knowledge_id = ind_knowledge_ascending[teammate_idx]
     
     elif demo_strategy == 'individual_knowledge_high':
         ind_knowledge_ascending = find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints)
-        knowledge_id = 'p' + str(ind_knowledge_ascending[len(ind_knowledge_ascending) - teammate_idx - 1])
+        knowledge_id = ind_knowledge_ascending[len(ind_knowledge_ascending) - teammate_idx - 1]
     
     elif demo_strategy == 'common_knowledge' or demo_strategy == 'joint_knowledge':
         knowledge_id = demo_strategy
@@ -580,7 +629,7 @@ def obtain_team_summary(data_loc, min_subset_constraints_record, min_BEC_constra
                         n_train_demos, particles_demo, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs):
 
 
-    summary_variant = 'counterfactual'
+    summary_variant = 'counterfactual' # uses min_BEC_constraints_running to sample human models and could sample models from 
     # summary_variant = 'particle-filter'
     
 
@@ -642,7 +691,7 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_prior=N
 
 
 
-def show_demonstrations(unit, particles_demo, mdp_class, weights, visualize_pf_transition=False, unit_count=0):
+def show_demonstrations(unit, particles_demo, mdp_class, weights, loop_count, viz_flag=False):
     # TODO: WIP
     
     # print('Summary:', summary)
@@ -653,23 +702,19 @@ def show_demonstrations(unit, particles_demo, mdp_class, weights, visualize_pf_t
     unit_constraints = []
     running_variable_filter_unit = unit[0][4]
 
-    
     n = 1
     # show each demonstration that is part of this unit       
     for subunit in unit:
-        # subunit[0].visualize_trajectory(subunit[1])
+        if viz_flag:
+            subunit[0].visualize_trajectory(subunit[1])
         unit_constraints.extend(subunit[3])
         
         # debug
         # print('Constraint ', n, 'for this unit: ', subunit[3])
         
-
         # update particle filter with demonstration's constraint
         particles_demo.update(subunit[3])
         
-        # visualize the updated particle filter
-        # if visualize_pf_transition:
-        #     visualize_transition(subunit[3], particles_demo, mdp_class, weights, text='Demo ' + str(n) + 'for Summary/Unit ' + str(unit_count+1))
 
         n += 1
 
@@ -772,7 +817,7 @@ def visualize_spherical_polygon_jk(poly, fig=None, ax=None, alpha=1.0, color='y'
 
 
 
-def visualize_transition(constraints, particles, mdp_class, weights=None, fig=None, text=None, knowledge_type = 'common_knowledge'):
+def visualize_transition(constraints, particles, mdp_class, weights=None, fig=None, text=None, knowledge_type = 'common_knowledge', plot_filename = 'transition'):
 
     # From BEC_viz.visualize_pf_transition function
    
@@ -782,7 +827,7 @@ def visualize_transition(constraints, particles, mdp_class, weights=None, fig=No
     if fig == None:
         fig = plt.figure()
     def label_axes(ax, mdp_class, weights=None):
-        fs = 16
+        fs = 12
         ax.set_facecolor('white')
         ax.xaxis.pane.fill = False
         ax.yaxis.pane.fill = False
@@ -878,10 +923,13 @@ def visualize_transition(constraints, particles, mdp_class, weights=None, fig=No
     fig.canvas.mpl_connect('motion_notify_event', on_move)
 
     plt.show()
+    fig.savefig('plots/' + plot_filename +'.png', dpi=300)
+    # plt.pause(10)
+    # plt.close()
 
 
 
-def visualize_team_knowledge_constraints(BEC_constraints, team_knowledge, unit_knowledge_level, BEC_knowledge_level, mdp_class, fig=None, weights=None, text=None):
+def visualize_team_knowledge_constraints(BEC_constraints, team_knowledge, unit_knowledge_level, BEC_knowledge_level, mdp_class, fig=None, weights=None, text=None, plot_filename = 'team_knowledge_constraints'):
 
 
     def label_axes(ax, mdp_class, weights=None):
@@ -1013,6 +1061,9 @@ def visualize_team_knowledge_constraints(BEC_constraints, team_knowledge, unit_k
     fig.canvas.mpl_connect('motion_notify_event', on_move)
 
     plt.show()
+    fig.savefig('plots/' + plot_filename +'.png', dpi=300)
+    # plt.pause(10)
+    # plt.close()
 
 
 
@@ -1195,13 +1246,12 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, variable_filter
 
         ################ Using precomputed counterfactual constraints  ###############################
 
-        
-
-        # sample_human_models, model_weights = BEC_helpers.sample_human_models_pf(particles_demo, n_human_models)
+    
         
         print('min_BEC_constraints_running: {}'.format(min_BEC_constraints_running))
 
         sample_human_models = BEC_helpers.sample_human_models_uniform(min_BEC_constraints_running, n_human_models)
+        # sample_human_models, model_weights = BEC_helpers.sample_human_models_pf(particles_demo, n_human_models)
 
         if len(sample_human_models) == 0:
             print(colored("Likely cannot reduce the BEC further through additional demonstrations. Returning.", 'red'))
@@ -1577,264 +1627,274 @@ def check_unit_learning_goal_reached(team_knowledge, min_unit_constraints):
 
 
 
-def obtain_summary_particle_filter_team(data_loc, particles, summary, variable_filter, nonzero_counter, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
-                       min_BEC_constraints_running, n_train_demos=np.inf, downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=1, min_info_gain=0.01, visited_env_traj_idxs=[]):
+# def obtain_summary_particle_filter_team(data_loc, particles, summary, variable_filter, nonzero_counter, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
+#                        min_BEC_constraints_running, n_train_demos=np.inf, downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=1, min_info_gain=0.01, visited_env_traj_idxs=[]):
 
 
-    # count how many nonzero constraints are present for each reward weight (i.e. variable) in the minimum BEC constraints
-    # (which are obtained using one-step deviations). mask variables in order of fewest nonzero constraints for variable scaffolding
-    # rationale: the variable with the most nonzero constraints, often the step cost, serves as a good reference/ratio variable
-    min_subset_constraints_record_flattened = [item for sublist in min_subset_constraints_record for item in sublist]
-    min_subset_constraints_record_flattened = [item for sublist in min_subset_constraints_record_flattened for item in sublist]
-    min_subset_constraints_record_array = np.array(min_subset_constraints_record_flattened)
+    # # count how many nonzero constraints are present for each reward weight (i.e. variable) in the minimum BEC constraints
+    # # (which are obtained using one-step deviations). mask variables in order of fewest nonzero constraints for variable scaffolding
+    # # rationale: the variable with the most nonzero constraints, often the step cost, serves as a good reference/ratio variable
+    # min_subset_constraints_record_flattened = [item for sublist in min_subset_constraints_record for item in sublist]
+    # min_subset_constraints_record_flattened = [item for sublist in min_subset_constraints_record_flattened for item in sublist]
+    # min_subset_constraints_record_array = np.array(min_subset_constraints_record_flattened)
 
-    print('variable filter: {}'.format(variable_filter))
+    # print('variable filter: {}'.format(variable_filter))
 
-    # running_variable_filter = variable_filter.copy()
+    # # running_variable_filter = variable_filter.copy()
 
-    # clear the demonstration generation log
-    open('models/' + data_loc + '/demo_gen_log.txt', 'w').close()
+    # # clear the demonstration generation log
+    # open('models/' + data_loc + '/demo_gen_log.txt', 'w').close()
 
-    while len(summary) < n_train_demos:
-        # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(len(summary)) + '.png', just_save=True)
-        sample_human_models = BEC_helpers.sample_human_models_pf(particles, n_human_models)
+    # while len(summary) < n_train_demos:
+    #     # visualize_constraints(min_BEC_constraints_running, weights, step_cost_flag, fig_name=str(len(summary)) + '.png', just_save=True)
+    #     sample_human_models = BEC_helpers.sample_human_models_pf(particles, n_human_models)
 
-        if len(sample_human_models) == 0:
-            print(colored("Likely cannot reduce the BEC further through additional demonstrations. Returning.", 'red'))
-            return summary
+    #     if len(sample_human_models) == 0:
+    #         print(colored("Likely cannot reduce the BEC further through additional demonstrations. Returning.", 'red'))
+    #         return summary
 
-        info_gains_record = []
-        overlap_in_opt_and_counterfactual_traj_record = []
+    #     info_gains_record = []
+    #     overlap_in_opt_and_counterfactual_traj_record = []
 
-        print("Length of summary: {}".format(len(summary)))
-        with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
-            myfile.write('Length of summary: {}\n'.format(len(summary)))
+    #     print("Length of summary: {}".format(len(summary)))
+    #     with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
+    #         myfile.write('Length of summary: {}\n'.format(len(summary)))
             
 
-        for model_idx, human_model in enumerate(sample_human_models[0]):
-            print(colored('Model #: {}'.format(model_idx), 'red'))
-            print(colored('Model val: {}'.format(human_model), 'red'))
+    #     for model_idx, human_model in enumerate(sample_human_models[0]):
+    #         print(colored('Model #: {}'.format(model_idx), 'red'))
+    #         print(colored('Model val: {}'.format(human_model), 'red'))
 
-            with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
-                myfile.write('Model #: {}\n'.format(model_idx))
-                myfile.write('Model val: {}\n'.format(human_model))
+    #         with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
+    #             myfile.write('Model #: {}\n'.format(model_idx))
+    #             myfile.write('Model val: {}\n'.format(human_model))
                 
 
-            # based on the human's current model, obtain the information gain generated when comparing to the agent's
-            # optimal trajectories in each environment (human's corresponding optimal trajectories and constraints
-            # are saved for reference later)
-            print("Obtaining counterfactual information gains:")
+    #         # based on the human's current model, obtain the information gain generated when comparing to the agent's
+    #         # optimal trajectories in each environment (human's corresponding optimal trajectories and constraints
+    #         # are saved for reference later)
+    #         print("Obtaining counterfactual information gains:")
 
-            cf_data_dir = 'models/' + data_loc + '/counterfactual_data_' + str(len(summary)) + '/model' + str(model_idx)
+    #         cf_data_dir = 'models/' + data_loc + '/counterfactual_data_' + str(len(summary)) + '/model' + str(model_idx)
             
-            # cf_data_dir = 'models/' + data_loc + '/counterfactual_data_' + str(summary_id) + '/model' + str(model_idx)
-            os.makedirs(cf_data_dir, exist_ok=True)
-            if consider_human_models_jointly:
-                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], particles, min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter, mdp_features_record[i], consider_human_models_jointly) for i in range(len(traj_record))]
+    #         # cf_data_dir = 'models/' + data_loc + '/counterfactual_data_' + str(summary_id) + '/model' + str(model_idx)
+    #         os.makedirs(cf_data_dir, exist_ok=True)
+    #         if consider_human_models_jointly:
+    #             args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], particles, min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter, mdp_features_record[i], consider_human_models_jointly) for i in range(len(traj_record))]
 
-                info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals_team, args), total=len(args)))
+    #             info_gain_envs = list(tqdm(pool.imap(compute_counterfactuals_team, args), total=len(args)))
 
-                info_gains_record.append(info_gain_envs)
-            else:
-                args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], particles, min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter, mdp_features_record[i], consider_human_models_jointly) for i in range(len(traj_record))]
-                info_gain_envs, overlap_in_opt_and_counterfactual_traj_env = zip(*pool.imap(compute_counterfactuals_team, tqdm(args), total=len(args)))
+    #             info_gains_record.append(info_gain_envs)
+    #         else:
+    #             args = [(data_loc, model_idx, i, human_model, mp_helpers.lookup_env_filename(data_loc, env_record[i]), traj_record[i], particles, min_BEC_constraints_running, step_cost_flag, len(summary), variable_filter, mdp_features_record[i], consider_human_models_jointly) for i in range(len(traj_record))]
+    #             info_gain_envs, overlap_in_opt_and_counterfactual_traj_env = zip(*pool.imap(compute_counterfactuals_team, tqdm(args), total=len(args)))
 
-                info_gains_record.append(info_gain_envs)
-                overlap_in_opt_and_counterfactual_traj_record.append(overlap_in_opt_and_counterfactual_traj_env)
-
-
-        with open('models/' + data_loc + '/info_gains_' + str(len(summary)) + '.pickle', 'wb') as f:
-            pickle.dump(info_gains_record, f)
-
-        # do a quick check of whether there's any information to be gained from any of the trajectories
-        no_info_flag = False
-        max_info_gain = -np.inf
-        if consistent_state_count:
-            info_gains = np.array(info_gains_record)
-            if np.sum(info_gains > 0) == 0:
-                no_info_flag = True
-        else:
-            info_gains_flattened_across_models = list(itertools.chain.from_iterable(info_gains_record))
-            info_gains_flattened_across_envs = list(itertools.chain.from_iterable(info_gains_flattened_across_models))
-            if sum(np.array(info_gains_flattened_across_envs) > 0) == 0:
-                no_info_flag = True
-
-        # no need to continue search for demonstrations if none of them will improve the human's understanding
-        if no_info_flag:
-            print('No information gained...')
-            break
+    #             info_gains_record.append(info_gain_envs)
+    #             overlap_in_opt_and_counterfactual_traj_record.append(overlap_in_opt_and_counterfactual_traj_env)
 
 
-        # todo: now that we're utilizing a probabilistic human model, we should account for the probability of having
-        #  selected each human model in the information gain calculation (e.g. by taking an expectation over the information
-        #  gain), rather than simply combine all of the constraints that could've been generated (which is currently done)
+    #     with open('models/' + data_loc + '/info_gains_' + str(len(summary)) + '.pickle', 'wb') as f:
+    #         pickle.dump(info_gains_record, f)
 
-        # todo: the code below isn't updated to provide demonstrations that only differ by a single constraint at a time,
-        #  nor does it ensure that the selected demonstrations don't conflict with prior selected demonstrations that are
-        #  specified through visited_env_traj_idxs (e.g. ones that will be used for assessment tests after teaching).
-        #  see obtain_summary_counterfactual() for a more updated version
-        print("Combining the most limiting constraints across human models:")
-        args = [(i, range(len(sample_human_models)), data_loc, len(summary), weights, step_cost_flag, variable_filter, mdp_features_record[i],
-                 traj_record[i], min_BEC_constraints_running, particles, True, False) for
-                i in range(len(traj_record))]
-        info_gains_record, min_env_constraints_record, n_diff_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(
-            *pool.imap(BEC.combine_limiting_constraints_IG, tqdm(args)))
+    #     # do a quick check of whether there's any information to be gained from any of the trajectories
+    #     no_info_flag = False
+    #     max_info_gain = -np.inf
+    #     if consistent_state_count:
+    #         info_gains = np.array(info_gains_record)
+    #         if np.sum(info_gains > 0) == 0:
+    #             no_info_flag = True
+    #     else:
+    #         info_gains_flattened_across_models = list(itertools.chain.from_iterable(info_gains_record))
+    #         info_gains_flattened_across_envs = list(itertools.chain.from_iterable(info_gains_flattened_across_models))
+    #         if sum(np.array(info_gains_flattened_across_envs) > 0) == 0:
+    #             no_info_flag = True
 
-        # the possibility that no demonstration provides information gain must be checked for again,
-        # in case all limiting constraints involve a masked variable and shouldn't be considered for demonstration yet
-        if consistent_state_count:
-            info_gains = np.array(info_gains_record)
-            traj_overlap_pcts = np.array(overlap_in_opt_and_counterfactual_traj_avg)
+    #     # no need to continue search for demonstrations if none of them will improve the human's understanding
+    #     if no_info_flag:
+    #         print('No information gained...')
+    #         break
 
-            # obj_function = info_gains * (traj_overlap_pcts + c)  # objective 2: scaled
-            obj_function = info_gains
 
-            # not considering demos where there is no info gain helps ensure that the final demonstration
-            # provides the maximum info gain (in conjuction with previously shown demonstrations)
-            obj_function[info_gains <= 0] = 0
+    #     # todo: now that we're utilizing a probabilistic human model, we should account for the probability of having
+    #     #  selected each human model in the information gain calculation (e.g. by taking an expectation over the information
+    #     #  gain), rather than simply combine all of the constraints that could've been generated (which is currently done)
 
-            max_info_gain = np.max(info_gains)
+    #     # todo: the code below isn't updated to provide demonstrations that only differ by a single constraint at a time,
+    #     #  nor does it ensure that the selected demonstrations don't conflict with prior selected demonstrations that are
+    #     #  specified through visited_env_traj_idxs (e.g. ones that will be used for assessment tests after teaching).
+    #     #  see obtain_summary_counterfactual() for a more updated version
+    #     print("Combining the most limiting constraints across human models:")
+    #     args = [(i, range(len(sample_human_models)), data_loc, len(summary), weights, step_cost_flag, variable_filter, mdp_features_record[i],
+    #              traj_record[i], min_BEC_constraints_running, particles, True, False) for
+    #             i in range(len(traj_record))]
+    #     info_gains_record, min_env_constraints_record, n_diff_constraints_record, overlap_in_opt_and_counterfactual_traj_avg, human_counterfactual_trajs = zip(
+    #         *pool.imap(BEC.combine_limiting_constraints_IG, tqdm(args)))
 
-            if max_info_gain <= min_info_gain:
-                no_info_flag = True
-            else:
-                # if visuals aren't considered, then you can simply return one of the demos that maximizes the obj function
-                # best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
+    #     # the possibility that no demonstration provides information gain must be checked for again,
+    #     # in case all limiting constraints involve a masked variable and shouldn't be considered for demonstration yet
+    #     if consistent_state_count:
+    #         info_gains = np.array(info_gains_record)
+    #         traj_overlap_pcts = np.array(overlap_in_opt_and_counterfactual_traj_avg)
 
-                if obj_func_proportion == 1:
-                    # a) select the trajectory with the maximal information gain
-                    best_env_idxs, best_traj_idxs = np.where(obj_function == max(obj_function.flatten()))
-                else:
-                    # b) select the trajectory closest to the desired partial information gain (to obtain more demonstrations0
-                    obj_function_flat = obj_function.flatten()
-                    obj_function_flat.sort()
+    #         # obj_function = info_gains * (traj_overlap_pcts + c)  # objective 2: scaled
+    #         obj_function = info_gains
 
-                    best_obj = obj_function_flat[-1]
-                    target_obj = obj_func_proportion * best_obj
-                    target_idx = np.argmin(abs(obj_function_flat - target_obj))
-                    closest_obj = obj_function_flat[target_idx]
-                    best_env_idxs, best_traj_idxs = np.where(obj_function == obj_function_flat[closest_obj])
+    #         # not considering demos where there is no info gain helps ensure that the final demonstration
+    #         # provides the maximum info gain (in conjuction with previously shown demonstrations)
+    #         obj_function[info_gains <= 0] = 0
 
-                best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
-        else:
-            best_obj = float('-inf')
-            best_env_idxs = []
-            best_traj_idxs = []
+    #         max_info_gain = np.max(info_gains)
 
-            if obj_func_proportion == 1:
-                # a) select the trajectory with the maximal information gain
-                for env_idx, info_gains_per_env in enumerate(info_gains_record):
-                    for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
-                        if info_gain_per_traj > 0:
+    #         if max_info_gain <= min_info_gain:
+    #             no_info_flag = True
+    #         else:
+    #             # if visuals aren't considered, then you can simply return one of the demos that maximizes the obj function
+    #             # best_env_idx, best_traj_idx = np.unravel_index(np.argmax(obj_function), info_gains.shape)
 
-                            # obj = info_gain_per_traj * (
-                            #             overlap_in_opt_and_counterfactual_traj_avg[env_idx][traj_idx] + c)  # objective 2: scaled
-                            obj = info_gain_per_traj
+    #             if obj_func_proportion == 1:
+    #                 # a) select the trajectory with the maximal information gain
+    #                 best_env_idxs, best_traj_idxs = np.where(obj_function == max(obj_function.flatten()))
+    #             else:
+    #                 # b) select the trajectory closest to the desired partial information gain (to obtain more demonstrations0
+    #                 obj_function_flat = obj_function.flatten()
+    #                 obj_function_flat.sort()
 
-                            if np.isclose(obj, best_obj):
-                                best_env_idxs.append(env_idx)
-                                best_traj_idxs.append(traj_idx)
-                            elif obj > best_obj:
-                                best_obj = obj
+    #                 best_obj = obj_function_flat[-1]
+    #                 target_obj = obj_func_proportion * best_obj
+    #                 target_idx = np.argmin(abs(obj_function_flat - target_obj))
+    #                 closest_obj = obj_function_flat[target_idx]
+    #                 best_env_idxs, best_traj_idxs = np.where(obj_function == obj_function_flat[closest_obj])
 
-                                best_env_idxs = [env_idx]
-                                best_traj_idxs = [traj_idx]
-                            if info_gain_per_traj > max_info_gain:
-                                max_info_gain = info_gain_per_traj
-                                print("new max info: {}".format(max_info_gain))
-            else:
-                # b) select the trajectory closest to the desired partial information gain (to obtain more demonstrations)
-                # first find the max information gain
-                for env_idx, info_gains_per_env in enumerate(info_gains_record):
-                    for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
-                        if info_gain_per_traj > 0:
-                            obj = info_gain_per_traj
+    #             best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
+    #     else:
+    #         best_obj = float('-inf')
+    #         best_env_idxs = []
+    #         best_traj_idxs = []
 
-                            if np.isclose(obj, best_obj):
-                                pass
-                            elif obj > best_obj:
-                                best_obj = obj
+    #         if obj_func_proportion == 1:
+    #             # a) select the trajectory with the maximal information gain
+    #             for env_idx, info_gains_per_env in enumerate(info_gains_record):
+    #                 for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
+    #                     if info_gain_per_traj > 0:
 
-                            if info_gain_per_traj > max_info_gain:
-                                max_info_gain = info_gain_per_traj
-                                print("new max info: {}".format(max_info_gain))
+    #                         # obj = info_gain_per_traj * (
+    #                         #             overlap_in_opt_and_counterfactual_traj_avg[env_idx][traj_idx] + c)  # objective 2: scaled
+    #                         obj = info_gain_per_traj
 
-                target_obj = obj_func_proportion * best_obj
-                closest_obj_dist = float('inf')
+    #                         if np.isclose(obj, best_obj):
+    #                             best_env_idxs.append(env_idx)
+    #                             best_traj_idxs.append(traj_idx)
+    #                         elif obj > best_obj:
+    #                             best_obj = obj
 
-                for env_idx, info_gains_per_env in enumerate(info_gains_record):
-                    for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
-                        if info_gain_per_traj > 0:
+    #                             best_env_idxs = [env_idx]
+    #                             best_traj_idxs = [traj_idx]
+    #                         if info_gain_per_traj > max_info_gain:
+    #                             max_info_gain = info_gain_per_traj
+    #                             print("new max info: {}".format(max_info_gain))
+    #         else:
+    #             # b) select the trajectory closest to the desired partial information gain (to obtain more demonstrations)
+    #             # first find the max information gain
+    #             for env_idx, info_gains_per_env in enumerate(info_gains_record):
+    #                 for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
+    #                     if info_gain_per_traj > 0:
+    #                         obj = info_gain_per_traj
 
-                            obj = info_gain_per_traj
+    #                         if np.isclose(obj, best_obj):
+    #                             pass
+    #                         elif obj > best_obj:
+    #                             best_obj = obj
 
-                            if np.isclose(abs(target_obj - obj), closest_obj_dist):
-                                best_env_idxs.append(env_idx)
-                                best_traj_idxs.append(traj_idx)
-                            elif abs(target_obj - obj) < closest_obj_dist:
-                                closest_obj_dist = abs(obj - target_obj)
+    #                         if info_gain_per_traj > max_info_gain:
+    #                             max_info_gain = info_gain_per_traj
+    #                             print("new max info: {}".format(max_info_gain))
 
-                                best_env_idxs = [env_idx]
-                                best_traj_idxs = [traj_idx]
+    #             target_obj = obj_func_proportion * best_obj
+    #             closest_obj_dist = float('inf')
 
-            if max_info_gain < min_info_gain:
-                no_info_flag = True
-            elif max_info_gain == min_info_gain:
-                no_info_flag = True
-                print(colored('Max info gain is equal to min info gain....!', 'red'))
-            else:
-                best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
+    #             for env_idx, info_gains_per_env in enumerate(info_gains_record):
+    #                 for traj_idx, info_gain_per_traj in enumerate(info_gains_per_env):
+    #                     if info_gain_per_traj > 0:
 
-        print("current max info: {}".format(max_info_gain))
-        # no need to continue search for demonstrations if none of them will improve the human's understanding
-        if no_info_flag:
-            # if no variables had been filtered out, then there are no more informative demonstrations to be found
-            if not np.any(variable_filter):
-                break
-            else:
-                # no more informative demonstrations with this variable filter, so update it
-                variable_filter, nonzero_counter = BEC_helpers.update_variable_filter(nonzero_counter)
-                print(colored('Did not find any informative demonstrations.', 'red'))
-                print('variable filter: {}'.format(variable_filter))
-                continue
+    #                         obj = info_gain_per_traj
 
-        best_traj = traj_record[best_env_idx][best_traj_idx]
+    #                         if np.isclose(abs(target_obj - obj), closest_obj_dist):
+    #                             best_env_idxs.append(env_idx)
+    #                             best_traj_idxs.append(traj_idx)
+    #                         elif abs(target_obj - obj) < closest_obj_dist:
+    #                             closest_obj_dist = abs(obj - target_obj)
 
-        filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
-        with open(filename, 'rb') as f:
-            wt_vi_traj_env = pickle.load(f)
-        best_mdp = wt_vi_traj_env[0][1].mdp
-        best_mdp.set_init_state(best_traj[0][0]) # for completeness
-        min_BEC_constraints_running.extend(min_env_constraints_record[best_env_idx][best_traj_idx])
-        min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
+    #                             best_env_idxs = [env_idx]
+    #                             best_traj_idxs = [traj_idx]
+
+    #         if max_info_gain < min_info_gain:
+    #             no_info_flag = True
+    #         elif max_info_gain == min_info_gain:
+    #             no_info_flag = True
+    #             print(colored('Max info gain is equal to min info gain....!', 'red'))
+    #         else:
+    #             best_env_idx, best_traj_idx = ps_helpers.optimize_visuals(data_loc, best_env_idxs, best_traj_idxs, traj_record, summary)
+
+    #     print("current max info: {}".format(max_info_gain))
+    #     # no need to continue search for demonstrations if none of them will improve the human's understanding
+    #     if no_info_flag:
+    #         # if no variables had been filtered out, then there are no more informative demonstrations to be found
+    #         if not np.any(variable_filter):
+    #             break
+    #         else:
+    #             # no more informative demonstrations with this variable filter, so update it
+    #             variable_filter, nonzero_counter = BEC_helpers.update_variable_filter(nonzero_counter)
+    #             print(colored('Did not find any informative demonstrations.', 'red'))
+    #             print('variable filter: {}'.format(variable_filter))
+    #             continue
+
+    #     best_traj = traj_record[best_env_idx][best_traj_idx]
+
+    #     filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
+    #     with open(filename, 'rb') as f:
+    #         wt_vi_traj_env = pickle.load(f)
+    #     best_mdp = wt_vi_traj_env[0][1].mdp
+    #     best_mdp.set_init_state(best_traj[0][0]) # for completeness
+    #     min_BEC_constraints_running.extend(min_env_constraints_record[best_env_idx][best_traj_idx])
+    #     min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
         
-        # # check and update unit
-        # if (running_variable_filter == variable_filter).all():
-        #     unit.append([best_mdp, best_traj, (best_env_idx, best_traj_idx), min_env_constraints_record[best_env_idx][best_traj_idx], variable_filter, sample_human_models])
-        # else:
-        #     summary.append(unit)
-        #     unit = [[best_mdp, best_traj, (best_env_idx, best_traj_idx), min_env_constraints_record[best_env_idx][best_traj_idx], variable_filter, sample_human_models]]
-        #     running_variable_filter = variable_filter.copy()
+    #     # # check and update unit
+    #     # if (running_variable_filter == variable_filter).all():
+    #     #     unit.append([best_mdp, best_traj, (best_env_idx, best_traj_idx), min_env_constraints_record[best_env_idx][best_traj_idx], variable_filter, sample_human_models])
+    #     # else:
+    #     #     summary.append(unit)
+    #     #     unit = [[best_mdp, best_traj, (best_env_idx, best_traj_idx), min_env_constraints_record[best_env_idx][best_traj_idx], variable_filter, sample_human_models]]
+    #     #     running_variable_filter = variable_filter.copy()
 
-        summary.append([best_mdp, best_traj, (best_env_idx, best_traj_idx), min_env_constraints_record[best_env_idx][best_traj_idx], variable_filter, sample_human_models])
+    #     summary.append([best_mdp, best_traj, (best_env_idx, best_traj_idx), min_env_constraints_record[best_env_idx][best_traj_idx], variable_filter, sample_human_models])
 
-        visited_env_traj_idxs.append((best_env_idx, best_traj_idx))
+    #     visited_env_traj_idxs.append((best_env_idx, best_traj_idx))
 
-        particles.update(min_env_constraints_record[best_env_idx][best_traj_idx])
+    #     particles.update(min_env_constraints_record[best_env_idx][best_traj_idx])
 
-        print(colored('Max infogain: {}'.format(max_info_gain), 'blue'))
-        with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
-            myfile.write('Max infogain: {}\n'.format(max_info_gain))
-            myfile.write('\n')
+    #     print(colored('Max infogain: {}'.format(max_info_gain), 'blue'))
+    #     with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
+    #         myfile.write('Max infogain: {}\n'.format(max_info_gain))
+    #         myfile.write('\n')
 
-        print(colored('entropy: {}'.format(particles.calc_entropy()), 'blue'))
+    #     print(colored('entropy: {}'.format(particles.calc_entropy()), 'blue'))
 
 
-        # this method doesn't always finish, so save the summary along the way (for each completed unit)
-        with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
-            pickle.dump((summary, min_BEC_constraints_running, visited_env_traj_idxs, particles), f)
+    #     # this method doesn't always finish, so save the summary along the way (for each completed unit)
+    #     with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
+    #         pickle.dump((summary, min_BEC_constraints_running, visited_env_traj_idxs, particles), f)
 
-    return summary, min_BEC_constraints_running, visited_env_traj_idxs, particles
+    # return summary, min_BEC_constraints_running, visited_env_traj_idxs, particles
+
+
+    #######################################################################################
+    ##################          Using pre-computed human models          ##################
+
+
+
+
+
+
 
 
 

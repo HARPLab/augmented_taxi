@@ -6,6 +6,8 @@ import json
 import teams.teams_helpers as teams_helpers
 import params_team as params
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 
 def str_to_dict(string, var_type = None, splitter = ', '):
@@ -70,7 +72,7 @@ def str_to_dict(string, var_type = None, splitter = ', '):
 
 if __name__ == "__main__":
     # params = Params('params_taxi.json')
-    sim_vars = pd.read_csv('models/augmented_taxi2/sim_run_ck.csv')
+    sim_vars = pd.read_csv('models/augmented_taxi2/sim_run_mixed_maj_copy.csv')
     # print(len(sim_vars))
 
     team_unit_knowledge_level = pd.DataFrame()
@@ -84,12 +86,16 @@ if __name__ == "__main__":
         tk = sim_vars['unit_knowledge_level'][i]
         unit_knowledge_dict = str_to_dict(tk, var_type = 'float')
         unit_knowledge_dict['run_no'] = int(sim_vars['run_no'][i])
+        unit_knowledge_dict['demo_strategy'] = sim_vars['demo_strategy'][i]
+        unit_knowledge_dict['loop_count'] = int(sim_vars['loop_count'][i])
         team_unit_knowledge_level = team_unit_knowledge_level.append(unit_knowledge_dict, ignore_index=True)
 
         # BEC knowledge level
         bec_k = sim_vars['BEC_knowledge_level'][i]
         BEC_team_knowledge_dict = str_to_dict(bec_k, var_type = 'float')
         BEC_team_knowledge_dict['run_no'] = int(sim_vars['run_no'][i])
+        BEC_team_knowledge_dict['loop_count'] = int(sim_vars['loop_count'][i])
+        BEC_team_knowledge_dict['demo_strategy'] = sim_vars['demo_strategy'][i]
         team_BEC_knowledge_level = team_BEC_knowledge_level.append(BEC_team_knowledge_dict, ignore_index=True)
 
         # team knowledge constraints
@@ -97,6 +103,9 @@ if __name__ == "__main__":
         # tkc = tkc.replace('\'', '"')
         team_knowledge_dict = str_to_dict(tkc, splitter = ', \'')
         team_knowledge_dict['run_no'] = int(sim_vars['run_no'][i])
+        team_knowledge_dict['demo_strategy'] = sim_vars['demo_strategy'][i]
+        team_knowledge_dict['loop_count'] = int(sim_vars['loop_count'][i])
+
 
         print('team_knowledge_dict: ', team_knowledge_dict)
         team_knowledge = team_knowledge.append(team_knowledge_dict, ignore_index=True)
@@ -113,14 +122,17 @@ if __name__ == "__main__":
         bec = bec_copy
 
         # plot knowledge constraints
-        teams_helpers.visualize_team_knowledge_constraints(bec, team_knowledge_dict, unit_knowledge_dict, BEC_team_knowledge_dict, params.mdp_class, weights=params.weights['val'])
+        # teams_helpers.visualize_team_knowledge_constraints(bec, team_knowledge_dict, unit_knowledge_dict, BEC_team_knowledge_dict, params.mdp_class, weights=params.weights['val'])
 
-
-
-
-    print(team_unit_knowledge_level)
+    # print(team_unit_knowledge_level)
     print(team_BEC_knowledge_level)
-    print(team_knowledge)
+    # print(team_knowledge)
 
+
+    for know_id in ['p1', 'p2', 'p3', 'common_knowledge', 'joint_knowledge']:
+        sns.lineplot(data = team_BEC_knowledge_level, x = 'loop_count', y = know_id, hue = 'demo_strategy').set(title='Knowledge level for ' + know_id)
+        plt.show()
+        plt.savefig('models/augmented_taxi2/BEC_knowledge_level_' + know_id + '.png')
+        plt.close()
 
     

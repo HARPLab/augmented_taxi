@@ -28,3 +28,4 @@ sandbox.py
 cysignals_crash_logs/
 demo_gen_log.txt
 aat_data/*
+plots/*
