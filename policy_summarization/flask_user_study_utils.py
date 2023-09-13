@@ -88,8 +88,8 @@ def normalize_trajectories(trajectory, actions, trajectory_counterfactual, actio
     elif len(actions_counterfactual_copy) > 0:
         diff = len(actions_counterfactual_copy)
         actions_counterfactual_copy.reverse()
-        normalized_actions.extend(actions_counterfactual_copy)
         normalized_actions.extend(['no-op'] * diff)
+        normalized_actions_counterfactual.extend(actions_counterfactual_copy)
 
     return normalized_actions, normalized_actions_counterfactual
 
