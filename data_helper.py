@@ -1032,6 +1032,8 @@ def save_user_study_json(mapping):
             'skateboard2': {"demo": {}, "diagnostic test": {}, "final test": {}}
     }
 
+    last_env_traj_idx = []
+
     for data_loc in mapping.keys():
         print(data_loc)
 
@@ -1063,12 +1065,13 @@ def save_user_study_json(mapping):
                 mdp_dict = wt_vi_traj_env[0][3]
 
                 user_study_dict[data_loc]["demo"][str(demo_idx)] = extract_mdp_dict(vi, subunit[0], subunit[1], mdp_dict, data_loc, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=running_variable_filter, constraints=demo_constraints)
+                last_env_traj_idx = user_study_dict[data_loc]["demo"][str(demo_idx)]['env_traj_idxs']
                 demo_idx += 1
 
             # b) save the diagnostic tests
             # obtain the constraints conveyed by the unit's demonstrations
             min_constraints = BEC_helpers.remove_redundant_constraints(unit_constraints)
-            # random.shuffle(min_constraints) # shuffle the order of the constraints so that it's not always the same
+            # random.shuffle(min_constraints) # shuffle the order of the constraints so that it's not always the same (edit: the preliminary tests are already somewhat shuffled)
             # obtain the diagnostic tests that will test the human's understanding of the unit's constraints
             preliminary_tests, visited_env_traj_idxs = BEC.obtain_diagnostic_tests(data_loc, unit, visited_env_traj_idxs, min_constraints, min_subset_constraints_record, traj_record, traj_features_record, running_variable_filter, mdp_features_record)
 
@@ -1086,23 +1089,38 @@ def save_user_study_json(mapping):
                 opt_traj = test[1]
                 test_constraints = test[3]
 
-                # if there are multiple tests, order the preliminary tests in order of corresponding appearance in the summary
-                # to prevent a test from immediately following an identical demonstration
-                if len(preliminary_tests) > 1:
-                    mdp_dict_stack.append(extract_mdp_dict(vi, test_mdp, opt_traj, mdp_dict, data_loc, element=-3, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=running_variable_filter, constraints=test_constraints))
-                    constraint_idx_stack.append(
-                        [i for i, arr in enumerate(unit_constraints) if np.array_equal(test_constraints[0], arr)][0])
+                # ensure that no diagnostic tests immediately follow an identical demonstration
+                mdp_dict = extract_mdp_dict(vi, test_mdp, opt_traj, mdp_dict, data_loc, element=-3, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=running_variable_filter, constraints=test_constraints)
+                if mdp_dict['env_traj_idxs'] != last_env_traj_idx:
+                    user_study_dict[data_loc]["diagnostic test"][str(diagnostic_test_idx)] = mdp_dict
+                    diagnostic_test_idx += 1
                 else:
-                    user_study_dict[data_loc]["diagnostic test"][str(diagnostic_test_idx)] = extract_mdp_dict(vi, test_mdp, opt_traj, mdp_dict, data_loc, element=-3, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=running_variable_filter, constraints=test_constraints)
-                    diagnostic_test_idx += 1
+                    mdp_dict_stack.append(mdp_dict)
 
-            if len(preliminary_tests) > 1:
-                for _ in range(len(preliminary_tests)):
-                    min_idx = np.argmin(constraint_idx_stack)
-                    user_study_dict[data_loc]["diagnostic test"][str(diagnostic_test_idx)] = mdp_dict_stack[min_idx]
-                    diagnostic_test_idx += 1
+            if len(mdp_dict_stack) > 0:
+                mdp_dict = mdp_dict_stack.pop()
+                user_study_dict[data_loc]["diagnostic test"][str(diagnostic_test_idx)] = mdp_dict
+                diagnostic_test_idx += 1
 
-                    constraint_idx_stack[min_idx] = np.inf
+
+            #     # another option: if there are multiple tests, order the preliminary tests exactly in order of corresponding appearance in the summary
+            #     # to prevent a test from immediately following an identical demonstration
+            #     if len(preliminary_tests) > 1:..
+            #         mdp_dict_stack.append(extract_mdp_dict(vi, test_mdp, opt_traj, mdp_dict, data_loc, element=-3, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=running_variable_filter, constraints=test_constraints))
+            #         constraint_idx_stack.append(
+            #             [i for i, arr in enumerate(unit_constraints) if np.array_equal(test_constraints[0], arr)][0])
+            #     else:
+            #         user_study_dict[data_loc]["diagnostic test"][str(diagnostic_test_idx)] = extract_mdp_dict(vi, test_mdp, opt_traj, mdp_dict, data_loc, element=-3, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=running_variable_filter, constraints=test_constraints)
+            #         diagnostic_test_idx += 1
+            #
+            # if len(preliminary_tests) > 1:
+            #     for _ in range(len(preliminary_tests)):
+            #         min_idx = np.argmin(constraint_idx_stack)
+            #         user_study_dict[data_loc]["diagnostic test"][str(diagnostic_test_idx)] = mdp_dict_stack[min_idx]
+            #         diagnostic_test_idx += 1
+            #
+            #         constraint_idx_stack[min_idx] = np.inf
+
 
         # c) save the final, held-out set of tests
         for test_difficulty in mapping[data_loc].keys():
