@@ -15,7 +15,7 @@ import os
 import itertools
 
 # Other imports.
-sys.path.append("simple_rl")
+# sys.path.append("simple_rl")
 import params_team as params
 from simple_rl.agents import FixedPolicyAgent
 from simple_rl.planning import ValueIteration
@@ -30,6 +30,7 @@ import policy_summarization.BEC_visualization as BEC_viz
 from teams import particle_filter_team as pf_team
 import matplotlib as mpl
 import teams.teams_helpers as team_helpers
+import simulation.sim_helpers as sim_helpers
 mpl.rcParams['figure.facecolor'] = '1.0'
 mpl.rcParams['axes.labelsize'] = 'x-large'
 mpl.rcParams['xtick.labelsize'] = 'large'
@@ -70,7 +71,6 @@ def calc_expected_learning(team_knowledge_expected, particles_team_expected, min
     if viz_flag:
         team_helpers.visualize_transition(new_constraints, particles_team_expected['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set' + str(loop_count+1) + ' for common knowledge', plot_filename ='ek_ck_loop_' + str(loop_count+1))
     
-
 
     # Update joint knowledge model
     # Method 1: Use complete joint knowledge of team
@@ -179,7 +179,7 @@ def run_remedial_loop(failed_BEC_constraints_tuple, particles_team, team_knowled
                     remedial_response = 'correct'
                 else:
                     remedial_response = 'mixed' # Note: We assume that one person always gets the remedial test correct and the other person gets it wrong (only for N=2)
-                human_traj_team, human_history = get_human_response(remedial_env_traj_tuple[0], remedial_constraint, remedial_traj, human_history, team_knowledge, team_size = params.team_size, response_distribution = remedial_response)
+                human_traj_team, human_history = sim_helpers.get_human_response_old(remedial_env_traj_tuple[0], remedial_constraint, remedial_traj, human_history, team_knowledge, team_size = params.team_size, response_distribution = remedial_response)
                 remedial_resp_no += 1
                 print('Simulating human response for remedial test... Remedial Response no: ', remedial_resp_no, '. Response type: ', remedial_response)
 
@@ -256,187 +256,7 @@ def run_remedial_loop(failed_BEC_constraints_tuple, particles_team, team_knowled
 
 
 
-def get_human_response(env_idx, env_cnst, opt_traj, human_history, team_knowledge, team_size = 2, response_distribution = 'correct'):
 
-    human_traj = []
-    cnst = []
-
-    # a) find the sub_optimal responses
-    BEC_depth_list = [1]
-
-    filename = 'models/augmented_taxi2/gt_policies/wt_vi_traj_params_env' + str(env_idx).zfill(5) + '.pickle'
-    
-    with open(filename, 'rb') as f:
-        wt_vi_traj_env = pickle.load(f)
-
-    mdp = wt_vi_traj_env[0][1].mdp
-    agent = FixedPolicyAgent(wt_vi_traj_env[0][1].policy)
-    mdp.set_init_state(opt_traj[0][0])
-    
-
-    constraints_list_correct = []
-    human_trajs_list_correct = []
-    constraints_list_incorrect = []
-    human_trajs_list_incorrect = []
-
-
-    for BEC_depth in BEC_depth_list:
-        # print('BEC_depth: ', BEC_depth)
-        action_seq_list = list(itertools.product(mdp.actions, repeat=BEC_depth))
-
-        traj_opt = mdp_helpers.rollout_policy(mdp, agent)
-        # print('Optimal Trajectory length: ', len(traj_opt))
-        traj_hyp = []
-
-        for sas_idx in range(len(traj_opt)):
-        
-            # reward features of optimal action
-            mu_sa = mdp.accumulate_reward_features(traj_opt[sas_idx:], discount=True)
-
-            sas = traj_opt[sas_idx]
-            cur_state = sas[0]
-            # if sas_idx > 0:
-            #     traj_hyp = traj_opt[:sas_idx-1]
-
-            # currently assumes that all actions are executable from all states
-            for action_seq in action_seq_list:
-                if sas_idx > 0:
-                    traj_hyp = traj_opt[:sas_idx-1]
-
-                traj_hyp_human = mdp_helpers.rollout_policy(mdp, agent, cur_state=cur_state, action_seq=action_seq)
-                traj_hyp.extend(traj_hyp_human)
-                
-                mu_sb = mdp.accumulate_reward_features(traj_hyp, discount=True)
-                new_constraint = mu_sa - mu_sb
-
-                count = sum(np.array_equal(new_constraint, arr) for arr in constraints_list_correct) + sum(np.array_equal(new_constraint, arr) for arr in constraints_list_incorrect)
-
-                # if count < team_size: # one sample trajectory for each constriant is sufficient; but just for a variety gather one trajectory for each person for each constraint, if possible
-                    # print('Hyp traj len: ', len(traj_hyp))
-                    # print('new_constraint: ', new_constraint)
-                if (new_constraint == np.array([0, 0, 0])).all():
-                    constraints_list_correct.append(env_cnst)
-                    human_trajs_list_correct.append(traj_opt) 
-                else:
-                    constraints_list_incorrect.append(new_constraint)
-                    human_trajs_list_incorrect.append(traj_hyp)
-
-           
-    print('Constraints list correct: ', len(constraints_list_correct))
-    print('Constraints list incorrect: ', len(constraints_list_incorrect))
-    
-    # b) find the counterfactual human responses
-    sample_human_models = BEC_helpers.sample_human_models_uniform([], 8)
-
-    for model_idx, human_model in enumerate(sample_human_models):
-
-        mdp.weights = human_model
-        vi_human = ValueIteration(mdp, sample_rate=1)
-        vi_human.run_vi()
-
-        if not vi_human.stabilized:
-            skip_human_model = True
-            print(colored('Human model ' + str(model_idx) + ' did not converge and skipping for response generation', 'red'))
-        
-        if not skip_human_model:
-            human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
-            for human_opt_traj in human_opt_trajs:
-                human_traj_rewards = mdp.accumulate_reward_features(human_opt_traj, discount=True)
-                mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
-                new_constraint = mu_sa - human_traj_rewards
-
-                count = sum(np.array_equal(new_constraint, arr) for arr in constraints_list_correct) + sum(np.array_equal(new_constraint, arr) for arr in constraints_list_incorrect)
-
-                # if count < team_size:
-                    # print('Hyp traj len: ', len(traj_hyp))
-                    # print('new_constraint: ', new_constraint)
-                if (new_constraint == np.array([0, 0, 0])).all():
-                    constraints_list_correct.append(env_cnst)
-                    human_trajs_list_correct.append(traj_opt) 
-                else:
-                    constraints_list_incorrect.append(new_constraint)
-                    human_trajs_list_incorrect.append(human_opt_traj)
-
-    print('Constraints list correct after human models: ', len(constraints_list_correct))
-    print('Constraints list incorrect after human models: ', len(constraints_list_incorrect))
-    
-
-    # Currently coded for a team size of 2
-    if response_distribution == 'correct':
-
-        for i in range(team_size):
-            random_index = random.randint(0, len(constraints_list_correct)-1)
-            human_traj.append(human_trajs_list_correct[random_index])
-            cnst.append(constraints_list_correct[random_index])
-
-            constraints_list_correct.pop(random_index)
-            human_trajs_list_correct.pop(random_index)
-        
-    elif response_distribution == 'incorrect':
-        for i in range(team_size):
-            member_id = 'p' + str(i+1)
-            random_index = random.randint(0, len(constraints_list_incorrect)-1)
-            while len([x for x in team_knowledge[member_id] if (x == constraints_list_incorrect[random_index]).all()]) or norm(constraints_list_incorrect[random_index], 1) > 8:  # additional check to ensure constraints are different from existing knowledge (just for generating examples for papers)
-                random_index = random.randint(0, len(constraints_list_incorrect)-1)
-
-            human_traj.append(human_trajs_list_incorrect[random_index])
-            cnst.append(constraints_list_incorrect[random_index])
-
-            constraints_list_correct.append(env_cnst)
-            human_trajs_list_correct.append(traj_opt)
-
-            constraints_list_incorrect.pop(random_index)
-            human_trajs_list_incorrect.pop(random_index)
-
-    elif response_distribution == 'mixed':
-        constraints_list_correct_used = []
-        for i in range(team_size):
-            if i%2 == 0:
-                print('len constraints_list_correct: ', len(constraints_list_correct))
-                random_index = random.randint(0, len(constraints_list_correct)-1)
-                human_traj.append(human_trajs_list_correct[random_index])
-                cnst.append(constraints_list_correct[random_index])
-                constraints_list_correct_used.append(constraints_list_correct[random_index])
-                constraints_list_correct.pop(random_index)
-                human_trajs_list_correct.pop(random_index)
-            else:
-                indices = [i for i in range(len(constraints_list_incorrect)) if np.array_equal(-constraints_list_incorrect[i], constraints_list_correct_used[-1])]
-                print('constraints_list_correct_used: ', constraints_list_correct_used)
-                print('opposing indices: ', indices, 'for constraint: ', constraints_list_correct_used[-1])
-                print('constraints_list_incorrect: ', constraints_list_incorrect)
-                if len(indices) > 0: 
-                    member_id = 'p' + str(i+1)
-                    random_index = random.choice(indices) 
-                    while len([x for x in team_knowledge[member_id] if (x == constraints_list_incorrect[random_index]).all()]) or norm(constraints_list_incorrect[random_index], 1) > 8:  # additional check to ensure constraints are different from existing knowledge (just for generating examples for papers)
-                        random_index = random.choice(indices)    # opposing incorrect response
-                else:
-                    member_id = 'p' + str(i+1)
-                    random_index = random.randint(0, len(constraints_list_incorrect)-1)
-                    while len([x for x in team_knowledge[member_id] if (x == constraints_list_incorrect[random_index]).all()]) or norm(constraints_list_incorrect[random_index], 1) > 8:  # additional check to ensure constraints are different from existing knowledge (just for generating examples for papers)
-                        random_index = random.randint(0, len(constraints_list_incorrect)-1)  # random incorrect response
-                
-                human_traj.append(human_trajs_list_incorrect[random_index])
-                cnst.append(constraints_list_incorrect[random_index])
-
-                constraints_list_incorrect.pop(random_index)
-                human_trajs_list_incorrect.pop(random_index)
-
-    human_history.append((env_idx, human_traj, cnst))
-
-    # print('N of human_traj: ', len(human_traj))
-
-    # print('Visualizing human trajectory ....')
-    # for ht in human_traj:
-    #     print('human_traj len: ', len(ht))
-    #     print('constraint: ', cnst[human_traj.index(ht)])
-    #     mdp.visualize_trajectory(ht)
-
-        # Later: Check that test responses are not getting repeated for the same environment
-        # TODO: Check if the trajectories generated are valid - seems like diagonal moves are occuring sometimes
-
-
-
-    return human_traj, human_history 
 
 
 
@@ -662,7 +482,12 @@ def run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', respon
                 if response_type == 'simulated':
                     # print('response_distribution_list: ', response_distribution_list)
                     print('Simulating human response... Response no: ', resp_no, '. Response type: ', response_distribution_list[resp_no])
-                    human_traj_team, human_history = get_human_response(env_idx, test_constraints, opt_traj, human_history, team_knowledge, team_size = params.team_size, response_distribution = response_distribution_list[resp_no])
+                    # human_traj_team, human_history = sim_helpers.get_human_respons_old(env_idx, test_constraints, opt_traj, human_history, team_knowledge, team_size = params.team_size, response_distribution = response_distribution_list[resp_no])
+                    
+                    human_traj_team = []
+                    for i in range(params.team_size):
+                        human_traj_team.append(sim_helpers.get_human_response(env_idx, test_constraints, opt_traj, ))
+                    
                     resp_no += 1
                     print('Opt traj len: ', len(opt_traj))
                     for i in range(len(human_traj_team)):
@@ -878,7 +703,8 @@ def run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', respon
                     #         # reset knowledge to mirror particle reset
                     #         print('Resetting constraints.. Previous constraints joint knowledge: ', team_knowledge['joint_knowledge'])
                     #         reset_index = team_knowledge['joint_knowledge'].index(particles_team['joint_knowledge'].reset_constraint.all())
-                    #         team_knowledge['joint_knowledge'] = team_knowledge['joint_knowledge'][reset_index:]
+                    #         team_knowledge['joint_knowledge'] = team_knowledg
+                    # e['joint_knowledge'][reset_index:]
                     #         print('New constraints: ', team_knowledge['joint_knowledge'])
                 
                 test_no += 1
@@ -1023,6 +849,7 @@ if __name__ == "__main__":
     ## run_reward_teaching
     # run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', response_type = 'simulated', response_distribution_list = ['mixed', 'correct', 'mixed', 'incorrect', 'correct', 'correct', 'correct', 'correct'], run_no = 1, viz_flag=True, vars_filename = 'workshop_data')
     # vars_to_save = run_reward_teaching(params, pool)
+    
     # viz_flag = [demo_viz, test_viz, pf_knowledge_viz]
     run_reward_teaching(params, pool, demo_strategy = 'individual_knowledge_low', response_type = 'manual', run_no = 1, viz_flag=[False, True, True], vars_filename = 'workshop_data_jk')
 

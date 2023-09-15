@@ -1,42 +1,59 @@
 import dill as pickle
 import sys, os
-import policy_summarization.BEC_helpers as BEC_helpers
-import params_team as params
 import itertools
 import copy
-from policy_summarization import BEC
-import policy_summarization.BEC_visualization as BEC_viz
+from collections import Counter
+import operator
+import random
+import pygame
+
 
 import sage.all
 import sage.geometry.polyhedron.base as Polyhedron
-import matplotlib
-matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
-from policy_summarization import particle_filter as pf
+from sage.symbolic.integration.integral import definite_integral
+from sage.symbolic.integration.integral import indefinite_integral
 import numpy as np
-from policy_summarization import computational_geometry as cg
-from termcolor import colored
+from numpy import linalg as LA
 from sklearn import metrics
-from policy_summarization import policy_summarization_helpers as ps_helpers
+from scipy.stats import vonmises_fisher
+from scipy import integrate
+from scipy.optimize import fsolve
+from scipy.optimize import minimize
+import sympy as sym
+from scipy.optimize import least_squares as ls 
+from scipy.optimize import root_scalar
+from scipy.special import ive
 
+import params_team as params
+import policy_summarization.BEC_helpers as BEC_helpers
+from policy_summarization import BEC
+import policy_summarization.BEC_visualization as BEC_viz
+from policy_summarization import particle_filter as pf
+from policy_summarization import computational_geometry as cg
+from policy_summarization import policy_summarization_helpers as ps_helpers
+from policy_summarization import probability_utils as p_utils
+from simple_rl.agents import FixedPolicyAgent
+from simple_rl.utils import mdp_helpers
+from simple_rl.agents import FixedPolicyAgent
+from simple_rl.planning import ValueIteration
 import teams.teams_helpers as team_helpers
 from teams import particle_filter_team as pf_team
 import teams.utils_teams as utils_teams
-from simple_rl.agents import FixedPolicyAgent
-from simple_rl.utils import mdp_helpers
+from simulation import human_learner_model as hlm
+from simulation.sim_helpers import get_human_response
 
+
+
+from termcolor import colored
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
+import seaborn as sns
 import matplotlib as mpl
 mpl.rcParams['figure.facecolor'] = '1.0'
 mpl.rcParams['axes.labelsize'] = 'x-large'
 mpl.rcParams['xtick.labelsize'] = 'large'
 
-from collections import Counter
-import operator
-from simple_rl.agents import FixedPolicyAgent
-from simple_rl.planning import ValueIteration
-import random
-import pygame
-from numpy import linalg as LA
 
 # # what does base_constraints.pickel contain?
 
@@ -274,14 +291,40 @@ def plot_sample_learning_rate():
 
 def visualize_constraints(constraints):
 
+    def label_axes(ax, mdp_class, weights=None):
+        fs = 12
+        ax.set_facecolor('white')
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
+        if weights is not None:
+            ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100/2)
+        if mdp_class == 'augmented_taxi2':
+            ax.set_xlabel('$\mathregular{w_0}$: Mud', fontsize = fs)
+            ax.set_ylabel('$\mathregular{w_1}$: Recharge', fontsize = fs)
+        elif mdp_class == 'colored_tiles':
+            ax.set_xlabel('X: Tile A (brown)')
+            ax.set_ylabel('Y: Tile B (green)')
+        else:
+            ax.set_xlabel('X: Goal')
+            ax.set_ylabel('Y: Skateboard')
+        ax.set_zlabel('$\mathregular{w_2}$: Action', fontsize = fs)
+
+        ax.view_init(elev=16, azim=-160)
+
+    
+
     fig = plt.figure()
+    ax1 = fig.add_subplot(1, 1, 1, projection='3d')
 
     # plot the constraints
     ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints)
     poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
     for constraints in [constraints]:
-        BEC_viz.visualize_planes(constraints, fig=fig)
-    BEC_viz.visualize_spherical_polygon(poly, fig=fig, plot_ref_sphere=False, alpha=0.75)
+        BEC_viz.visualize_planes(constraints, fig=fig, ax=ax1)
+    BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax1, plot_ref_sphere=False, alpha=0.75)
+
+    label_axes(ax1, params.mdp_class, params.weights['val'])
 
     plt.show()
 
@@ -1317,42 +1360,309 @@ if __name__ == "__main__":
 
 #########################################################
 
-    # constraints = [np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]]), np.array([[ 0,  0, -1]]), np.array([[ 3,  0, -2]]), np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]])]
-    constraints = [np.array([[-1,  0,  2]]), np.array([[3,  0,  -2]]), np.array([[ 0,  0, -1]])]
+    # # constraints = [np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]]), np.array([[ 0,  0, -1]]), np.array([[ 3,  0, -2]]), np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]])]
+    # constraints = [np.array([[-1,  0,  2]]), np.array([[3,  0,  -2]]), np.array([[ 0,  0, -1]])]
 
-    # print(BEC_helpers.remove_redundant_constraints(constraints, params.weights['val'], params.step_cost_flag))
-    # common_constraints = BEC_helpers.remove_redundant_constraints(constraints, params.weights['val'], params.step_cost_flag)
+    # # print(BEC_helpers.remove_redundant_constraints(constraints, params.weights['val'], params.step_cost_flag))
+    # # common_constraints = BEC_helpers.remove_redundant_constraints(constraints, params.weights['val'], params.step_cost_flag)
 
+    # # unit_constraint_flag = True
+    # # for constraint in common_constraints:
+    # #     print('Constraint: ', constraint, 'norm: ', LA.norm(constraint,1))
+    # #     if LA.norm(constraint,1) !=1:
+    # #         unit_constraint_flag = False
+    # # if unit_constraint_flag:
+    # #     utils_teams.visualize_planes_team(common_constraints)
+    # #     plt.show()
+    
     # unit_constraint_flag = True
-    # for constraint in common_constraints:
-    #     print('Constraint: ', constraint, 'norm: ', LA.norm(constraint,1))
-    #     if LA.norm(constraint,1) !=1:
-    #         unit_constraint_flag = False
-    # if unit_constraint_flag:
-    #     utils_teams.visualize_planes_team(common_constraints)
-    #     plt.show()
+    # unit_common_constraint_flag = True
+    # constraints_copy = constraints.copy()
     
-    unit_constraint_flag = True
-    unit_common_constraint_flag = True
-    constraints_copy = constraints.copy()
-    
-    while not unit_constraint_flag and unit_common_constraint_flag:
+    # while not unit_constraint_flag and unit_common_constraint_flag:
         
-        common_constraints = BEC_helpers.remove_redundant_constraints(constraints_copy, params.weights['val'], params.step_cost_flag)
-        print('Origninal common knowledge: ', constraints_copy)
-        print('Remove redundant common knowledge: ', common_constraints)
+    #     common_constraints = BEC_helpers.remove_redundant_constraints(constraints_copy, params.weights['val'], params.step_cost_flag)
+    #     print('Origninal common knowledge: ', constraints_copy)
+    #     print('Remove redundant common knowledge: ', common_constraints)
 
-        for constraint in common_constraints:
-            if LA.norm(constraint,1) !=1:
-                unit_constraint_flag = False
+    #     for constraint in common_constraints:
+    #         if LA.norm(constraint,1) !=1:
+    #             unit_constraint_flag = False
 
-        for constraint in common_constraints:
-            if LA.norm(constraint,1) !=1:
-                unit_common_constraint_flag = False
+    #     for constraint in common_constraints:
+    #         if LA.norm(constraint,1) !=1:
+    #             unit_common_constraint_flag = False
 
-        if not unit_constraint_flag and unit_common_constraint_flag:
-            constraints_copy.pop(0)  # remove the first constraint
-
-
+    #     if not unit_constraint_flag and unit_common_constraint_flag:
+    #         constraints_copy.pop(0)  # remove the first constraint
 
 
+#########################################################
+    # x = [np.array([[1,  0,  0]])]
+    
+    # visualize_constraints(x)
+
+    # particles_sample = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], 50))
+
+    # fig = plt.figure()
+    # ax1 = fig.add_subplot(1, 1, 1, projection='3d')
+
+    # particles_sample.plot(fig=fig, ax=ax1)
+    # plt.show()
+
+####################################
+
+    # mu_rep = np.array([1,  0,  0])
+    # x_edge_rep = np.array([0,  0,  1])  # a point on the edge of the constraint mu
+    # # x_edge = [1/np.sqrt(2), 1/np.sqrt(2), 0] 
+    # kappa = 1.23
+    # vmf = vonmises_fisher(mu_rep, kappa)
+    # pdf_vmf = vmf.pdf(x_edge_rep)
+    # # print(pdf_vmf)
+
+    # phi_lim = [0, np.pi]
+    # theta_lim = [np.pi/2, 3*np.pi/2]    # these limits are specific to the constraint mu = [1, 0, 0]
+    # f1 = lambda phi, theta: kappa*np.exp(kappa*np.array([np.cos(theta)* np.sin(phi), np.sin(theta) * np.sin(phi), np.cos(phi)]).dot(mu_rep))*np.sin(phi)/(2*np.pi*(np.exp(kappa)-np.exp(-kappa)))
+    # int_probability_vmf = integrate.dblquad(f1, theta_lim[0], theta_lim[1], phi_lim[0], phi_lim[1])
+    # x1 = 1 / (4 * np.pi * pdf_vmf)
+    # x2 = 1 / (int_probability_vmf * x1 + 0.5)
+
+    # print(int_probability_vmf)
+
+
+############################
+
+
+
+    # mu = np.array([1,  0,  0])
+    # kappa_list = np.linspace(0.0001, 10, 100)
+    # correct_hs_likelihood = np.zeros(len(kappa_list))
+    # p = 3
+
+
+    # for k in range(len(kappa_list)):
+    #     kappa = kappa_list[k]
+    #     human_model = hlm.cust_pdf(mu, kappa, p)
+    #     # create samples
+    #     n = 1000
+    #     dot_n = np.zeros([n, 1], int)
+
+    #     cust_samps = human_model.rvs(size=n)
+    #     # print(cust_samps)
+
+    #     fig = plt.figure()
+    #     ax1 = fig.add_subplot(1, 1, 1, projection='3d')
+
+    #     # particles_sample = pf_team.Particles_team(cust_samps)
+    #     # particles_sample.plot(fig=fig, ax=ax1)
+    #     # plt.show()
+
+    #     for i in range(n):
+    #         dot = cust_samps[i].dot(mu)
+    #         if dot >= 0:
+    #             dot_n[i] = 1
+        
+    #     correct_hs_likelihood[k] = sum(dot_n)/n
+
+
+    # print(correct_hs_likelihood)
+
+    # # sns.lineplot(x=kappa_list, y=correct_hs_likelihood, title='Correct human response likelihood')
+    # # plt.show()
+
+
+
+    # correct_hs_likelihood = np. array([0.628, 0.607, 0.646, 0.665, 0.68,  0.683, 0.681, 0.679, 0.68,  0.722, 0.7,   0.711,
+    #                                     0.739, 0.739, 0.744, 0.739, 0.745, 0.76,  0.773, 0.76,  0.789, 0.784, 0.788, 0.782,
+    #                                     0.791, 0.836, 0.822, 0.807, 0.826, 0.831, 0.837, 0.824, 0.859, 0.847, 0.848, 0.854,
+    #                                     0.844, 0.869, 0.862, 0.852, 0.875, 0.854, 0.853, 0.872, 0.88,  0.871, 0.874, 0.891,
+    #                                     0.873, 0.882, 0.897, 0.892, 0.881, 0.897, 0.913, 0.891, 0.904, 0.887, 0.896, 0.9,
+    #                                     0.917, 0.905, 0.91,  0.911, 0.913, 0.914, 0.914, 0.905, 0.904, 0.906, 0.905, 0.921,
+    #                                     0.909, 0.904, 0.909, 0.912, 0.922, 0.922, 0.925, 0.919, 0.921, 0.923, 0.916, 0.922,
+    #                                     0.919, 0.926, 0.927, 0.924, 0.922, 0.943, 0.927, 0.937, 0.941, 0.934, 0.925, 0.937,
+    #                                     0.924, 0.932, 0.93,  0.935])
+
+
+    # sns.lineplot(x=kappa_list, y=correct_hs_likelihood).set(title='Correct human response likelihood')
+    # plt.xlabel("kappa")
+    # plt.ylabel("Probability of sampling correct response")
+    # plt.show()
+
+    ######################################
+
+    
+    
+    #####
+    # rng = np.random.default_rng()
+    # mu, kappa = np.array([1, 0, 0]), 2
+    # samples = vonmises_fisher(mu, kappa).rvs(10, random_state=rng)
+
+    # print(samples)
+
+    # mu_fit, kappa_fit = vonmises_fisher.fit(samples)
+    # print(mu_fit, kappa_fit)
+
+    # print(np.linalg.norm(mu_fit, 2))
+
+
+
+    #### from scipy vmf.fit  ####
+
+    # mu = np.array([1,  0,  0])
+
+    # x_list = BEC_helpers.sample_human_models_uniform([], 1000)
+
+    # print(x_list)
+
+    # x_list_correct = np.empty([3])
+    # x_list_incorrect = np.empty([3])
+    
+
+    # for i in range(len(x_list)):
+    #     if mu.dot(x_list[i].T) >= 0:
+    #         x_list_correct = np.vstack((x_list_correct, x_list[i]))
+    #     else:
+    #         x_list_incorrect = np.vstack((x_list_incorrect, x_list[i]))
+
+    
+    # kappa = 1
+    # vmf = vonmises_fisher(mu, kappa)
+
+    # pdf_incorrect = np.zeros(len(x_list_incorrect))
+    # pdf_correct = np.zeros(len(x_list_correct))
+
+    # print(x_list_incorrect)
+    # print(x_list_correct)
+
+    # for i in range(len(x_list_incorrect)):
+    #     pdf_incorrect[i] = vmf.pdf(x_list_incorrect[i, :])
+
+    # for i in range(len(x_list_correct)):
+    #     pdf_correct[i] = vmf.pdf(x_list_correct[i, :])
+
+    # print(np.max(pdf_incorrect))
+    # print(np.max(pdf_correct))
+
+
+######################
+
+    # solve for kappa given the pdf at the intersection of uniform and VMF
+
+    # p = 3
+    # x = np.array([0,  0,  1])
+    # f = 0.25/np.pi
+
+    # func = lambda kappa : np.exp(kappa) - np.exp(-kappa) - kappa/(2*np.pi*f)
+    # func_prime = lambda kappa : np.exp(kappa) + np.exp(-kappa) - 1/(2*np.pi*f)  # derivative
+    # func_prime2 = lambda kappa : np.exp(kappa) - np.exp(-kappa)  # second derivative
+
+    # root_res = root_scalar(func, x0 = 1e-6, method="halley", fprime = func_prime, fprime2 = func_prime2,
+    #                            bracket=(1e-8, 1e9))
+
+    # root_res = root_scalar(func, x0 = 1e-6, method="secant", fprime = func_prime,
+    #                            bracket=(1e-8, 1e9))
+
+    # root_res = minimize(func, x0 = 1e-6, method = 'L-BFGS-B', bounds = [(0, None)])
+
+    # root_res = ls(func, x0 = 1e-6, bounds = (0, np.inf))
+    
+    # print(root_res)
+
+    # print(p_utils.VMF_pdf(mu, root_res.root, p, np.array([0, 0, 1])))
+
+    # vmf = vonmises_fisher(mu, 0.00001)
+
+    # print(f)
+    # print(vmf.pdf(np.array([0, 0, 1])))
+
+
+####################
+    ## Solve for kappa given uniform cdf
+
+    # LHS = 0.2
+
+    # def integrand(phi, theta, kappa):
+    #     return ( kappa*np.sin(phi)*np.exp(kappa*np.cos(theta)*np.sin(phi)) ) / ( 2*np.pi*(np.exp(kappa)-np.exp(-kappa)) )
+
+
+    # def func(kappa):
+    #     y, err = integrate.dblquad(integrand, np.pi/2, 3*np.pi/2, 0, np.pi, args = (kappa, ))
+
+    #     return LHS-y
+    
+
+    # sol = fsolve(func, 0.001)
+
+    # # sol = ls(func, x0 = 1, bounds = (0, np.inf))
+
+    # # sol = minimize(func, x0 = 1, method = 'L-BFGS-B', bounds = [(0, None)])
+
+
+    # # Brute force solve
+
+    # x_range = np.array([0.001, 10])
+    # sol_found = False
+    # # while not sol_found:
+    # #     x = np.mean(x_range)
+    # #     if func(x) > 0:
+    # #         x_range[1] = x
+    # #     else:
+    # #         x_range[0] = x
+        
+    # #     if np.abs(func(x)) < 0.001:
+    # #         sol_found = True
+        
+    # #     print(x, x_range, func(x))
+
+    # print(sol)
+
+
+    #############
+
+    mu = np.array([1,  0,  0])
+    u_cdf_list = np.linspace(0.5, 0.99, 100)
+    kappa_list = np.zeros(len(u_cdf_list))
+    correct_hs_likelihood = np.zeros(len(u_cdf_list))
+    p = 3
+
+
+    for k in range(len(u_cdf_list)):
+        u_cdf = u_cdf_list[k]
+        human_model = hlm.cust_pdf_uniform(mu, u_cdf)
+        kappa_list[k] = human_model.kappa
+        # create samples
+        n = 1000
+        dot_n = np.zeros([n, 1], int)
+
+        cust_samps = human_model.rvs(size=n)
+        # print(cust_samps)
+
+        # fig = plt.figure()
+        # ax1 = fig.add_subplot(1, 1, 1, projection='3d')
+
+        # particles_sample = pf_team.Particles_team(cust_samps)
+        # particles_sample.plot(fig=fig, ax=ax1)
+        # plt.show()
+
+        for i in range(n):
+            dot = cust_samps[i].dot(mu)
+            if dot >= 0:
+                dot_n[i] = 1
+        
+        correct_hs_likelihood[k] = sum(dot_n)/n
+
+
+    print(correct_hs_likelihood)
+
+
+    fig, ax = plt.subplots(2)
+
+    ax[0].plot(u_cdf_list, correct_hs_likelihood)
+    ax[0].set_xlabel('Uniform distribution mass')
+    ax[0].set_ylabel('Probability of sampling a correct response')
+
+
+    ax[1].plot(kappa_list, correct_hs_likelihood)
+    ax[1].set_xlabel('Kappa of VMF')
+    ax[1].set_ylabel('Probability of sampling a correct response')
+    plt.show()
