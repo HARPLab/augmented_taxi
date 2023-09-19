@@ -139,7 +139,7 @@ class Skateboard2OOMDP(OOMDP):
         '''
         skateboard_step_cost_flag = 0
         path_step_cost_flag = 0
-        base_step_cost_flag = 0
+        base_step_cost_flag = 1
 
         agent = state.get_first_obj_of_class("agent")
 
@@ -149,12 +149,6 @@ class Skateboard2OOMDP(OOMDP):
                 skateboard_step_cost_flag = 1
             elif skateboard_helpers.agent_on_path(self, state):
                 path_step_cost_flag = 1
-            else:
-                base_step_cost_flag = 1
-        elif action == 'pickup' or action == 'dropoff':
-            skateboard_step_cost_flag = 1
-        else:
-            base_step_cost_flag = 1
 
         return np.array([[skateboard_step_cost_flag, path_step_cost_flag, base_step_cost_flag]])
 

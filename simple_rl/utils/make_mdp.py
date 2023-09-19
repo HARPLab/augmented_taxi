@@ -133,10 +133,23 @@ def make_mdp_obj(mdp_class, mdp_code, mdp_parameters):
         for x in range(0, len(mdp_code) - offset):
             entry = mdp_code[x]
             if entry:
-                requested_paths.append(available_paths[x * 2])
-                requested_paths.append(available_paths[x * 2 + 1])
-                requested_paths.append(available_paths[x * 2 + 2])
-                requested_paths.append(available_paths[x * 2 + 3])
+                if x == 0:
+                    requested_paths.append(available_paths[0])
+                    requested_paths.append(available_paths[1])
+                    requested_paths.append(available_paths[2])
+                elif x == 1:
+                    requested_paths.append(available_paths[3])
+                    requested_paths.append(available_paths[4])
+                    requested_paths.append(available_paths[5])
+                elif x == 2:
+                    requested_paths.append(available_paths[6])
+                    requested_paths.append(available_paths[7])
+                elif x == 3:
+                    requested_paths.append(available_paths[8])
+                    requested_paths.append(available_paths[9])
+                elif x == 4:
+                    requested_paths.append(available_paths[10])
+                    requested_paths.append(available_paths[11])
 
         requested_skateboard = []
         if mdp_code[-offset]:

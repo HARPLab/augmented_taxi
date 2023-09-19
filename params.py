@@ -138,7 +138,7 @@ elif mdp_class == 'two_goal2':
     prior = [np.array([[1, 0, 0]]), np.array([[0, 1, 0]]), np.array([[0, 0, -1]])]
     posterior = [np.array([[1, 0, 0]]), np.array([[0, 1, 0]]), np.array([[0, 0, -1]])]
 elif mdp_class == 'skateboard2':
-    w = np.array([[-0.175, -0.5125, -1]]) # skateboard (you might want to go backward to retrieve it), path
+    w = np.array([[0.825, 0.4875, -1]]) # skateboard (you might want to go backward to retrieve it), path
     w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order)
 
     mdp_parameters = {
@@ -147,7 +147,7 @@ elif mdp_class == 'skateboard2':
         'goal': {'x': 6, 'y': 4},
         'walls': [],
         'available_paths': [{'x': 1, 'y': 1}, {'x': 2, 'y': 1}, {'x': 3, 'y': 1}, {'x': 4, 'y': 1}, {'x': 5, 'y': 1}, {'x': 6, 'y': 1},
-                 {'x': 6, 'y': 2}, {'x': 6, 'y': 3}],
+                 {'x': 6, 'y': 2}, {'x': 6, 'y': 3}, {'x': 1, 'y': 4}, {'x': 2, 'y': 4}, {'x': 3, 'y': 4}, {'x': 4, 'y': 4}],
         'paths': [{'x': 1, 'y': 1}, {'x': 2, 'y': 1}, {'x': 3, 'y': 1}, {'x': 4, 'y': 1}, {'x': 5, 'y': 1}, {'x': 6, 'y': 1},
                  {'x': 6, 'y': 2}, {'x': 6, 'y': 3}],
         'width': 6,
@@ -160,7 +160,7 @@ elif mdp_class == 'skateboard2':
     }
 
     prior = [np.array([[0, 0, -1]])]
-    posterior = [np.array([[-1, 0, 0]]), np.array([[0, -1, 0]]), np.array([[0, 0, -1]])]
+    posterior = [np.array([[1, 0, 0]]), np.array([[0, 1, 0]]), np.array([[0, 0, -1]])]
 elif mdp_class == 'colored_tiles':
     w = np.array([[-6.5, -5.25, -1]]) # A_tile (square), B_tile (ring), step cost
     w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order)
@@ -258,7 +258,7 @@ else:
     raise Exception("Unknown MDP class.")
 
 # Based on Pygame's key constants
-keys_map = ['K_UP', 'K_DOWN', 'K_LEFT', 'K_RIGHT', 'K_p', 'K_d', 'K_r', 'K_u', 'K_9', 'K_0']
+keys_map = ['K_UP', 'K_DOWN', 'K_LEFT', 'K_RIGHT', 'K_g', 'K_d', 'K_r', 'K_u', 'K_9', 'K_0']
 
 # reward weight parameters (on the goal with the passenger, on a toll, step cost).
 # assume the L1 norm of the weights is equal 1. WLOG

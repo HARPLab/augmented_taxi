@@ -215,7 +215,7 @@ def obtain_env_policies(mdp_class, data_loc, wt_candidates, mdp_parameters, pool
         elif mdp_class == 'skateboard':
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_walls']))))
         elif mdp_class == 'skateboard2':
-            mdp_codes = list(map(list, itertools.product([0, 1], repeat=int((len(mdp_parameters['available_paths'])/4)+1))))
+            mdp_codes = list(map(list, itertools.product([0, 1], repeat=6)))
         elif mdp_class == 'cookie_crumb':
             mdp_codes = list(map(list, itertools.product([0, 1], repeat=len(mdp_parameters['available_crumbs']))))
         elif mdp_class == 'augmented_taxi2':
