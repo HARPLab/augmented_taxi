@@ -143,7 +143,7 @@ elif mdp_class == 'skateboard2':
 
     mdp_parameters = {
         'agent': {'x': 4, 'y': 4, 'has_skateboard': 0},
-        'skateboard': [{'x': 1, 'y': 4, 'on_agent': 0}],
+        'skateboard': [{'x': 1, 'y': 2, 'on_agent': 0}],
         'goal': {'x': 6, 'y': 4},
         'walls': [],
         'available_paths': [{'x': 1, 'y': 1}, {'x': 2, 'y': 1}, {'x': 3, 'y': 1}, {'x': 4, 'y': 1}, {'x': 5, 'y': 1}, {'x': 6, 'y': 1},
