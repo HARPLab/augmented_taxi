@@ -140,6 +140,7 @@ def extract_test_demonstrations(data_loc):
         test_BEC_lengths_subset.append(test_BEC_lengths[idx])
         test_BEC_constraints_subset.append(test_BEC_constraints[idx])
         test_selected_env_traj_tracers_subset.append(selected_env_traj_tracers[idx])
+        # test_wt_vi_traj_tuples[idx][1].mdp.visualize_trajectory(test_wt_vi_traj_tuples[idx][2]) # visualize test trajectories
 
     with open('models/' + data_loc_push + '/test_environments.pickle', 'wb') as f:
         pickle.dump((test_wt_vi_traj_tuples_subset, test_BEC_lengths_subset, test_BEC_constraints_subset, test_selected_env_traj_tracers_subset), f)
@@ -1018,7 +1019,7 @@ def consolidate_counterfactual_constraints():
         pickle.dump(precomputed_PF_constraints, f)
 
 
-def save_user_study_json(mapping):
+def save_user_study_json():
     '''
     Save the demonstrations, diagnostic tests, and final tests to be used in the user study as a json
     '''
@@ -1028,13 +1029,14 @@ def save_user_study_json(mapping):
 
     user_study_dict = {
             'augmented_taxi2': {"demo": {}, "diagnostic test": {}, "final test": {}},
-            'colored_tiles': {"demo": {}, "diagnostic test": {}, "final test": {}},
-            'skateboard2': {"demo": {}, "diagnostic test": {}, "final test": {}}
+            'skateboard2': {"demo": {}, "diagnostic test": {}, "final test": {}},
+            'open': {'augmented_taxi2': {"demo": {}}, 'skateboard2': {"demo": {}}},
+            'pl': {'augmented_taxi2': {"demo": {}}, 'skateboard2': {"demo": {}}},
     }
 
     last_env_traj_idx = []
 
-    for data_loc in mapping.keys():
+    for data_loc in ['augmented_taxi2', 'skateboard2']:
         print(data_loc)
 
         # a) save the teaching demonstrations
@@ -1123,7 +1125,7 @@ def save_user_study_json(mapping):
 
 
         # c) save the final, held-out set of tests
-        for test_difficulty in mapping[data_loc].keys():
+        for test_difficulty in ['low', 'medium', 'high']:
             data_loc_test = 'models/' + data_loc + '/testing/test_' + test_difficulty + '/test_environments.pickle'
 
             with open(data_loc_test, 'rb') as f:
@@ -1142,12 +1144,64 @@ def save_user_study_json(mapping):
                     optimal_traj = test_wt_vi_traj_tuple[2]
                     test_mdp_dict = test_wt_vi_traj_tuple[3]
 
-                    test_mdp_dict = extract_mdp_dict(vi, mdp, optimal_traj, test_mdp_dict, data_loc, element=element, test_difficulty=test_difficulty)
+                    test_mdp_dict = extract_mdp_dict(vi, mdp, optimal_traj, test_mdp_dict, data_loc, element=element, test_difficulty=test_difficulty, env_traj_idxs=selected_env_traj_tracers[element])
                     pair_mdp_dict.append(test_mdp_dict)
 
                 test_difficulty_dicts.append(pair_mdp_dict)
 
             user_study_dict[data_loc]["final test"][test_difficulty] = test_difficulty_dicts
+
+        # save the open loop and partial loop (pl) teaching demonstrations
+        print("saving open loop and partial loop demonstrations")
+        demo_idx = 0
+        with open('models/' + data_loc + '/BEC_summary_open.pickle', 'rb') as f:
+            BEC_summary, visited_env_traj_idxs = pickle.load(f)
+
+        for unit_idx, unit in enumerate(BEC_summary):
+            # unit_constraints = []
+            # running_variable_filter = unit[0][4]
+            #
+            # save the information for each demonstration that is part of this unit into a dictionary
+            for subunit_idx, subunit in enumerate(unit):
+                print("Unit {}/{}, demo {}/{}:".format(unit_idx + 1, len(BEC_summary), subunit_idx + 1,
+                                                       len(unit)))
+                demo_constraints = subunit[3]
+                # unit_constraints.extend(demo_constraints)
+
+                best_env_idx, best_traj_idx = subunit[2]
+                filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
+                with open(filename, 'rb') as f:
+                    wt_vi_traj_env = pickle.load(f)
+                vi = wt_vi_traj_env[0][1]
+                mdp_dict = wt_vi_traj_env[0][3]
+
+                user_study_dict["open"][data_loc]["demo"][str(demo_idx)] = extract_mdp_dict(vi, subunit[0], subunit[1], mdp_dict, data_loc, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=running_variable_filter, constraints=demo_constraints)
+                demo_idx += 1
+
+        demo_idx = 0
+        with open('models/' + data_loc + '/BEC_summary_pl.pickle', 'rb') as f:
+            BEC_summary, visited_env_traj_idxs = pickle.load(f)
+
+        for unit_idx, unit in enumerate(BEC_summary):
+            # unit_constraints = []
+            # running_variable_filter = unit[0][4]
+            #
+            # save the information for each demonstration that is part of this unit into a dictionary
+            for subunit_idx, subunit in enumerate(unit):
+                print("Unit {}/{}, demo {}/{}:".format(unit_idx + 1, len(BEC_summary), subunit_idx + 1,
+                                                       len(unit)))
+                demo_constraints = subunit[3]
+                # unit_constraints.extend(demo_constraints)
+
+                best_env_idx, best_traj_idx = subunit[2]
+                filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
+                with open(filename, 'rb') as f:
+                    wt_vi_traj_env = pickle.load(f)
+                vi = wt_vi_traj_env[0][1]
+                mdp_dict = wt_vi_traj_env[0][3]
+
+                user_study_dict["pl"][data_loc]["demo"][str(demo_idx)] = extract_mdp_dict(vi, subunit[0], subunit[1], mdp_dict, data_loc, env_traj_idxs=(best_env_idx, best_traj_idx), variable_filter=running_variable_filter, constraints=demo_constraints)
+                demo_idx += 1
 
     with open('models/user_study_dict.json', 'w') as f:
         json.dump(user_study_dict, f)
@@ -1216,4 +1270,4 @@ if __name__ == "__main__":
 
 
     # preparing for closed-loop teaching user study
-    save_user_study_json(mapping)
+    save_user_study_json()

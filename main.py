@@ -1063,13 +1063,39 @@ def run_scripts():
     # contrast_PF_2_step_dev(params.mdp_class, BEC_summary, visited_env_traj_idxs, particles_summary, pool, params.prior, params.BEC['n_particles'], params.BEC['n_human_models'], params.data_loc['BEC'], params.weights['val'], params.step_cost_flag, visualize_pf_transition=False)
 
     # f) obtain test environments
-    obtain_test_environments(pool, params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,
-                             params.step_cost_flag, params.BEC['n_human_models'], params.prior, params.posterior, summary=BEC_summary, visualize_test_env=True, use_counterfactual=True)
+    # obtain_test_environments(pool, params.mdp_class, params.data_loc['BEC'], params.mdp_parameters, params.weights['val'], params.BEC,
+    #                          params.step_cost_flag, params.BEC['n_human_models'], params.prior, params.posterior, summary=BEC_summary, visualize_test_env=True, use_counterfactual=True)
 
     # g) expand a summary to the desired number of demonstrations (e.g. as a baseline condition for a user study)
-    # n_demos_desired = 14
-    # expanded_summary = ps_helpers.obtain_expanded_summary(BEC_summary, n_demos_desired, visited_env_traj_idxs, params.data_loc['BEC'])
+    # todo: need to run this four times -- twice for each domain (type: open and pl)
+    type = 'pl' # open or pl
+
+    if params.data_loc['BEC'] == 'augmented_taxi2':
+        n_demos_needed = 19  # update with mean or median interaction for the closed-loop condition
+
+        # env and traj idxs of the final tests
+        visited_env_traj_idxs.extend([(16, 17), (45, 110), (25, 82), (7, 7), (13, 131), (31, 27)])
+        n_diagnostic_tests = 4
+        if type == 'pl':
+            n_demos_needed = n_demos_needed - n_diagnostic_tests
+    elif params.data_loc['BEC'] == 'skateboard2':
+        n_demos_needed = 19  # update with mean or median interaction for the closed-loop condition
+
+        visited_env_traj_idxs.extend([(49, 344), (1, 451), (29, 185), (33, 416), (37, 63), (61, 252)])
+        n_diagnostic_tests = 7
+        if type == 'pl':
+            n_demos_needed = n_demos_needed - n_diagnostic_tests
+    expanded_summary = ps_helpers.obtain_expanded_summary(BEC_summary, n_demos_needed, visited_env_traj_idxs, params.data_loc['BEC'])
     # BEC.visualize_summary(expanded_summary)
+
+    if type == 'open':
+        with open('models/' + params.data_loc['BEC'] + '/BEC_summary_open.pickle', 'wb') as f:
+            pickle.dump((expanded_summary, visited_env_traj_idxs), f)
+    elif type == 'pl':
+        with open('models/' + params.data_loc['BEC'] + '/BEC_summary_pl.pickle', 'wb') as f:
+            pickle.dump((expanded_summary, visited_env_traj_idxs), f)
+    else:
+        raise ValueError('Invalid type')
 
     pool.close()
     pool.join()

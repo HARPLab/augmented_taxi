@@ -472,7 +472,7 @@ def obtain_expanded_summary(template_summary, n_demos_desired, visited_env_traj_
             previous_demonstrations = []
             running_variable_filter = unit[0][4]
 
-            print("this is the original demo for constraint {}".format(demonstration[3]))
+            # print("this is the original demo for constraint {}".format(demonstration[3]))
             # demonstration[0].visualize_trajectory(demonstration[1])
             demonstration_constraints = demonstration[3]
             expanded_unit.append(demonstration)
@@ -488,7 +488,7 @@ def obtain_expanded_summary(template_summary, n_demos_desired, visited_env_traj_
                                                                                             mdp_features_record,
                                                                                             variable_filter=running_variable_filter)
 
-                print('{} exact candidates for remedial demo/test'.format(len(BEC_constraint_bookkeeping[0])))
+                # print('{} exact candidates for remedial demo/test'.format(len(BEC_constraint_bookkeeping[0])))
                 if len(BEC_constraint_bookkeeping[0]) > 0:
                     best_env_idxs, best_traj_idxs = list(zip(*BEC_constraint_bookkeeping[0]))
 
@@ -501,8 +501,8 @@ def obtain_expanded_summary(template_summary, n_demos_desired, visited_env_traj_
                     nn_BEC_constraint_bookkeeping, minimal_distances = BEC_helpers.perform_nn_BEC_constraint_bookkeeping(
                         demonstration_constraints, min_subset_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record,
                         mdp_features_record, variable_filter=running_variable_filter)
-                    print('{} approximate candidates for remedial demo/test'.format(
-                        len(nn_BEC_constraint_bookkeeping[0])))
+                    # print('{} approximate candidates for remedial demo/test'.format(
+                    #     len(nn_BEC_constraint_bookkeeping[0])))
                     if len(nn_BEC_constraint_bookkeeping[0]) > 0:
                         best_env_idxs, best_traj_idxs = list(zip(*nn_BEC_constraint_bookkeeping[0]))
 
@@ -513,7 +513,7 @@ def obtain_expanded_summary(template_summary, n_demos_desired, visited_env_traj_
                                                                                     type=type,
                                                                                     return_all_equiv=False, dissimilarity_only=True)
 
-                        print('Similar-enough constraint: {}'.format(minimal_distances[0][3]))
+                        # print('Similar-enough constraint: {}'.format(minimal_distances[0][3]))
 
                 best_traj = traj_record[best_env_idx][best_traj_idx]
                 filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
@@ -532,5 +532,6 @@ def obtain_expanded_summary(template_summary, n_demos_desired, visited_env_traj_
             template_summary_idx += 1
 
         expanded_summary.append(expanded_unit)
+        print("number of demonstrations for this unit: {}".format(len(expanded_unit)))
 
     return expanded_summary
