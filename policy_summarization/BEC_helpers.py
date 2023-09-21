@@ -977,7 +977,7 @@ def combine_counterfactual_constraints(args):
         with open('models/' + data_loc + '/counterfactual_data_' + str(counterfactual_folder_idx) + '/model' + str(
                 model_idx) + '/cf_data_env' + str(
             env_idx).zfill(5) + '.pickle', 'rb') as f:
-            best_human_trajs_record_env, constraints_env, human_rewards_env = pickle.load(f)
+            constraints_env = pickle.load(f)
 
         # only consider the first best human trajectory (no need to consider partial trajectories)
         constraints_env_across_models.append(constraints_env)

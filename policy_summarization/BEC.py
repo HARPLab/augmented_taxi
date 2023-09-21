@@ -533,7 +533,7 @@ def overlap_demo_BEC_and_human_posterior(args):
     '''
     Summary: combine the most limiting constraints across all potential human models for each potential demonstration
     '''
-    env_idx, n_sample_human_models, min_subset_constraints, prior, posterior, data_loc, counterfactual_folder_idx, weights, trajs_opt, step_cost_flag, pool = args
+    env_idx, n_sample_human_models, min_subset_constraints, prior, posterior, data_loc, counterfactual_folder_idx, weights, step_cost_flag = args
 
     human_model = posterior
     human_model = BEC_helpers.remove_redundant_constraints(human_model, weights, step_cost_flag)

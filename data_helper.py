@@ -117,11 +117,11 @@ def extract_test_demonstrations(data_loc):
             test_idxs = [0, 7, 14, 20, 18, 15]
     else:
         if test_difficulty == 'low':
-            test_idxs = [8, 10, 9, 11, 12, 14]
+            test_idxs = [18, 22]
         elif test_difficulty == 'medium':
-            test_idxs = [0, 3, 5, 1, 11, 23]
+            test_idxs = [7, 20]
         else:
-            test_idxs = [6, 9, 3, 7, 8, 29]
+            test_idxs = [8, 24]
 
     test_wt_vi_traj_tuples_subset = []
     test_BEC_lengths_subset = []
@@ -1162,21 +1162,21 @@ if __name__ == "__main__":
     mapping = {
         'augmented_taxi2':
             {
-                'low': [[0, 1], [2, 3], [4, 5]],
-                'medium': [[0, 1], [2, 3], [4, 5]],
-                'high': [[0, 1], [2, 3], [4, 5]],
+                'low': [[0, 1]],
+                'medium': [[0, 1]],
+                'high': [[0, 1]],
             },
         'colored_tiles':
             {
-                'low': [[0, 1], [2, 3], [4, 5]],
-                'medium': [[0, 1], [2, 3], [4, 5]],
-                'high': [[0, 1], [2, 3], [4, 5]],
+                'low': [[0, 1]],
+                'medium': [[0, 1]],
+                'high': [[0, 1]],
             },
         'skateboard2':
             {
-                'low': [[0, 1], [2, 3], [4, 5]],
-                'medium': [[0, 1], [2, 3], [4, 5]],
-                'high': [[0, 1], [2, 3], [4, 5]],
+                'low': [[0, 1]],
+                'medium': [[0, 1]],
+                'high': [[0, 1]],
             }
     }
 
