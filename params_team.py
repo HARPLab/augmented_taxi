@@ -342,7 +342,7 @@ test_env_traj_tracers = {
 
 ### Added for robot teaching to team situation
 
-team_size = 3
+team_size = 1
 
 human_learning_models = {'p1': np.array([0.9, 0.9, 0.9]), \
                          'p2': np.array([0.8, 0.8, 0.8]), \

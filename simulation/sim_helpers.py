@@ -10,58 +10,114 @@ from simple_rl.planning import ValueIteration
 from simple_rl.utils import mdp_helpers
 
 import policy_summarization.BEC_helpers as BEC_helpers
-import human_learner_model as hlm
+import simulation.human_learner_model as hlm
 from termcolor import colored
-
+import matplotlib.pyplot as plt
 
 
 
 def get_human_response(env_idx, env_cnst, opt_traj, likelihood_correct_response):
 
-    human_model = hlm.cust_pdf_uniform(env_cnst, likelihood_correct_response)
-    cust_samps = human_model.rvs(size=1) # sample a human model (weight vector) from the distribution created from the constraint and the likelihood of sampling a correct response for that constraint
+    # print('Generating human response for environment constraint: ', env_cnst[0])
 
-    filename = '../models/augmented_taxi2/gt_policies/wt_vi_traj_params_env' + str(env_idx).zfill(5) + '.pickle'
+    human_model = hlm.cust_pdf_uniform(env_cnst[0], likelihood_correct_response)
+
+    # print('human model kappa: ', human_model.kappa)
+
+    filename = 'models/augmented_taxi2/gt_policies/wt_vi_traj_params_env' + str(env_idx).zfill(5) + '.pickle'
     
     with open(filename, 'rb') as f:
         wt_vi_traj_env = pickle.load(f)
 
     mdp = wt_vi_traj_env[0][1].mdp
+
     agent = FixedPolicyAgent(wt_vi_traj_env[0][1].policy)
     mdp.set_init_state(opt_traj[0][0])
     traj_opt = mdp_helpers.rollout_policy(mdp, agent)
 
-    print(traj_opt)
-    print(opt_traj)
+    # mdp.visualize_state(mdp.get_init_state())
+    # plt.show()
 
-    for model_idx, human_model in enumerate(cust_samps):
+    
+    # print(traj_opt)
+    # print(opt_traj)
 
-        mdp.weights = human_model
-        vi_human = ValueIteration(mdp, sample_rate=1)
-        vi_human.run_vi()
+    # opt_overlap_pct = BEC_helpers.calculate_counterfactual_overlap_pct(traj_opt, opt_traj)
+    # print('Optimal trajectory overlap percentage: ', opt_overlap_pct)
+    
+    likely_correct_response_count = 0
+    likely_incorrect_response_count = 0
 
-        if not vi_human.stabilized:
-            skip_human_model = True
-            print(colored('Human model ' + str(model_idx) + ' did not converge and skipping for response generation', 'red'))
+    skip_human_model = True
+
+    loop_count = 0
+
+    while skip_human_model:
+        # print('Sampling a human model ...')
+        cust_samps = human_model.rvs(size=1) # sample a human model (weight vector) from the distribution created from the constraint and the likelihood of sampling a correct response for that constraint
         
-        if not skip_human_model:
-            cur_state = mdp.get_init_state()
-            human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
+        dot = cust_samps[0].dot(env_cnst[0])
+        if dot >= 0:
+            # print('Possibly a correct response sampled')
+            likely_correct_response_count += 1
+            likely_response_type = 'correct'
+        else:
+            # print('Possibly an incorrect response sampled')
+            likely_incorrect_response_count += 1
+            likely_response_type = 'incorrect'
+
+        if loop_count == 0:
+            initial_likely_response_type = likely_response_type
+
+
+        for model_idx, human_model_weight in enumerate(cust_samps):
+
+            mdp.weights = human_model_weight
+            # vi_human = ValueIteration(mdp, sample_rate=1, max_iterations=100)
+            vi_human = ValueIteration(mdp, sample_rate=1)
+            vi_human.run_vi()
+
+            if not vi_human.stabilized:
+                # print(colored('Human model ' + str(model_idx) + ' did not converge and skipping for response generation', 'red'))
+                skip_human_model = True
+            else:
+                skip_human_model = False
             
-            for human_opt_traj in human_opt_trajs:
-                human_traj_rewards = mdp.accumulate_reward_features(human_opt_traj, discount=True)
+            if not skip_human_model:
+                cur_state = mdp.get_init_state()
+                # print('Current state: ', cur_state)
+                human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
+                
+                human_traj_rewards = mdp.accumulate_reward_features(human_opt_trajs[0], discount=True)  # just use the first optimal trajectory
                 mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
                 new_constraint = mu_sa - human_traj_rewards
 
-                print('New constraint: ', new_constraint)
+                # print('New constraint: ', new_constraint)
                 if (new_constraint == np.array([0, 0, 0])).all():
-                    print(colored('Correct response sampled', 'blue'))
+                    # print(colored('Correct response sampled', 'blue'))
+                    response_type = 'correct'
                 else:
-                    print(colored('Correct response sampled', 'red'))
+                    # print(colored('Incorrect response sampled', 'red'))
+                    response_type = 'incorrect'
 
-    return human_opt_trajs
+                # check if the response matches the initial likely guess
+                if response_type != initial_likely_response_type:
+                    skip_human_model = True
+                
+                
+                # mdp.visualize_trajectory(traj_opt)
+                # plt.show()
+                # mdp.visualize_trajectory(human_opt_trajs[0])
+                # plt.show()
 
+        loop_count += 1
 
+    # human_traj_overlap_pct = BEC_helpers.calculate_counterfactual_overlap_pct(human_opt_trajs[0], traj_opt)
+    # print('human traj overlap pct: ', human_traj_overlap_pct)
+
+    # return human_opt_trajs, response_type, likely_correct_response_count, likely_incorrect_response_count, initial_likely_response_type
+
+    return human_opt_trajs[0], response_type
 
 
 

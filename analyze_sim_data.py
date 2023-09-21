@@ -72,7 +72,7 @@ def str_to_dict(string, var_type = None, splitter = ', '):
 
 if __name__ == "__main__":
     # params = Params('params_taxi.json')
-    sim_vars = pd.read_csv('models/augmented_taxi2/sim_run_mixed_maj_copy.csv')
+    sim_vars = pd.read_csv('models/augmented_taxi2/hlm_.csv')
     # print(len(sim_vars))
 
     team_unit_knowledge_level = pd.DataFrame()

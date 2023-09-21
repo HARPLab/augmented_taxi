@@ -739,18 +739,39 @@ if __name__ == "__main__":
 
 
     # # 2)
-    # min_BEC_constraints =  [np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
+    min_BEC_constraints =  [np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
 
-    # min_unit_constraints = [np.array([[-1,  0,  0]]), np.array([[-1,  0,  2]])]
+    min_unit_constraints = [np.array([[-1,  0,  0]]), np.array([[-1,  0,  2]])]
     # # min_unit_constraints = [np.array([[-1,  0,  0]])]
 
+    # Correct response by both members
     # team_knowledge = {'p1': [np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]])], 
     #                 'p2': [np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]])], 
     #                 'common_knowledge': [np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]])], 
     #                 'joint_knowledge': [[np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 0,  0, -1]])]]}
-    
-    # # knowledge_level = team_helpers.calc_knowledge_level(team_knowledge, min_unit_constraints)
 
+    # Incorrect response by one team member
+    team_knowledge_prior = {'p1': [np.array([[ 0,  0, -1]])], 
+                            'p2': [np.array([[ 0,  0, -1]])], 
+                            'common_knowledge': [np.array([[ 0,  0, -1]])], 
+                            'joint_knowledge': [[np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])]]}
+
+
+
+    team_knowledge_new = {'p1': [np.array([[-1,  0,  0]]), np.array([[-1,  0,  2]]),], 
+                        'p2': [np.array([[1,  0,  0]]), np.array([[3,  0,  -2]])], 
+                        'common_knowledge': [np.array([[-1,  0,  0]]), np.array([[-1,  0,  2]]), np.array([[1,  0,  0]]), np.array([[3,  0,  -2]])], 
+                        'joint_knowledge': [[np.array([[-1,  0,  0]]), np.array([[-1,  0,  2]])], [np.array([[1,  0,  0]]), np.array([[3,  0,  -2]])]]}
+    
+    unit_knowledge_level = team_helpers.calc_knowledge_level(team_knowledge_new, min_unit_constraints)
+    
+    print('Unit knowledge level: ', unit_knowledge_level)
+
+    # team_knowledge_level = team_helpers.calc_knowledge_level(team_knowledge, min_BEC_constraints)
+
+    # print('Team knowledge level: ', team_knowledge_level)
+
+    plt.show()
 
     # # inv_constraints = []
     # # for k_id, k_type in enumerate(team_knowledge):
@@ -813,12 +834,16 @@ if __name__ == "__main__":
     # # poly = Polyhedron.Polyhedron(ieqs=ieqs)
     # # hrep = np.array(poly.Hrepresentation())
 
-    # # fig = plt.figure()
-    # # ax1 = fig.add_subplot(1, 1, 1, projection='3d')
-    # # utils_teams.visualize_planes_team(min_intersection_constraints, fig=fig, ax=ax1)
-    # # BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax1, plot_ref_sphere=False, alpha=0.75)
-    # # label_axes(ax1, params.weights['val'])
-    # # plt.show()
+    # fig = plt.figure()
+    # ax1 = fig.add_subplot(1, 2, 1, projection='3d')
+    # ax2 = fig.add_subplot(1, 2, 2, projection='3d')
+    # utils_teams.visualize_planes_team(min_intersection_constraints, fig=fig, ax=ax1)
+    # BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax1, plot_ref_sphere=False, alpha=0.75)
+
+
+
+    # label_axes(ax1, params.weights['val'])
+    # plt.show()
 
     # # # remove boundary constraints/facets from consideration
     # # boundary_facet_idxs = np.where(hrep[:, 0] != 0)
@@ -1436,6 +1461,7 @@ if __name__ == "__main__":
 
     # mu = np.array([1,  0,  0])
     # kappa_list = np.linspace(0.0001, 10, 100)
+    # u_cdf = np.linspace(0.0, 1, 100)
     # correct_hs_likelihood = np.zeros(len(kappa_list))
     # p = 3
 
@@ -1467,9 +1493,8 @@ if __name__ == "__main__":
 
     # print(correct_hs_likelihood)
 
-    # # sns.lineplot(x=kappa_list, y=correct_hs_likelihood, title='Correct human response likelihood')
-    # # plt.show()
-
+    # sns.lineplot(x=kappa_list, y=correct_hs_likelihood, title='Correct human response likelihood')
+    # plt.show()
 
 
     # correct_hs_likelihood = np. array([0.628, 0.607, 0.646, 0.665, 0.68,  0.683, 0.681, 0.679, 0.68,  0.722, 0.7,   0.711,
@@ -1482,9 +1507,14 @@ if __name__ == "__main__":
     #                                     0.919, 0.926, 0.927, 0.924, 0.922, 0.943, 0.927, 0.937, 0.941, 0.934, 0.925, 0.937,
     #                                     0.924, 0.932, 0.93,  0.935])
 
+    # u_cdf_ls = np.zeros(len(u_cdf))
+    # for i in range(len(u_cdf)):
 
-    # sns.lineplot(x=kappa_list, y=correct_hs_likelihood).set(title='Correct human response likelihood')
-    # plt.xlabel("kappa")
+    #     # u_cdf_ls[i] = min(max(u_cdf[i] + random.uniform(-0.1, 0.1), 0), 1)
+    #     u_cdf_ls[i] = random.uniform(13, 3.2)
+
+    # sns.lineplot(x=u_cdf, y=u_cdf_ls).set(title='Correct human response likelihood')
+    # plt.xlabel("uniform cdf")
     # plt.ylabel("Probability of sampling correct response")
     # plt.show()
 
@@ -1619,50 +1649,142 @@ if __name__ == "__main__":
 
     #############
 
-    mu = np.array([1,  0,  0])
-    u_cdf_list = np.linspace(0.5, 0.99, 100)
-    kappa_list = np.zeros(len(u_cdf_list))
-    correct_hs_likelihood = np.zeros(len(u_cdf_list))
-    p = 3
+    # mu = np.array([1,  0,  0])
+    # u_cdf_list = np.linspace(0.5, 0.99, 100)
+    # kappa_list = np.zeros(len(u_cdf_list))
+    # correct_hs_likelihood = np.zeros(len(u_cdf_list))
+    # p = 3
 
 
-    for k in range(len(u_cdf_list)):
-        u_cdf = u_cdf_list[k]
-        human_model = hlm.cust_pdf_uniform(mu, u_cdf)
-        kappa_list[k] = human_model.kappa
-        # create samples
-        n = 1000
-        dot_n = np.zeros([n, 1], int)
+    # for k in range(len(u_cdf_list)):
+    #     u_cdf = u_cdf_list[k]
+    #     human_model = hlm.cust_pdf_uniform(mu, u_cdf)
+    #     kappa_list[k] = human_model.kappa
+    #     # create samples
+    #     n = 1000
+    #     dot_n = np.zeros([n, 1], int)
 
-        cust_samps = human_model.rvs(size=n)
-        # print(cust_samps)
+    #     cust_samps = human_model.rvs(size=n)
+    #     # print(cust_samps)
 
-        # fig = plt.figure()
-        # ax1 = fig.add_subplot(1, 1, 1, projection='3d')
+    #     # fig = plt.figure()
+    #     # ax1 = fig.add_subplot(1, 1, 1, projection='3d')
 
-        # particles_sample = pf_team.Particles_team(cust_samps)
-        # particles_sample.plot(fig=fig, ax=ax1)
-        # plt.show()
+    #     # particles_sample = pf_team.Particles_team(cust_samps)
+    #     # particles_sample.plot(fig=fig, ax=ax1)
+    #     # plt.show()
 
-        for i in range(n):
-            dot = cust_samps[i].dot(mu)
-            if dot >= 0:
-                dot_n[i] = 1
+    #     for i in range(n):
+    #         dot = cust_samps[i].dot(mu)
+    #         if dot >= 0:
+    #             dot_n[i] = 1
         
-        correct_hs_likelihood[k] = sum(dot_n)/n
+    #     correct_hs_likelihood[k] = sum(dot_n)/n
 
 
-    print(correct_hs_likelihood)
+    # print(correct_hs_likelihood)
 
 
-    fig, ax = plt.subplots(2)
+    # fig, ax = plt.subplots(2)
 
-    ax[0].plot(u_cdf_list, correct_hs_likelihood)
-    ax[0].set_xlabel('Uniform distribution mass')
-    ax[0].set_ylabel('Probability of sampling a correct response')
+    # ax[0].plot(u_cdf_list, correct_hs_likelihood)
+    # ax[0].set_xlabel('Uniform distribution mass')
+    # ax[0].set_ylabel('Probability of sampling a correct response')
 
 
-    ax[1].plot(kappa_list, correct_hs_likelihood)
-    ax[1].set_xlabel('Kappa of VMF')
-    ax[1].set_ylabel('Probability of sampling a correct response')
-    plt.show()
+    # ax[1].plot(kappa_list, correct_hs_likelihood)
+    # ax[1].set_xlabel('Kappa of VMF')
+    # ax[1].set_ylabel('Probability of sampling a correct response')
+    # plt.show()
+
+
+    ##############################
+
+    # # check if sampled response is matching expected response and if likelihood matches the final proportion of correct responses sampled
+
+    # with open('models/augmented_taxi2/human_resp_debug.pickle', 'rb') as f:
+    #     env_idx, test_constraints, opt_traj, team_likelihood_correct_response = pickle.load(f)
+
+    # print('test_constraints: ', test_constraints)
+    # print('team likelihood correct response: ', team_likelihood_correct_response)
+
+    # human_traj_team = []
+    # response_type_team = []
+    # initial_likely_response_type_team = []
+    # likely_correct_response_count = 0
+    # likely_incorrect_response_count = 0
+
+    # for i in range(100):
+    #     print('Sampling human response for iteration ', i+1, ' ...')
+    #     human_traj, response_type, lcr, lir, initial_likely_response_type = get_human_response(env_idx, test_constraints[0], opt_traj, 0.55)
+    #     likely_correct_response_count += lcr
+    #     likely_incorrect_response_count += lir
+    #     human_traj_team.append(human_traj)
+    #     response_type_team.append(response_type)
+    #     initial_likely_response_type_team.append(initial_likely_response_type)
+    #     # print('Simulated  response length for player ', i+1, ' : ', len(human_traj_team[i]))
+    
+    # print('Likelihood of initially sampled response to be correct :', len([x for x in initial_likely_response_type_team if x == 'correct'])/len(initial_likely_response_type_team))
+    # print('Likelihood of plausible correct response: ', likely_correct_response_count/(likely_correct_response_count + likely_incorrect_response_count))
+    # print('Likelihood of actual correct response: ', len([x for x in response_type_team if x == 'correct'])/len(response_type_team))
+
+    ###############################
+
+    ## check if scaled uniform distribution matches the expected likelihood
+    # mu = np.array([1,  0,  0])
+    # u_cdf_list = np.linspace(0.5, 1, 50)
+
+
+    # N_loops = 5
+
+    # correct_hs_likelihood = np.zeros([N_loops, len(u_cdf_list)])
+
+    # for j in range(N_loops):
+    #     print('Loop no: ', j)
+    #     for u in range(len(u_cdf_list)):
+    #         # u_cdf = random.sample(u_cdf_list)
+    #         u_cdf = u_cdf_list[u]
+    #         human_model = hlm.cust_pdf_uniform(mu, u_cdf)
+            
+    #         # create samples
+    #         n = 1000
+    #         dot_n = np.zeros([n, 1], int)
+
+    #         cust_samps = human_model.rvs(size=n)
+    #         # print(cust_samps)
+
+    #         # fig = plt.figure()
+    #         # ax1 = fig.add_subplot(1, 1, 1, projection='3d')
+
+    #         # particles_sample = pf_team.Particles_team(cust_samps)
+    #         # particles_sample.plot(fig=fig, ax=ax1)
+    #         # plt.show()
+
+    #         for i in range(n):
+    #             dot = cust_samps[i].dot(mu)  # note that here we are not checking if the human model are stable for Value Iteration or not
+    #             if dot >= 0:
+    #                 dot_n[i] = 1
+            
+    #         correct_hs_likelihood[j, u] = sum(dot_n)/n
+
+    # correct_hs_likelihood_expand = correct_hs_likelihood.flatten()
+    # u_cdf_list_expand = np.repeat(u_cdf_list, N_loops, axis=0)
+
+    # correct_hs_likelihood_mean = np.mean(correct_hs_likelihood, axis=0)
+    # correct_hs_likelihood_std = np.std(correct_hs_likelihood, axis=0)
+
+    # # print('u_cdf_list: ', u_cdf_list)
+    # # print('correct_hs_likelihood: ', correct_hs_likelihood)
+    # # print('correct_hs_likelihood_expand: ', correct_hs_likelihood_expand)
+    # # print('u_cdf_list_expand: ', u_cdf_list_expand)
+
+
+
+    # plt.plot(u_cdf_list, correct_hs_likelihood_mean)
+    # plt.fill_between(u_cdf_list, correct_hs_likelihood_mean - correct_hs_likelihood_std, correct_hs_likelihood_mean + correct_hs_likelihood_std, color='b', alpha=0.2)
+    # plt.xlabel("uniform cdf")
+    # plt.ylabel("Probability of sampling correct response")
+    # plt.show()
+
+    ##################################################################
+

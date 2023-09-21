@@ -24,7 +24,18 @@ class cust_pdf_uniform(stats.rv_continuous):
         self.u_cdf = uniform_cdf  # probability of choosing right response
         self.mu = mu
         self.u_pdf = self.u_cdf/(2*np.pi)
-        self.kappa = self.calc_kappa()
+
+        if uniform_cdf < 0.5:
+            self.VMF_scaling_factor = 0.5/uniform_cdf
+            self.kappa = self.calc_kappa(u_cdf=0.5) # limit VMF_cdf to 0.5 to find Kappa and appropriate scale the resulting pdf
+        else:
+            self.VMF_scaling_factor = 1
+            self.kappa = self.calc_kappa()
+        
+        # print('Uniform_cdf: ', self.u_cdf)
+        # print('Kappa: ', self.kappa)
+        # print('VMF_scaling_factor: ', self.VMF_scaling_factor)
+
         self.xs_array, self.my_cdf = self.calc_cdf()
 
 
@@ -36,16 +47,22 @@ class cust_pdf_uniform(stats.rv_continuous):
         if dot >= 0:
             pdf = self.u_pdf
         else:
-            pdf = p_utils.VMF_pdf(self.mu, self.kappa, self.p, x)
+            pdf = p_utils.VMF_pdf(self.mu, self.kappa, self.p, x) * self.VMF_scaling_factor
 
         # print('pdf_scaled type:', type(pdf_scaled))
         return pdf
 
 
 
-    def calc_kappa(self):
+    def calc_kappa(self, u_cdf = -1):
 
-        LHS = 1-self.u_cdf
+
+        if u_cdf == -1:
+            LHS = 1-self.u_cdf
+        else:
+            LHS = 1-u_cdf
+
+        # print('LHS:', LHS)
         
         def integrand(phi, theta, kappa):
             return ( kappa*np.sin(phi)*np.exp(kappa*np.cos(theta)*np.sin(phi)) ) / ( 2*np.pi*(np.exp(kappa)-np.exp(-kappa)) ) #this equation is for mu = [1, 0, 0], but kappa would be same for any mu for a particular cdf.
@@ -66,6 +83,7 @@ class cust_pdf_uniform(stats.rv_continuous):
 
         my_pdfs = np.zeros(len(xs))
         xs_array = np.zeros([len(xs), 3])
+        
         # print(my_pdfs.shape)
         # compute pdfs to be summed to form cdf
         for i in range(len(xs)):
@@ -98,6 +116,9 @@ class cust_pdf_uniform(stats.rv_continuous):
 
         return query_x
 
+
+######################################################
+######################################################
 
 
 class cust_pdf_kappa(stats.rv_continuous):

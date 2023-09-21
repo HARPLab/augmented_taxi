@@ -47,11 +47,11 @@ if __name__ == "__main__":
     os.makedirs('models/' + params.data_loc['base'], exist_ok=True)
     os.makedirs('models/' + params.data_loc['BEC'], exist_ok=True)
 
-    N_runs = 30
+    N_runs = 1
 
     # weights_list = [[0.6, 0.15, 0.25], [0.5, 0.25, 0.25], [0.4, 0.3, 0.3], [0.8, 0.05, 0.1], [0.2, 0.6, 0.2], [0.2, 0.2, 0.6], [0.5, 0.1, 0.4], [0, 0, 1], [1, 0, 0], [0, 1, 0]]
     
-    weights_list = [[0.2, 0.0, 0.8]]
+    # weights_list = [[0.2, 0.0, 0.8]]
 
     # try:
     #     with open('models/augmented_taxi2/vars_to_save.pickle', 'rb') as f:
@@ -60,23 +60,32 @@ if __name__ == "__main__":
     #     vars_to_save = None
     # print('Vars len so far: ', vars_to_save.shape[0])
         
-
-    resp_dist_list_history = []
-    for i in range(1, N_runs+1):
-        # j = int(np.floor(i/len(weights_list)))
-        j = 0
-        resp_dist_list = []
-        while len(resp_dist_list) == 0 or (resp_dist_list in resp_dist_list_history and (1 not in weights_list[j])):
-            resp_dist_list = random.choices(['correct', 'incorrect', 'mixed'], weights = weights_list[j], k=40)
+    # # simulation old
+    # resp_dist_list_history = []
+    # for i in range(1, N_runs+1):
+    #     # j = int(np.floor(i/len(weights_list)))
+    #     j = 0
+    #     resp_dist_list = []
+    #     while len(resp_dist_list) == 0 or (resp_dist_list in resp_dist_list_history and (1 not in weights_list[j])):
+    #         resp_dist_list = random.choices(['correct', 'incorrect', 'mixed'], weights = weights_list[j], k=40)
                 
-        resp_dist_list_history.append(resp_dist_list)
-        dem_strategy = random.choice(['common_knowledge', 'joint_knowledge', 'individual_knowledge_low', 'individual_knowledge_high'])
-        # dem_strategy = 'common_knowledge'
-        # print('resp_dist_list_history: ', resp_dist_list_history)
-        print('Simulation run: ', i, '. Demo strategy: ', dem_strategy)
-        print('resp_dist_list: ', resp_dist_list)
-        # vars_to_save = run_reward_teaching(params, pool, demo_strategy = dem_strategy, response_type = 'simulated', response_distribution_list= resp_dist_list, run_no = i, vars_to_save = vars_to_save)
-        run_reward_teaching(params, pool, demo_strategy = dem_strategy, response_type = 'simulated', viz_flag=[False, False, False], response_distribution_list= resp_dist_list, run_no = i, vars_filename='sim_run_mixed_maj')
+    #     resp_dist_list_history.append(resp_dist_list)
+    #     dem_strategy = random.choice(['common_knowledge', 'joint_knowledge', 'individual_knowledge_low', 'individual_knowledge_high'])
+    #     # dem_strategy = 'common_knowledge'
+    #     # print('resp_dist_list_history: ', resp_dist_list_history)
+    #     print('Simulation run: ', i, '. Demo strategy: ', dem_strategy)
+    #     print('resp_dist_list: ', resp_dist_list)
+    #     # vars_to_save = run_reward_teaching(params, pool, demo_strategy = dem_strategy, response_type = 'simulated', response_distribution_list= resp_dist_list, run_no = i, vars_to_save = vars_to_save)
+    #     run_reward_teaching(params, pool, demo_strategy = dem_strategy, response_type = 'simulated', viz_flag=[False, False, False], response_distribution_list= resp_dist_list, run_no = i, vars_filename='sim_run_mixed_maj')
+
+
+    for i in range(1, N_runs+1):
+        ilcr = random.random()*0.2 + 0.5 # between 0.5 and 0.7 
+        rlcr = random.random()*0.10 + 0.05 # between 0.05 and 0.15
+        # dem_strategy = random.choice(['common_knowledge', 'joint_knowledge', 'individual_knowledge_low', 'individual_knowledge_high'])
+        dem_strategy = 'individual_knowledge_low'
+        print('Simulation run: ', i, '. Demo strategy: ', dem_strategy, 'initial lcr: ', ilcr, 'rate lcr: ', rlcr)
+        run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', experiment_type = 'simulated', team_likelihood_correct_response = ilcr*np.ones(params.team_size) ,  team_learning_rate = np.hstack((rlcr*np.ones([params.team_size, 1]), -rlcr*np.ones([params.team_size, 1]))), viz_flag=[True, True, True], run_no = i, vars_filename='hlm_sim_3')
 
 
     # # save all the variables
