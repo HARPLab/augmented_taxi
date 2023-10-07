@@ -35,6 +35,8 @@ class Particles_team():
         self.positions_prev = self.positions.copy()
         self.weights_prev = self.weights.copy()
 
+        self.constraints = []
+
         # Spherical discretization taken from : A new method to subdivide a spherical surface into equal-area cells,
         # Malkin 2019 https://arxiv.org/pdf/1612.03467.pdf
         self.ele_bin_edges = np.array([0, 0.1721331, 0.34555774, 0.52165622, 0.69434434, 0.86288729,
@@ -746,7 +748,13 @@ class Particles_team():
 
         print(colored('Performed a reset', 'red'))
         self.pf_reset_count += 1
-        self.reset_constraint = constraint
+        self.reset_constraint = [constraint[0]]
+
+    
+    # currently unused - will be needed when particles are reset based on all prior knowledge instead of just the last constraint
+    def knowledge_update(self, constraints):
+        self.constraints = copy.deepcopy(constraints)
+
 
 
     def update(self, constraints, c=0.5, reset_threshold_prob=0.001):

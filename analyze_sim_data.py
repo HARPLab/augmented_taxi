@@ -25,16 +25,22 @@ def str_to_dict(string, var_type = None, splitter = ', '):
     # the dictionary, converting the values to
     # integers and removing the quotes from the keys
     dict = {}
-    print(pairs)
+    # print(pairs)
     for i in range(len(pairs)):
         pair = pairs[i]
         key, value = pair.split(': ')
+        
+        
         key = key.strip(' \' ')
+        # print('key: ', key)
+        # print('value: ', value)
 
         if splitter == ', ':
             value = value.strip(' \' ')  # strip is used only for leading and trailing characters
-            value = value.strip(' array ')
-            value = value.strip(' ([]) ')
+            value = value.strip('[]')
+            value = value.strip('array')
+            value = value.strip('([])')
+            # print('value 1: ', value)
         else:
             value = value.replace('array', '')
             value = value.replace('(', '')
@@ -44,6 +50,7 @@ def str_to_dict(string, var_type = None, splitter = ', '):
             # print('Check before: ', value)
             # value = ast.literal_eval(value)
             value = eval(value)
+            # print('value 2: ', value)
             if key == 'joint_knowledge':
                 value_copy = []
                 for val in value:
@@ -54,8 +61,8 @@ def str_to_dict(string, var_type = None, splitter = ', '):
                 value = value_copy
             else:   
                 value = [np.array(v) for v in value]
-            # print('Type after: ', type(value))
-            # print('Check after: ', value)
+            print('Type after: ', type(value))
+            print('Check after: ', value)
         
         if var_type == 'float':
             dict[key] = float(value)
@@ -68,11 +75,18 @@ def str_to_dict(string, var_type = None, splitter = ', '):
     return dict
  
 
+def normalize_knowledge(knowledge):
+    knowledge['loop_count_normalized'] = np.zeros(len(knowledge))
+    for i in range(len(knowledge)):
+        knowledge['loop_count_normalized'][i] = knowledge['loop_count'][i]/max(knowledge['loop_count'])
+
+    return knowledge
+
 
 
 if __name__ == "__main__":
     # params = Params('params_taxi.json')
-    sim_vars = pd.read_csv('models/augmented_taxi2/hlm_.csv')
+    sim_vars = pd.read_csv('models/augmented_taxi2/new_hlm_sim_run_1 - Copy.csv')
     # print(len(sim_vars))
 
     team_unit_knowledge_level = pd.DataFrame()
@@ -97,6 +111,9 @@ if __name__ == "__main__":
         BEC_team_knowledge_dict['loop_count'] = int(sim_vars['loop_count'][i])
         BEC_team_knowledge_dict['demo_strategy'] = sim_vars['demo_strategy'][i]
         team_BEC_knowledge_level = team_BEC_knowledge_level.append(BEC_team_knowledge_dict, ignore_index=True)
+        
+        team_BEC_knowledge_level_normalized = normalize_knowledge(team_BEC_knowledge_level)
+
 
         # team knowledge constraints
         tkc = sim_vars['team_knowledge'][i]
@@ -129,10 +146,15 @@ if __name__ == "__main__":
     # print(team_knowledge)
 
 
-    for know_id in ['p1', 'p2', 'p3', 'common_knowledge', 'joint_knowledge']:
-        sns.lineplot(data = team_BEC_knowledge_level, x = 'loop_count', y = know_id, hue = 'demo_strategy').set(title='Knowledge level for ' + know_id)
-        plt.show()
-        plt.savefig('models/augmented_taxi2/BEC_knowledge_level_' + know_id + '.png')
-        plt.close()
+    # for know_id in ['p1', 'p2', 'p3', 'common_knowledge', 'joint_knowledge']:
+    #     sns.lineplot(data = team_BEC_knowledge_level, x = 'loop_count', y = know_id, hue = 'demo_strategy').set(title='Knowledge level for ' + know_id)
+    #     plt.show()
+    #     # plt.savefig('models/augmented_taxi2/BEC_knowledge_level_' + know_id + '.png')
+    #     # plt.close()
+
+    sea = sns.FacetGrid(team_BEC_knowledge_level_normalized, row = "loop_count", col="know_id", hue="demo_strategy", col_wrap=2)
+
+    sea.map(sns.lineplot, "loop_count", "knowledge_level", color='red')
+
 
     

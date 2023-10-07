@@ -16,10 +16,11 @@ from tqdm import tqdm
 import os
 import itertools
 from sklearn import metrics
+import random
 
 # Other imports.
 sys.path.append("simple_rl")
-import params
+import params_team as params
 from simple_rl.agents import FixedPolicyAgent
 from simple_rl.planning import ValueIteration
 from simple_rl.utils import make_mdp
@@ -52,51 +53,46 @@ from numpy import linalg as LA
 
 
 
-def calc_common_knowledge(team_knowledge, team_size, weights, step_cost_flag):
+def calc_common_knowledge(team_knowledge, team_size, weights, step_cost_flag, kc_id=None):
 
+    print('Team knowledge: ', team_knowledge)
 
     for i in range(team_size):
         member_id = 'p' + str(i+1)
-        if i==0:
-            constraints = team_knowledge[member_id].copy()
-        else:
-            constraints.extend(team_knowledge[member_id])
+        
+        if kc_id is None:
+            kc_id = len(team_knowledge[member_id])-1  # constraints of last KC
 
-    # check for opposing constraints (since remove redundant constraints gives the perpendicular axes for opposing constraints)
+        if i==0:
+            constraints = copy.deepcopy(team_knowledge[member_id][kc_id])
+        else:
+            constraints.extend(team_knowledge[member_id][kc_id])
+
+        # print('Constraints so far:', constraints)
+
+    # # check for opposing constraints (since remove redundant constraints gives the perpendicular axes for opposing constraints)
 
     opposing_constraints_flag, _, _ = check_opposing_constraints(constraints)
+    if opposing_constraints_flag:
+        raise RuntimeError('Opposing constraints found in common knowledge!')
 
-    # if not opposing_constraints_flag:
-    unit_constraint_flag = True
-    unit_common_constraint_flag = True
-    constraints_copy = constraints.copy()
+    non_intersecting_cnsts_flag, _ = check_for_non_intersecting_constraints(constraints, weights, step_cost_flag)
+    if non_intersecting_cnsts_flag:
+        raise RuntimeError('Non-intersecting constraints found in common knowledge!')
+
+    # print('Opposing constraints flag: ', opposing_constraints_flag)
+
+    # # if not opposing_constraints_flag:
+    # unit_constraint_flag = True
+    # unit_common_constraint_flag = True
+    constraints_copy = copy.deepcopy(constraints)
 
     common_constraints = BEC_helpers.remove_redundant_constraints(constraints_copy, weights, step_cost_flag)
+    print('Common knowledge after removing redundant constraints: ', common_constraints)
 
-    
-    # while unit_constraint_flag:
-        
-    #     common_constraints = BEC_helpers.remove_redundant_constraints(constraints_copy, weights, step_cost_flag)
-    #     print('Origninal common knowledge: ', constraints_copy)
-    #     print('Remove redundant common knowledge: ', common_constraints)
-
-    #     for constraint in common_constraints:
-    #         if LA.norm(constraint,1) !=1:
-    #             unit_constraint_flag = False
-
-    #     for constraint in common_constraints:
-    #         if LA.norm(constraint,1) !=1:
-    #             unit_common_constraint_flag = False
-
-    #     if not unit_constraint_flag and unit_common_constraint_flag:
-    #         constraints_copy.pop(0)  # remove the first constraint
-
-    # else:
-    #     print('Opposing constraints found for common knowledge! Constraints: ', constraints, '.Reset constraints to [0, 0, 0].')
-    #     ck = np.zeros((3,1), dtype=int)
-    #     common_constraints = [ck.reshape(ck.shape[1], ck.shape[0])]
 
     return common_constraints
+
 
 
 def check_opposing_constraints(test_constraints_team_expanded, opposing_constraints_count=0):
@@ -106,17 +102,20 @@ def check_opposing_constraints(test_constraints_team_expanded, opposing_constrai
     new_opposing_constraints_count = 0
     for cnst_idx, cnst in enumerate(test_constraints_team_expanded):
         for cnst2_idx, cnst2 in enumerate(test_constraints_team_expanded):
+            # print('-cnst[0]: ', -cnst[0])
+            # print('cnst2[0]): ', cnst2[0])
             if (np.array_equal(-cnst[0], cnst2[0])):
                 opposing_constraints_flag = True  
                 opposing_idx.append([cnst_idx, cnst2_idx])
                 new_opposing_constraints_count += 1 # gets double-counted
                 
+    print('opposing_constraints_flag: ', opposing_constraints_flag)
+    
     return opposing_constraints_flag, opposing_constraints_count+new_opposing_constraints_count/2, opposing_idx
 
 
-def calc_joint_knowledge(team_knowledge, team_size, weights=None, step_cost_flag=None):
+def calc_joint_knowledge(team_knowledge, team_size, kc_id = None):
 
-    # TODO: Calculate joint constraints
     # Joint constraints is normally expressed as the union of constraints of individuals. 
 
     # ## Method 1: Joint constraints expressed as inverse of the inverted and minimal constraints of individual members
@@ -137,10 +136,13 @@ def calc_joint_knowledge(team_knowledge, team_size, weights=None, step_cost_flag
     ## Method 2: Here we just represent the constraints of each individual as a separate list.
     for i in range(team_size):
         member_id = 'p' + str(i+1)
+        if kc_id is None:
+            kc_id = len(team_knowledge[member_id])-1  # constraints of last KC
+
         if i==0:
-            joint_constraints = [team_knowledge[member_id]]
+            joint_constraints = [team_knowledge[member_id][kc_id]]
         else:
-            joint_constraints.append(team_knowledge[member_id])
+            joint_constraints.append(team_knowledge[member_id][kc_id])
 
     # print('Team knowledge:', team_knowledge)
     # print('Joint constraints:', joint_constraints)
@@ -150,46 +152,63 @@ def calc_joint_knowledge(team_knowledge, team_size, weights=None, step_cost_flag
 
 
 
-def update_team_knowledge(team_knowledge, new_constraints, team_size, weights, step_cost_flag, knowledge_to_update = 'all'):
 
-    team_knowledge_updated = team_knowledge.copy()
+def update_team_knowledge(team_knowledge, kc_id, kc_reset_flag, new_constraints, team_size, weights, step_cost_flag, knowledge_to_update = 'all'):
+
+    print(colored('Updating team knowledge...', 'blue'))
+    team_knowledge_updated = copy.deepcopy(team_knowledge)
 
     if knowledge_to_update == 'all':
         knowledge_types = list(team_knowledge.keys())
     else:
-        knowledge_types = knowledge_to_update.copy()
+        knowledge_types = copy.deepcopy(knowledge_to_update)
 
 
     for knowledge_type in knowledge_types:
-        if knowledge_type != 'joint_knowledge' and  knowledge_type != 'common_knowledge':
-            knowledge = team_knowledge[knowledge_type].copy()
-            # print('Old_knowledge: ', knowledge)
-            knowledge.extend(new_constraints)
-            # print('New_knowledge: ', knowledge)
-            # print('New_knowledge: ', new_knowledge)
-            # print('New constraints: ', new_constraints)
 
-            # check for opposing constraints (since remove redundant constraints gives the perpendicular axes for opposing constraints)
-            
-            # opposing_constraints_flag, _, opposing_idx = check_opposing_constraints(knowledge)
-            # if not opposing_constraints_flag:
-            #     new_knowledge = BEC_helpers.remove_redundant_constraints(knowledge, weights, step_cost_flag)
-            # else:
-            #     while opposing_constraints_flag:
-            #         opp_idx_unique = []
-            #         for i in range(len(opposing_idx)):
-            #             opp_idx_unique.extend(x for x in opposing_idx[i] if x not in opp_idx_unique)
-            #         knowledge.pop(min(opp_idx_unique))
-            #         opposing_constraints_flag, _, opposing_idx = check_opposing_constraints(knowledge)
-            
-            new_knowledge = BEC_helpers.remove_redundant_constraints(knowledge, weights, step_cost_flag)
-            team_knowledge_updated[knowledge_type] = new_knowledge.copy()
+        print('Knowledge type: ', knowledge_type)
+        print('Knowledge constraints: ', team_knowledge[knowledge_type])
+        print('KC index: ', kc_id)
+        print('Knowledge len: ', len(team_knowledge[knowledge_type]))
+        print('New constraints: ', new_constraints)
+
+        if knowledge_type != 'joint_knowledge' and  knowledge_type != 'common_knowledge':
+            new_knowledge = copy.deepcopy(new_constraints)
+        
         elif  knowledge_type == 'joint_knowledge':
-            team_knowledge_updated[knowledge_type] = calc_joint_knowledge(team_knowledge_updated, team_size, weights=weights, step_cost_flag=step_cost_flag)
+            new_knowledge = calc_joint_knowledge(team_knowledge_updated, team_size)
+        
         elif  knowledge_type == 'common_knowledge':
-            team_knowledge_updated[knowledge_type] = calc_common_knowledge(team_knowledge_updated, team_size, weights=weights, step_cost_flag=step_cost_flag)
+            new_knowledge = calc_common_knowledge(team_knowledge_updated, team_size, weights=weights, step_cost_flag=step_cost_flag)
+        
         else:
-            print(colored('Unknow knowledge type to update.', 'red'))
+            print(colored('Unknown knowledge type to update.', 'red'))
+
+        if kc_id > len(team_knowledge[knowledge_type]):
+            raise RuntimeError('kc_id is greater than the number of knowledge constraints in the team knowledge.')
+
+        print('New knowledge: ', new_knowledge)
+
+        # if knowledge_type != 'joint_knowledge' and kc_id == len(team_knowledge[knowledge_type]):
+        #     print('Appendin knowledge...')
+        #     team_knowledge_updated[knowledge_type].append(new_knowledge)
+        # elif knowledge_type == 'joint_knowledge' and kc_id == len(team_knowledge[knowledge_type])/params.team_size:
+        #     print('Appendin joint knowledge...')
+        #     team_knowledge_updated[knowledge_type].append(new_knowledge)
+        if kc_id == len(team_knowledge[knowledge_type]):
+            print('Appendin knowledge...')
+            team_knowledge_updated[knowledge_type].append(new_knowledge)
+        elif knowledge_type != 'joint_knowledge' and kc_reset_flag:
+            print('Reset knowledge...')
+            team_knowledge_updated[knowledge_type][kc_id] = copy.deepcopy(new_knowledge)
+        elif  knowledge_type == 'joint_knowledge':
+            print('Updte joint knowledge. Always reset..')
+            team_knowledge_updated[knowledge_type][kc_id] = copy.deepcopy(new_knowledge)
+        else:
+            print('Extend knowledge..')
+            team_knowledge_updated[knowledge_type][kc_id].extend(new_knowledge)
+
+    print('team_knowledge_updated: ', team_knowledge_updated)
 
     return team_knowledge_updated
 
@@ -258,12 +277,11 @@ def check_and_update_variable_filter(min_subset_constraints_record = None, varia
 
 
 
-def find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints):
+def find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints, kc_id=None):
 
     # Sorts based on ascending order of knowledge
 
-    team_knowledge_level = calc_knowledge_level(team_knowledge, min_BEC_constraints)
-    # sorted_kl = sorted(team_knowledge_level)
+    team_knowledge_level = calc_knowledge_level(team_knowledge, min_BEC_constraints, kc_id=kc_id)
     sorted_kl = dict(sorted(team_knowledge_level.items(), key=lambda item: item[1]))
     print('sorted_kl: ', sorted_kl)
     ascending_order_of_knowledge = []
@@ -276,27 +294,79 @@ def find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints):
 
 
 
-def check_for_non_intersecting_constraints(min_constraints):
+def check_for_non_intersecting_constraints(constraints, weights, step_cost_flag, non_intersecting_constraints_count=0):
 
-    non_intersecting_constraints = True
+    # print('Checking for non-intersecting constraints in list:', constraints)
 
-    for constraint in min_constraints:
-        if LA.norm(constraint, 1) != 1:
-            non_intersecting_constraints = False
+    # check for non-intersecting constraints
+    all_unit_norm_flag = True
+    for cnst in constraints:
+        if LA.norm(cnst, 1) != 1:
+            all_unit_norm_flag = False
+    # print('all_unit_norm_flag: ', all_unit_norm_flag)
 
-    return non_intersecting_constraints
+    min_constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
+
+    # print('min constraints: ', min_constraints)
+
+    if not all_unit_norm_flag:
+        
+        # Method 1: crude check after redundancy removal. Assuming it would always result in unit constraints
+        non_intersecting_constraints_flag = True
+
+        for cnst in min_constraints:
+            if LA.norm(cnst, 1) != 1:
+                non_intersecting_constraints_flag = False
+
+    else:
+        # print('all((i==constraints[0]).all() for i in constraints) : ', all((i==constraints[0]).all() for i in constraints))
+
+        # all reduced constraints are in the original constraints (happens when there are intersecting unit norm constraints)
+        N_min_cnst_in_cnst_list = 0
+        for cnst in min_constraints:
+            if any((i==cnst).all() for i in constraints):
+                non_intersecting_constraints_flag = False
+                N_min_cnst_in_cnst_list += 1
+        
+        # print('N_min_cnst_in_cnst_list: ', N_min_cnst_in_cnst_list)
+
+        if N_min_cnst_in_cnst_list == len(min_constraints):
+            # print('Intersecting constraints...')
+            non_intersecting_constraints_flag = False
+        else:
+            # print('Constraints: ', constraints)
+            # print('Min constraints: ', min_constraints)
+            print(colored('Non-intersecting constraints!', 'red'))
+
+
+        # if len([i for i in min_constraints if i in constraints]) == len(min_constraints):
+        #     non_intersecting_constraints_flag = False
+        # elif len(min_constraints) == len(constraints):
+        #     non_intersecting_constraints_flag = False
+        # elif all((i==constraints[0]).all() for i in constraints):
+        #     non_intersecting_constraints_flag = False
+        # elif len(min_constraints)> 1 and np.abs(np.array(BEC_helpers.calc_solid_angles([min_constraints])) - np.pi) < 0.01:  # reduced constraints forms exactly quarter of a sphere. Not sure how accurate this condition is!
+        #     non_intersecting_constraints_flag = False
+        # else:
+        #     print('Constraints: ', constraints)
+        #     print('Min constraints: ', min_constraints)
+        #     raise RuntimeError('This is a weird case! All constraints are unit norm but also has redundant constraints!')
+
+    # print('non_intersecting_constraints_flag: ', non_intersecting_constraints_flag)
+
+    return non_intersecting_constraints_flag, non_intersecting_constraints_count+1
 
 
 
 
 
 
-def calc_knowledge_level(team_knowledge, min_unit_constraints, weights = None, step_cost_flag = False):
+def calc_knowledge_level(team_knowledge, min_unit_constraints, kc_id = None, weights = None, step_cost_flag = False, plot_flag = False, fig_title=''):
     # 
     
     
     def plot_text(constraints, knowledge, fig, i):
-        x_loc = [0.1, 0.3, 0.5, 0.7]
+        x_loc = [0.1, 0.3, 0.5, 0.7, 0.9]
         y_loc = 0.2
         fig.text(x_loc[i], y_loc, 'Knowledge level: ' + str(knowledge), fontsize=12)
         y_loc -= 0.03
@@ -307,9 +377,6 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, weights = None, s
             y_loc -= 0.02
         
         
-
-
-
     def calc_inverse_constraints():
         inv_constraints = []
         for k_id, k_type in enumerate(team_knowledge):
@@ -320,30 +387,15 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, weights = None, s
 
         return inv_constraints, inv_joint_constraints
 
-    # def label_axes(ax, weights=None):
-    #     ax.set_facecolor('white')
-    #     ax.xaxis.pane.fill = False
-    #     ax.yaxis.pane.fill = False
-    #     ax.zaxis.pane.fill = False
-    #     if weights is not None:
-    #         ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100/2)
-        
-    #     ax.set_xlabel('$\mathregular{w_0}$: Mud')
-    #     ax.set_ylabel('$\mathregular{w_1}$: Recharge')
-    #     ax.set_zlabel('$\mathregular{w_2}$: Action')
-
-    #     ax.view_init(elev=16, azim=-160)
-
-
 
     def calc_recursive_intersection_area(constraint_list, N_intersecting_sets, weights, step_cost_flag, fixed_constraint = []):
         
         N_sets = len(constraint_list)
         intersections_to_check = list(itertools.combinations(range(len(constraint_list)), N_intersecting_sets))
         intersection_area = 0
-        print('Constraint list: ', constraint_list)
-        print('Intersections to check: ', intersections_to_check)
-        print('Fixed constraint: ', fixed_constraint)
+        # print('Constraint list: ', constraint_list)
+        # print('Intersections to check: ', intersections_to_check)
+        # print('Fixed constraint: ', fixed_constraint)  # will always be part of the intersection
 
         for i in range(len(intersections_to_check)):
             constraints = []
@@ -352,36 +404,29 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, weights = None, s
 
             constraints.extend(fixed_constraint) # in case there is a fixed constraint
 
-            constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
-
-            if not check_for_non_intersecting_constraints(constraints):
-                print('Constraint combinations: ', intersections_to_check[i])
-                print('Constraints: ', constraints)
-                print('Area: ', (-1)**(N_intersecting_sets+1) * np.array(BEC_helpers.calc_solid_angles([constraints])))
+            if not check_for_non_intersecting_constraints(constraints, weights, step_cost_flag)[0]:
+                # print('Constraint combinations: ', intersections_to_check[i])
+                # print('Constraints: ', constraints)
+                
+                # remove redundant constraints before calculating area
+                constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
+                
+                # print('Min constraints: ', constraints)
 
                 intersection_area += (-1)**(N_intersecting_sets+1) * np.array(BEC_helpers.calc_solid_angles([constraints]))
-
-        #     intersection_area = calc_recursive_intersection_area(constraint_list, N_intersecting_sets+1, intersection_area, weights, step_cost_flag)
-
-        # else:
-        #     return intersection_area
-
-        print('N_intersecting_sets: ', N_intersecting_sets)
-        print('intersection_area: ', intersection_area)
+        
+        # print('N_intersecting_sets: ', N_intersecting_sets)
+        # print('intersection_area: ', intersection_area)
 
 
-        return 0 if N_intersecting_sets > N_sets else intersection_area + calc_recursive_intersection_area(constraint_list, N_intersecting_sets+1, weights, step_cost_flag)
+        return 0 if N_intersecting_sets > N_sets else intersection_area + calc_recursive_intersection_area(constraint_list, N_intersecting_sets+1, weights, step_cost_flag, fixed_constraint)
 
     
 
-    def calc_joint_knowledge_separately(team_knowledge, min_unit_constraints, weights, step_cost_flag):
+    def calc_joint_knowledge_separately(ind_intersection_constraints,  min_unit_constraints, weights, step_cost_flag, kc_id_list):
         
-        ind_intersection_constraints = []
-        for ind_constraints in team_knowledge['joint_knowledge']:
-            ind_intersection_constraints.append(ind_constraints)
-
-        print('ind_intersection_constraints: ', ind_intersection_constraints)
-        print('min_unit_constraints: ', min_unit_constraints)
+        # print('ind_intersection_constraints: ', ind_intersection_constraints)
+        # print('min_unit_constraints: ', min_unit_constraints)
 
         ind_union_constraints = copy.deepcopy(ind_intersection_constraints)
         ind_union_constraints.extend([min_unit_constraints])
@@ -389,261 +434,209 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, weights = None, s
         min_unit_BEC_knowledge_union = calc_recursive_intersection_area(ind_union_constraints, 1, weights, step_cost_flag)
         min_unit_BEC_knowledge_intersection = calc_recursive_intersection_area(ind_intersection_constraints, 1, weights, step_cost_flag, fixed_constraint = min_unit_constraints)
             
-        print('min_unit_BEC_knowledge_union :', min_unit_BEC_knowledge_union)
-        print('min_unit_BEC_knowledge_intersection :', min_unit_BEC_knowledge_intersection)
+        # print('min_unit_BEC_knowledge_union :', min_unit_BEC_knowledge_union)
+        # print('min_unit_BEC_knowledge_intersection :', min_unit_BEC_knowledge_intersection)
 
         return min_unit_BEC_knowledge_intersection/min_unit_BEC_knowledge_union
 
     
-    
+    # print(colored(fig_title, 'blue'))
+    # print('team_knowledge: ', team_knowledge)
+    # print('min_unit_constraints: ', min_unit_constraints)
     
     ######
     
     knowledge_level = {}
+    min_unit_BEC_knowledge_intersection = 0
+    min_unit_BEC_knowledge_union = 0
 
     # for visualizing knowledge
-    fig = plt.figure()
-    ax1 = fig.add_subplot(1, 4, 1, projection='3d')
-    ax2 = fig.add_subplot(1, 4, 2, projection='3d')
-    ax3 = fig.add_subplot(1, 4, 3, projection='3d')
-    ax4 = fig.add_subplot(1, 4, 4, projection='3d')
+    if plot_flag:
+        fig = plt.figure()
+        ax1 = fig.add_subplot(2, 3, 1, projection='3d')
+        ax2 = fig.add_subplot(2, 3, 2, projection='3d')
+        ax3 = fig.add_subplot(2, 3, 3, projection='3d')
+        ax4 = fig.add_subplot(2, 3, 4, projection='3d')
+        ax5 = fig.add_subplot(2, 3, 5, projection='3d')
+        fig.suptitle(fig_title, fontsize=16)
+
+    # specific knowledge component or overall knowledge
+    if kc_id is None:
+        kc_id_list = range(len(team_knowledge['p1']))
+    else:
+        kc_id_list = [kc_id]
+
 
     for knowledge_id, knowledge_type in enumerate(team_knowledge):
 
-        print(colored('Calculating knowledge level for: ', 'blue'), knowledge_type)
+        # print(colored('Calculating knowledge level for: ', 'blue'), knowledge_type)
+        # print('knowledge constraints: ', team_knowledge[knowledge_type])
+        # combine constraints of all KCs
+        team_knowledge_constraints = []
+        first_index = True
+        # for kc_index in kc_id_list:
+        #     print('KC index: ', kc_index)
+        #     for i in range(len(team_knowledge[knowledge_type][kc_index])):
+        #         if first_index:
+        #             print('team_knowledge[knowledge_type][kc_index][i]: ', team_knowledge[knowledge_type][kc_index][i])
+        #             team_knowledge_constraints.append([team_knowledge[knowledge_type][kc_index][i]])
+        #         else:
+        #             print(colored('team_knowledge_constraints: ' + str(team_knowledge_constraints), 'blue' ))
+        #             team_knowledge_constraints[i].extend(team_knowledge[knowledge_type][kc_index][i])
+        #     first_index = False
+        
+        for kc_index in kc_id_list:
+            # print('KC index: ', kc_index)
+            if knowledge_type == 'joint_knowledge':
+                # print('team_knowledge[knowledge_type][kc_index]: ', team_knowledge[knowledge_type][kc_index])
+                for i in range(len(team_knowledge[knowledge_type][kc_index])):
+                    # print('team_knowledge[knowledge_type][kc_index][i]: ', team_knowledge[knowledge_type][kc_index][i])
+                    # if len(team_knowledge_constraints) == 0:
+                    if first_index:
+                        team_knowledge_constraints.append(utils_teams.flatten_list(copy.deepcopy(team_knowledge[knowledge_type][kc_index][i])))
+                        # team_knowledge_constraints = copy.deepcopy(team_knowledge[knowledge_type][kc_index][i])
+                        # print(colored('team_knowledge_constraints flattened: ' + str(team_knowledge_constraints), 'blue' ))
+                    else:
+                        # print(colored('team_knowledge_constraints: ' + str(team_knowledge_constraints), 'blue' ))
+                        # print('i: ', i)
+                        team_knowledge_constraints[i].extend(team_knowledge[knowledge_type][kc_index][i])
+                first_index = False
+            else:
+                # print('team_knowledge[knowledge_type][kc_index]: ', team_knowledge[knowledge_type][kc_index])
+                if len(team_knowledge_constraints) == 0:
+                    team_knowledge_constraints = copy.deepcopy(team_knowledge[knowledge_type][kc_index])
+                else:
+                    team_knowledge_constraints.extend(team_knowledge[knowledge_type][kc_index])
+
+
+            
+
+
+
+        plot_constraints = copy.deepcopy(team_knowledge_constraints)
+
+        # print('team_knowledge_constraints: ', team_knowledge_constraints)
 
         if knowledge_type == 'joint_knowledge':
             ## Knowledge metric for joint knowledge
-            
-            # calculte joint knowledge area (area of p1 + area of P2 + ... - intersection of {p1, p2, ...})
-            ind_knowledge = []
-            ind_intersection_constraints = []
-            for ind_constraints in team_knowledge['joint_knowledge']:
-                ind_knowledge.append(BEC_helpers.calc_solid_angles([ind_constraints]))
-                ind_intersection_constraints.extend(ind_constraints)
-            
-            plot_ax = ax4
-            plot_constraints = ind_intersection_constraints
-
-            # min_ind_intersection_constraints = BEC_helpers.remove_redundant_constraints(ind_intersection_constraints, weights, step_cost_flag)
-            min_ind_intersection_constraints = remove_redundant_constraints_team(ind_intersection_constraints, weights, step_cost_flag)
-
-            print('Flag - Non intersecting individual constraints', check_for_non_intersecting_constraints(min_ind_intersection_constraints))
-
-            if not check_for_non_intersecting_constraints(min_ind_intersection_constraints):
-                
-                print('min_ind_intersection_constraints: ', min_ind_intersection_constraints)
-                knowledge_area = sum(np.array(ind_knowledge)) - np.array(BEC_helpers.calc_solid_angles([min_ind_intersection_constraints]))
-                
-                # knowledge area and unit constraints intersection
-                unit_intersection_constraints = copy.deepcopy(min_ind_intersection_constraints)
-                unit_intersection_constraints.extend(min_unit_constraints)
-                print('Unit intersection constraints: ', unit_intersection_constraints)
-
-                min_unit_intersection_constraints = remove_redundant_constraints_team(unit_intersection_constraints, weights, step_cost_flag)
-
-                print('Flag - Non intersecting unit constraints', check_for_non_intersecting_constraints(min_unit_intersection_constraints))
-
-                if not check_for_non_intersecting_constraints(min_unit_intersection_constraints):
-                    min_unit_BEC_knowledge_intersection = np.array(BEC_helpers.calc_solid_angles([min_unit_intersection_constraints]))
-
-                # calculate relevant areas
-                min_unit_area = np.array(BEC_helpers.calc_solid_angles([min_unit_constraints]))
-                min_unit_BEC_knowledge_union = min_unit_area + knowledge_area - min_unit_BEC_knowledge_intersection
-                
-                # # check if the knowledge area is a subset of the unit BEC area
-                if min_unit_BEC_knowledge_intersection == knowledge_area:
-                    knowledge_level[knowledge_type] = 1
-                else:
-                #     kl = min_unit_BEC_knowledge_intersection/min_unit_BEC_knowledge_union
-                #     knowledge_level[knowledge_type] = min(1, max(0, kl))  # limit between 0 and 1. To Check later!
-                
-                    knowledge_level[knowledge_type] = min_unit_BEC_knowledge_intersection/min_unit_BEC_knowledge_union
-            
-            else:
-                # joint knowledge is disjointed for the team and thus calculate knowledge level by considering knowledge gain of each individual (but is this method in alignment with how joint knowledge is defined?)
-                # Yes it does. The definition of JK is that as long as one person in the team knows something about the robot, the team is assumed to know about the robot. Joint knowledge would be the combination/sum of what each person knows about the robot.
-                print(colored('Disjoint sets of joint knowledge for the team.', 'red'))
-
-                knowledge_level[knowledge_type] = calc_joint_knowledge_separately(team_knowledge, min_unit_constraints, weights, step_cost_flag)
-
-
-
-
-            ############## When opposing constraints were calculated separately #####################
-            # # check for opposing constraints (since remove redundant constraints gives the perpendicular axes for opposing constraints)
-            # opposing_constraints = False
-            # for cnst in unit_intersection_constraints:
-            #     for cnst2 in unit_intersection_constraints:
-            #         if (np.array_equal(-cnst, cnst2)):
-            #             opposing_constraints = True                
-            
-            # if opposing_constraints:
-            #     min_unit_BEC_knowledge_intersection = 0
-            #     # print('opposing_constraints: ', opposing_constraints)
-            # else:
-            #     # min_unit_intersection_constraints = BEC_helpers.remove_redundant_constraints(unit_intersection_constraints, weights, step_cost_flag)
-            #     min_unit_intersection_constraints = remove_redundant_constraints_team(unit_intersection_constraints, weights, step_cost_flag)
-                
-            #     min_unit_BEC_knowledge_intersection = np.array(BEC_helpers.calc_solid_angles([min_unit_intersection_constraints]))            
-            ############## When opposing constraints were calculated separately #####################
-
+        
+            knowledge_level[knowledge_type] = calc_joint_knowledge_separately(team_knowledge_constraints, min_unit_constraints, weights, step_cost_flag, kc_id_list)
+            if plot_flag:
+                plot_ax = ax5
 
 
         else:
-        # Methods using particle filters - unreliable; varies based on the number of particles!
-        #     # print('min_BEC_constraints: ', [min_BEC_constraints])
-        #     min_BEC_area = BEC_helpers.calc_solid_angles([min_BEC_constraints])
-        #     # print('knowledge: ', team_knowledge[knowledge_type])
-        #     knowledge_area = BEC_helpers.calc_solid_angles([team_knowledge[knowledge_type]])
-            
-        #     # n_particles = 5000
-        #     n_particles = 500
-        #     knowledge_particles = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform(team_knowledge[knowledge_type], n_particles))
-
-        #     const_id = []
-        #     for j, x in enumerate(knowledge_particles.positions):
-
-        #         all_constraints_satisfied = True
-        #         for constraint in min_BEC_constraints:
-        #             dot = constraint.dot(x.T)
-
-        #             if dot < 0:
-        #                 all_constraints_satisfied = False
-                
-        #         if all_constraints_satisfied:
-        #             const_id.append(j)
-            
-        #     BEC_overlap_area = min(min_BEC_area, len(const_id)/n_particles * np.array(knowledge_area))
-            
-        #     # # Method 1: Calculates the knowledge level (0 to 1) based on two factors: ratio of BEC area to knowledge area and % of overlap of BEC area with knowledge area
-        #     # knowledge_spread = np.array(knowledge_area)/np.array(min_BEC_area)
-        #     # BEC_overlap_ratio = BEC_overlap_area/np.array(min_BEC_area)
-        #     # knowledge_level[knowledge_type] = 0.5*BEC_overlap_ratio + 0.5/knowledge_spread
-
-        #     # Method 2: Calculate knowledge level based on the ratio of BEC overlap area with the total knowledge area
-        #     knowledge_level[knowledge_type] = BEC_overlap_area/np.array(knowledge_area)
-
-            ##############################################
-
             # Method 3: Use Jaccard's index for set similarity (Intersection over Union)
             
-            if knowledge_type == 'common_knowledge':
-                plot_ax = ax3
-            elif knowledge_type == 'p1':
-                plot_ax = ax1
-            elif knowledge_type == 'p2':
-                plot_ax = ax2
-            plot_constraints = team_knowledge[knowledge_type]
-
-            # print('min_BEC_constraints: ', [min_BEC_constraints])
+            # double check that these are indeed minimum constraints
             min_unit_area = np.array(BEC_helpers.calc_solid_angles([min_unit_constraints]))
-            
-            knowledge_area = np.array(BEC_helpers.calc_solid_angles([team_knowledge[knowledge_type]]))
 
-            min_unit_intersection_constraints = min_unit_constraints.copy()
+            # remove redundant constraints before calculating area
+            team_knowledge_constraints = BEC_helpers.remove_redundant_constraints(team_knowledge_constraints, weights, step_cost_flag)
+            knowledge_area = np.array(BEC_helpers.calc_solid_angles([team_knowledge_constraints]))
+
+            min_unit_intersection_constraints = copy.deepcopy(min_unit_constraints)
             # print('unit_intersection_constraints before update: ', min_unit_intersection_constraints)
-            min_unit_intersection_constraints.extend(team_knowledge[knowledge_type])
+            min_unit_intersection_constraints.extend(team_knowledge_constraints)
             # print('unit_intersection_constraints: ', min_unit_intersection_constraints)
 
-            ############## When opposing constraints were calculated separately #####################
-
-            # check for opposing constraints (since remove redundant constraints gives the perpendicular axes for opposing constraints)
-            # opposing_constraints = False
-            # for cnst in min_unit_intersection_constraints:
-            #     for cnst2 in min_unit_intersection_constraints:
-            #         if (np.array_equal(-cnst, cnst2)):
-            #             opposing_constraints = True
-            
-            # if not opposing_constraints:
-            #     # min_unit_intersection_constraints = BEC_helpers.remove_redundant_constraints(min_unit_intersection_constraints, weights, step_cost_flag)
-            #     min_unit_intersection_constraints = remove_redundant_constraints_team(min_unit_intersection_constraints, weights, step_cost_flag)
-
-            #     min_unit_BEC_knowledge_intersection = np.array(BEC_helpers.calc_solid_angles([min_unit_intersection_constraints]))
-            # else:
-            #     print('Opposing contraints with unit knowledge found for ', knowledge_type )
-            #     print('Extended unit constraints: ', min_unit_intersection_constraints)
-            #     min_unit_BEC_knowledge_intersection = 0
-
-            # There should not be a zero constraint anymore!
-            # zero_cnst = False
-            # for knwlg_cnst in team_knowledge[knowledge_type]:
-            #     if (knwlg_cnst == 0).all():
-            #         zero_cnst = True
-            
-            # if zero_cnst:
-            #     print(colored('Found a zero constraint!', 'red'))
-            #     print('min_unit_intersection_constraints: ', min_unit_intersection_constraints)
-            #     print('min_BEC_knowledge_intersection: ', min_unit_BEC_knowledge_intersection)
-
-            # if min_unit_BEC_knowledge_intersection > 0:
-            #     min_unit_BEC_knowledge_union = min_unit_area + knowledge_area - min_unit_BEC_knowledge_intersection
-            # else:
-            #     min_unit_BEC_knowledge_union = 1
-
-             ############## When opposing constraints were calculated separately #####################
-            
-            min_unit_intersection_constraints = BEC_helpers.remove_redundant_constraints(min_unit_intersection_constraints, weights, step_cost_flag)
-            
-            if not check_for_non_intersecting_constraints(min_unit_intersection_constraints):
-                min_unit_BEC_knowledge_intersection = np.array(BEC_helpers.calc_solid_angles([min_unit_intersection_constraints]))
+            if not check_opposing_constraints(min_unit_intersection_constraints)[0]:
+                # print('min_unit_intersection_constraints: ', min_unit_intersection_constraints)
+                # min_unit_intersection_constraints = BEC_helpers.remove_redundant_constraints(min_unit_intersection_constraints, weights, step_cost_flag)
                 
-                min_unit_BEC_knowledge_union = min_unit_area + knowledge_area - min_unit_BEC_knowledge_intersection
+                if not check_for_non_intersecting_constraints(min_unit_intersection_constraints, weights, step_cost_flag)[0]:
+                    # remove redundant constraints before calculating area
+                    min_unit_intersection_constraints = BEC_helpers.remove_redundant_constraints(min_unit_intersection_constraints, weights, step_cost_flag)
+                    min_unit_BEC_knowledge_intersection = np.array(BEC_helpers.calc_solid_angles([min_unit_intersection_constraints]))
+                    min_unit_BEC_knowledge_union = min_unit_area + knowledge_area - min_unit_BEC_knowledge_intersection
 
-                # check if the knowledge area is a subset of the BEC area
-                if min_unit_BEC_knowledge_intersection == knowledge_area:
-                    knowledge_level[knowledge_type] = 1
+                    # check if the knowledge area is a subset of the BEC area
+                    if np.abs(min_unit_BEC_knowledge_intersection - knowledge_area) < 0.001:
+                        knowledge_level[knowledge_type] = [np.array(1.0)]
+                    else:
+                        kl = min_unit_BEC_knowledge_intersection/min_unit_BEC_knowledge_union
+                        # knowledge_level[knowledge_type] = copy.deepcopy(kl)
+                        knowledge_level[knowledge_type] = [np.array(min(1, max(0, kl)))]
                 else:
-                    kl = min_unit_BEC_knowledge_intersection/min_unit_BEC_knowledge_union
-                    knowledge_level[knowledge_type] = kl
-                    # knowledge_level[knowledge_type] = min(1, max(0, kl))  
+                    knowledge_level[knowledge_type] = [np.array(0.0)]  # if constraints need to be relaxed/reset it would have happened before when particles were being reset. Constraints should not be reset unless the associated particles are reset!
             else:
-                knowledge_level[knowledge_type] = 0  # if constraints need to be relaxed/reset it would have happened before when particles were being reset. Constraints should not be reset unless the associated particles are reset!
-
+                    knowledge_level[knowledge_type] = [np.array(0.0)] # if constraints need to be relaxed/reset it would have happened before when particles were being reset. Constraints should not be reset unless the associated particles are reset!
 
             # Method 4: An improved method for disjoint sets to see how close the disjoint is Generalized Intersection over Union (see https://giou.stanford.edu/)
             # TODO: Later
 
-        # print(colored('Calculated knowledge level for: ', 'blue'), knowledge_type)
-        print('min_unit_constraints: ', min_unit_constraints)
-        print('knowledge constraints: ', team_knowledge[knowledge_type])
-        print('min_unit_intersection_constraints: ', min_unit_intersection_constraints)
-        print('min unit area: ', min_unit_area)
-        print('knowledge_area: ', knowledge_area)
-        print('min_unit_BEC_knowledge_intersection: ', min_unit_BEC_knowledge_intersection)
-        print('min_unit_BEC_knowledge_union: ', min_unit_BEC_knowledge_union)
-        print('knowledge_level_unit: ', knowledge_level[knowledge_type])
 
-        # visualize constraint spaces
 
-        # plot actual knowledge constraints for this knowledge type
-        utils_teams.visualize_planes_team(min_unit_constraints, fig=fig, ax=plot_ax, alpha=0.5)
-        ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(min_unit_constraints)
-        poly = Polyhedron.Polyhedron(ieqs=ieqs)
-        BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=plot_ax, plot_ref_sphere=False, color = 'b')
 
-        # plot unit constraints
-        utils_teams.visualize_planes_team(plot_constraints, fig=fig, ax=plot_ax)
+            # sanity check
+            knowledge_not_zero_flag = False
+            if knowledge_type == 'joint_knowledge' or knowledge_type == 'common_knowledge':
+                for know_id, know_type in enumerate(team_knowledge):
+                    if 'p' in know_type:
+                        if knowledge_level[know_type] !=0:
+                            knowledge_not_zero_flag = True
+                if not knowledge_not_zero_flag:
+                    if knowledge_level[knowledge_type] != 0:
+                        # raise RuntimeError('Knowledge level should be zero if there is no knowledge for any individual!')
+                        print(colored('Knowledge level should be zero if there is no knowledge for any individual!', 'red'))
+                        knowledge_level[knowledge_type] =  [np.array(0.0)]
 
-        min_plot_constraints = BEC_helpers.remove_redundant_constraints(plot_constraints, weights, step_cost_flag)
-        if not check_for_non_intersecting_constraints(min_plot_constraints):
-            ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(plot_constraints)
-            poly = Polyhedron.Polyhedron(ieqs=ieqs)
-            BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=plot_ax, plot_ref_sphere=False, alpha=0.75)
-        elif knowledge_type == 'joint_knowledge':
-            for cnst in team_knowledge['joint_knowledge']:
-                print(cnst)
-                ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(cnst)
-                poly = Polyhedron.Polyhedron(ieqs=ieqs)
-                BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=plot_ax, plot_ref_sphere=False, alpha=0.75)
 
-        plot_ax.set_title(knowledge_type)
-        plot_text(plot_constraints, knowledge_level[knowledge_type], fig, knowledge_id)
+
+            # Plot knowledge
+            if plot_flag:
+                if knowledge_type == 'common_knowledge':
+                    plot_ax = ax4
+                elif knowledge_type == 'p1':
+                    plot_ax = ax1
+                elif knowledge_type == 'p2':
+                    plot_ax = ax2
+                elif knowledge_type == 'p3':
+                    plot_ax = ax3
 
         
 
-        # if zero_cnst:
-        #     print('Found a zero constraint. Knowledge level: ', knowledge_level[knowledge_type])
+
+        # print(colored('Calculated knowledge level for: ', 'blue'), knowledge_type)
+        # print('min_unit_constraints: ', min_unit_constraints)
+        # print('knowledge constraints: ', team_knowledge_constraints)
+        # print('min_unit_intersection_constraints: ', min_unit_intersection_constraints)
+        # print('min unit area: ', min_unit_area)
+        # print('knowledge_area: ', knowledge_area)
+        # print('min_unit_BEC_knowledge_intersection: ', min_unit_BEC_knowledge_intersection)
+        # print('min_unit_BEC_knowledge_union: ', min_unit_BEC_knowledge_union)
+        # print('knowledge_level_unit: ', knowledge_level[knowledge_type])
+
+        # visualize constraint spaces
+        if plot_flag:
+            # plot actual knowledge constraints for this knowledge type
+            utils_teams.visualize_planes_team(min_unit_constraints, fig=fig, ax=plot_ax, alpha=0.5)
+            ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(min_unit_constraints)
+            poly = Polyhedron.Polyhedron(ieqs=ieqs)
+            BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=plot_ax, plot_ref_sphere=False, color = 'b')
+
+ 
+            if knowledge_type != 'joint_knowledge':
+                if not check_for_non_intersecting_constraints(plot_constraints, weights, step_cost_flag)[0]:
+                    # plot unit constraints
+                    utils_teams.visualize_planes_team(plot_constraints, fig=fig, ax=plot_ax)
+                    ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(plot_constraints)
+                    poly = Polyhedron.Polyhedron(ieqs=ieqs)
+                    BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=plot_ax, plot_ref_sphere=False, alpha=0.75)
+            else:
+                # for cnsts in team_knowledge['joint_knowledge']:
+                for kc_index in kc_id_list:
+                    for i in range(len(team_knowledge['joint_knowledge'][kc_index])):
+                        cnst = team_knowledge['joint_knowledge'][kc_index][i]
+                        print(cnst)
+                        ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(cnst)
+                        poly = Polyhedron.Polyhedron(ieqs=ieqs)
+                        BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=plot_ax, plot_ref_sphere=False, alpha=0.75)
+
+            plot_ax.set_title(knowledge_type)
+            plot_text(plot_constraints, knowledge_level[knowledge_type], fig, knowledge_id)
+
+        
 
     return knowledge_level
 
@@ -734,11 +727,11 @@ def particles_for_demo_strategy(demo_strategy, team_knowledge, team_particles, t
     
     # particles to consider while generating demos
     if demo_strategy =='individual_knowledge_low':
-        ind_knowledge_ascending = find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints)
+        ind_knowledge_ascending = find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints, kc_id=0) # kc_id matters only when team members have a different prior
         knowledge_id = ind_knowledge_ascending[teammate_idx]
     
     elif demo_strategy == 'individual_knowledge_high':
-        ind_knowledge_ascending = find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints)
+        ind_knowledge_ascending = find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints, kc_id=0)
         knowledge_id = ind_knowledge_ascending[len(ind_knowledge_ascending) - teammate_idx - 1]
     
     elif demo_strategy == 'common_knowledge' or demo_strategy == 'joint_knowledge':
@@ -819,13 +812,14 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_prior=N
         particles_team[member_id] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles))
 
         if team_prior is not None:
-            particles_team[member_id].update(team_prior[member_id])
+            for cnst in team_prior[member_id]:  
+                particles_team[member_id].update(cnst)
 
     
     # particles for aggregated team knowledge - common knowledge
     particles_team['common_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles))
     if team_prior is not None:
-        team_prior['common_knowledge'] = calc_common_knowledge(team_prior, team_size, weights, step_cost_flag)
+        team_prior['common_knowledge'] = [calc_common_knowledge(team_prior, team_size, weights, step_cost_flag)]
         particles_team['common_knowledge'].update(team_prior['common_knowledge'])
     
 
@@ -833,8 +827,8 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_prior=N
     # method 1
     particles_team['joint_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles))
     if team_prior is not None:
-        team_prior['joint_knowledge'] = calc_joint_knowledge(team_prior, team_size, weights, step_cost_flag)
-        particles_team['joint_knowledge'].update_jk(team_prior['joint_knowledge'])
+        team_prior['joint_knowledge'] = [calc_joint_knowledge(team_prior, team_size)]
+        particles_team['joint_knowledge'].update_jk(team_prior['joint_knowledge'][0])
     
     # # method 2
     # if team_prior is not None:
@@ -858,6 +852,7 @@ def show_demonstrations(unit, particles_demo, mdp_class, weights, loop_count, vi
     # print('Unit to demonstrate:', unit)
 
     unit_constraints = []
+    demo_ids = []
     running_variable_filter_unit = unit[0][4]
 
     n = 1
@@ -866,6 +861,7 @@ def show_demonstrations(unit, particles_demo, mdp_class, weights, loop_count, vi
         if viz_flag:
             subunit[0].visualize_trajectory(subunit[1])
         unit_constraints.extend(subunit[3])
+        demo_ids.append(subunit[2])
         
         # debug
         # print('Constraint ', n, 'for this unit: ', subunit[3])
@@ -876,7 +872,7 @@ def show_demonstrations(unit, particles_demo, mdp_class, weights, loop_count, vi
 
         n += 1
 
-    return unit_constraints, running_variable_filter_unit
+    return unit_constraints, demo_ids, running_variable_filter_unit
 
 
 
@@ -1134,7 +1130,7 @@ def visualize_team_knowledge_constraints(BEC_constraints, team_knowledge, unit_k
 
     
     #########
-    print('Plotting team knowledge constraints..')
+    print(colored('Plotting team knowledge constraints..', 'blue'))
     n_subplots = len(team_knowledge)
     if fig == None:
         # fig = plt.subplots(n_subplots)
@@ -1142,8 +1138,19 @@ def visualize_team_knowledge_constraints(BEC_constraints, team_knowledge, unit_k
     i = 0
 
     for knowledge_id, knowledge_type  in enumerate(team_knowledge):
+        constraints = []
         if 'p' in knowledge_type or 'knowledge' in knowledge_type:
-            constraints = team_knowledge[knowledge_type]
+
+            for kc_id in range(len(team_knowledge[knowledge_type])):
+                if kc_id == 0:
+                    constraints = copy.deepcopy(team_knowledge[knowledge_type][0])
+                    print('constraints so far: ', constraints)
+                elif knowledge_type == 'joint_knowledge':
+                    for j in range(params.team_size):
+                        constraints[j].extend(team_knowledge[knowledge_type][kc_id][j])
+                else:
+                    constraints.extend(team_knowledge[knowledge_type][kc_id])
+            # constraints = team_knowledge[knowledge_type]
             print('knowledge type: ', knowledge_type)
             print('constraints: ', constraints)
             if i == 0:
@@ -1220,7 +1227,7 @@ def visualize_team_knowledge_constraints(BEC_constraints, team_knowledge, unit_k
     fig.canvas.mpl_connect('motion_notify_event', on_move)
 
     plt.show()
-    fig.savefig('plots/' + plot_filename +'.png', dpi=300)
+    # fig.savefig('plots/' + plot_filename +'.png', dpi=300)
     # plt.pause(10)
     # plt.close()
 
@@ -1293,7 +1300,7 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, variable_filter
     unit = []
 
     # impose prior
-    min_BEC_constraints_running = prior.copy()
+    min_BEC_constraints_running = copy.deepcopy(prior)
 
     # # count how many nonzero constraints are present for each reward weight (i.e. variable) in the minimum BEC constraints
     # # (which are obtained using one-step deviations). mask variables in order of fewest nonzero constraints for variable scaffolding
@@ -1308,7 +1315,7 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, variable_filter
     # nonzero_counter = nonzero_counter.flatten()
 
     # variable_filter, nonzero_counter = BEC_helpers.update_variable_filter(nonzero_counter)
-    running_variable_filter = variable_filter.copy()
+    running_variable_filter = copy.deepcopy(variable_filter)
     # print('variable filter: {}'.format(variable_filter))
 
     # clear the demonstration generation log
@@ -1672,6 +1679,397 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, variable_filter
 
 
 
+
+
+
+def check_unit_learning_goal_reached(team_knowledge, min_unit_constraints, kc_id):
+
+    
+    check_unit_learning_goal_reached = False
+    
+    knowledge_level = calc_knowledge_level(team_knowledge, min_unit_constraints, kc_id)
+    
+    # if knowledge_level['common_knowledge'] > 0.7:
+    #     check_unit_learning_goal_reached = True
+    knowledge_types = list(team_knowledge.keys())
+
+    check_unit_learning_goal_reached = True
+
+    print('knowledge_level: ', knowledge_level)
+
+    for ind_knowledge in knowledge_types:
+        if 'p' in ind_knowledge:
+            print('ind_knowledge[kc_id][0]: ', type(np.array(knowledge_level[ind_knowledge][0])))
+            print('params.learning_goal: ', type(params.learning_goal))
+            if np.array(knowledge_level[ind_knowledge][0]).astype(float) < params.learning_goal:
+                check_unit_learning_goal_reached = False
+    
+
+    return check_unit_learning_goal_reached
+
+
+
+
+
+
+def compute_counterfactuals_team(args):
+    data_loc, model_idx, env_idx, w_human_normalized, env_filename, trajs_opt, particles, min_BEC_constraints_running, step_cost_flag, summary_len, variable_filter, mdp_features, consider_human_models_jointly = args
+
+    skip_env = False
+
+    # if the mdp has a feature that is meant to be filtered out, then skip this environment
+    if variable_filter.dot(mdp_features.T) > 0:
+        skip_env = True
+
+    if not skip_env:
+        with open(env_filename, 'rb') as f:
+            wt_vi_traj_env = pickle.load(f)
+
+        agent = wt_vi_traj_env[0][1]
+        weights = agent.mdp.weights
+
+        human = copy.deepcopy(agent)
+        mdp = human.mdp
+        mdp.weights = w_human_normalized
+        vi_human = ValueIteration(mdp, sample_rate=1)
+        vi_human.run_vi()
+
+        if not vi_human.stabilized:
+            skip_env = True
+            print(colored('Skipping environment' + str(env_idx) + '...', 'red'))
+
+    if not skip_env:
+        # only consider counterfactual trajectories from human models whose value iteration have converged and whose
+        # mdp does not have a feature that is meant to be filtered out
+        # best_human_trajs_record_env = []
+        constraints_env = []
+        info_gain_env = []
+        # human_rewards_env = []
+        overlap_in_opt_and_counterfactual_traj_env = []
+
+        for traj_idx, traj_opt in enumerate(trajs_opt):
+            constraints = []
+
+            # # a) accumulate the reward features and generate a single constraint
+            # mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
+            # traj_hyp = mdp_helpers.rollout_policy(vi_human.mdp, vi_human)
+            # mu_sb = vi_human.mdp.accumulate_reward_features(traj_hyp, discount=True)
+            # constraints.append(mu_sa - mu_sb)
+            # best_human_trajs_record = [] # for symmetry with below
+            # best_human_reward = weights.dot(mu_sb.T)  # for symmetry with below
+
+            # b) contrast differing expected feature counts for each state-action pair along the agent's optimal trajectory
+            # best_human_trajs_record = []
+            # best_human_reward = 0
+            for sas_idx in range(len(traj_opt)):
+                # reward features of optimal action
+                mu_sa = mdp.accumulate_reward_features(traj_opt[sas_idx:], discount=True)
+
+                sas = traj_opt[sas_idx]
+                cur_state = sas[0]
+
+                # obtain all optimal trajectory rollouts according to the human's model (assuming that it's a reasonable policy that has converged)
+                human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
+
+                cur_best_reward = float('-inf')
+                best_reward_features = []
+                best_human_traj = []
+                # select the human's possible trajectory that has the highest true reward (i.e. give the human's policy the benefit of the doubt)
+                for traj in human_opt_trajs:
+                    mu_sb = mdp.accumulate_reward_features(traj, discount=True)  # the human and agent should be working with identical mdps
+                    reward_hyp = weights.dot(mu_sb.T)
+                    if reward_hyp > cur_best_reward:
+                        cur_best_reward = reward_hyp
+                        best_reward_features = mu_sb
+                        best_human_traj = traj
+
+                # # todo: for testing how much computation and time I save by not doing a recursive rollout
+                # best_human_traj = mdp_helpers.rollout_policy(vi_human.mdp, vi_human, cur_state, [])
+                # best_reward_features = mdp.accumulate_reward_features(best_human_traj,
+                #                                        discount=True)  # the human and agent should be working with identical mdps
+                # cur_best_reward = weights.dot(best_reward_features.T)
+
+                # only store the reward of the full trajectory
+                # if sas_idx == 0:
+                #     best_human_reward = cur_best_reward
+                #     traj_opt_feature_count = mu_sa
+                constraints.append(mu_sa - best_reward_features)
+                # best_human_trajs_record.append(best_human_traj)
+
+            if len(constraints) > 0:
+                constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
+
+            if particles is not None:
+                info_gain = particles.calc_info_gain(constraints)
+            else:
+                info_gain = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, constraints,
+                                                                   weights, step_cost_flag)
+
+            # human_rewards_env.append(best_human_reward)
+            # best_human_trajs_record_env.append(best_human_trajs_record)
+            constraints_env.append(constraints)
+            info_gain_env.append(info_gain)
+
+            # if not consider_human_models_jointly:
+            #     # you should only consider the overlap for the first counterfactual human trajectory (as opposed to
+            #     # counterfactual trajectories that could've arisen from states after the first state)
+            #     overlap_pct = BEC_helpers.calculate_counterfactual_overlap_pct(best_human_trajs_record[0], traj_opt)
+            #
+            #     overlap_in_opt_and_counterfactual_traj_env.append(overlap_pct)
+
+    # else just populate with dummy variables
+    else:
+        # best_human_trajs_record_env = [[[]] for i in range(len(trajs_opt))]
+        constraints_env = [[] for i in range(len(trajs_opt))]
+        info_gain_env = [0 for i in range(len(trajs_opt))]
+        if not consider_human_models_jointly:
+            overlap_in_opt_and_counterfactual_traj_env = [float('inf') for i in range(len(trajs_opt))]
+        # human_rewards_env = [np.array([[0]]) for i in range(len(trajs_opt))]
+
+    if summary_len is not None:
+        with open('models/' + data_loc + '/counterfactual_data_' + str(summary_len) + '/model' + str(model_idx) +
+                  '/cf_data_env' + str(env_idx).zfill(5) + '.pickle', 'wb') as f:
+            pickle.dump(constraints_env, f)
+        # print('Info gain for Summary length ' + str(summary_len) + ' of model ' + str(model_idx) + 'of env' + str(env_idx) + 'is' + str(info_gain_env) + '...')
+
+    if consider_human_models_jointly:
+        return info_gain_env
+    else:
+        return info_gain_env, overlap_in_opt_and_counterfactual_traj_env
+
+
+
+def remove_redundant_constraints_team(constraints, weights, step_cost_flag):
+    '''
+    Summary: Remove redundant constraints
+    '''
+    if step_cost_flag:
+        # Remove redundant constraint that do not change the underlying intersection between the BEC region and the
+        # L1 constraints
+        try:
+            BEC_length_all_constraints, nonredundant_constraint_idxs = BEC_helpers.calculate_BEC_length(constraints, weights,
+                                                                                            step_cost_flag)
+            print('')
+        except:
+            # a subset of these constraints aren't numerically stable (e.g. you can have a constraint that's ever so slightly
+            # over the ground truth reward weight and thus fail to yield a proper polygonal convex hull. remove the violating constraints
+            A, b = BEC_helpers.constraints_to_halfspace_matrix(constraints, weights, step_cost_flag)
+            violating_idxs = BEC_helpers.indicate_violating_constraints(A, b)
+
+            for violating_idx in sorted(violating_idxs[0], reverse=True):
+                del constraints[violating_idx]
+
+            BEC_length_all_constraints, nonredundant_constraint_idxs = BEC_helpers.calculate_BEC_length(constraints, weights,
+                                                                                            step_cost_flag)
+            
+
+        nonredundant_constraints = [constraints[x] for x in nonredundant_constraint_idxs]
+
+        for query_idx, query_constraint in enumerate(constraints):
+            if query_idx not in nonredundant_constraint_idxs:
+                pass
+            else:
+                # see if this is truly non-redundant or crosses an L1 constraint exactly where another constraint does
+                constraints_other = []
+                for constraint_idx, constraint in enumerate(nonredundant_constraints):
+                    if not BEC_helpers.equal_constraints(query_constraint, constraint):
+                        constraints_other.append(constraint)
+                if len(constraints_other) > 0:
+                    BEC_length = BEC_helpers.calculate_BEC_length(constraints_other, weights, step_cost_flag)[0]
+
+                    # simply remove the first redundant constraint. can also remove the redundant constraint that's
+                    # 1) conveyed by the fewest environments, 2) conveyed by a higher minimum complexity environment,
+                    # 3) doesn't work as well with visual similarity of other nonredundant constraints
+                    if np.isclose(BEC_length, BEC_length_all_constraints):
+                        nonredundant_constraints = constraints_other
+    else:
+        # remove constraints that don't belong in the minimal H-representation of the corresponding polyhedron (not
+        # including the boundary constraints/facets)
+        # ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints)
+        ieqs = constraints_to_halfspace_matrix_sage_team(constraints)
+        print('ieqs: ', ieqs)
+
+        poly = Polyhedron.Polyhedron(ieqs=ieqs)
+        hrep = np.array(poly.Hrepresentation())
+
+        print('hrep: ', hrep)
+        
+        # remove boundary constraints/facets from consideration
+        boundary_facet_idxs = np.where(hrep[:, 0] != 0)
+        hrep_constraints = np.delete(hrep, boundary_facet_idxs, axis=0)
+        # remove the first column since these constraints goes through the origin
+        nonredundant_constraints = hrep_constraints[:, 1:]
+
+        # reshape so that each element is a valid weight vector
+        nonredundant_constraints = nonredundant_constraints.reshape(nonredundant_constraints.shape[0], 1, nonredundant_constraints.shape[1])
+
+
+    return list(nonredundant_constraints)
+
+
+
+def constraints_to_halfspace_matrix_sage_team(constraints):
+    '''
+    Summary: convert list of halfspace constraints into an array of halfspace constraints. Add bounding cube
+
+    Halfspace representation of a convex polygon (Ax < b):
+    [-1,7,3,4] represents the inequality 7x_1 + 3x_2 + 4x_3 >= 1
+    '''
+    constraints_stacked = np.vstack(constraints)
+    constraints_stacked = np.insert(constraints_stacked, 0, np.zeros((constraints_stacked.shape[0]), dtype='int'), axis=1)
+    # constraints_stacked = np.vstack((constraints_stacked, np.array([1, 1, 0, 0]), np.array([1, -1, 0, 0]), np.array([1, 0, 1, 0]), np.array([1, 0, -1, 0]), np.array([1, 0, 0, 1]), np.array([1, 0, 0, -1])))
+    ieqs = constraints_stacked
+
+    return ieqs
+
+
+
+def majority_rules_opposing_team_constraints(opposing_idx, test_constraints_team_expanded, response_category_team):
+
+    opp_idx_unique = []
+    for i in range(len(opposing_idx)):
+        opp_idx_unique.extend(x for x in opposing_idx[i] if x not in opp_idx_unique)
+
+    # print('opp_idx_unique: ', opp_idx_unique)
+    opp_constraints = [test_constraints_team_expanded[x] for x in opp_idx_unique]
+    print('opp_constraints: ', opp_constraints)
+    # resp_cat = [response_category_team[x] for x in opp_idx_unique]
+    # print('resp_cat: ', resp_cat)
+    opp_set = []
+    count_opp_set = []
+    # resp_cat_set = []
+    for j in range(len(opp_constraints)):
+        opp_c = opp_constraints[j]
+        if len(opp_set) > 0:
+            in_minimal_set = False
+            for i in range(len(opp_set)):
+                opp_c_set = opp_set[i]
+                if (opp_c == opp_c_set).all():
+                    in_minimal_set = True
+                    count_opp_set[i] += 1
+
+            if not in_minimal_set:
+                opp_set.append(opp_c)
+                count_opp_set.append(1)
+                # resp_cat_set.append(resp_cat[j])
+        else:
+            opp_set.append(opp_c)
+            count_opp_set.append(1)
+            # resp_cat_set.append(resp_cat[j])
+            
+    # print('minimal opposing constraints: ', opp_set)
+    # print('count_opp_set: ', count_opp_set)
+    # print('response set: ', resp_cat_set)
+
+    max_count_idx = [i for i in range(len(count_opp_set)) if count_opp_set[i] == max(count_opp_set)]
+
+    # print('max_count_idx: ', max_count_idx)
+    if len(max_count_idx) == 1:
+        # print('Majority response: ', resp_cat_set[max_count_idx[0]])
+        maj_cnst = [opp_set[max_count_idx[0]]]
+    else:        
+        # print('Checking when there are multiple max counts')
+        # print('Majority response: ', 'incorrect')
+        # maj_cnst = [opp_set[x] for x in max_count_idx if resp_cat_set[x] == 'incorrect'] # choose the set with incorrect responses
+        maj_cnst = [opp_set[random.randint(0, len(opp_set)-1)]] # randomly choose a set (unbiased)
+        
+    # print('Majority constraint: ', maj_cnst)
+
+    alternate_team_constraints = copy.deepcopy(maj_cnst)  # majority rules
+    print('Majority_team_constraints: ', alternate_team_constraints, ' count: ', count_opp_set[max_count_idx[0]])
+    # print('Maj team constraints type: ', type(alternate_team_constraints))
+
+
+    return alternate_team_constraints
+
+
+
+def majority_rules_non_intersecting_team_constraints(test_constraints_team_expanded, weights, step_cost_flag):
+
+
+    N_intersecting_sets = len(test_constraints_team_expanded)
+    print('N_intersecting_sets: ', N_intersecting_sets)
+    
+    # non_intersecting_flag_cnst = []
+    intersecting_cnst = []
+    max_intersecting_cnsts = []
+    alternate_team_constraints = []
+
+    while N_intersecting_sets != 1:
+        intersections_to_check = list(itertools.combinations(range(len(test_constraints_team_expanded)), N_intersecting_sets))
+
+        # print('Constraint list: ', test_constraints_team_expanded)
+        # print('Intersections to check: ', intersections_to_check)
+
+        for i in range(len(intersections_to_check)):
+            constraints = []
+            for j in intersections_to_check[i]:
+                constraints.append(test_constraints_team_expanded[j])
+
+            non_intersecting_cnst_flag, _ = check_for_non_intersecting_constraints(constraints, weights, step_cost_flag)
+            # non_intersecting_flag_cnst.extend([non_intersecting_cnst_flag, constraints])
+            # print('non_intersecting_cnst_flag: ', non_intersecting_cnst_flag, ' constraints: ', constraints)
+
+            if not non_intersecting_cnst_flag:
+                # print('max_intersecting_cnsts: ', max_intersecting_cnsts)
+                # print('constraints: ', constraints)
+
+                if len(max_intersecting_cnsts) == 0:
+                    max_intersecting_cnsts = [copy.deepcopy(constraints)]
+                    intersecting_cnst = [intersections_to_check[i]]
+                    N_max_cnst = len(constraints)
+                else:
+                    # print('max_intersecting_cnsts[0]): ', max_intersecting_cnsts[0])
+                    if len(constraints) > N_max_cnst:
+                        max_intersecting_cnsts = [copy.deepcopy(constraints)]
+                        intersecting_cnst = [intersections_to_check[i]]
+                        N_max_cnst = len(constraints)
+                    elif len(constraints) == N_max_cnst:
+                        max_intersecting_cnsts.append(constraints)
+                        intersecting_cnst.append(intersections_to_check[i])
+                # print('Updated max int cnts: ', max_intersecting_cnsts)
+                
+            # # plot
+            # if non_intersecting_cnst_flag:
+            #     print('Plotting..')
+            #     # plot actual knowledge constraints for this knowledge type
+            #     fig = plt.figure()
+            #     ax = fig.add_subplot(projection='3d')
+            #     utils_teams.visualize_planes_team(constraints, fig=fig, ax=ax, alpha=0.5)
+            #     ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints)
+            #     poly = Polyhedron.Polyhedron(ieqs=ieqs)
+            #     BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax, plot_ref_sphere=False, color = 'b')
+            #     plt.show()
+
+
+
+        N_intersecting_sets -= 1
+
+    
+    # choose the sets of constraints that are the most intersecting
+    if len(max_intersecting_cnsts) == 1:
+        # alternate_team_constraints = copy.deepcopy(max_intersecting_cnsts)
+        # intersecting_constraints = copy.deepcopy(intersecting_cnst)
+        alternate_team_constraints = max_intersecting_cnsts[0]
+        intersecting_constraints = intersecting_cnst[0]
+    elif len(max_intersecting_cnsts) > 1:
+        rand_index = random.randint(0, len(max_intersecting_cnsts)-1)
+        alternate_team_constraints = max_intersecting_cnsts[rand_index]
+        intersecting_constraints = intersecting_cnst[rand_index]
+    else:
+        raise RuntimeError('No intersecting constraints found!')
+
+
+    
+    # print(non_intersecting_flag_cnst)
+    
+
+    return alternate_team_constraints, intersecting_constraints
+
+
+
+
+
 # def obtain_remedial_demos_tests(data_loc, previous_demos, visited_env_traj_idxs, min_BEC_constraints, min_subset_constraints_record, traj_record, traj_features_record, variable_filter, mdp_features_record, downsample_threshold=float("inf"), opt_simplicity=True, opt_similarity=True, type = 'training'):
 
 #     preliminary_test_info = []
@@ -1768,21 +2166,6 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, variable_filter
 #         visited_env_traj_idxs.append((env_idx, traj_idx))
 
 #     return preliminary_tests, visited_env_traj_idxs
-
-
-
-def check_unit_learning_goal_reached(team_knowledge, min_unit_constraints):
-
-    
-    check_unit_learning_goal_reached = False
-    
-    knowledge_level = calc_knowledge_level(team_knowledge, min_unit_constraints)
-    
-    if knowledge_level['common_knowledge'] > 0.7:
-        check_unit_learning_goal_reached = True
-    
-
-    return check_unit_learning_goal_reached
 
 
 
@@ -2048,226 +2431,6 @@ def check_unit_learning_goal_reached(team_knowledge, min_unit_constraints):
 
     #######################################################################################
     ##################          Using pre-computed human models          ##################
-
-
-
-
-
-
-
-
-
-def compute_counterfactuals_team(args):
-    data_loc, model_idx, env_idx, w_human_normalized, env_filename, trajs_opt, particles, min_BEC_constraints_running, step_cost_flag, summary_len, variable_filter, mdp_features, consider_human_models_jointly = args
-
-    skip_env = False
-
-    # if the mdp has a feature that is meant to be filtered out, then skip this environment
-    if variable_filter.dot(mdp_features.T) > 0:
-        skip_env = True
-
-    if not skip_env:
-        with open(env_filename, 'rb') as f:
-            wt_vi_traj_env = pickle.load(f)
-
-        agent = wt_vi_traj_env[0][1]
-        weights = agent.mdp.weights
-
-        human = copy.deepcopy(agent)
-        mdp = human.mdp
-        mdp.weights = w_human_normalized
-        vi_human = ValueIteration(mdp, sample_rate=1)
-        vi_human.run_vi()
-
-        if not vi_human.stabilized:
-            skip_env = True
-            print(colored('Skipping environment' + str(env_idx) + '...', 'red'))
-
-    if not skip_env:
-        # only consider counterfactual trajectories from human models whose value iteration have converged and whose
-        # mdp does not have a feature that is meant to be filtered out
-        # best_human_trajs_record_env = []
-        constraints_env = []
-        info_gain_env = []
-        # human_rewards_env = []
-        overlap_in_opt_and_counterfactual_traj_env = []
-
-        for traj_idx, traj_opt in enumerate(trajs_opt):
-            constraints = []
-
-            # # a) accumulate the reward features and generate a single constraint
-            # mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
-            # traj_hyp = mdp_helpers.rollout_policy(vi_human.mdp, vi_human)
-            # mu_sb = vi_human.mdp.accumulate_reward_features(traj_hyp, discount=True)
-            # constraints.append(mu_sa - mu_sb)
-            # best_human_trajs_record = [] # for symmetry with below
-            # best_human_reward = weights.dot(mu_sb.T)  # for symmetry with below
-
-            # b) contrast differing expected feature counts for each state-action pair along the agent's optimal trajectory
-            # best_human_trajs_record = []
-            # best_human_reward = 0
-            for sas_idx in range(len(traj_opt)):
-                # reward features of optimal action
-                mu_sa = mdp.accumulate_reward_features(traj_opt[sas_idx:], discount=True)
-
-                sas = traj_opt[sas_idx]
-                cur_state = sas[0]
-
-                # obtain all optimal trajectory rollouts according to the human's model (assuming that it's a reasonable policy that has converged)
-                human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
-
-                cur_best_reward = float('-inf')
-                best_reward_features = []
-                best_human_traj = []
-                # select the human's possible trajectory that has the highest true reward (i.e. give the human's policy the benefit of the doubt)
-                for traj in human_opt_trajs:
-                    mu_sb = mdp.accumulate_reward_features(traj, discount=True)  # the human and agent should be working with identical mdps
-                    reward_hyp = weights.dot(mu_sb.T)
-                    if reward_hyp > cur_best_reward:
-                        cur_best_reward = reward_hyp
-                        best_reward_features = mu_sb
-                        best_human_traj = traj
-
-                # # todo: for testing how much computation and time I save by not doing a recursive rollout
-                # best_human_traj = mdp_helpers.rollout_policy(vi_human.mdp, vi_human, cur_state, [])
-                # best_reward_features = mdp.accumulate_reward_features(best_human_traj,
-                #                                        discount=True)  # the human and agent should be working with identical mdps
-                # cur_best_reward = weights.dot(best_reward_features.T)
-
-                # only store the reward of the full trajectory
-                # if sas_idx == 0:
-                #     best_human_reward = cur_best_reward
-                #     traj_opt_feature_count = mu_sa
-                constraints.append(mu_sa - best_reward_features)
-                # best_human_trajs_record.append(best_human_traj)
-
-            if len(constraints) > 0:
-                constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
-
-            if particles is not None:
-                info_gain = particles.calc_info_gain(constraints)
-            else:
-                info_gain = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, constraints,
-                                                                   weights, step_cost_flag)
-
-            # human_rewards_env.append(best_human_reward)
-            # best_human_trajs_record_env.append(best_human_trajs_record)
-            constraints_env.append(constraints)
-            info_gain_env.append(info_gain)
-
-            # if not consider_human_models_jointly:
-            #     # you should only consider the overlap for the first counterfactual human trajectory (as opposed to
-            #     # counterfactual trajectories that could've arisen from states after the first state)
-            #     overlap_pct = BEC_helpers.calculate_counterfactual_overlap_pct(best_human_trajs_record[0], traj_opt)
-            #
-            #     overlap_in_opt_and_counterfactual_traj_env.append(overlap_pct)
-
-    # else just populate with dummy variables
-    else:
-        # best_human_trajs_record_env = [[[]] for i in range(len(trajs_opt))]
-        constraints_env = [[] for i in range(len(trajs_opt))]
-        info_gain_env = [0 for i in range(len(trajs_opt))]
-        if not consider_human_models_jointly:
-            overlap_in_opt_and_counterfactual_traj_env = [float('inf') for i in range(len(trajs_opt))]
-        # human_rewards_env = [np.array([[0]]) for i in range(len(trajs_opt))]
-
-    if summary_len is not None:
-        with open('models/' + data_loc + '/counterfactual_data_' + str(summary_len) + '/model' + str(model_idx) +
-                  '/cf_data_env' + str(env_idx).zfill(5) + '.pickle', 'wb') as f:
-            pickle.dump(constraints_env, f)
-        # print('Info gain for Summary length ' + str(summary_len) + ' of model ' + str(model_idx) + 'of env' + str(env_idx) + 'is' + str(info_gain_env) + '...')
-
-    if consider_human_models_jointly:
-        return info_gain_env
-    else:
-        return info_gain_env, overlap_in_opt_and_counterfactual_traj_env
-
-
-
-def remove_redundant_constraints_team(constraints, weights, step_cost_flag):
-    '''
-    Summary: Remove redundant constraints
-    '''
-    if step_cost_flag:
-        # Remove redundant constraint that do not change the underlying intersection between the BEC region and the
-        # L1 constraints
-        try:
-            BEC_length_all_constraints, nonredundant_constraint_idxs = BEC_helpers.calculate_BEC_length(constraints, weights,
-                                                                                            step_cost_flag)
-            print('')
-        except:
-            # a subset of these constraints aren't numerically stable (e.g. you can have a constraint that's ever so slightly
-            # over the ground truth reward weight and thus fail to yield a proper polygonal convex hull. remove the violating constraints
-            A, b = BEC_helpers.constraints_to_halfspace_matrix(constraints, weights, step_cost_flag)
-            violating_idxs = BEC_helpers.indicate_violating_constraints(A, b)
-
-            for violating_idx in sorted(violating_idxs[0], reverse=True):
-                del constraints[violating_idx]
-
-            BEC_length_all_constraints, nonredundant_constraint_idxs = BEC_helpers.calculate_BEC_length(constraints, weights,
-                                                                                            step_cost_flag)
-            
-
-        nonredundant_constraints = [constraints[x] for x in nonredundant_constraint_idxs]
-
-        for query_idx, query_constraint in enumerate(constraints):
-            if query_idx not in nonredundant_constraint_idxs:
-                pass
-            else:
-                # see if this is truly non-redundant or crosses an L1 constraint exactly where another constraint does
-                constraints_other = []
-                for constraint_idx, constraint in enumerate(nonredundant_constraints):
-                    if not BEC_helpers.equal_constraints(query_constraint, constraint):
-                        constraints_other.append(constraint)
-                if len(constraints_other) > 0:
-                    BEC_length = BEC_helpers.calculate_BEC_length(constraints_other, weights, step_cost_flag)[0]
-
-                    # simply remove the first redundant constraint. can also remove the redundant constraint that's
-                    # 1) conveyed by the fewest environments, 2) conveyed by a higher minimum complexity environment,
-                    # 3) doesn't work as well with visual similarity of other nonredundant constraints
-                    if np.isclose(BEC_length, BEC_length_all_constraints):
-                        nonredundant_constraints = constraints_other
-    else:
-        # remove constraints that don't belong in the minimal H-representation of the corresponding polyhedron (not
-        # including the boundary constraints/facets)
-        # ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints)
-        ieqs = constraints_to_halfspace_matrix_sage_team(constraints)
-        print('ieqs: ', ieqs)
-
-        poly = Polyhedron.Polyhedron(ieqs=ieqs)
-        hrep = np.array(poly.Hrepresentation())
-
-        print('hrep: ', hrep)
-        
-        # remove boundary constraints/facets from consideration
-        boundary_facet_idxs = np.where(hrep[:, 0] != 0)
-        hrep_constraints = np.delete(hrep, boundary_facet_idxs, axis=0)
-        # remove the first column since these constraints goes through the origin
-        nonredundant_constraints = hrep_constraints[:, 1:]
-
-        # reshape so that each element is a valid weight vector
-        nonredundant_constraints = nonredundant_constraints.reshape(nonredundant_constraints.shape[0], 1, nonredundant_constraints.shape[1])
-
-
-    return list(nonredundant_constraints)
-
-
-
-def constraints_to_halfspace_matrix_sage_team(constraints):
-    '''
-    Summary: convert list of halfspace constraints into an array of halfspace constraints. Add bounding cube
-
-    Halfspace representation of a convex polygon (Ax < b):
-    [-1,7,3,4] represents the inequality 7x_1 + 3x_2 + 4x_3 >= 1
-    '''
-    constraints_stacked = np.vstack(constraints)
-    constraints_stacked = np.insert(constraints_stacked, 0, np.zeros((constraints_stacked.shape[0]), dtype='int'), axis=1)
-    # constraints_stacked = np.vstack((constraints_stacked, np.array([1, 1, 0, 0]), np.array([1, -1, 0, 0]), np.array([1, 0, 1, 0]), np.array([1, 0, -1, 0]), np.array([1, 0, 0, 1]), np.array([1, 0, 0, -1])))
-    ieqs = constraints_stacked
-
-    return ieqs
-
-
 
 
 

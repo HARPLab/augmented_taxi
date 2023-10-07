@@ -135,6 +135,43 @@ def sample_human_models_uniform_joint_knowledge(joint_constraints, n_models):
     return sample_human_models
 
 
+#############################
 
+# calculating knowledge area based on particle filter
+
+    # Methods using particle filters - unreliable; varies based on the number of particles!
+    #     # print('min_BEC_constraints: ', [min_BEC_constraints])
+    #     min_BEC_area = BEC_helpers.calc_solid_angles([min_BEC_constraints])
+    #     # print('knowledge: ', team_knowledge[knowledge_type])
+    #     knowledge_area = BEC_helpers.calc_solid_angles([team_knowledge[knowledge_type]])
+        
+    #     # n_particles = 5000
+    #     n_particles = 500
+    #     knowledge_particles = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform(team_knowledge[knowledge_type], n_particles))
+
+    #     const_id = []
+    #     for j, x in enumerate(knowledge_particles.positions):
+
+    #         all_constraints_satisfied = True
+    #         for constraint in min_BEC_constraints:
+    #             dot = constraint.dot(x.T)
+
+    #             if dot < 0:
+    #                 all_constraints_satisfied = False
+            
+    #         if all_constraints_satisfied:
+    #             const_id.append(j)
+        
+    #     BEC_overlap_area = min(min_BEC_area, len(const_id)/n_particles * np.array(knowledge_area))
+        
+    #     # # Method 1: Calculates the knowledge level (0 to 1) based on two factors: ratio of BEC area to knowledge area and % of overlap of BEC area with knowledge area
+    #     # knowledge_spread = np.array(knowledge_area)/np.array(min_BEC_area)
+    #     # BEC_overlap_ratio = BEC_overlap_area/np.array(min_BEC_area)
+    #     # knowledge_level[knowledge_type] = 0.5*BEC_overlap_ratio + 0.5/knowledge_spread
+
+    #     # Method 2: Calculate knowledge level based on the ratio of BEC overlap area with the total knowledge area
+    #     knowledge_level[knowledge_type] = BEC_overlap_area/np.array(knowledge_area)
+
+        ##############################################
 
 

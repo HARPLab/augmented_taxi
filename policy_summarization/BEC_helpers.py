@@ -514,6 +514,7 @@ def calc_solid_angles(constraint_sets):
     for constraint_set in constraint_sets:
         if len(constraint_set) == 1:
             # hemisphere
+            # print('Calculating angles for a hemisphere')
             solid_angles.append(2 * np.pi)
         elif len(constraint_set) == 2:
             # lune / diangle, whose area is 2 * theta (https://www.math.csi.cuny.edu/abhijit/623/spherical-triangle.pdf)
@@ -522,7 +523,9 @@ def calc_solid_angles(constraint_sets):
                                             np.zeros((constraints_stacked.shape[0]), dtype='int'), axis=1)
             theta = calc_dihedral_supp(constraints_stacked[0, :], constraints_stacked[1, :])
             solid_angles.append(2 * theta)
+            # print('Calculating angles for a diangle')
         else:
+            # print('Calculating angles for a polygon')
             ieqs = constraints_to_halfspace_matrix_sage(constraint_set)
             poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
 

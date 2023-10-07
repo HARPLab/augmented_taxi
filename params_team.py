@@ -342,17 +342,18 @@ test_env_traj_tracers = {
 
 ### Added for robot teaching to team situation
 
-team_size = 1
+team_size = 3
 
-human_learning_models = {'p1': np.array([0.9, 0.9, 0.9]), \
-                         'p2': np.array([0.8, 0.8, 0.8]), \
-                         'p3': np.array([0.7, 0.7, 0.7]) }
+
+# human_learning_models = {'p1': np.array([0.9, 0.9, 0.9]), \
+#                          'p2': np.array([0.8, 0.8, 0.8]), \
+#                          'p3': np.array([0.7, 0.7, 0.7]) }
 
 
 team_prior = {}
 for i in range(team_size):
     member_id = 'p' + str(i+1)
-    team_prior[member_id] = prior
+    team_prior[member_id] = [prior]
 
 
 
@@ -360,12 +361,14 @@ knowledge = 'common_knowledge'
 # knowledge = 'joint_knowledge'
 # knowledge = 'individual_knowledge'
 
-learning_goal = {'common_knowledge': np.array([0.5, 0.5, 0.5]), \
-                  'joint_knowledge': np.array([0.95, 0.95, 0.95]), \
-                  'individual_knowledge': np.array([0.7, 0.7, 0.7])}
+# learning_goal = {'common_knowledge': np.array([0.5, 0.5, 0.5]), \
+#                   'joint_knowledge': np.array([0.95, 0.95, 0.95]), \
+#                   'individual_knowledge': np.array([0.7, 0.7, 0.7])}
 
 demo_strategy = 'common_knowledge'
 # demo_strategy = 'joint_knowledge'
 # demo_strategy = 'individual_knowledge_low'
 # demo_strategy = 'individual_knowledge_high'
 
+max_KC_loops = 10
+learning_goal = 1.0
