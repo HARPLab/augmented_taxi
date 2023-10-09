@@ -80,7 +80,7 @@ if __name__ == "__main__":
     #     run_reward_teaching(params, pool, demo_strategy = dem_strategy, response_type = 'simulated', viz_flag=[False, False, False], response_distribution_list= resp_dist_list, run_no = i, vars_filename='sim_run_mixed_maj')
 
     sim_params = {'min_correct_likelihood': 0.5}
-    start_id = 20
+    start_id = 3
 
 
     team_params_learning = {'low': [0.5, 0.05], 'med': [0.6, 0.07], 'high': [0.7, 0.1]}
@@ -88,7 +88,7 @@ if __name__ == "__main__":
     # team_composition_list = list(permutations([*range(params.team_size)]))
     team_composition_list = [[0,1,2], [0,2,1], [1,0,2], [1,2,0], [2,0,1], [2,1,0]]
     print(team_composition_list)
-    for i in range(50, N_runs+1):
+    for i in range(1, N_runs+1):
         team_composition_for_run = team_composition_list[np.random.choice(range(len(team_composition_list)))]
         print('team_composition_for_run: ', team_composition_for_run)
 
@@ -123,7 +123,7 @@ if __name__ == "__main__":
             dem_strategy = dem_strategy_list[3]
 
         print(colored('Simulation run: ' + str(i) + '. Demo strategy: ' + str(dem_strategy) + 'initial lcr: ' + str(ilcr) + 'rate lcr: ' + str(rlcr), 'red'))
-        run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy, experiment_type = 'simulated', team_likelihood_correct_response = ilcr,  team_learning_rate = rlcr, viz_flag=[False, False, False], run_no = i, vars_filename='new_hlm_sim_run_2')
+        run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy, experiment_type = 'simulated', team_likelihood_correct_response = ilcr,  team_learning_rate = rlcr, viz_flag=[False, False, False], run_no = i, vars_filename='new_hlm_sim_run_6')
 
 
     # # save all the variables
