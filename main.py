@@ -1067,11 +1067,11 @@ def run_scripts():
     #                          params.step_cost_flag, params.BEC['n_human_models'], params.prior, params.posterior, summary=BEC_summary, visualize_test_env=True, use_counterfactual=True)
 
     # g) expand a summary to the desired number of demonstrations (e.g. as a baseline condition for a user study)
-    # todo: need to run this four times -- twice for each domain (type: open and pl)
+    # need to run this four times -- twice for each domain (and for each type: open and pl)
     type = 'pl' # open or pl
 
     if params.data_loc['BEC'] == 'augmented_taxi2':
-        n_demos_needed = 19  # update with mean or median interaction for the closed-loop condition
+        n_demos_needed = 11  # median number of interactions for the closed-loop condition
 
         # env and traj idxs of the final tests
         visited_env_traj_idxs.extend([(16, 17), (45, 110), (25, 82), (7, 7), (13, 131), (31, 27)])
@@ -1079,7 +1079,7 @@ def run_scripts():
         if type == 'pl':
             n_demos_needed = n_demos_needed - n_diagnostic_tests
     elif params.data_loc['BEC'] == 'skateboard2':
-        n_demos_needed = 19  # update with mean or median interaction for the closed-loop condition
+        n_demos_needed = 22  # median number of interactions for the closed-loop condition
 
         visited_env_traj_idxs.extend([(49, 344), (1, 451), (29, 185), (33, 416), (37, 63), (61, 252)])
         n_diagnostic_tests = 7

@@ -584,6 +584,65 @@ def process_human_scores(test_env_dict, type='binary'):
     # with open('dfs_processed.pickle', 'wb') as f:
     #     pickle.dump((df_training, df_testing, df_testing_sandbox, df_training_survey, df_post_survey), f)
 
+def process_human_scores_f23(test_env_dict, type='binary'):
+    with open('../../analysis/dfs_f23.pickle', 'rb') as f:
+        df_users, df_trials, df_domain = pickle.load(f)
+
+    # df_trials = df_trials.copy()
+    # df_trials = df_trials[df_trials.interaction_type == 'final test']
+
+    df_trials['reward_diff'] = np.zeros(len(df_trials))
+    df_trials['human_reward'] = np.zeros(len(df_trials))
+    df_trials['regret_norm'] = np.zeros(len(df_trials))
+    df_trials_final_test = df_trials[df_trials.interaction_type == 'final test']
+
+    if type == 'scaled' or type == 'scale-truncated':
+        test_demos_low_human_scores = obtain_test_demos_low_human_scores(df_trials, test_env_dict)
+
+    for i in df_trials_final_test.index:
+        domain = df_trials.at[i, 'domain']
+        if domain == 'at':
+            domain = 'augmented_taxi2'
+        elif domain == 'sb':
+            domain = 'skateboard2'
+
+        moves_list = df_trials.unpickled_moves[i]
+        test_difficulty = df_trials['test_difficulty'][i]
+        tag = df_trials['tag'][i]
+
+        mdp = test_env_dict[domain][test_difficulty][tag][1].mdp
+
+        mdp.reset()
+        trajectory = []
+        cur_state = mdp.get_init_state()
+
+        for idx in range(len(moves_list)):
+            # assumes that the user study only allows actions that change the state of the MDP
+            reward, next_state = mdp.execute_agent_action(moves_list[idx])
+            trajectory.append((cur_state, moves_list[idx], next_state))
+
+            # deepcopy occurs within transition function
+            cur_state = next_state
+
+        human_reward = mdp.weights.dot(mdp.accumulate_reward_features(trajectory).T)
+
+        # record raw data
+        df_trials.at[i, 'human_reward'] = human_reward[0][0]
+
+        # record the difference
+        df_trials.at[i, 'reward_diff'] = abs(human_reward[0][0] - df_trials['opt_traj_reward'][i])
+        # df_trials.at[i, 'scaled_diff'] = 1 - ((human_reward[0][0] - df_trials['opt_traj_reward'][i]) / df_trials['opt_traj_reward'][i])
+        df_trials.at[i, 'regret_norm'] = (human_reward[0][0] - df_trials['opt_traj_reward'][i]) / df_trials['opt_traj_reward'][i] # normalized regret
+
+        if df_trials['opt_traj_reward'][i] > 0 or human_reward[0][0] > 0:
+            print('positive reward, need to reconsider diff calculations!')
+
+        if (human_reward[0][0] - df_trials['opt_traj_reward'][i]) / df_trials['opt_traj_reward'][i] < 0:
+            print('negative regret, need to reconsider normalized regret calculation!')
+
+    with open('../../analysis/dfs_f23_processed.pickle', 'wb') as f:
+        pickle.dump((df_users, df_trials, df_domain), f)
+
 def obtain_human_trajectories(test_env_dict):
     '''
     Extract human trajectories for each test difficulty level from pandas dfs and store them in a dictionary
@@ -1270,4 +1329,5 @@ if __name__ == "__main__":
 
 
     # preparing for closed-loop teaching user study
-    save_user_study_json()
+    # save_user_study_json()
+    process_human_scores_f23(test_env_dict)
