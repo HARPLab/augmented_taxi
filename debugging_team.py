@@ -38,6 +38,7 @@ from simple_rl.agents import FixedPolicyAgent
 from simple_rl.planning import ValueIteration
 import teams.teams_helpers as team_helpers
 from teams import particle_filter_team as pf_team
+import policy_summarization.particle_filter as pf
 import teams.utils_teams as utils_teams
 from simulation import human_learner_model as hlm
 from simulation.sim_helpers import get_human_response
@@ -1411,11 +1412,11 @@ if __name__ == "__main__":
     #     print('Remove redundant common knowledge: ', common_constraints)
 
     #     for constraint in common_constraints:
-    #         if LA.norm(constraint,1) !=1:
+    #         if LA.norm(constraint) !=1:
     #             unit_constraint_flag = False
 
     #     for constraint in common_constraints:
-    #         if LA.norm(constraint,1) !=1:
+    #         if LA.norm(constraint) !=1:
     #             unit_common_constraint_flag = False
 
     #     if not unit_constraint_flag and unit_common_constraint_flag:
@@ -2029,121 +2030,376 @@ if __name__ == "__main__":
 
 
     ############
-    # team_knowledge = {'p1': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[-1,  0,  0]])], [np.array([[0, 1, 2]])], [np.array([[3, 0, 0]])]], 
-    #                   'p2': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[-1,  0,  0]])], [np.array([[0, 1, 2]])], [np.array([[ 1,  0, -2]]), np.array([[1, 1, 0]]), np.array([[-2, -1,  0]])]], 
-    #                   'p3': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[-1,  0,  0]])], [np.array([[0, 1, 2]])], [np.array([[ 1,  0, -2]]), np.array([[1, 1, 0]]), np.array([[-2, -1,  0]])]], 
-    #                   'common_knowledge': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[-1,  0,  0]])], [np.array([[0, 1, 2]])], [np.array([[ 1,  0, -2]]), np.array([[1, 1, 0]]), np.array([[-2, -1,  0]]), np.array([[1, 0, 0]])]], 
-    #                   'joint_knowledge': [[[np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])]], [[np.array([[-1,  0,  2]]), np.array([[-1,  0,  0]])], [np.array([[-1,  0,  2]]), np.array([[-1,  0,  0]])], [np.array([[-1,  0,  2]]), np.array([[-1,  0,  0]])]], [[np.array([[0, 1, 2]])], [np.array([[0, 1, 2]])], [np.array([[0, 1, 2]])]], [[np.array([[3, 0, 0]])], [np.array([[ 1,  0, -2]]), np.array([[1, 1, 0]]), np.array([[-2, -1,  0]])], [np.array([[ 1,  0, -2]]), np.array([[1, 1, 0]]), np.array([[-2, -1,  0]])]]]}
+    # # team_knowledge = {'p1': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[-1,  0,  0]])], [np.array([[0, 1, 2]])], [np.array([[3, 0, 0]])]], 
+    # #                   'p2': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[-1,  0,  0]])], [np.array([[0, 1, 2]])], [np.array([[ 1,  0, -2]]), np.array([[1, 1, 0]]), np.array([[-2, -1,  0]])]], 
+    # #                   'p3': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[-1,  0,  0]])], [np.array([[0, 1, 2]])], [np.array([[ 1,  0, -2]]), np.array([[1, 1, 0]]), np.array([[-2, -1,  0]])]], 
+    # #                   'common_knowledge': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[-1,  0,  0]])], [np.array([[0, 1, 2]])], [np.array([[ 1,  0, -2]]), np.array([[1, 1, 0]]), np.array([[-2, -1,  0]]), np.array([[1, 0, 0]])]], 
+    # #                   'joint_knowledge': [[[np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])]], [[np.array([[-1,  0,  2]]), np.array([[-1,  0,  0]])], [np.array([[-1,  0,  2]]), np.array([[-1,  0,  0]])], [np.array([[-1,  0,  2]]), np.array([[-1,  0,  0]])]], [[np.array([[0, 1, 2]])], [np.array([[0, 1, 2]])], [np.array([[0, 1, 2]])]], [[np.array([[3, 0, 0]])], [np.array([[ 1,  0, -2]]), np.array([[1, 1, 0]]), np.array([[-2, -1,  0]])], [np.array([[ 1,  0, -2]]), np.array([[1, 1, 0]]), np.array([[-2, -1,  0]])]]]}
     # BEC_constraints =  [np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
     # unit_constraints = [np.array([[-1,  0,  0]]), np.array([[0, 1, 2]]), np.array([[-2, -1,  0]]), np.array([[-1,  0,  2]]), np.array([[1, 1, 0]])]
-    # kc_id = 3
-
-
-    # knowledge_constraints = copy.deepcopy(team_knowledge['joint_knowledge'][kc_id])
-
-
-
-    ########################
-
-    # test_constraints_team =  [[np.array([[-1,  0,  0]])], [np.array([[-1,  0,  0]])], [np.array([[2, 0, 0]])]]
-
-    # response_category_team = ['correct', 'correct', 'incorrect']
-    # opposing_constraints_count = 0
-    # non_intersecting_constraints_count = 0
-
-    # test_constraints_team_expanded = []
-    # for test_constraints in test_constraints_team:
-    #     test_constraints_team_expanded.extend(test_constraints)
-
-    # print(colored('test_constraints_team_expanded: ' + str(test_constraints_team_expanded), 'red'))
     
-    # opposing_constraints_flag, opposing_constraints_count, opposing_idx = team_helpers.check_opposing_constraints(test_constraints_team_expanded, opposing_constraints_count)
-    # print('Opposing constraints normal loop? ', opposing_constraints_flag)
-    # # Assign majority rules and update common knowledge and joint knowledge accordingly
-    # if opposing_constraints_flag:
-    #     test_constraints_team_expanded = team_helpers.majority_rules_opposing_team_constraints(opposing_idx, test_constraints_team_expanded, response_category_team)
-
-    #     print(colored('test_constraints_team_expanded after majority rules opposinng constraints: ' + str(test_constraints_team_expanded), 'red' ))
-
-    # non_intersecting_constraints_flag, non_intersecting_constraints_count = team_helpers.check_for_non_intersecting_constraints(test_constraints_team_expanded, params.weights['val'], params.step_cost_flag, non_intersecting_constraints_count)
-    # print('Non-intersecting constraints normal loop? ', non_intersecting_constraints_flag)
-    # # Assign majority rules and update common knowledge and joint knowledge accordingly
-    # if non_intersecting_constraints_flag:
-    #     test_constraints_team_expanded, intersecting_constraints = team_helpers.majority_rules_non_intersecting_team_constraints(test_constraints_team_expanded, params.weights['val'], params.step_cost_flag)
-
-    #     print(colored('test_constraints_team_expanded after majority rules non intersecting: ' + str(test_constraints_team_expanded), 'red'))
-
-    # # double check again
-    # print('Double checking agan...')
-    # opposing_constraints_flag, opposing_constraints_count, opposing_idx = team_helpers.check_opposing_constraints(test_constraints_team_expanded, opposing_constraints_count)
-    # non_intersecting_constraints_flag, non_intersecting_constraints_count = team_helpers.check_for_non_intersecting_constraints(test_constraints_team_expanded, params.weights['val'], params.step_cost_flag, non_intersecting_constraints_count)
-
-    ##################
-
-    all_unit_constraints = [np.array([[-1,  0,  0]]), np.array([[-1,  0,  2]]), np.array([[0, 1, 2]]), np.array([[-1,  0,  0]]), np.array([[0, 1, 2]]), 
-                            np.array([[-2, -1,  0]]), np.array([[-1,  0,  2]]), np.array([[1, 1, 0]])]
     
-    min_BEC_constraints = [np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
-
-    min_all_unit_constraints = BEC_helpers.remove_redundant_constraints(all_unit_constraints, params.weights['val'], params.step_cost_flag)
+    # team_knowledge =  {'p1': [[np.array([[ 0,  0, -1]])], [np.array([[ 1,  0, -2]])]], 
+    #                    'p2': [[np.array([[ 0,  0, -1]])], [np.array([[ 1,  0, -2]])]], 
+    #                    'p3': [[np.array([[ 0,  0, -1]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])]], 
+    #                    'common_knowledge': [[np.array([[ 0,  0, -1]])], [np.array([[1,  0,  -2]]), np.array([[ 1,  0, -4]])]], 
+    #                    'joint_knowledge': [[[np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])]], 
+    #                                        [[np.array([[ 1,  0, -2]])], 
+    #                                         [np.array([[ 1,  0, -2]])], 
+    #                                         [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])]]]}
     
 
-    print('unit constraints: ', all_unit_constraints)
-    print('min unit constraints: ', min_all_unit_constraints)
-    print('BEC constraints: ', min_BEC_constraints)
 
+    # # p3 =  [np.array([[ 0,  0, -1]]), np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]]), np.array([[ 0, -1, -2]]), np.array([[0, 1, 4]])]
+    # # p3_min = BEC_helpers.remove_redundant_constraints(p3, params.weights['val'], params.step_cost_flag)
+    # # print(p3_min)
 
-    # team_knowledge = {'p1': [min_all_unit_constraints]}
+    
+    # kc_id_list = range(len(team_knowledge['p1']))
 
-    # all_unit_constraints_area = BEC_helpers.calc_solid_angles([all_unit_constraints])
-    # min_unit_constraints_area = BEC_helpers.calc_solid_angles([min_all_unit_constraints])
-    # BEC_area = BEC_helpers.calc_solid_angles([min_BEC_constraints])
+    # # min_KC_constraints =  [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])]
 
-    # print('All Units Area: ', all_unit_constraints_area)
-    # print('Min Units Area: ', min_unit_constraints_area)
-    # print('BEC Area: ', BEC_area)
+    # # unit_learning_goal_reached = team_helpers.check_unit_learning_goal_reached(team_knowledge, min_KC_constraints, 1)
 
-    # knowledge_level = team_helpers.calc_knowledge_level(team_knowledge, min_BEC_constraints)
-
-    # print(knowledge_level)
+    # # print(unit_learning_goal_reached)
 
     # fig = plt.figure()
-    # ax1 = fig.add_subplot(1, 1, 1, projection='3d')
+    # ax1 = fig.add_subplot(1, 2, 1, projection='3d')
+    # ax2 = fig.add_subplot(1, 2, 2, projection='3d')
+    # # # for cnsts in team_knowledge['joint_knowledge']:
+    # for kc_index in kc_id_list:
+    #     for i in range(len(team_knowledge['joint_knowledge'][kc_index])):
+    #         cnst = team_knowledge['joint_knowledge'][kc_index][i]
+    #         print('Plotting joint constraints: ', cnst)
+    #         ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(cnst)
+    #         poly = Polyhedron.Polyhedron(ieqs=ieqs)
+    #         BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax1, plot_ref_sphere=False, alpha=0.75)
 
-    # utils_teams.visualize_planes_team(min_all_unit_constraints, fig=fig, ax=ax1, alpha=0.5)
-    # ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(min_all_unit_constraints)
-    # poly = Polyhedron.Polyhedron(ieqs=ieqs)
-    # BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax1, plot_ref_sphere=False, color = 'y')
+    # # plt.show()
 
-    # utils_teams.visualize_planes_team(min_BEC_constraints, fig=fig, ax=ax1, alpha=0.5)
-    # ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(min_BEC_constraints)
+    # knowledge_constraints = []
+    # knowledge_id = 'common_knowledge'
+    # kc_id_list = range(len(team_knowledge[knowledge_id]))
+
+
+    # # team_knowledge = team_helpers.update_team_knowledge(team_knowledge, kc_id, kc_reset_flag, test_constraints, params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = ['common_knowledge'])
+
+
+    
+    # for kc_index in kc_id_list:
+    #     if knowledge_id == 'joint_knowledge':
+    #         # # print('team_knowledge[knowledge_type][kc_index]: ', team_knowledge[knowledge_type][kc_index])
+    #         for i in range(len(team_knowledge[knowledge_id][kc_index])):
+    #             if first_index:
+    #                 knowledge_constraints.append(utils_teams.flatten_list(copy.deepcopy(team_knowledge[knowledge_id][kc_index][i])))
+    #                 # # print(colored('team_knowledge_constraints flattened: ' + str(team_knowledge_constraints), 'blue' ))
+    #             else:
+    #                 knowledge_constraints[i].extend(team_knowledge[knowledge_id][kc_index][i])
+    #         first_index = False
+    #     else:
+    #         # print('team_knowledge[knowledge_type][kc_index]: ', team_knowledge[knowledge_type][kc_index])
+    #         if len(knowledge_constraints) == 0:
+    #             knowledge_constraints = copy.deepcopy(team_knowledge[knowledge_id][kc_index])
+    #         else:
+    #             knowledge_constraints.extend(team_knowledge[knowledge_id][kc_index])
+
+
+
+    # print('knowledge_constraints:', knowledge_constraints)
+    # min_const = BEC_helpers.remove_redundant_constraints(knowledge_constraints,  params.weights['val'], params.step_cost_flag)
+
+
+    # utils_teams.visualize_planes_team(min_const, fig=fig, ax=ax2)
+    # ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(min_const)
     # poly = Polyhedron.Polyhedron(ieqs=ieqs)
-    # BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax1, plot_ref_sphere=False, color = 'b')
+    # BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax2, plot_ref_sphere=False, alpha=0.75)
+
+    # utils_teams.visualize_planes_team(knowledge_constraints, fig=fig, ax=ax1)
 
     # plt.show()
 
-    ################################
+
+
+
+
+
+    
+    # # kc_id = 3
+
+
+    # # knowledge_constraints = copy.deepcopy(team_knowledge['joint_knowledge'][kc_id])
+
+
+
+    # ########################
+
+    # # test_constraints_team =  [[np.array([[-1,  0,  0]])], [np.array([[-1,  0,  0]])], [np.array([[2, 0, 0]])]]
+
+    # # response_category_team = ['correct', 'correct', 'incorrect']
+    # # opposing_constraints_count = 0
+    # # non_intersecting_constraints_count = 0
+
+    # # test_constraints_team_expanded = []
+    # # for test_constraints in test_constraints_team:
+    # #     test_constraints_team_expanded.extend(test_constraints)
+
+    # # print(colored('test_constraints_team_expanded: ' + str(test_constraints_team_expanded), 'red'))
+    
+    # # opposing_constraints_flag, opposing_constraints_count, opposing_idx = team_helpers.check_opposing_constraints(test_constraints_team_expanded, opposing_constraints_count)
+    # # print('Opposing constraints normal loop? ', opposing_constraints_flag)
+    # # # Assign majority rules and update common knowledge and joint knowledge accordingly
+    # # if opposing_constraints_flag:
+    # #     test_constraints_team_expanded = team_helpers.majority_rules_opposing_team_constraints(opposing_idx, test_constraints_team_expanded, response_category_team)
+
+    # #     print(colored('test_constraints_team_expanded after majority rules opposinng constraints: ' + str(test_constraints_team_expanded), 'red' ))
+
+    # # non_intersecting_constraints_flag, non_intersecting_constraints_count = team_helpers.check_for_non_intersecting_constraints(test_constraints_team_expanded, params.weights['val'], params.step_cost_flag, non_intersecting_constraints_count)
+    # # print('Non-intersecting constraints normal loop? ', non_intersecting_constraints_flag)
+    # # # Assign majority rules and update common knowledge and joint knowledge accordingly
+    # # if non_intersecting_constraints_flag:
+    # #     test_constraints_team_expanded, intersecting_constraints = team_helpers.majority_rules_non_intersecting_team_constraints(test_constraints_team_expanded, params.weights['val'], params.step_cost_flag)
+
+    # #     print(colored('test_constraints_team_expanded after majority rules non intersecting: ' + str(test_constraints_team_expanded), 'red'))
+
+    # # # double check again
+    # # print('Double checking agan...')
+    # # opposing_constraints_flag, opposing_constraints_count, opposing_idx = team_helpers.check_opposing_constraints(test_constraints_team_expanded, opposing_constraints_count)
+    # # non_intersecting_constraints_flag, non_intersecting_constraints_count = team_helpers.check_for_non_intersecting_constraints(test_constraints_team_expanded, params.weights['val'], params.step_cost_flag, non_intersecting_constraints_count)
+
+    # ##################
+
+    # # all_unit_constraints = [np.array([[-1,  0,  0]]), np.array([[-1,  0,  2]]), np.array([[0, 1, 2]]), np.array([[-1,  0,  0]]), np.array([[0, 1, 2]]), 
+    # #                         np.array([[-2, -1,  0]]), np.array([[-1,  0,  2]]), np.array([[1, 1, 0]])]
+    
+    # # min_BEC_constraints = [np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
+
+    # # min_all_unit_constraints = BEC_helpers.remove_redundant_constraints(all_unit_constraints, params.weights['val'], params.step_cost_flag)
+    
+
+    # # print('unit constraints: ', all_unit_constraints)
+    # # print('min unit constraints: ', min_all_unit_constraints)
+    # # print('BEC constraints: ', min_BEC_constraints)
+
+
+    # # team_knowledge = {'p1': [min_all_unit_constraints]}
+
+    # # all_unit_constraints_area = BEC_helpers.calc_solid_angles([all_unit_constraints])
+    # # min_unit_constraints_area = BEC_helpers.calc_solid_angles([min_all_unit_constraints])
+    # # BEC_area = BEC_helpers.calc_solid_angles([min_BEC_constraints])
+
+    # # print('All Units Area: ', all_unit_constraints_area)
+    # # print('Min Units Area: ', min_unit_constraints_area)
+    # # print('BEC Area: ', BEC_area)
+
+    # # knowledge_level = team_helpers.calc_knowledge_level(team_knowledge, min_BEC_constraints)
+
+    # # print(knowledge_level)
+
+    # # fig = plt.figure()
+    # # ax1 = fig.add_subplot(1, 1, 1, projection='3d')
+
+    # # utils_teams.visualize_planes_team(min_all_unit_constraints, fig=fig, ax=ax1, alpha=0.5)
+    # # ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(min_all_unit_constraints)
+    # # poly = Polyhedron.Polyhedron(ieqs=ieqs)
+    # # BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax1, plot_ref_sphere=False, color = 'y')
+
+    # # utils_teams.visualize_planes_team(min_BEC_constraints, fig=fig, ax=ax1, alpha=0.5)
+    # # ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(min_BEC_constraints)
+    # # poly = Polyhedron.Polyhedron(ieqs=ieqs)
+    # # BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax1, plot_ref_sphere=False, color = 'b')
+
+    # # plt.show()
+
+    # ################################
+
+    # # with open('models/' + params.data_loc['BEC'] + '/team_base_constraints.pickle', 'rb') as f:
+    # #     policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(f)
+
+    # # with open('models/' + params.data_loc['BEC'] + '/team_BEC_constraints.pickle', 'rb') as f:
+    # #     min_BEC_constraints, BEC_lengths_record = pickle.load(f)
+
+
+    # # print('Policy constraints: ', policy_constraints)
+
+    # # print('min_subset_constraints_record: ', min_subset_constraints_record)
+
+    # # print('min_BEC_constraints: ', min_BEC_constraints)
+
+    # # print('BEC_lengths_record: ', BEC_lengths_record)
+
+    # ##############################
+
+    # # x = np.array([ 0.87365874, -0.44951806, -0.18615563])
+
+    # # min_BEC_constraints_running = [np.array([[0, 0, -1]])]
+
+    # # particles_team = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], 500))
+    # # # particles = pf.Particles(BEC_helpers.sample_human_models_uniform([], 500))
+    # # particles_team.update(min_BEC_constraints_running)
+
+    # # sample_human_models = BEC_helpers.sample_human_models_uniform(min_BEC_constraints_running, 20)
+    # # sample_human_models_pf = BEC_helpers.sample_human_models_pf(particles_team, 20)
+
+    # # team_helpers.plot_sampled_models(particles_team, sample_human_models, weights=params.weights['val'], fig=None, text='Sampled human models')
+
+
+###############################
+
+    # min_KC_constraints = [np.array([[  0,  -1, -10]]), np.array([[ 0, -1, -6]])]
 
     # with open('models/' + params.data_loc['BEC'] + '/team_base_constraints.pickle', 'rb') as f:
     #     policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(f)
-
+    
     # with open('models/' + params.data_loc['BEC'] + '/team_BEC_constraints.pickle', 'rb') as f:
-    #     min_BEC_constraints, BEC_lengths_record = pickle.load(f)
+    #         min_BEC_constraints, BEC_lengths_record = pickle.load(f)
+
+    # with open('models/augmented_taxi2/BEC_summary.pickle', 'rb') as f:
+    #         summary, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = pickle.load(f)
+
+    # running_variable_filter_unit =  np.array([[1, 0, 0]])
+
+    # preliminary_tests, visited_env_traj_idxs = team_helpers.obtain_diagnostic_tests(params.data_loc['BEC'], summary[-1], visited_env_traj_idxs, min_KC_constraints, min_subset_constraints_record, traj_record, traj_features_record, running_variable_filter_unit, mdp_features_record)
 
 
-    # print('Policy constraints: ', policy_constraints)
+    # print(preliminary_tests)
 
-    # print('min_subset_constraints_record: ', min_subset_constraints_record)
+    # x = [np.array([[ 0,  0, -1]]), np.array([[ -2,  0, -2]]), np.array([[ 1,  0, -4]])]
 
-    # print('min_BEC_constraints: ', min_BEC_constraints)
+    # x =  [np.array([[2, 0, 0]]), np.array([[-1,  0,  0]]), np.array([[-1,  0,  0]])]
 
-    # print('BEC_lengths_record: ', BEC_lengths_record)
+    # x_min = BEC_helpers.remove_redundant_constraints(x, params.weights['val'], params.step_cost_flag)
+    # print(x_min)
+
+    # non_intersecting_constraints_flag, _ = team_helpers.check_for_non_intersecting_constraints(x, params.weights['val'], params.step_cost_flag)
+    # print('non_intersecting_constraints_flag: ', non_intersecting_constraints_flag)
+    # if non_intersecting_constraints_flag:
+    #     x, _ = team_helpers.majority_rules_non_intersecting_team_constraints(x, params.weights['val'], params.step_cost_flag)
+
+    # print('intersecting constraints: ', x)
+
+    # fig = plt.figure()
+    # ax0 = fig.add_subplot(1, 1, 1, projection='3d')
+    # utils_teams.visualize_planes_team(x, fig=fig, ax=ax0)
+    # ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(x)
+    # poly = Polyhedron.Polyhedron(ieqs=ieqs)
+    # BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax0, plot_ref_sphere=False, alpha=0.75)
+    # plt.show()
+
+    #######################
+
+    # team_knowledge =  {'p1': [[np.array([[ 0,  0, -1]])], [ np.array([[ -1,  0, 4]]), np.array([[ -1,  0, 2]]) ] ], 
+    #                    'p2': [[np.array([[ 0,  0, -1]])], [ np.array([[ 1,  0, -4]]), np.array([[ 1,  0, -2]]) ] ], 
+    #                    'p3': [[np.array([[ 0,  0, -1]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])]], 
+    #                    'common_knowledge': [], 
+    #                    'joint_knowledge': []}
+
+
+
+    # test_constraints_team = [[ np.array([[ -1,  0, 4]]),  np.array([[ 1,  0, -4]]),  np.array([[ 1,  0, -4]])], 
+    #                          [ np.array([[ -1,  0, 2]]), np.array([[ 1,  0, -2]]), np.array([[ -1,  0, 2]])] ]
+
+    # # constraints = [np.array([[ 0,  0, -1]]),  np.array([[ 1,  0, -4]]), np.array([[ 1,  0, -2]]) ] 
+
+    # # x_min = BEC_helpers.remove_redundant_constraints(constraints, params.weights['val'], params.step_cost_flag)
+    # # print(x_min)
+
+    # x, int_index = team_helpers.majority_rules_non_intersecting_team_constraints(test_constraints_team, params.weights['val'], params.step_cost_flag, test_flag = True) 
+
+    # print(x)
+    # print(int_index)
 
 
 
 
+    #################################
+
+    # team_knowledge = {'p1': [[np.array([[ 0,  0, -1]])], [np.array([[1, 0, 0]])]], 
+    #                   'p2': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  0]])]], 
+    #                   'p3': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  0]])]], 
+    #                   'common_knowledge': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  0]])]], 
+    #                   'joint_knowledge': [[[np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])]], [[np.array([[1, 0, 0]])], [np.array([[-1,  0,  0]])], [np.array([[-1,  0,  0]])]]]}
+    
+    # min_KC_constraints =  [np.array([[-1,  0,  0]])]  
 
 
 
+    # team_knowledge =  {'p1': [[np.array([[ 0,  0, -1]])], [np.array([[ 1,  0, -2]])]], 
+    #                   'p2': [[np.array([[ 0,  0, -1]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])]], 
+    #                   'p3': [[np.array([[ 0,  0, -1]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])]], 
+    #                   'common_knowledge': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])]], 
+    #                   'joint_knowledge': [[[np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])]], 
+    #                                       [[np.array([[ 1,  0, -2]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])]]]}
+    
+    # KC_constraints =  [np.array([[ 0,  0, -1]]), np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])]
+
+    # min_KC_constraints = BEC_helpers.remove_redundant_constraints(KC_constraints, params.weights['val'], params.step_cost_flag)
+
+    # min_BEC_constraints = [np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
+
+    # all_unit_constraints = [np.array([[-2, -1,  0]]), np.array([[1, 1, 0]]), np.array([[-1,  0,  2]])]
+                                                   
+
+    # print('min_KC_constraints: ', min_KC_constraints)
+    
+    # knowledge = team_helpers.calc_knowledge_level(team_knowledge, all_unit_constraints)
+
+    # print(knowledge)
+
+    #######################
+
+    # x =   [np.array([[ 0,  0, -1]]), np.array([[ -1,  0, 4]]), np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
+    # # x = [np.array([[ 1,  0, -2]]),  np.array([[-1,  0,  2]])]
+
+    # # x=  [np.array([[ 0,  0, -1]]), np.array([[ 1,  0, -2]]), np.array([[ 0,  0, -1]]), np.array([[-1,  0,  4]])]
+
+    # print(team_helpers.check_for_non_intersecting_constraints(x, params.weights['val'], params.step_cost_flag))
+
+    # print(BEC_helpers.calc_solid_angles([x]))
 
 
+    # fig = plt.figure()
+    # ax0 = fig.add_subplot(1, 1, 1, projection='3d')
+    # utils_teams.visualize_planes_team(x, fig=fig, ax=ax0)
+    # ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(x)
+    # poly = Polyhedron.Polyhedron(ieqs=ieqs)
+    # BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax0, plot_ref_sphere=False, alpha=0.75)
+    # plt.show()
+
+    #################################
+
+    # team_knowledge =  {'p1': [[np.array([[ 0,  0, -1]])], [np.array([[1,  0,  -4]]), np.array([[-1,  0,  2]])]], 
+    #                   'p2': [[np.array([[ 0,  0, -1]])], [np.array([[ 2,  0, -2]])]], 
+    #                   'p3': [[np.array([[ 0,  0, -1]])], [np.array([[ -1,  0, 4]])]], 
+    #                   'common_knowledge': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]])]], 
+    #                   'joint_knowledge': [[[np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])]], 
+    #                                       [[np.array([[1,  0,  -4]]), np.array([[ -1,  0, 2]])], [np.array([[1,  0,  -1]])], [np.array([[ -1,  0, 4]])]]]}
+    
+    # min_KC_constraints =  [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])]
+
+
+    # # knowledge = team_helpers.calc_knowledge_level(team_knowledge, min_KC_constraints)
+
+    # # fig = team_helpers.visualize_team_knowledge_constraints(team_knowledge, params.weights['val'], params.step_cost_flag, particles_team = None, kc_id = None, fig=None, text=None, plot_min_constraints_flag = False, plot_text_flag = False, min_unit_constraints = [], plot_filename = 'team_knowledge_constraints', fig_title = None)
+
+    # # plot_constraints = [np.array([[ 0,  0, -1]]), np.array([[-1,  0,  2]]), np.array([[1,  0,  -1]])]
+
+    # plot_constraints = [[np.array([[1,  0,  -4]]), np.array([[-1,  0,  2]])], [np.array([[ 2,  0, -2]])], [np.array([[ -1,  0, 4]])] ]
+    
+
+    # plot_constraints, _ = team_helpers.majority_rules_non_intersecting_team_constraints(plot_constraints, params.weights['val'], params.step_cost_flag, test_flag=True)
+
+    # print('plot_constraints: ', plot_constraints)
+    
+    # # print(knowledge)
+
+    #############################
+
+    test_constraints_team =  [[np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])], [np.array([[-1,  0,  4]])]]
+
+    # majority_rules_non_intersecting_team_constraints(test_constraints_team, weights, step_cost_flag, test_flag = False)
+
+    intersections_to_check =  [(0, 1), (0, 2), (1, 2)]
+
+    max_constraints = [test_constraints_team[cnst_id] for cnst_id in intersections_to_check[0] ]
+
+    print(max_constraints)

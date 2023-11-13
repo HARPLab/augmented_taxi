@@ -175,3 +175,142 @@ def sample_human_models_uniform_joint_knowledge(joint_constraints, n_models):
         ##############################################
 
 
+
+def majority_rules_non_intersecting_team_constraints(test_constraints_team, weights, step_cost_flag, test_flag = False):
+
+    
+    # non_intersecting_flag_cnst = []
+    intersecting_constraint_idx = []
+    max_intersecting_cnsts = []
+    intersecting_cnst = []
+    alternate_team_constraints = []
+    N_max_cnst = 0
+
+    # N_loops = 1
+    # if test_flag == True:
+    #     N_loops = len(test_constraints_team)
+    # N_max_cnst = np.zeros(N_loops)
+
+    # print(colored('Number of loops:' + str(N_loops), 'blue'))
+    print('test_constraints_team: ', test_constraints_team)
+
+    for loop_id in range(1):
+        print('Checking for majority constrainst for loop: ', loop_id)
+        
+        if not test_flag:
+            test_constraints_team_expanded = copy.deepcopy(test_constraints_team)
+            N_intersecting_sets = len(test_constraints_team_expanded)
+
+        else:
+            test_constraints_team_expanded = copy.deepcopy(test_constraints_team)
+            N_intersecting_sets = len(test_constraints_team)
+
+
+
+        
+        while N_intersecting_sets > 1:
+            intersections_to_check = list(itertools.combinations(range(len(test_constraints_team_expanded)), N_intersecting_sets))
+
+            print('Constraint list: ', test_constraints_team_expanded)
+            print('N_intersecting_sets: ', N_intersecting_sets)
+            print('Intersections to check: ', intersections_to_check)
+
+            for i in range(len(intersections_to_check)):
+                constraints = []
+                for j in intersections_to_check[i]:
+                    if test_flag:
+                        constraints.extend(test_constraints_team_expanded[j])
+                    else:
+                        constraints.append(test_constraints_team_expanded[j])
+
+                print('Constraints to check for non-intersection: ', constraints)
+
+                non_intersecting_cnst_flag, _ = check_for_non_intersecting_constraints(constraints, weights, step_cost_flag)
+                # non_intersecting_flag_cnst.extend([non_intersecting_cnst_flag, constraints])
+                # # print('non_intersecting_cnst_flag: ', non_intersecting_cnst_flag, ' constraints: ', constraints)
+
+                if not non_intersecting_cnst_flag:
+                    # # print('max_intersecting_cnsts: ', max_intersecting_cnsts)
+                    # # print('constraints: ', constraints)
+
+                    if len(max_intersecting_cnsts) == loop_id:
+                        if loop_id == 0:
+                            max_intersecting_cnsts = [[copy.deepcopy(constraints)]]
+                            intersecting_cnst = [[intersections_to_check[i]]]
+                        else:
+                            max_intersecting_cnsts.append([copy.deepcopy(constraints)])
+                            intersecting_cnst.append([intersections_to_check[i]])
+                        N_max_cnst[loop_id] = len(constraints)
+                    else:
+                        # # print('max_intersecting_cnsts[0]): ', max_intersecting_cnsts[0])
+                        if len(constraints) > N_max_cnst[loop_id]:   # update the max intersecting constraints
+                            max_intersecting_cnsts[loop_id] = [copy.deepcopy(constraints)]
+                            intersecting_cnst[loop_id] = [intersections_to_check[i]]
+                            N_max_cnst[loop_id] = len(constraints)
+                        elif len(constraints) == N_max_cnst[loop_id]:         # joint max intersecting constraints
+                            max_intersecting_cnsts[loop_id].append(constraints)
+                            intersecting_cnst[loop_id].append(intersections_to_check[i])
+                    # # print('Updated max int cnts: ', max_intersecting_cnsts)
+                    
+                # # plot
+                # if non_intersecting_cnst_flag:
+                #     # print('Plotting..')
+                #     # plot actual knowledge constraints for this knowledge type
+                #     fig = plt.figure()
+                #     ax = fig.add_subplot(projection='3d')
+                #     utils_teams.visualize_planes_team(constraints, fig=fig, ax=ax, alpha=0.5)
+                #     ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints)
+                #     poly = Polyhedron.Polyhedron(ieqs=ieqs)
+                #     BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax, plot_ref_sphere=False, color = 'b')
+                #     plt.show()
+
+            N_intersecting_sets -= 1
+
+
+        print('max_intersecting_cnsts for loop ', loop_id, ': ', max_intersecting_cnsts[loop_id])
+
+
+        # choose the sets of constraints that are the most intersecting
+        # if len(max_intersecting_cnsts) == 1:
+        #     if len(alternate_team_constraints) == 0:
+        #         alternate_team_constraints = max_intersecting_cnsts[0]
+        #         intersecting_constraint_idx = [intersecting_cnst[0]]
+        #     else:
+        #         alternate_team_constraints.append(max_intersecting_cnsts[0])
+        #         intersecting_constraint_idx.append(intersecting_cnst[0])
+        # elif len(max_intersecting_cnsts) > 1:
+        #     rand_index = random.randint(0, len(max_intersecting_cnsts)-1)
+        #     if len(alternate_team_constraints) == 0:
+        #         alternate_team_constraints = max_intersecting_cnsts[rand_index]
+        #         intersecting_constraint_idx = [intersecting_cnst[rand_index]]
+        #     else:
+        #         alternate_team_constraints.append(max_intersecting_cnsts[rand_index])
+        #         intersecting_constraint_idx.append(intersecting_cnst[rand_index])
+        # else:
+        #     # raise RuntimeError('No intersecting constraints found!')
+        #     alternate_team_constraints = []
+        #     intersecting_constraints = []
+
+    print('max_intersecting_cnsts: ', max_intersecting_cnsts) 
+
+    ## max intersecting constraints
+    if len(max_intersecting_cnsts) > 0:
+        for max_int_cnsts in max_intersecting_cnsts:
+            if len(max_int_cnsts) == 1:
+                if len(alternate_team_constraints) == 0:
+                    alternate_team_constraints = max_int_cnsts[0]
+                else:
+                    alternate_team_constraints.extend(max_int_cnsts[0])
+            elif len(max_int_cnsts) > 1:
+                rand_index = random.randint(0, len(max_int_cnsts)-1)
+                if len(alternate_team_constraints) == 0:
+                    alternate_team_constraints = max_int_cnsts[rand_index]
+                else:
+                    alternate_team_constraints.extend(max_int_cnsts[rand_index])
+
+
+    
+    # # print(non_intersecting_flag_cnst)
+    
+
+    return alternate_team_constraints, intersecting_cnst

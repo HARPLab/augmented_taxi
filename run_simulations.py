@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import os
 import itertools
-from itertools import permutations
+from itertools import permutations, combinations
 
 # Other imports.
 sys.path.append("simple_rl")
@@ -40,6 +40,7 @@ import random
 import pandas as pd
 
 from main_team import run_reward_teaching
+from analyze_sim_data import run_analysis_script
 
 
 
@@ -48,84 +49,80 @@ if __name__ == "__main__":
     os.makedirs('models/' + params.data_loc['base'], exist_ok=True)
     os.makedirs('models/' + params.data_loc['BEC'], exist_ok=True)
 
-    N_runs = 100
-
-    # weights_list = [[0.6, 0.15, 0.25], [0.5, 0.25, 0.25], [0.4, 0.3, 0.3], [0.8, 0.05, 0.1], [0.2, 0.6, 0.2], [0.2, 0.2, 0.6], [0.5, 0.1, 0.4], [0, 0, 1], [1, 0, 0], [0, 1, 0]]
     
-    # weights_list = [[0.2, 0.0, 0.8]]
-
-    # try:
-    #     with open('models/augmented_taxi2/vars_to_save.pickle', 'rb') as f:
-    #         vars_to_save = pickle.load(f)
-    # except:
-    #     vars_to_save = None
-    # print('Vars len so far: ', vars_to_save.shape[0])
-        
-    # # simulation old
-    # resp_dist_list_history = []
-    # for i in range(1, N_runs+1):
-    #     # j = int(np.floor(i/len(weights_list)))
-    #     j = 0
-    #     resp_dist_list = []
-    #     while len(resp_dist_list) == 0 or (resp_dist_list in resp_dist_list_history and (1 not in weights_list[j])):
-    #         resp_dist_list = random.choices(['correct', 'incorrect', 'mixed'], weights = weights_list[j], k=40)
-                
-    #     resp_dist_list_history.append(resp_dist_list)
-    #     dem_strategy = random.choice(['common_knowledge', 'joint_knowledge', 'individual_knowledge_low', 'individual_knowledge_high'])
-    #     # dem_strategy = 'common_knowledge'
-    #     # print('resp_dist_list_history: ', resp_dist_list_history)
-    #     print('Simulation run: ', i, '. Demo strategy: ', dem_strategy)
-    #     print('resp_dist_list: ', resp_dist_list)
-    #     # vars_to_save = run_reward_teaching(params, pool, demo_strategy = dem_strategy, response_type = 'simulated', response_distribution_list= resp_dist_list, run_no = i, vars_to_save = vars_to_save)
-    #     run_reward_teaching(params, pool, demo_strategy = dem_strategy, response_type = 'simulated', viz_flag=[False, False, False], response_distribution_list= resp_dist_list, run_no = i, vars_filename='sim_run_mixed_maj')
-
-    sim_params = {'min_correct_likelihood': 0.5}
-    start_id = 3
-
 
     team_params_learning = {'low': [0.5, 0.05], 'med': [0.6, 0.07], 'high': [0.7, 0.1]}
-    print([*range(params.team_size)])
-    # team_composition_list = list(permutations([*range(params.team_size)]))
-    team_composition_list = [[0,1,2], [0,2,1], [1,0,2], [1,2,0], [2,0,1], [2,1,0]]
-    print(team_composition_list)
-    for i in range(1, N_runs+1):
-        team_composition_for_run = team_composition_list[np.random.choice(range(len(team_composition_list)))]
+    # print([*range(params.team_size)])
+    # team_composition_list = list(permutations([*range(2)]))
+    # team_composition_list = list(combinations([*range(2)], params.team_size))
+
+
+    team_composition_list = [[0,2,2], [0,0,2]]
+    # dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
+    dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
+    team_comp_id = 1
+    dem_strategy_id = 0
+
+    sim_params = {'min_correct_likelihood': 0.5}
+    N_runs = 1
+    run_start_id = 6
+    file_prefix = 'debug_trial'
+    path = 'models/augmented_taxi2'
+
+    for run_id in range(run_start_id, run_start_id+N_runs):
+        # team_composition_for_run = list(team_composition_list[np.random.choice(range(len(team_composition_list)))])
+
+        # team_composition_for_run = []
+        # for k in range(params.team_size):
+        #     team_composition_for_run.append(random.choice([0,1,2]))
+
+        team_composition_for_run = team_composition_list[team_comp_id]
+
+        # if N_runs < 5:
+        #     team_composition_for_run = team_composition_list[0]
+        # else:
+        #     team_composition_for_run = team_composition_list[1]
+
+
         print('team_composition_for_run: ', team_composition_for_run)
 
         ilcr = np.zeros(params.team_size)
         rlcr = np.zeros([params.team_size, 2])
 
         for j in range(params.team_size):
-            if team_composition_for_run[j] == 0:
-                ilcr[j] = random.random()*0.1 + team_params_learning['low'][0]  # between 0.5 and 0.6
-                x = random.random()*0.05 + team_params_learning['low'][1]  # between 0.05 and 0.15
+            if team_composition_for_run[j] == 0:# 
+                ilcr[j] = 0.5
+                x = 0.05        
             elif team_composition_for_run[j] == 1:
-                ilcr[j] = random.random()*0.1 + team_params_learning['med'][0]  # between 0.5 and 0.6
-                x = random.random()*0.05 + team_params_learning['med'][1]  # between 0.05 and 0.15
+                ilcr[j] = 0.6
+                x = 0.07
             elif team_composition_for_run[j] == 2:
-                ilcr[j] = random.random()*0.1 + team_params_learning['high'][0]  # between 0.5 and 0.6
-                x = random.random()*0.05 + team_params_learning['high'][1]  # between 0.05 and 0.15
-                
+                ilcr[j] = 0.7
+                x = 0.1
+
             rlcr[j,0] = x
             rlcr[j,1] = -x      
             
-        
-        # dem_strategy = random.choice(['common_knowledge', 'joint_knowledge', 'individual_knowledge_low', 'individual_knowledge_high'])
-        dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
-        
-        if (i-start_id)/(N_runs-start_id) < 0.25:
-            dem_strategy = dem_strategy_list[0]
-        elif (i-start_id)/(N_runs-start_id) < 0.5:
-            dem_strategy = dem_strategy_list[1]
-        elif (i-start_id)/(N_runs-start_id) < 0.75:
-            dem_strategy = dem_strategy_list[2]
+
+        dem_strategy = dem_strategy_list[dem_strategy_id]
+
+        print(colored('Simulation run: ' + str(run_id) + '. Demo strategy: ' + str(dem_strategy) + 'initial lcr: ' + str(ilcr) + 'rate lcr: ' + str(rlcr), 'red'))
+        run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy, experiment_type = 'simulated', team_likelihood_correct_response = ilcr,  team_learning_rate = rlcr, viz_flag=[False, False, False], run_no = run_id, vars_filename=file_prefix)
+        file_name = file_prefix+'_'+str(run_id)+'.csv'
+        run_analysis_script(path, file_name, file_prefix)
+
+        # update sim params
+        if dem_strategy_id == 3:
+            dem_strategy_id = 0
         else:
-            dem_strategy = dem_strategy_list[3]
+            dem_strategy_id += 1
 
-        print(colored('Simulation run: ' + str(i) + '. Demo strategy: ' + str(dem_strategy) + 'initial lcr: ' + str(ilcr) + 'rate lcr: ' + str(rlcr), 'red'))
-        run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy, experiment_type = 'simulated', team_likelihood_correct_response = ilcr,  team_learning_rate = rlcr, viz_flag=[False, False, False], run_no = i, vars_filename='new_hlm_sim_run_6')
+        if team_comp_id == 0:
+            team_comp_id = 1
+        else:
+            team_comp_id = 0
 
-
+    
     # # save all the variables
     # vars_to_save.to_csv('models/augmented_taxi2/vars_to_save.csv', index=False)
     # with open('models/augmented_taxi2/vars_to_save.pickle', 'wb') as f:

@@ -211,6 +211,7 @@ def perform_BEC_constraint_bookkeeping_flattened(BEC_constraints, min_subset_con
 
     return BEC_constraint_bookkeeping
 
+
 def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record, mdp_features_record, variable_filter=np.array([[0, 0, 0]])):
     '''
     Summary: For each constraint in min_subset_constraints_record, see if it matches one of the BEC_constraints
@@ -246,6 +247,7 @@ def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_r
             BEC_constraint_bookkeeping[BEC_constraint_idx] = BEC_constraint_bookkeeping_redundant[BEC_constraint_idx]
 
     return BEC_constraint_bookkeeping
+
 
 def traj_not_shown_previously(env_idx, traj_idx, visited_env_traj_idxs, traj_record):
     '''
@@ -887,6 +889,7 @@ def sample_human_models_uniform(constraints, n_models):
                 select_sph_points = select_sph_points.reshape(select_sph_points.shape[0], 1, select_sph_points.shape[1])
                 sample_human_models.extend(select_sph_points)
     else:
+        # print('n_models: ', n_models)
         points = cg.generate_equidistributed_points_on_sphere(n_models)
         points = np.expand_dims(points, 1)
         sample_human_models.extend(points)

@@ -26,6 +26,7 @@ class cust_pdf_uniform(stats.rv_continuous):
         self.u_pdf = self.u_cdf/(2*np.pi)
 
         if uniform_cdf < 0.5:
+            # print('Uniform_cdf: ', uniform_cdf)
             self.VMF_scaling_factor = 0.5/uniform_cdf
             self.kappa = self.calc_kappa(u_cdf=0.5) # limit VMF_cdf to 0.5 to find Kappa and appropriate scale the resulting pdf
         else:
@@ -94,6 +95,7 @@ class cust_pdf_uniform(stats.rv_continuous):
         # cumsum to form cdf
         my_cdf = np.cumsum(my_pdfs)
         # make sure cdf bounded on [0,1]
+        # print('my_cdf: ', my_cdf)
         my_cdf = my_cdf / my_cdf[-1]
         
         return xs_array, my_cdf
@@ -189,6 +191,7 @@ class cust_pdf_kappa(stats.rv_continuous):
         # cumsum to form cdf
         my_cdf = np.cumsum(my_pdfs)
         # make sure cdf bounded on [0,1]
+        print('my_cdf: ', my_cdf)
         my_cdf = my_cdf / my_cdf[-1]
         # print(my_cdf)
         # # create cdf and ppf

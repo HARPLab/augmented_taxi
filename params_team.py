@@ -294,7 +294,7 @@ BEC = {
 
     'test_difficulty': 'high',                # expected ease for human to correctly predict the agent's actions in this test environment (low, medium, high)
 
-    'n_human_models': 4,                      # number of human beliefs to actively consider
+    'n_human_models': 25,                      # number of human beliefs to actively consider
 
     'n_particles': 500,                      # number of particles in particle filter
 
@@ -342,6 +342,10 @@ test_env_traj_tracers = {
 
 ### Added for robot teaching to team situation
 
+# for debugging
+debug_flag = True
+debug_kl_calc = False
+
 team_size = 3
 
 
@@ -357,7 +361,7 @@ for i in range(team_size):
 
 
 
-knowledge = 'common_knowledge'
+# knowledge = 'common_knowledge'
 # knowledge = 'joint_knowledge'
 # knowledge = 'individual_knowledge'
 
@@ -365,10 +369,10 @@ knowledge = 'common_knowledge'
 #                   'joint_knowledge': np.array([0.95, 0.95, 0.95]), \
 #                   'individual_knowledge': np.array([0.7, 0.7, 0.7])}
 
-demo_strategy = 'common_knowledge'
+# demo_strategy = 'common_knowledge'
 # demo_strategy = 'joint_knowledge'
 # demo_strategy = 'individual_knowledge_low'
 # demo_strategy = 'individual_knowledge_high'
 
-max_KC_loops = 10
+max_KC_loops = 3
 learning_goal = 1.0

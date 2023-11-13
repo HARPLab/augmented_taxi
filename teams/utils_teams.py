@@ -40,7 +40,7 @@ def visualize_planes_team(constraints, fig=None, ax=None, alpha=0.5, color=None)
                 ax.plot_surface(X_xy, Y_xy, Z, alpha=alpha, color=color)
             else:
                 ax.plot_surface(X_xy, Y_xy, Z, alpha=alpha)
-            # plot_normal(constraint, X_xy, Y_xy, Z, ax=ax)
+            plot_normal(constraint, X_xy, Y_xy, Z, ax=ax)
         elif constraint[0, 1] != 0:
             X_xz, Z_xz, = np.meshgrid(x, z)
             Y = (-constraint[0, 0] * X_xz - constraint[0, 2] * Z_xz) / constraint[0, 1]
@@ -48,7 +48,7 @@ def visualize_planes_team(constraints, fig=None, ax=None, alpha=0.5, color=None)
                 ax.plot_surface(X_xz, Y, Z_xz, alpha=alpha, color=color)
             else:
                 ax.plot_surface(X_xz, Y, Z_xz, alpha=alpha)
-            # plot_normal(constraint, X_xz, Y, Z_xz, ax=ax)
+            plot_normal(constraint, X_xz, Y, Z_xz, ax=ax)
         else:
             Y_yz, Z_yz, = np.meshgrid(y, z)
             X = (-constraint[0, 1] * Y_yz - constraint[0, 2] * Z_yz) / constraint[0, 0]
@@ -56,7 +56,7 @@ def visualize_planes_team(constraints, fig=None, ax=None, alpha=0.5, color=None)
                 ax.plot_surface(X, Y_yz, Z_yz, alpha=alpha, color=color)
             else:
                 ax.plot_surface(X, Y_yz, Z_yz, alpha=alpha)
-            # plot_normal(constraint, X, Y_yz, Z_yz, ax=ax)
+            plot_normal(constraint, X, Y_yz, Z_yz, ax=ax)
 
 
 def flatten_list(nested_list):

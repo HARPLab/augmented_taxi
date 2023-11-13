@@ -1482,10 +1482,16 @@ def obtain_diagnostic_tests(data_loc, previous_demos, visited_env_traj_idxs, min
     BEC_constraints = min_BEC_constraints.copy()
     BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(BEC_constraints,
                                                                                 min_subset_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record, mdp_features_record, variable_filter=variable_filter)
-    # print('BEC_constraint_bookkeeping: {}'.format(BEC_constraint_bookkeeping))
-    # print('BEC_constraints: {}'.format(BEC_constraints))
+    print('BEC_constraint_bookkeeping for generating diagnostic tests: {}'.format(BEC_constraint_bookkeeping))
+    print('BEC_constraints: {}'.format(BEC_constraints))
+
+    if len(BEC_constraints) > 0 and len(BEC_constraint_bookkeeping[0]) == 0:
+        nn_BEC_constraint_bookkeeping, minimal_distances = BEC_helpers.perform_nn_BEC_constraint_bookkeeping(
+                    BEC_constraints,
+                    min_subset_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record,
+                    mdp_features_record, variable_filter=variable_filter)
     
-    while len(BEC_constraints) > 0:
+    while len(BEC_constraints) > 0 and len(BEC_constraint_bookkeeping[0]) > 0:
         # downsampling strategy 1: randomly cull sets with too many members for computational feasibility
         # for j, set in enumerate(sets):
         #     if len(set) > downsample_threshold:

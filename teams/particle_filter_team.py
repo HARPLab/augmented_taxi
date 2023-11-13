@@ -35,7 +35,7 @@ class Particles_team():
         self.positions_prev = self.positions.copy()
         self.weights_prev = self.weights.copy()
 
-        self.constraints = []
+        self.knowledge_constraints = []
 
         # Spherical discretization taken from : A new method to subdivide a spherical surface into equal-area cells,
         # Malkin 2019 https://arxiv.org/pdf/1612.03467.pdf
@@ -752,8 +752,8 @@ class Particles_team():
 
     
     # currently unused - will be needed when particles are reset based on all prior knowledge instead of just the last constraint
-    def knowledge_update(self, constraints):
-        self.constraints = copy.deepcopy(constraints)
+    def knowledge_update(self, knowledge_constraints):
+        self.knowledge_constraints = copy.deepcopy(knowledge_constraints)
 
 
 
@@ -812,30 +812,37 @@ class Particles_team():
 
     ## Unique functions for the team case
 
-    def update_jk(self, joint_constraints, c=0.5, reset_threshold_prob=0.001):
+    def update_jk(self, joint_knowledge, c=0.5, reset_threshold_prob=0.001):
+        
+        joint_constraints = joint_knowledge[0]
+
+        print('Update JK with constraints: {}'.format(joint_constraints))
+        
         self.weights_prev = self.weights.copy()
         self.positions_prev = self.positions.copy()
 
         self.reweight_jk(joint_constraints) # particles reweighted even if one of the original constraints is satisfied.
 
-        if sum(self.weights) < reset_threshold_prob:
-            self.reset_jk(joint_constraints) # TODO: Check if the same reset procedure applies to the joint knowledge case. Reset particles based on the first constraint for now.
-            print(colored('Resetting weights JK. The reset process is currently incomplete.', 'red'))
-        else:
-            # normalize weights and update particles
-            self.weights /= sum(self.weights)
+        # Joint particles reset temporarily removed. To be fixed and added back!
 
-            n_eff = self.calc_n_eff(self.weights)
-            # print('n_eff: {}'.format(n_eff))
-            if n_eff < c * len(self.weights):
-                # a) use systematic resampling
-                # resample_indexes = p_utils.systematic_resample(self.weights)
-                # self.resample_from_index(resample_indexes)
+        # if sum(self.weights) < reset_threshold_prob:
+        #     self.reset_jk(joint_constraints) # TODO: Check if the same reset procedure applies to the joint knowledge case. Reset particles based on the first constraint for now.
+        #     print(colored('Resetting weights JK. The reset process is currently incomplete.', 'red'))
+        # else:
+        #     # normalize weights and update particles
+        #     self.weights /= sum(self.weights)
 
-                # b) use KLD resampling
-                resample_indexes = self.KLD_resampling()
-                print('Resampling...')
-                self.resample_from_index(np.array(resample_indexes))
+        #     n_eff = self.calc_n_eff(self.weights)
+        #     # print('n_eff: {}'.format(n_eff))
+        #     if n_eff < c * len(self.weights):
+        #         # a) use systematic resampling
+        #         # resample_indexes = p_utils.systematic_resample(self.weights)
+        #         # self.resample_from_index(resample_indexes)
+
+        #         # b) use KLD resampling
+        #         resample_indexes = self.KLD_resampling()
+        #         print('Resampling...')
+        #         self.resample_from_index(np.array(resample_indexes))
 
         self.binned = False
 
@@ -848,7 +855,7 @@ class Particles_team():
         Reset the particle filter to conservative include a set of new particles that are consistent with the specified constraint
         '''
         new_particle_positions = []
-        N_team = len(joint_constraints)
+        N_team = len(joint_constraints[0])
         for individual_constraints in joint_constraints:
             new_particle_positions.extend(BEC_helpers.sample_human_models_uniform(individual_constraints, int(50/N_team))) # sample from feasible region of each person on the team        
         
