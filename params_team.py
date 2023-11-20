@@ -294,7 +294,7 @@ BEC = {
 
     'test_difficulty': 'high',                # expected ease for human to correctly predict the agent's actions in this test environment (low, medium, high)
 
-    'n_human_models': 25,                      # number of human beliefs to actively consider
+    'n_human_models': 24,                     # number of human beliefs to actively consider; ensure that this is a multiple of the team size parameter below; needed for sampling models from joint team knowledge
 
     'n_particles': 500,                      # number of particles in particle filter
 
@@ -345,9 +345,10 @@ test_env_traj_tracers = {
 # for debugging
 debug_flag = True
 debug_kl_calc = False
+debug_hm_sampling = False
+plot_sampled_models_flag = False
 
 team_size = 3
-
 
 # human_learning_models = {'p1': np.array([0.9, 0.9, 0.9]), \
 #                          'p2': np.array([0.8, 0.8, 0.8]), \
@@ -374,5 +375,6 @@ for i in range(team_size):
 # demo_strategy = 'individual_knowledge_low'
 # demo_strategy = 'individual_knowledge_high'
 
-max_KC_loops = 3
+max_KC_loops = 10
+max_loops = 30
 learning_goal = 1.0

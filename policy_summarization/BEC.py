@@ -492,38 +492,38 @@ def combine_limiting_constraints_IG(args):
         overlap_in_opt_and_counterfactual_traj = [[] for i in range(len(min_env_constraints_record))]
         overlap_in_opt_and_counterfactual_traj_avg = []
 
-        # commenting out trajectory overlap calculation
+        ## human_counterfactual_trajs and overlap_in_opt_and_counterfactual_traj_avg are not being used and hence commenting its calculation
         # for model_idx in range(sample_human_model_idxs):
         #     with open('models/' + data_loc + '/counterfactual_data_' + str(curr_summary_len) + '/model' + str(
         #             model_idx) + '/cf_data_env' + str(
         #         env_idx).zfill(5) + '.pickle', 'rb') as f:
         #         constraints_env = pickle.load(f)
-        #
+        
         #     # for each of the minimum constraint sets in each environment (with a unique starting state)
         #     for traj_idx, min_env_constraints in enumerate(min_env_constraints_record):
         #         in_minimum_set = False
-        #
+        
         #         # see if any of the constraints generated using this human trajectory match any of those in the minimum constraint set
         #         for constraint in constraints_env[traj_idx]:
         #             for min_env_constraint in min_env_constraints:
         #                 # if there is a match, consider the overlap with the agent's optimal trajectory and store that trajectory
         #                 if BEC_helpers.equal_constraints(constraint, min_env_constraint):
         #                     in_minimum_set = True
-        #
-        #                     # you should only consider the overlap for the first counterfactual human trajectory (as opposed to
-        #                     # counterfactual trajectories that could've arisen from states after the first state)
-        #                     overlap_pct = BEC_helpers.calculate_counterfactual_overlap_pct(best_human_trajs_record_env[traj_idx][0], trajs_opt[traj_idx])
-        #
-        #                     overlap_in_opt_and_counterfactual_traj[traj_idx].append(overlap_pct)
-        #                     # store the required information for replaying the closest human counterfactual trajectory
-        #                     human_counterfactual_trajs[traj_idx].append((curr_summary_len, model_idx, env_idx, traj_idx))
-        #                     break
-        #
-        #             # a counterfactual trajectory only needs to contribute one constraint in the minimal set for the
-        #             # corresponding optimal trajectory to be considered for the summary
-        #             if in_minimum_set:
-        #                 break
-        #
+        
+                            # # you should only consider the overlap for the first counterfactual human trajectory (as opposed to
+                            # # counterfactual trajectories that could've arisen from states after the first state)
+                            # overlap_pct = BEC_helpers.calculate_counterfactual_overlap_pct(best_human_trajs_record_env[traj_idx][0], trajs_opt[traj_idx])
+        
+                            # overlap_in_opt_and_counterfactual_traj[traj_idx].append(overlap_pct)
+                            # # store the required information for replaying the closest human counterfactual trajectory
+                            # human_counterfactual_trajs[traj_idx].append((curr_summary_len, model_idx, env_idx, traj_idx))
+                            # break
+        
+                    # # a counterfactual trajectory only needs to contribute one constraint in the minimal set for the
+                    # # corresponding optimal trajectory to be considered for the summary
+                    # if in_minimum_set:
+                    #     break
+        
         # # take the average overlap across all counterfactual trajectories that contributed to the most limiting constraints
         # for traj_idx, overlap_pcts in enumerate(overlap_in_opt_and_counterfactual_traj):
         #     if len(overlap_pcts) > 0:

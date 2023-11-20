@@ -130,6 +130,7 @@ def run_analysis_script(path, files, file_prefix):
                     BEC_team_knowledge_dict['run_no'] = int(sim_vars['run_no'][i])
                     BEC_team_knowledge_dict['loop_count'] = int(sim_vars['loop_count'][i])
                     BEC_team_knowledge_dict['demo_strategy'] = sim_vars['demo_strategy'][i]
+                    BEC_team_knowledge_dict['knowledge_comp_id'] = int(sim_vars['knowledge_comp_id'][i])
                     team_BEC_knowledge_level = team_BEC_knowledge_level.append(BEC_team_knowledge_dict, ignore_index=True)
                 
                     # expected BEC knowledge level
@@ -137,6 +138,7 @@ def run_analysis_script(path, files, file_prefix):
                     BEC_team_knowledge_dict_expected['run_no'] = int(sim_vars['run_no'][i])
                     BEC_team_knowledge_dict_expected['loop_count'] = int(sim_vars['loop_count'][i])
                     BEC_team_knowledge_dict_expected['demo_strategy'] = sim_vars['demo_strategy'][i]
+                    BEC_team_knowledge_dict_expected['knowledge_comp_id'] = int(sim_vars['knowledge_comp_id'][i])
                     team_BEC_knowledge_level_expected = team_BEC_knowledge_level_expected.append(BEC_team_knowledge_dict_expected, ignore_index=True)
 
 
@@ -157,13 +159,13 @@ def run_analysis_script(path, files, file_prefix):
 
                     # likelihood response
                     team_likelihood_correct_response_dict = {}
-                    print('lcr before: ', lcr)
+                    # print('lcr before: ', lcr)
                     lcr = lcr.strip('[]')
                     lcr = lcr.split(' ')
                     lcr = [i for i in lcr if i != '']
-                    print('lcr: ', lcr)
+                    # print('lcr: ', lcr)
                     lcr_array = np.array(list(lcr), dtype=float)
-                    print('lcr_array: ', lcr_array)
+                    # print('lcr_array: ', lcr_array)
                     team_likelihood_correct_response_dict['p1'] = lcr_array[0]
                     team_likelihood_correct_response_dict['p2'] = lcr_array[1]
                     team_likelihood_correct_response_dict['p3'] = lcr_array[2]
@@ -205,6 +207,7 @@ def run_analysis_script(path, files, file_prefix):
     normalized_loop_count = []
     lcr_var = []
     team_knowledge_level_min = team_BEC_knowledge_level.copy(deep=True)
+    print('team_knowledge_level_min columns: ', team_knowledge_level_min.columns)
     team_knowledge_level_min = team_knowledge_level_min.drop(['p1', 'p2', 'p3', 'common_knowledge', 'joint_knowledge'], axis=1)
 
     learning_rate_index = []
@@ -222,10 +225,10 @@ def run_analysis_script(path, files, file_prefix):
                 lr_index.extend([0])
         learning_rate_index.append(lr_index)
 
-    print('learning_rate_index:', learning_rate_index)
+    # print('learning_rate_index:', learning_rate_index)
 
-    print('team_BEC_knowledge_level: ', team_BEC_knowledge_level)
-    print('likelihood_correct_response: ', likelihood_correct_response)
+    # print('team_BEC_knowledge_level: ', team_BEC_knowledge_level)
+    # print('likelihood_correct_response: ', likelihood_correct_response)
 
     # Long format data
     team_knowledge_level_long = pd.DataFrame()
@@ -260,7 +263,7 @@ def run_analysis_script(path, files, file_prefix):
     # rescale knowledge levels
     unique_ids = team_knowledge_level_long['run_no'].unique()
 
-    print('unique_id: ', unique_ids)
+    # print('unique_id: ', unique_ids)
 
     # for id in unique_ids:
     #     idx = team_knowledge_level_long[(team_knowledge_level_long['run_no'] == id) & (team_knowledge_level_long['knowledge_type']=='joint_knowledge')].index
@@ -345,19 +348,57 @@ def run_analysis_script(path, files, file_prefix):
             line, = ax.plot(team_BEC_knowledge_level.loc[idx, 'loop_count'], y, lw=2.5)
             ax.set_title(column_name, fontsize='small', loc='center')
 
+
+            # plot verticle lines for visulizng end of concepts
+            for kc_id in team_BEC_knowledge_level['knowledge_comp_id'].unique():
+                max_idx = team_BEC_knowledge_level[(team_BEC_knowledge_level['knowledge_comp_id'] == kc_id) & (team_BEC_knowledge_level['run_no'] == id)].index.max()
+                ax.axvline(team_BEC_knowledge_level.loc[max_idx, 'loop_count'], color='k', linestyle='--', linewidth=1)
+
             if nn == 4:
                 break
 
         fig.supxlabel('Interaction Number')
-        fig.supylabel('Knowledge Level')
+        fig.supylabel('BEC Knowledge Level')
 
-        plt.show()
+        fig2, axs2 = plt.subplots(2, 3, figsize=(9, 5), layout='constrained',
+                        sharex=True, sharey=True)
+        for nn, ax in enumerate(axs2.flat):
+            column_name = team_unit_knowledge_level.columns[nn]
+            y = team_unit_knowledge_level.loc[idx,column_name]
+            line, = ax.plot(team_unit_knowledge_level.loc[idx, 'loop_count'], y, lw=2.5)
+            ax.set_title(column_name, fontsize='small', loc='center')
 
+            # plot verticle lines for visulizng end of concepts
+            for kc_id in team_BEC_knowledge_level['knowledge_comp_id'].unique():
+                max_idx = team_BEC_knowledge_level[(team_BEC_knowledge_level['knowledge_comp_id'] == kc_id) & (team_BEC_knowledge_level['run_no'] == id)].index.max()
+                ax.axvline(team_BEC_knowledge_level.loc[max_idx, 'loop_count'], color='k', linestyle='--', linewidth=1)
+
+            if nn == 4:
+                break
+
+        fig2.supxlabel('Interaction Number')
+        fig2.supylabel('Unit Knowledge Level')
+
+        
 
     
 
-    team_knowledge_level_long.describe(include='all').to_csv('models/augmented_taxi2/descriptives.csv')
+    # team_knowledge_level_long.describe(include='all').to_csv('models/augmented_taxi2/descriptives.csv')
 
+    
+
+    # print out the team knowledge constraints
+
+    for id, know in team_knowledge.iterrows():
+        print('Loop: ', id)
+        print('p1: ', know['p1'])
+        print('p2: ', know['p2'])
+        print('p3: ', know['p3'])
+        print('common_knowledge: ', know['common_knowledge'])
+        print('joint_knowledge: ', know['joint_knowledge'])
+
+
+    plt.show()
 
 
 
@@ -365,8 +406,9 @@ if __name__ == "__main__":
 
     # process team knowledge data
     path = 'models/augmented_taxi2'
-    files = os.listdir(path)
-    file_prefix = 'debug_trial'
+    # files = os.listdir(path)
+    files = ['trials_set_1__4.csv']
+    file_prefix = 'trials_set_1_'
 
     run_analysis_script(path, files, file_prefix)
 

@@ -61,12 +61,12 @@ if __name__ == "__main__":
     # dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
     dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
     team_comp_id = 1
-    dem_strategy_id = 0
+    dem_strategy_id = 3
 
     sim_params = {'min_correct_likelihood': 0.5}
     N_runs = 1
-    run_start_id = 6
-    file_prefix = 'debug_trial'
+    run_start_id = 4
+    file_prefix = 'trials_set_1_'
     path = 'models/augmented_taxi2'
 
     for run_id in range(run_start_id, run_start_id+N_runs):
@@ -107,9 +107,12 @@ if __name__ == "__main__":
         dem_strategy = dem_strategy_list[dem_strategy_id]
 
         print(colored('Simulation run: ' + str(run_id) + '. Demo strategy: ' + str(dem_strategy) + 'initial lcr: ' + str(ilcr) + 'rate lcr: ' + str(rlcr), 'red'))
+        # viz_flag = [demo_viz, test_viz, pf_knowledge_viz]
         run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy, experiment_type = 'simulated', team_likelihood_correct_response = ilcr,  team_learning_rate = rlcr, viz_flag=[False, False, False], run_no = run_id, vars_filename=file_prefix)
-        file_name = file_prefix+'_'+str(run_id)+'.csv'
-        run_analysis_script(path, file_name, file_prefix)
+        
+        # file_name = [file_prefix + '_' + str(run_id) + '.csv']
+        # print('Running analysis script... Reading data from: ', file_name)
+        # run_analysis_script(path, file_name, file_prefix)
 
         # update sim params
         if dem_strategy_id == 3:

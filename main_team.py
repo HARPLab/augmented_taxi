@@ -272,7 +272,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
     initial_likelihood_vars = {'ilcr': np.copy(team_likelihood_correct_response), 'rlcr': np.copy(team_learning_rate)}
     
     plt.rcParams['figure.figsize'] = [10, 6]
-    BEC_summary, visited_env_traj_idxs, min_BEC_constraints_running = [], [], []
+    BEC_summary, visited_env_traj_idxs, min_BEC_constraints_running, prior_min_BEC_constraints_running = [], [], copy.deepcopy(params.prior), copy.deepcopy(params.prior)
     summary_count, prev_summary_len = 0, 0 
     demo_viz_flag, test_viz_flag, knowledge_viz_flag = viz_flag
 
@@ -335,9 +335,10 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                             'particles_team_expected': None,
                             'unit_knowledge_level_expected': None,
                             'BEC_knowledge_level_expected': None,
-                            'response_type': None,
+                            # 'response_type': None,
                             # 'response_distribution': None,
                             'test_constraints': None,
+                            'test_constraints_team': None,
                             'opposing_constraints_count': 0,
                             'final_remedial_constraints': None,
                             'N_remedial_tests': None,
@@ -394,7 +395,10 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
 
             if knowledge_id_new != knowledge_id:
                 knowledge_id = knowledge_id_new
-                particles_demo = copy.deepcopy(particles_team[knowledge_id])
+        
+        # update demo particles
+        print(colored('Updating demo particles with particles for: ', 'red'), knowledge_id)
+        particles_demo = copy.deepcopy(particles_team[knowledge_id])
 
         # Obtain BEC summary for a new unit (skip if its the 1st unit)
         # print('Summary count: ', summary_count)
@@ -405,7 +409,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                 with open('models/' + params.data_loc['BEC'] + '/BEC_summary_initial_2.pickle', 'rb') as f:
                     BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = pickle.load(f)
             except:
-                # # print('Starting summary generation for 1st unit..')
+                print(colored('Starting summary generation for 1st unit..', 'blue'))
                 BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = team_helpers.obtain_team_summary(params.data_loc['BEC'], min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, params.weights['val'], params.step_cost_flag, 
                                                                                                                     pool, params.BEC['n_human_models'], consistent_state_count, params.BEC['n_train_demos'], particles_demo, knowledge_id, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs)
                 # # print('Ended summary generation for 1st unit..')
@@ -415,7 +419,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
             
             
         else:
-            # # print('Starting summary generation for unit no.  ' + str(loop_count + 1) )
+            print(colored('Starting summary generation for unit no.  ', 'blue') + str(loop_count + 1) )
             BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = team_helpers.obtain_team_summary(params.data_loc['BEC'], min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, params.weights['val'], params.step_cost_flag, 
                                                                                                                 pool, params.BEC['n_human_models'], consistent_state_count, params.BEC['n_train_demos'], particles_demo, knowledge_id, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs)
             # # print('Ended summary generation for unit no.  ' + str(loop_count + 1) )
@@ -427,6 +431,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
         print('Current summary len: ', len(BEC_summary))
 
         if len(BEC_summary) > prev_summary_len:
+            print('Showing demo....')
             unit_constraints, demo_ids, running_variable_filter_unit = team_helpers.show_demonstrations(BEC_summary[-1], particles_demo, params.mdp_class, params.weights['val'], loop_count, viz_flag = demo_viz_flag)
 
             # print('Knowledge component / Variable filter:', variable_filter)
@@ -453,7 +458,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
             test_no = 1
             all_tests_constraints = []
             test_constraints_team = []
-            kc_reset_flag = True
+            kc_reset_flag = True  # flag to reset the KC constraints in the team knowledge
             for test in preliminary_tests:
                 print('Test no ', test_no, ' out of ', len(preliminary_tests), 'for unit ', loop_count)
                 response_category_team = []
@@ -462,8 +467,10 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                 opt_traj = test[1]
                 env_idx, traj_idx = test[2]
                 test_constraints = copy.deepcopy(test[3])
-                # all_tests_constraints.append(test_constraints)
+                all_tests_constraints.append(test_constraints)
                 test_history = [test] # to ensure that remedial demonstrations and tests are visually simple/similar and complex/different, respectively
+
+                print('Test constraints: ', test_constraints)
 
                 if experiment_type == 'simulated':
                     
@@ -474,11 +481,10 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                     response_type_team = []
                     # team_likelihood_correct_response_temp = [1, 0.1]
                     for i in range(params.team_size):
-                        print('Test constraints: ', test_constraints)
                         print('Simulating response for player ', i+1, 'for constraint', test_constraints[0], 'with likelihood of correct response ', team_likelihood_correct_response[i])
 
                         human_traj, response_type = sim_helpers.get_human_response(env_idx, test_constraints[0], opt_traj, team_likelihood_correct_response[i])
-                        print(colored('Got human response!', 'green'))
+                        # print(colored('Got human response!', 'green'))
                         # human_traj, response_type = sim_helpers.get_human_response(env_idx, test_constraints[0], opt_traj, team_likelihood_correct_response_temp[i]) # for testing effects of specific response combinations
                         human_traj_team.append(human_traj)
                         response_type_team.append(response_type)
@@ -619,6 +625,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                 
                 # Update test number
                 test_no += 1
+                kc_reset_flag = False
 
             ###  Completed simulating team response for all tests  ###
 
@@ -647,6 +654,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                 if non_intersecting_constraints_flag:
                     test_constraints_team_expanded, intersecting_constraints = team_helpers.majority_rules_non_intersecting_team_constraints(test_constraints_team, params.weights['val'], params.step_cost_flag, test_flag = True)
                     print('Majority rules for non intersecting contraints...')
+                    print('Team constraints team expanded after processing: ', test_constraints_team_expanded)
                 
                 # if there are no constraints after majority rules non intersecting constraints! just an additional check so that simulation does not stop
                 if len(test_constraints_team_expanded) == 0:
@@ -660,8 +668,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
 
                 if not non_intersecting_constraints_flag:
                     
-                    print('Team constraints team expanded after processing: ', test_constraints_team_expanded)
-                    # update common knowledge manually since it could have been updated by the majority rules function
+                    ## update common knowledge manually since it could have been updated by the majority rules function
                     test_cnst_team_updated = []
                     for cnst in test_constraints_team_expanded:
                         test_cnst_team_updated.append(cnst)
@@ -671,25 +678,31 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                     print('Updating common knowledge...')
                     print('min_new_common_knowledge: ', min_new_common_knowledge)
 
-
                     print(colored('Updated team knowledge for common knowledge: ', 'blue'))
                     print(team_knowledge)
 
+                    # if kc_id == len(team_knowledge['common_knowledge']):
+                    #     # # print('Appendin common knowledge...')
+                    #     team_knowledge['common_knowledge'].append(min_new_common_knowledge)
+                    # elif kc_reset_flag:
+                    #     # # print('Reset common knowledge...')
+                    #     team_knowledge['common_knowledge'][kc_id] = copy.deepcopy(min_new_common_knowledge)
+                    # else:
+                    #     # # print('Extend common knowledge..')
+                    #     team_knowledge['common_knowledge'][kc_id].extend(min_new_common_knowledge)
+                   
                     if kc_id == len(team_knowledge['common_knowledge']):
                         # # print('Appendin common knowledge...')
                         team_knowledge['common_knowledge'].append(min_new_common_knowledge)
-                    elif kc_reset_flag:
-                        # # print('Reset common knowledge...')
-                        team_knowledge['common_knowledge'][kc_id] = copy.deepcopy(min_new_common_knowledge)
                     else:
-                        # # print('Extend common knowledge..')
-                        team_knowledge['common_knowledge'][kc_id].extend(min_new_common_knowledge)
+                        team_knowledge['common_knowledge'][kc_id] = copy.deepcopy(min_new_common_knowledge)
+
 
                     print(colored('Updated team knowledge for common knowledge: ', 'blue'))
                     print(team_knowledge)
                     
 
-                    # update joint knowledge
+                    ## update joint knowledge
                     team_knowledge = team_helpers.update_team_knowledge(team_knowledge, kc_id, kc_reset_flag, [], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = ['joint_knowledge'])
                     
 
@@ -738,10 +751,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                 team_knowledge['common_knowledge'] = copy.deepcopy(team_knowledge['p1'])
                 team_knowledge = team_helpers.update_team_knowledge(team_knowledge, kc_id, kc_reset_flag, [], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = ['joint_knowledge'])
                     
-                
-                # update test loop variables
-                test_no += 1
-                kc_reset_flag = False
+                        
 
             ##########################################################################
 
@@ -751,13 +761,24 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
             print('team_knowledge: ', team_knowledge)
             print('min_KC_constraints: ', min_KC_constraints)
             unit_learning_goal_reached = team_helpers.check_unit_learning_goal_reached(team_knowledge, min_KC_constraints, kc_id)
-            # print('unit_learning_goal_reached: ', unit_learning_goal_reached)
+            print(colored('unit_learning_goal_reached: ', 'blue'), unit_learning_goal_reached)
 
             # Evaluate if next unit should be checked
             next_unit_flag = False
-            if loop_count - next_unit_loop_id > params.max_KC_loops or unit_learning_goal_reached:
+            # if loop_count - next_unit_loop_id > params.max_KC_loops or unit_learning_goal_reached:
+            if unit_learning_goal_reached:
                 next_unit_flag = True
                 next_unit_loop_id = loop_count
+                print(colored('prior_min_BEC_constraints_running: ', 'green'), prior_min_BEC_constraints_running)
+                prior_min_BEC_constraints_running = copy.deepcopy(min_BEC_constraints_running)  # update last_min_BEC_cnst_id since the constraints have been learned
+                print(colored('updated prior_min_BEC_constraints_running: ', 'green'), prior_min_BEC_constraints_running)
+            else:
+                # demo generation loop continues for the current KC. reset min_BEC_constraints_running
+                print(colored('min_BEC_constraints_running including unlearned ones: ', 'green'), min_BEC_constraints_running)
+                min_BEC_constraints_running = copy.deepcopy(prior_min_BEC_constraints_running)
+                print(colored('updated min_BEC_constraints_running: ', 'green'), min_BEC_constraints_running)
+
+
             
 
             # update variables
@@ -776,9 +797,10 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
             loop_vars['team_knowledge_expected'] = copy.deepcopy(team_knowledge_expected)
             loop_vars['unit_knowledge_level_expected'] = team_helpers.calc_knowledge_level(team_knowledge_expected, min_KC_constraints, kc_id_list = [kc_id], plot_flag = False, fig_title = 'Expected Unit knowledge level for var filter: ' + str(variable_filter) )
             loop_vars['BEC_knowledge_level_expected'] = team_helpers.calc_knowledge_level(team_knowledge_expected, min_BEC_constraints, plot_flag = False, fig_title = 'Expected BEC knowledge level after var filter: ' + str(variable_filter))
-            loop_vars['response_type'] = response_type
+            # loop_vars['response_type'] = response_type
             # loop_vars['response_distribution'] = response_distribution_list[resp_no-1]
             loop_vars['test_constraints'] = copy.deepcopy(all_tests_constraints)
+            loop_vars['test_constraints_team'] = copy.deepcopy(test_constraints_team)
             loop_vars['opposing_constraints_count'] = opposing_constraints_count  
             loop_vars['final_remedial_constraints'] = copy.deepcopy(remedial_constraints_team_expanded)
             loop_vars['N_remedial_tests'] = N_remedial_tests
@@ -843,7 +865,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                 
                 prev_summary_len = len(BEC_summary)
 
-                print('Moving to next unit. Updated variable filter: ', variable_filter)
+                print(colored('Moving to next unit. Updated variable filter: ', 'blue'), variable_filter, '. Teaching_complete_flag: ', teaching_complete_flag)
 
                 # print(colored('Saving session data for run {}.'.format(run_no), 'blue'))
                 # save vars so far (end of session)
@@ -857,12 +879,19 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                 # update variables for next summary but same KC
                 prev_summary_len = len(BEC_summary)
 
-                # Update demo particles for next iteration based on actual team knowledge and the demo strategy
-                particles_demo = copy.deepcopy(particles_team[knowledge_id])
+                # # Update demo particles for next iteration based on actual team knowledge and the demo strategy - now being done at the beginning of the loop
+                # print(colored('Updating demo particles (EOL) with particles for: ', 'red'), knowledge_id)
+                # particles_demo = copy.deepcopy(particles_team[knowledge_id])
 
                 # Update expected knowledge with actual knowledge for next iteration
                 # particles_team_expected = copy.deepcopy(particles_team)
                 team_knowledge_expected = copy.deepcopy(team_knowledge)
+
+
+                # check if number of max interactions sets have been reached
+                if loop_count > params.max_loops:
+                    print(colored('Maximum teaching interactions reached! ', 'red'))
+                    teaching_complete_flag = True
 
         else:
             # Update Variable filter and move to next unit, if applicable, if no demos are available for this unit.
@@ -882,7 +911,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                     next_kc_flag = True
 
             if teaching_complete_flag:
-                # print(colored('Teaching completed for run: ', run_no,'. Saving session data...', 'blue'))
+                print(colored('Teaching completed for run: ', 'blue'), run_no,'. Saving session data...')
                 
                 vars_to_save.to_csv('models/' + params.data_loc['BEC'] + '/' + vars_filename + '_' + str(run_no) + '.csv', index=False)
                 # print('Saved sim data len: ', vars_to_save.shape[0])

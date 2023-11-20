@@ -527,12 +527,9 @@ def calc_solid_angles(constraint_sets):
             solid_angles.append(2 * theta)
             # print('Calculating angles for a diangle')
         else:
-            # print('Calculating angles for a polygon')
             ieqs = constraints_to_halfspace_matrix_sage(constraint_set)
             poly = Polyhedron.Polyhedron(ieqs=ieqs)  # automatically finds the minimal H-representation
-
             hrep = np.array(poly.Hrepresentation())
-
             facet_adj_triu = np.triu(poly.facet_adjacency_matrix())  # upper triangular matrix of fact adjacencies
             boundary_facet_idxs = np.where(hrep[:, 0] != 0)[0]       # boundary facets have a non-zero offset (D in plane eq)
 

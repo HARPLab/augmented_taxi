@@ -13,12 +13,14 @@ import policy_summarization.BEC_helpers as BEC_helpers
 import simulation.human_learner_model as hlm
 from termcolor import colored
 import matplotlib.pyplot as plt
+import params_team as params
 
 
 
 def get_human_response(env_idx, env_cnst, opt_traj, likelihood_correct_response):
 
-    # print('Generating human response for environment constraint: ', env_cnst[0])
+    if params.debug_hm_sampling:
+        print('Generating human response for environment constraint: ', env_cnst[0])
 
     human_model = hlm.cust_pdf_uniform(env_cnst[0], likelihood_correct_response)
 
@@ -51,22 +53,23 @@ def get_human_response(env_idx, env_cnst, opt_traj, likelihood_correct_response)
     skip_human_model = True
 
     loop_count = 0
-    max_loop_count = 50
+    max_loop_count = 100
     differing_response_model_idx = []
 
     while skip_human_model:
-        print('Sampling a human model ...')
+        if params.debug_hm_sampling:
+            print('Sampling a human model ...')
         cust_samps = human_model.rvs(size=1) # sample a human model (weight vector) from the distribution created from the constraint and the likelihood of sampling a correct response for that constraint
-        
-        print('Sampled models: ', cust_samps)
+        if params.debug_hm_sampling:
+            print('Sampled models: ', cust_samps)
 
         dot = cust_samps[0].dot(env_cnst[0])
         if dot >= 0:
-            print('Possibly a correct response sampled')
+            # print('Possibly a correct response sampled')
             likely_correct_response_count += 1
             likely_response_type = 'correct'
         else:
-            print('Possibly an incorrect response sampled')
+            # print('Possibly an incorrect response sampled')
             likely_incorrect_response_count += 1
             likely_response_type = 'incorrect'
 
@@ -76,7 +79,7 @@ def get_human_response(env_idx, env_cnst, opt_traj, likelihood_correct_response)
 
         for model_idx, human_model_weight in enumerate(cust_samps):
 
-            print('Sampled model: ', human_model_weight)
+            # print('Sampled model: ', human_model_weight)
 
             mdp.weights = human_model_weight
             # vi_human = ValueIteration(mdp, sample_rate=1, max_iterations=100)
@@ -84,10 +87,12 @@ def get_human_response(env_idx, env_cnst, opt_traj, likelihood_correct_response)
             vi_human.run_vi()
 
             if not vi_human.stabilized:
-                print(colored('Human model ' + str(model_idx) + ' did not converge and skipping for response generation', 'red'))
+                if params.debug_hm_sampling:
+                    print(colored('Human model ' + str(model_idx) + ' did not converge and skipping for response generation', 'red'))
                 skip_human_model = True
             else:
-                print(colored('Human model ' + str(model_idx) + ' converged', 'green'))
+                if params.debug_hm_sampling:
+                    print(colored('Human model ' + str(model_idx) + ' converged', 'green'))
                 skip_human_model = False
             
             if not skip_human_model:
@@ -101,25 +106,29 @@ def get_human_response(env_idx, env_cnst, opt_traj, likelihood_correct_response)
 
                 # print('New constraint: ', new_constraint)
                 if (new_constraint == np.array([0, 0, 0])).all():
-                    # print(colored('Correct response sampled', 'blue'))
+                    if params.debug_hm_sampling:
+                        print(colored('Correct response sampled', 'blue'))
                     response_type = 'correct'
                 else:
-                    # print(colored('Incorrect response sampled', 'red'))
+                    if params.debug_hm_sampling:
+                        print(colored('Incorrect response sampled', 'red'))
                     response_type = 'incorrect'
 
                 # check if the response matches the initial likely guess
                 if response_type != initial_likely_response_type and loop_count < max_loop_count:
                     skip_human_model = True
                     differing_response_model_idx.append([model_idx, human_model_weight])
-                    print(colored('Different from initial repsonse. Skipping ...', 'red'))
-                    print('Initial likely response type: ', initial_likely_response_type, 'Current response type: ', response_type)
+                    if params.debug_hm_sampling:
+                        print(colored('Different from initial repsonse. Skipping ...', 'red'))
+                        print('Initial likely response type: ', initial_likely_response_type, 'Current response type: ', response_type)
                 elif response_type != initial_likely_response_type and loop_count >= max_loop_count:
                     alt_human_model_weight = differing_response_model_idx[0][1] # choose a previously converged model that differs from the initial likely response
                     mdp.weights = alt_human_model_weight
                     vi_human = ValueIteration(mdp, sample_rate=1)
                     vi_human.run_vi()
                     human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
-                    print(colored('Human model chose from differing repsonse. ', 'green'))
+                    if params.debug_hm_sampling:
+                        print(colored('Human model chose from differing repsonse. ', 'green'))
                 
                 
                 # mdp.visualize_trajectory(traj_opt)
