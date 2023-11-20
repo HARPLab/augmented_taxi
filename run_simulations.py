@@ -65,8 +65,8 @@ if __name__ == "__main__":
 
     sim_params = {'min_correct_likelihood': 0.5}
     N_runs = 1
-    run_start_id = 4
-    file_prefix = 'trials_set_1_'
+    run_start_id = 1
+    file_prefix = 'debug_obj_func'
     path = 'models/augmented_taxi2'
 
     for run_id in range(run_start_id, run_start_id+N_runs):

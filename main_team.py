@@ -273,7 +273,8 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
     
     plt.rcParams['figure.figsize'] = [10, 6]
     BEC_summary, visited_env_traj_idxs, min_BEC_constraints_running, prior_min_BEC_constraints_running = [], [], copy.deepcopy(params.prior), copy.deepcopy(params.prior)
-    summary_count, prev_summary_len = 0, 0 
+    summary_count, prev_summary_len = 0, 0
+    obj_func_prop = 1.0 
     demo_viz_flag, test_viz_flag, knowledge_viz_flag = viz_flag
 
     # # hard-coded for the current reward weights and pre-computed counterfactuals
@@ -380,7 +381,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
         opposing_constraints_count, non_intersecting_constraints_count, N_remedial_tests = 0, 0, 0
         remedial_constraints_team_expanded = []
         if next_kc_flag:
-            next_unit_loop_id += 1
+            # next_unit_loop_id += 1
             team_likelihood_correct_response = np.copy(initial_likelihood_vars['ilcr'])
             team_learning_rate = np.copy(initial_likelihood_vars['rlcr'])
             kc_id += 1
@@ -411,7 +412,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
             except:
                 print(colored('Starting summary generation for 1st unit..', 'blue'))
                 BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = team_helpers.obtain_team_summary(params.data_loc['BEC'], min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, params.weights['val'], params.step_cost_flag, 
-                                                                                                                    pool, params.BEC['n_human_models'], consistent_state_count, params.BEC['n_train_demos'], particles_demo, knowledge_id, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs)
+                                                                                                                    pool, params.BEC['n_human_models'], consistent_state_count, params.BEC['n_train_demos'], particles_demo, knowledge_id, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, obj_func_proportion = obj_func_prop )
                 # # print('Ended summary generation for 1st unit..')
                 if len(BEC_summary) > 0:
                     with open('models/' + params.data_loc['BEC'] + '/BEC_summary_initial.pickle', 'wb') as f:
@@ -421,7 +422,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
         else:
             print(colored('Starting summary generation for unit no.  ', 'blue') + str(loop_count + 1) )
             BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = team_helpers.obtain_team_summary(params.data_loc['BEC'], min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, params.weights['val'], params.step_cost_flag, 
-                                                                                                                pool, params.BEC['n_human_models'], consistent_state_count, params.BEC['n_train_demos'], particles_demo, knowledge_id, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs)
+                                                                                                                pool, params.BEC['n_human_models'], consistent_state_count, params.BEC['n_train_demos'], particles_demo, knowledge_id, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, obj_func_proportion = obj_func_prop)
             # # print('Ended summary generation for unit no.  ' + str(loop_count + 1) )
         
 
@@ -860,6 +861,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                 # if knowledge was added to current KC then add KC id
                 if kc_id == len(team_knowledge['p1'])-1:
                     next_kc_flag = True
+                    obj_func_prop = 1.0
                     print(colored('kc_id: ' + str(kc_id), 'red') )
                     print('len(team_knowledge[p1]): ', len(team_knowledge['p1']), 'next_kc_flag: ', next_kc_flag)
                 
@@ -887,6 +889,9 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                 # particles_team_expected = copy.deepcopy(particles_team)
                 team_knowledge_expected = copy.deepcopy(team_knowledge)
 
+                if loop_count - next_unit_loop_id > params.loop_threshold_demo_simplification:
+                    obj_func_prop = 0.5     # reduce informativeness from demos if they have not learned
+                    print(colored('updated obj_func_prop: ' + str(obj_func_prop), 'red') )
 
                 # check if number of max interactions sets have been reached
                 if loop_count > params.max_loops:
@@ -909,6 +914,8 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                 # if knowledge was added to current KC then add KC id
                 if kc_id == len(team_knowledge['p1'])-1:
                     next_kc_flag = True
+                    obj_func_prop = 1.0
+                    print(colored('updated obj_func_prop for new KC: ' + str(obj_func_prop), 'red') )
 
             if teaching_complete_flag:
                 print(colored('Teaching completed for run: ', 'blue'), run_no,'. Saving session data...')

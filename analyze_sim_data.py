@@ -407,8 +407,8 @@ if __name__ == "__main__":
     # process team knowledge data
     path = 'models/augmented_taxi2'
     # files = os.listdir(path)
-    files = ['trials_set_1__4.csv']
-    file_prefix = 'trials_set_1_'
+    files = ['debug_obj_func_1.csv']
+    file_prefix = 'debug_obj_func'
 
     run_analysis_script(path, files, file_prefix)
 
