@@ -1567,7 +1567,7 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, member_id, vari
             sample_human_models = BEC_helpers.sample_human_models_uniform(constraint_space_to_sample_human_models, n_human_models)
         else:
             for i in range(len(constraint_space_to_sample_human_models)):
-                print('constraint_space_to_sample_human_models[i]: ', constraint_space_to_sample_human_models[i])
+                # print('constraint_space_to_sample_human_models[i]: ', constraint_space_to_sample_human_models[i])
                 if len(sample_human_models) == 0:
                     sample_human_models.extend(BEC_helpers.sample_human_models_uniform(constraint_space_to_sample_human_models[i], int(n_human_models/len(constraint_space_to_sample_human_models))))
                 else:
@@ -1584,7 +1584,7 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, member_id, vari
         with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
             myfile.write('Length of summary: {}\n'.format(summary_count))
 
-        print(colored('sample_human_models: ', 'red'), sample_human_models)
+        # print(colored('sample_human_models: ', 'red'), sample_human_models)
 
         # obtain the indices of the reference human models (that have precomputed constraints) that are closest to the sampled human models
         sample_human_models_ref_latllong = cg.cart2latlong(np.array(sample_human_models_ref).squeeze())
@@ -1864,10 +1864,10 @@ def check_unit_learning_goal_reached(team_knowledge, min_unit_constraints, kc_id
     knowledge_level = calc_knowledge_level(team_knowledge, min_unit_constraints, kc_id_list=[kc_id])
     
     # if knowledge_level['common_knowledge'] > 0.7:
-    #     check_unit_learning_goal_reached = True
+    #     unit_learning_goal_reached_flag = True
     knowledge_types = list(team_knowledge.keys())
 
-    check_unit_learning_goal_reached = True
+    unit_learning_goal_reached_flag = True
 
     print('knowledge_level: ', knowledge_level)
 
@@ -1876,10 +1876,10 @@ def check_unit_learning_goal_reached(team_knowledge, min_unit_constraints, kc_id
             # print('ind_knowledge[kc_id][0]: ', type(np.array(knowledge_level[ind_knowledge][0])))
             # print('params.learning_goal: ', type(params.learning_goal))
             if np.array(knowledge_level[ind_knowledge][0]).astype(float) < params.learning_goal:
-                check_unit_learning_goal_reached = False
+                unit_learning_goal_reached_flag = False
     
 
-    return check_unit_learning_goal_reached
+    return unit_learning_goal_reached_flag
 
 
 

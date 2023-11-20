@@ -2446,6 +2446,13 @@ if __name__ == "__main__":
     #                    'joint_knowledge': [[[np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])]], 
     #                                        [[np.array([[ 1,  0, -2]]), np.array([[-1,  0,  4]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])]]]}
 
+
+    team_knowledge = {'p1': [[np.array([[ 0,  0, -1]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])], [np.array([[ 2, -1, -2]]), np.array([[-1,  1,  0]]), np.array([[1, 1, 0]])]], 
+                    'p2': [[np.array([[ 0,  0, -1]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])], [np.array([[ 1, -1, -2]]), np.array([[-1,  1,  0]]), np.array([[ 0, -1, -2]])]], 
+                    'p3': [[np.array([[ 0,  0, -1]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  1,  0]]), np.array([[1, 1, 0]])]], 
+                    'common_knowledge': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[ 0, -1, -4]]), np.array([[0, 1, 2]])], [np.array([[ 2, -1, -2]]), np.array([[-1,  1,  0]]), np.array([[ 0, -1, -2]]), np.array([[1, 1, 0]])]], 
+                    'joint_knowledge': [[[np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])]], [[np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])]], [[np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])]], [[np.array([[ 2, -1, -2]]), np.array([[-1,  1,  0]]), np.array([[1, 1, 0]])], [np.array([[ 1, -1, -2]]), np.array([[-1,  1,  0]]), np.array([[ 0, -1, -2]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  1,  0]]), np.array([[1, 1, 0]])]]]}
+   
     # min_KC_constraints =  [np.array([[ 1, 0, -4]]), np.array([[-1, 0, 2]])]
 
     # min_BEC_constraints = [np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
@@ -2455,8 +2462,8 @@ if __name__ == "__main__":
     # BEC_knowledge = team_helpers.calc_knowledge_level(team_knowledge, min_BEC_constraints, plot_flag = True, fig_title = 'BEC knowledge')
     # print(colored('BEC_knowledge: ', 'blue'), BEC_knowledge)
 
-    # # team_helpers.visualize_team_knowledge_constraints(team_knowledge, params.weights['val'], params.step_cost_flag, particles_team = None, kc_id = None, fig=None, text=None, plot_min_constraints_flag = False, plot_text_flag = False, min_unit_constraints = [], plot_filename = 'team_knowledge_constraints', fig_title = None)
-    # # plt.show()
+    team_helpers.visualize_team_knowledge_constraints(team_knowledge, params.weights['val'], params.step_cost_flag, particles_team = None, kc_id = None, fig=None, text=None, plot_min_constraints_flag = False, plot_text_flag = False, min_unit_constraints = [], plot_filename = 'team_knowledge_constraints', fig_title = None)
+    plt.show()
 
     ###################################
 
@@ -2476,8 +2483,7 @@ if __name__ == "__main__":
 
     ##########################
 
-    x = [ np.array([[ 0,  0, -1]]), np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]]), np.array([[ 0, -1, -2]]), np.array([[ 0,  1,  4]]) ]
+    # x = [ np.array([[ 0,  0, -1]]), np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]]), np.array([[ 0, -1, -2]]), np.array([[ 0,  1,  4]]) ]
 
-    print(team_helpers.check_for_non_intersecting_constraints(x, params.weights['val'], params.step_cost_flag))
+    # print(team_helpers.check_for_non_intersecting_constraints(x, params.weights['val'], params.step_cost_flag))
 
-    
