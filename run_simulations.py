@@ -58,7 +58,7 @@ if __name__ == "__main__":
     # team_composition_list = list(combinations([*range(2)], params.team_size))
 
     # team_composition_list = [[0,2,2]]
-    team_composition_list = [[0,0,0], [0,0,2], [0, 2, 2] [2,2,2]]
+    team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
     dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
     # dem_strategy_list = ['individual_knowledge_high']
     team_comp_id = 0
