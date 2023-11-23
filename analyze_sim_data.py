@@ -114,7 +114,11 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
 
             sim_vars = pd.read_csv(path + '/' + file)
 
-            if (len(runs_to_analyze_list) > 0 and len(runs_to_analyze_list[prefix_id]) > 0 and sim_vars['run_no'][0] in runs_to_analyze_list ) or \
+            # print('len(runs_to_analyze_list) > 0: ', len(runs_to_analyze_list) > 0)
+            # print('len(runs_to_analyze_list[prefix_id]) > 0: ', len(runs_to_analyze_list[prefix_id]) > 0)
+            # print('sim_vars[run_no][0] in runs_to_analyze_list: ', sim_vars['run_no'][0] in runs_to_analyze_list[prefix_id])
+
+            if (len(runs_to_analyze_list) > 0 and len(runs_to_analyze_list[prefix_id]) > 0 and sim_vars['run_no'][0] in runs_to_analyze_list[prefix_id]) or \
                 (len(runs_to_analyze_list) == 0 and ( len(runs_to_exclude_list) == 0 or len(runs_to_exclude_list[prefix_id]) == 0 or sim_vars['run_no'][0] not in runs_to_exclude_list[prefix_id]) ):
 
             # if sim_vars['run_no'][0] not in runs_to_exclude[0]:
@@ -246,6 +250,10 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
                 lr_index.extend([0])
         learning_rate_index.append(str(lr_index))
 
+
+    # add this to current dfs
+    team_BEC_knowledge_level['team_mix'] = learning_rate_index
+
     # print('learning_rate_index:', learning_rate_index)
 
     # print('team_BEC_knowledge_level: ', team_BEC_knowledge_level)
@@ -286,24 +294,25 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
     interaction_count = pd.DataFrame()
 
     for id in unique_ids:
+        interaction_count_dict = {}
         for c_id in range(len(concept_ids)):
-            interaction_count_dict = {}
             interaction_count_dict['run_no'] = id
             interaction_count_dict['demo_strategy'] = team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['demo_strategy'].iloc[0]
-            interaction_count_dict['knowledge_comp_id'] = concept_ids[c_id]
+            interaction_count_dict['team_mix'] = team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['team_mix'].iloc[0]
+            
+            print('A: ', team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['loop_count'])
+            print('run_no: ', id, ' c_id: ', c_id, ' concept_ids[c_id+1]: ', concept_ids[c_id])
+            
+            max_loop_id = team_BEC_knowledge_level[(team_BEC_knowledge_level['run_no'] == id) & (team_BEC_knowledge_level['knowledge_comp_id'] == concept_ids[c_id])]['loop_count'].iloc[-1]
+            max_loop_count = max_loop_id - team_BEC_knowledge_level[(team_BEC_knowledge_level['run_no'] == id) & (team_BEC_knowledge_level['knowledge_comp_id'] == concept_ids[c_id])]['loop_count'].iloc[0] + 1
 
-            if c_id == len(concept_ids) - 1:
-                max_loop_count = team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['loop_count'].iloc[-1]
-            else:
-                max_loop_count = team_BEC_knowledge_level[(team_BEC_knowledge_level['run_no'] == id) & (team_BEC_knowledge_level['knowledge_comp_id'] == concept_ids[c_id+1])]['loop_count'].iloc[-1] - \
-                                 team_BEC_knowledge_level[(team_BEC_knowledge_level['run_no'] == id) & (team_BEC_knowledge_level['knowledge_comp_id'] == concept_ids[c_id])]['loop_count'].iloc[-1]
+            interaction_count_dict['Int_end_id_concept_'+str(concept_ids[c_id])] = max_loop_id
+            interaction_count_dict['N_int_concept_'+str(concept_ids[c_id])] = max_loop_count    
 
-            interaction_count_dict['max_loop_count'] = max_loop_count
+        interaction_count = interaction_count.append(interaction_count_dict, ignore_index=True)
 
-            interaction_count = interaction_count.append(interaction_count_dict, ignore_index=True)
-
-    # print('interaction_count: ', interaction_count)
-    # interaction_count.to_csv('models/augmented_taxi2/interaction_count.csv')
+    print('interaction_count: ', interaction_count)
+    interaction_count.to_csv('models/augmented_taxi2/interaction_count.csv')
 
     
     ## run-wise data
@@ -319,6 +328,7 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
 
     run_data.to_csv('models/augmented_taxi2/run_data.csv')
 
+    print(colored('Number of runs processed: ' + str(len(run_data)), 'red'))
 
 
     # # filter negative knowledge levels
@@ -366,11 +376,33 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
     #     # plt.close()
     
     
-    f, ax = plt.subplots(ncols=3)
-    ax_id = 0
-    for know_id in ['individual', 'common_knowledge', 'joint_knowledge']:
-        sns.lineplot(data = team_knowledge_level_long[team_knowledge_level_long['knowledge_type']==know_id], x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[ax_id], errorbar=('se', 1), err_style="band").set(title='Knowledge level for ' + know_id)
-        ax_id += 1 
+    # f, ax = plt.subplots(nrows=2,ncols=3, sharex=True, sharey=True, figsize=(10,6))
+    # plt.subplots_adjust(wspace=0.1, hspace=0.1)
+    # row_id = 0
+    # col_id = 0
+    # for team_mix_cond in [[0, 1, 1]]:
+    #     col_id = 0
+    #     for know_id in ['individual', 'common_knowledge', 'joint_knowledge']:    
+    #         plot_data = team_knowledge_level_long[(team_knowledge_level_long['knowledge_type']==know_id) & (team_knowledge_level_long['team_mix']==str(team_mix_cond))]
+    #         # plot_data.to_csv('models/augmented_taxi2/plot_data_' + know_id + '_' + str(team_mix_cond) + '.csv')
+    #         print('plot_data: ', type(plot_data))
+    #         sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[row_id, col_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge'], legend=False).set(title='Knowledge level for ' + know_id + ' with a team mix: ' + str(team_mix_cond))
+    #         col_id += 1 
+    #     row_id += 1
+
+    f, ax = plt.subplots(ncols=3, sharex=True, sharey=True, figsize=(10,6))
+    plt.subplots_adjust(wspace=0.1, hspace=0.1)
+    col_id = 0
+    for team_mix_cond in [[0, 0, 1]]:
+        for know_id in ['individual', 'common_knowledge', 'joint_knowledge']:    
+            plot_data = team_knowledge_level_long[(team_knowledge_level_long['knowledge_type']==know_id) & (team_knowledge_level_long['team_mix']==str(team_mix_cond))]
+            # plot_data.to_csv('models/augmented_taxi2/plot_data_' + know_id + '_' + str(team_mix_cond) + '.csv')
+            print('plot_data: ', type(plot_data))
+            sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[col_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge'], legend=False).set(title='Knowledge level for ' + know_id + ' with a team mix: ' + str(team_mix_cond))
+            col_id += 1 
+
+
+
         # plt.savefig('models/augmented_taxi2/BEC_knowledge_level_' + know_id + '.png')
         # plt.close()
 
@@ -396,34 +428,34 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
     #     plt.show(block='False')
 
 
-    ## plot team BEC knowledge level
-    for id in unique_ids:
-        idx = team_BEC_knowledge_level[(team_BEC_knowledge_level['run_no'] == id)].index
+    # ## plot team BEC knowledge level
+    # for id in unique_ids:
+    #     idx = team_BEC_knowledge_level[(team_BEC_knowledge_level['run_no'] == id)].index
 
-        # print(team_BEC_knowledge_level.columns)
+    #     # print(team_BEC_knowledge_level.columns)
 
-        fig, axs = plt.subplots(2, 3, figsize=(9, 5), layout='constrained',
-                        sharex=True, sharey=True)
-        fig.suptitle('Run: ' + str(id))
-        for nn, ax in enumerate(axs.flat):
-            column_name = team_BEC_knowledge_level.columns[nn]
-            y = team_BEC_knowledge_level.loc[idx,column_name]
-            line, = ax.plot(team_BEC_knowledge_level.loc[idx, 'loop_count'], y, lw=2.5)
-            ax.set_title(column_name, fontsize='small', loc='center')
+    #     fig, axs = plt.subplots(2, 3, figsize=(9, 5), layout='constrained',
+    #                     sharex=True, sharey=True)
+    #     fig.suptitle('Run: ' + str(id))
+    #     for nn, ax in enumerate(axs.flat):
+    #         column_name = team_BEC_knowledge_level.columns[nn]
+    #         y = team_BEC_knowledge_level.loc[idx,column_name]
+    #         line, = ax.plot(team_BEC_knowledge_level.loc[idx, 'loop_count'], y, lw=2.5)
+    #         ax.set_title(column_name, fontsize='small', loc='center')
 
 
-            # plot verticle lines for visualizng end of concepts
-            for kc_id in team_BEC_knowledge_level['knowledge_comp_id'].unique():
-                max_idx = team_BEC_knowledge_level[(team_BEC_knowledge_level['knowledge_comp_id'] == kc_id) & (team_BEC_knowledge_level['run_no'] == id)].index.max()
-                # print('kc_id:', kc_id, ' max_idx: ', max_idx)
-                if not math.isnan(max_idx):
-                    ax.axvline(team_BEC_knowledge_level.loc[max_idx, 'loop_count'], color='k', linestyle='--', linewidth=1)
+    #         # plot verticle lines for visualizng end of concepts
+    #         for kc_id in team_BEC_knowledge_level['knowledge_comp_id'].unique():
+    #             max_idx = team_BEC_knowledge_level[(team_BEC_knowledge_level['knowledge_comp_id'] == kc_id) & (team_BEC_knowledge_level['run_no'] == id)].index.max()
+    #             # print('kc_id:', kc_id, ' max_idx: ', max_idx)
+    #             if not math.isnan(max_idx):
+    #                 ax.axvline(team_BEC_knowledge_level.loc[max_idx, 'loop_count'], color='k', linestyle='--', linewidth=1)
 
-            if nn == 4:
-                break
+    #         if nn == 4:
+    #             break
 
-        fig.supxlabel('Interaction Number')
-        fig.supylabel('BEC Knowledge Level')
+    #     fig.supxlabel('Interaction Number')
+    #     fig.supylabel('BEC Knowledge Level')
 
 
         ## Plot Unit knowledge level
@@ -466,27 +498,103 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
 
 
 
+def analyze_run_data(file):
+
+    pd.read_csv(file).describe(include='all').to_csv('models/augmented_taxi2/descriptives_run_data.csv')
+
+#
+#  def concept_label(value):
+
+#     if '1' in value:
+#         return 'Concept 1'
+#     elif '2' in value:
+#         return 'Concept 2'
+#     elif '3' in value:
+#         return 'Concept 3'
+
+
+def analyze_concept_data(file):
+
+    # pd.read_csv(file).describe(include='all').to_csv('models/augmented_taxi2/descriptives_concept_data.csv') 
+    team_mix_var = [0, 1, 1]
+
+    concept_data = pd.read_csv(file)
+
+    
+
+    concept_data_plot = concept_data[concept_data['team_mix']==str(team_mix_var)]
+
+    concept_data_plot_N_int_melt = pd.melt(concept_data_plot, id_vars=['run_no', 'demo_strategy', 'team_mix'], value_vars=['N_int_concept_1', 'N_int_concept_2', 'N_int_concept_3'], var_name='Concept_id', value_name='N_int_concept')
+    concept_data_plot_max_int_melt = pd.melt(concept_data_plot, id_vars=['run_no', 'demo_strategy', 'team_mix'], value_vars=['Int_end_id_concept_1', 'Int_end_id_concept_2', 'Int_end_id_concept_3'], var_name='Concept_id', value_name='Max_int_concept')
+
+    
+    # Create a stacked bar chart with error bars
+
+    ## print(concept_data_plot)
+
+    # concept_ids = [0, 1, 2]
+    # fig, ax = plt.subplots()
+    # Plot the stacked bars
+    # bar_width = 0.5
+
+    # print(concept_data[(concept_data['team_mix']==team_mix_var).all(), 'N_int_concept_1'].mean())
+    # print(concept_data[concept_data['team_mix']==team_mix_var, 'N_int_concept_1'].sem())
+
+    # bar1 = ax.barh(concept_ids[0],  concept_data_plot['N_int_concept_1'].mean(), bar_width, label='Concept ' + str(concept_ids[0]), xerr= concept_data_plot['N_int_concept_1'].sem(), capsize=5)
+    # bar2 = ax.barh(concept_ids[1],  concept_data_plot['N_int_concept_2'].mean(), bar_width, left=concept_data_plot['N_int_concept_1'].mean(), label='Concept' + str(concept_ids[1]), xerr= concept_data_plot['N_int_concept_1'].sem(), capsize=5)
+    # bar3 = ax.barh(concept_ids[2],  concept_data_plot['N_int_concept_3'].mean(), bar_width, left=concept_data_plot['N_int_concept_1'].mean()+concept_data_plot['N_int_concept_2'].mean(), label='Concept' + str(concept_ids[2]), xerr= concept_data_plot['N_int_concept_2'].sem(), capsize=5)
+
+    # ax.set_xlabel('Knowledge component / Concept')
+    # ax.set_ylabel('Number of interactions')
+    # ax.set_title('Number of interactions to learn concepts')
+
+
+    # Box plot
+    sns.boxplot(data = concept_data_plot_max_int_melt, x = 'Max_int_concept', y = 'Concept_id', orient = 'h').set(title='Number of interactions to learn concepts')
+
+
+
+
+
+    plt.show()
+
+
+
 if __name__ == "__main__":
 
     # process team knowledge data
     path = 'models/augmented_taxi2'
     files = os.listdir(path)
     # files = ['debug_obj_func_1.csv']
-    
-    # file_prefix_list = ['trials_set_1', 'trial_set_5', 'trial_set_6', 'trial_set_7']
-    file_prefix_list = ['trials_set_1']
-    
-    # runs_to_exclude_list = [[3, 12, 24]]
-    # runs_to_exclude_list = [[3, 12, 24, 7], [1,4,6,8], [], [1,3]]
-    # runs_to_exclude_list = [[1,3]]
-    runs_to_exclude_list = []
 
+    all_file_prefix_list = ['trials_set_1', 'trial_set_5', 'trial_set_6', 'trial_set_7', 'trial_set_8']
+    all_runs_to_exclude_list = [[3, 12, 24, 7], [1,4,6,8], [], [1,3, 11, 12, 16, 18], [17, 21, 35]]
     
-    runs_to_analyze_list = [[3, 12, 24]]
-    # runs_to_analyze_list = []
+    # file_prefix_list = ['trials_set_1']
+    # runs_to_analyze_list = [[3, 12, 24]]
+    
+    # file_prefix_list = ['trial_set_8']
+    # runs_to_exclude_list = [[17, 21, 35]]
+
+
+    file_prefix_list = all_file_prefix_list[0:4]
+    runs_to_exclude_list = all_runs_to_exclude_list[0:4]
+
+    print(file_prefix_list)
+    print(runs_to_exclude_list)
+    
+    runs_to_analyze_list = []
 
     run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list = runs_to_exclude_list, runs_to_analyze_list = runs_to_analyze_list)
+
+    # analyze_run_data('models/augmented_taxi2/run_data.csv')
+
+    # analyze_concept_data('models/augmented_taxi2/interaction_count.csv')
     
+
+    # # plot concept interaction data
+    # team_long_data = pd.read_csv('models/augmented_taxi2/team_knowledge_level_long.csv')
+    # sns.boxplot(team_long_data, x='loop_count'y='knowledge_comp_id')
 
    
 

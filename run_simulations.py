@@ -52,22 +52,22 @@ if __name__ == "__main__":
     
 
     # team_params_learning = {'low': [0.4, 0.1], 'med': [0.5, 0.1], 'high': [0.6, 0.1]}
-    team_params_learning = {'low': [0.5, 0.05], 'med': [0.6, 0.07], 'high': [0.7, 0.1]}
+    team_params_learning = {'low': [0.5, 0.05], 'med': [0.6, 0.05], 'high': [0.7, 0.05]}
     # print([*range(params.team_size)])
     # team_composition_list = list(permutations([*range(2)]))
     # team_composition_list = list(combinations([*range(2)], params.team_size))
 
-
-    team_composition_list = [[0,0,2], [0,2,2]]
-    # dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
-    dem_strategy_list = ['common_knowledge']
+    # team_composition_list = [[0,2,2]]
+    team_composition_list = [[0,0,0], [0,0,2], [0, 2, 2] [2,2,2]]
+    dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
+    # dem_strategy_list = ['individual_knowledge_high']
     team_comp_id = 0
     dem_strategy_id = 0
 
     sim_params = {'min_correct_likelihood': 0.5}
-    N_runs = 10
-    run_start_id = 9
-    file_prefix = 'trial_set_7'
+    N_runs = 120
+    run_start_id = 1
+    file_prefix = 'trial_set_10'
     path = 'models/augmented_taxi2'
 
     for run_id in range(run_start_id, run_start_id+N_runs):
