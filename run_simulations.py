@@ -65,8 +65,8 @@ if __name__ == "__main__":
     dem_strategy_id = 0
 
     sim_params = {'min_correct_likelihood': 0.5}
-    N_runs = 80
-    run_start_id = 1
+    N_runs = 38
+    run_start_id = 43
     file_prefix = 'trial_set_14'
     path = 'models/augmented_taxi2'
 
