@@ -67,7 +67,7 @@ if __name__ == "__main__":
     sim_params = {'min_correct_likelihood': 0.5}
     N_runs = 80
     run_start_id = 1
-    file_prefix = 'trial_set_13'
+    file_prefix = 'trial_set_14'
     path = 'models/augmented_taxi2'
 
     for run_id in range(run_start_id, run_start_id+N_runs):
@@ -94,15 +94,15 @@ if __name__ == "__main__":
             if team_composition_for_run[j] == 0: 
                 ilcr[j] = team_params_learning['low'][0]
                 rlcr[j,0] = team_params_learning['low'][1]
-                rlcr[j,1] = -0.1     
+                rlcr[j,1] = -0.03     
             elif team_composition_for_run[j] == 1:
                 ilcr[j] = team_params_learning['med'][0]
                 rlcr[j,0] = team_params_learning['med'][1]
-                rlcr[j,1] = -0.1
+                rlcr[j,1] = -0.03
             elif team_composition_for_run[j] == 2:
                 ilcr[j] = team_params_learning['high'][0]
                 rlcr[j,0] = team_params_learning['high'][1]
-                rlcr[j,1] = -0.1
+                rlcr[j,1] = -0.03
 
 
         dem_strategy = dem_strategy_list[dem_strategy_id]
