@@ -43,6 +43,33 @@ from main_team import run_reward_teaching
 from analyze_sim_data import run_analysis_script
 
 
+def get_sim_conditions(team_composition_list, dem_strategy_list, N_runs):
+    sim_conditions = []
+    team_comp_id = 0
+    dem_strategy_id = 0
+    
+    for run_id in range(N_runs):
+        
+        team_composition_for_run = team_composition_list[team_comp_id]
+        dem_strategy = dem_strategy_list[dem_strategy_id]
+        sim_conditions.append([run_id, team_composition_for_run, dem_strategy])
+        
+        # update sim params for next run
+        if dem_strategy_id == len(dem_strategy_list)-1:
+            dem_strategy_id = 0
+        else:
+            dem_strategy_id += 1
+
+        if run_id % len(team_composition_list) == (len(team_composition_list)-1):
+            if team_comp_id == len(team_composition_list)-1:
+                team_comp_id = 0
+            else:
+                team_comp_id += 1
+
+
+    return sim_conditions
+
+
 
 if __name__ == "__main__":
     pool = Pool(min(params.n_cpu, 60))
@@ -53,36 +80,34 @@ if __name__ == "__main__":
 
     # team_params_learning = {'low': [0.4, 0.1], 'med': [0.5, 0.1], 'high': [0.6, 0.1]}
     team_params_learning = {'low': [0.5, 0.05], 'med': [0.6, 0.05], 'high': [0.7, 0.05]}
-    # print([*range(params.team_size)])
-    # team_composition_list = list(permutations([*range(2)]))
-    # team_composition_list = list(combinations([*range(2)], params.team_size))
 
-    # team_composition_list = [[0,2,2]]
-    team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
+    # team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
+    # dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
+
+    team_composition_list = [[0,2,2]]
     dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
-    # dem_strategy_list = ['individual_knowledge_high']
-    team_comp_id = 0
-    dem_strategy_id = 0
-
+ 
     sim_params = {'min_correct_likelihood': 0.5}
-    N_runs = 38
-    run_start_id = 43
-    file_prefix = 'trial_set_14'
+    
+    N_runs = 40
+    run_start_id = 1
+
+    file_prefix = 'trial_set_18'
     path = 'models/augmented_taxi2'
 
+
+    sim_conditions = get_sim_conditions(team_composition_list, dem_strategy_list, N_runs)
+    print('sim_conditions: ', sim_conditions)
+
     for run_id in range(run_start_id, run_start_id+N_runs):
-        # team_composition_for_run = list(team_composition_list[np.random.choice(range(len(team_composition_list)))])
 
-        # team_composition_for_run = []
-        # for k in range(params.team_size):
-        #     team_composition_for_run.append(random.choice([0,1,2]))
-
-        team_composition_for_run = team_composition_list[team_comp_id]
-
-        # if N_runs < 5:
-        #     team_composition_for_run = team_composition_list[0]
-        # else:
-        #     team_composition_for_run = team_composition_list[1]
+        if run_id == sim_conditions[run_id][0]:
+            team_composition_for_run = sim_conditions[run_id][1]
+            dem_strategy_for_run = sim_conditions[run_id][2]
+        else:
+            print('run_id: ', run_id, 'sim_conditions[run_id][0]: ', sim_conditions[run_id][0])
+            RuntimeError('Error in sim conditions')
+            break
 
 
         print('team_composition_for_run: ', team_composition_for_run)
@@ -94,37 +119,26 @@ if __name__ == "__main__":
             if team_composition_for_run[j] == 0: 
                 ilcr[j] = team_params_learning['low'][0]
                 rlcr[j,0] = team_params_learning['low'][1]
-                rlcr[j,1] = -0.03     
+                rlcr[j,1] = 0     
             elif team_composition_for_run[j] == 1:
                 ilcr[j] = team_params_learning['med'][0]
                 rlcr[j,0] = team_params_learning['med'][1]
-                rlcr[j,1] = -0.03
+                rlcr[j,1] = 0
             elif team_composition_for_run[j] == 2:
                 ilcr[j] = team_params_learning['high'][0]
                 rlcr[j,0] = team_params_learning['high'][1]
-                rlcr[j,1] = -0.03
+                rlcr[j,1] = 0
 
 
-        dem_strategy = dem_strategy_list[dem_strategy_id]
+        
 
-        print(colored('Simulation run: ' + str(run_id) + '. Demo strategy: ' + str(dem_strategy) + 'initial lcr: ' + str(ilcr) + 'rate lcr: ' + str(rlcr), 'red'))
+        print(colored('Simulation run: ' + str(run_id) + '. Demo strategy: ' + str(dem_strategy_for_run) + 'initial lcr: ' + str(ilcr) + 'rate lcr: ' + str(rlcr), 'red'))
         # viz_flag = [demo_viz, test_viz, pf_knowledge_viz]
-        run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy, experiment_type = 'simulated', team_likelihood_correct_response = ilcr,  team_learning_rate = rlcr, viz_flag=[False, False, False], run_no = run_id, vars_filename=file_prefix)
+        run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', team_likelihood_correct_response = ilcr,  team_learning_rate = rlcr, viz_flag=[False, False, False], run_no = run_id, vars_filename=file_prefix)
         
         # file_name = [file_prefix + '_' + str(run_id) + '.csv']
         # print('Running analysis script... Reading data from: ', file_name)
         # run_analysis_script(path, file_name, file_prefix)
-
-        # update sim params
-        if dem_strategy_id == len(dem_strategy_list)-1:
-            dem_strategy_id = 0
-        else:
-            dem_strategy_id += 1
-
-        if team_comp_id == 0:
-            team_comp_id = 1
-        else:
-            team_comp_id = 0
 
     
     # # save all the variables

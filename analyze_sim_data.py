@@ -117,7 +117,7 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
             # print('len(runs_to_analyze_list) > 0: ', len(runs_to_analyze_list) > 0)
             # print('len(runs_to_analyze_list[prefix_id]) > 0: ', len(runs_to_analyze_list[prefix_id]) > 0)
             # print('sim_vars[run_no][0] in runs_to_analyze_list: ', sim_vars['run_no'][0] in runs_to_analyze_list[prefix_id])
-
+            print('prefix_id: ', prefix_id)
             if (len(runs_to_analyze_list) > 0 and len(runs_to_analyze_list[prefix_id]) > 0 and sim_vars['run_no'][0] in runs_to_analyze_list[prefix_id]) or \
                 (len(runs_to_analyze_list) == 0 and ( len(runs_to_exclude_list) == 0 or len(runs_to_exclude_list[prefix_id]) == 0 or sim_vars['run_no'][0] not in runs_to_exclude_list[prefix_id]) ):
 
@@ -390,16 +390,31 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
     #         col_id += 1 
     #     row_id += 1
 
-    f, ax = plt.subplots(ncols=3, sharex=True, sharey=True, figsize=(10,6))
+
+    ###############################################################################################
+    know_list_full = ['individual', 'common_knowledge', 'joint_knowledge']
+    team_mix_full = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
+
+    know_list = know_list_full[0:]
+    team_mix = team_mix_full[0:]
+
+
+    f, ax = plt.subplots(nrows = len(team_mix_full), ncols=3, sharex=True, sharey=True, figsize=(10,6))
     plt.subplots_adjust(wspace=0.1, hspace=0.1)
     col_id = 0
-    for team_mix_cond in [[0, 0, 1]]:
-        for know_id in ['individual', 'common_knowledge', 'joint_knowledge']:    
+    row_id = 0
+    for team_mix_cond in team_mix:
+        col_id = 0
+        for know_id in know_list:    
             plot_data = team_knowledge_level_long[(team_knowledge_level_long['knowledge_type']==know_id) & (team_knowledge_level_long['team_mix']==str(team_mix_cond))]
             # plot_data.to_csv('models/augmented_taxi2/plot_data_' + know_id + '_' + str(team_mix_cond) + '.csv')
-            print('plot_data: ', type(plot_data))
-            sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[col_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge'], legend=False).set(title='Knowledge level for ' + know_id + ' with a team mix: ' + str(team_mix_cond))
+            print('plot_data: ', len(plot_data))
+            print('Plotting  ', 'row_id: ', row_id, ' col_id: ', col_id, ' know_id: ', know_id, ' team_mix_cond: ', team_mix_cond)
+            # sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[col_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge'], legend=False).set(title='Knowledge level for ' + know_id + ' with a team mix: ' + str(team_mix_cond))
+            sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[row_id, col_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge']).set(title='Knowledge level for ' + know_id + ' with a team mix: ' + str(team_mix_cond))
+
             col_id += 1 
+        row_id += 1
 
 
 
@@ -567,8 +582,8 @@ if __name__ == "__main__":
     files = os.listdir(path)
     # files = ['debug_obj_func_1.csv']
 
-    all_file_prefix_list = ['trials_set_1', 'trial_set_5', 'trial_set_6', 'trial_set_7', 'trial_set_8']
-    all_runs_to_exclude_list = [[3, 12, 24, 7], [1,4,6,8], [], [1,3, 11, 12, 16, 18], [17, 21, 35]]
+    all_file_prefix_list = ['trials_set_1', 'trial_set_5', 'trial_set_6', 'trial_set_7', 'trial_set_8', 'trial_set_9', 'trial_set_10', 'trial_set_11', 'trial_set_12', 'trial_set_13', 'trial_set_14']
+    all_runs_to_exclude_list = [[3, 12, 24, 7], [1,4,6,8], [], [1,3, 11, 12, 16, 18], [17, 21, 35], [], [], [], [], [], []]
     
     # file_prefix_list = ['trials_set_1']
     # runs_to_analyze_list = [[3, 12, 24]]
@@ -577,8 +592,8 @@ if __name__ == "__main__":
     # runs_to_exclude_list = [[17, 21, 35]]
 
 
-    file_prefix_list = all_file_prefix_list[0:4]
-    runs_to_exclude_list = all_runs_to_exclude_list[0:4]
+    file_prefix_list = all_file_prefix_list[0:]
+    runs_to_exclude_list = all_runs_to_exclude_list[0:]
 
     print(file_prefix_list)
     print(runs_to_exclude_list)
