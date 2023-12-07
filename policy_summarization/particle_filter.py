@@ -767,12 +767,15 @@ class Particles():
         for constraint in constraints:
             dot = constraint.dot(x.T)
 
+            # use the scaled pdfs for both uniform and VMF distributions (determined by the kappa value of the VMF),
+            # which ensures that the integral of the custom pdf is 1
             if dot >= 0:
                 # use the uniform dist
-                prob *= 0.12779
+                prob *= 0.11109015027  # self.integral_prob_uniform / (2 * np.pi)
             else:
                 # use the VMF dist
-                prob *= p_utils.VMF_pdf(constraint, k, p, x, dot=dot)
+                # x1 * x2 * self.integral_prob_VMF (see uniform_VMF_dist.py for values of x1 and x2 for k = 2)
+                prob *= 1.8134302039235095 * 1.396323690793764 * p_utils.VMF_pdf(constraint, k, p, x, dot=dot)
 
         return prob
 
