@@ -91,10 +91,10 @@ if __name__ == "__main__":
  
     sim_params = {'min_correct_likelihood': 0.6}
     
-    N_runs = 20
-    run_start_id = 5
+    N_runs = 40
+    run_start_id = 21
 
-    file_prefix = 'trials_12_10_set_2'
+    file_prefix = 'trials_12_10_set_3'
     path = 'models/augmented_taxi2'
 
 
