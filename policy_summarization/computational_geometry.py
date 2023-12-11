@@ -12,7 +12,7 @@ def generate_equidistributed_points_on_sphere(num_points):
 
     Note that this algorithm may return slightly fewer than the number of points requested.
     """
-
+    print('num_points: ', num_points)
     N_count = 0
     a = 4 * np.pi / num_points
     d = np.sqrt(a)
@@ -29,6 +29,8 @@ def generate_equidistributed_points_on_sphere(num_points):
             points[N_count, 1] = np.sin(theta) * np.sin(phi)
             points[N_count, 2] = np.cos(theta)
             N_count += 1
+            if N_count == num_points:
+                break
 
     points = points[0:N_count]
 

@@ -23,6 +23,8 @@ import sympy as sym
 from scipy.optimize import least_squares as ls 
 from scipy.optimize import root_scalar
 from scipy.special import ive
+from scipy import special
+import pandas as pd
 
 import params_team as params
 import policy_summarization.BEC_helpers as BEC_helpers
@@ -465,6 +467,161 @@ def label_axes(ax, weights=None):
 
     ax.view_init(elev=16, azim=-160)
 
+
+
+
+def run_sim(condition, filename):
+
+    ###################  testing the human response sampling method  ###################
+
+    # test_constraints =  [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])]
+    with open('models/augmented_taxi2/test_mdp.pickle', 'rb') as f:
+        test_mdp = pickle.load(f) 
+    with open('models/augmented_taxi2/test_constraints.pickle', 'rb') as f:
+        test_constraints = pickle.load(f) 
+    with open('models/augmented_taxi2/opt_traj.pickle', 'rb') as f:
+        opt_traj = pickle.load(f)    
+    with open('models/augmented_taxi2/env_idx.pickle', 'rb') as f:
+        env_idx = pickle.load(f)  
+    # env_idx =  10
+    
+    # new_constraints = [[np.array([[-1,  0,  2]])]]
+
+    # particles_team_learner['p1'].update(new_constraints)
+    # particles_team_learner['p2'].update(new_constraints)
+    # particles_team_learner['p3'].update(new_constraints)
+
+    # team_helpers.visualize_transition(new_constraints[0], particles_team_learner['p1'], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for p1' )
+    # team_helpers.visualize_transition(new_constraints[0], particles_team_learner['p2'], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for p2' )
+    # team_helpers.visualize_transition(new_constraints[0], particles_team_learner['p3'], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for p3' )
+
+    new_constraints = [[np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])]]
+    # test_responses_sim = [ [[np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[1,  0,  -2]])]],
+    #                     [[np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[3,  0,  -2]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])]], 
+    #                     [[np.array([[-1,  0, 4]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])]], 
+    #                     [[np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[3,  0,  -2]])], [np.array([[1,  0,  -2]])]] ]
+
+
+    sampling_unit_size = 1
+    N_samples = 20
+    N_updates = 4
+    viz_flag = False
+
+    prior = [np.array([[0, 0, -1]])]
+    team_size = 5
+    team_prior = {}
+    for i in range(team_size):
+        member_id = 'p' + str(i+1)
+        team_prior[member_id] = [prior]
+
+    
+
+    initial_team_learning_factor = np.array([0.65, 0.7, 0.75, 0.8, 0.85])
+    max_learning_factor = 0.95
+    team_learning_rate = np.hstack((0.025*np.ones([team_size, 1]), 0*np.ones([team_size, 1])))
+    team_learning_factor = copy.deepcopy(initial_team_learning_factor)
+    sampled_points_history = []
+    team_learning_factor_history = []
+    response_history = []
+    member = []
+    constraint_history = []
+    update_id_history = []
+    skip_model_history = []
+    cluster_id_history = []
+    point_probability = []
+    run_sim = True
+    response_team = {'p1': [], 'p2': [], 'p3': [], 'p4': [], 'p5': []}
+    human_traj_team = {'p1': [], 'p2': [], 'p3': [], 'p4': [], 'p5': []}
+
+    team_prior, particles_team_teacher = team_helpers.sample_team_pf(team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_prior = team_prior)
+    particles_team_learner = team_helpers.sample_team_pf(team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_learning_factor = initial_team_learning_factor, team_prior = team_prior, pf_flag='learner')
+
+    print(colored('Running condition ' + str(condition) + ' with filename ' + str(filename), 'blue'))
+    print('Entropy p1: ', particles_team_learner['p1'].calc_entropy(), 'Entropy p2: ', particles_team_learner['p2'].calc_entropy(), 'Entropy p3: ', particles_team_learner['p3'].calc_entropy())
+
+
+    while(run_sim):
+        for update_id in range(N_updates):
+           
+            correct_response = {'p1': 0, 'p2': 0, 'p3': 0, 'p4': 0, 'p5': 0}
+
+            # update particles based on demo constraints
+            for p in range(team_size):
+                member_id = 'p' + str(p+1)
+                # particles_team_teacher[member_id].update(new_constraints)
+                particles_team_learner[member_id].update(new_constraints, team_learning_factor[p])
+                particles_team_learner[member_id].cluster()
+                if viz_flag:
+                    team_helpers.visualize_transition(new_constraints[0], particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = 'Teacher knowledge change after demos set ' + str(update_id+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(update_id+1))
+                    team_helpers.visualize_transition(new_constraints[0], particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = 'Learner knowledge change after demos set ' + str(update_id+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(update_id+1))
+            
+            # Sample responses
+                for sample_id in range(int(N_samples/sampling_unit_size)):
+                    print(colored('Sampling test response for set id ' + str(update_id) + 'for sample ' + str(sample_id) + ' for Player ' + str(member_id) + ' with learning factor ' + str(team_learning_factor[p]), 'yellow'))
+                    
+                    # human_model_weight, human_traj, response_type = get_human_response(env_idx, particles_team_learner[member_id], opt_traj, test_constraints, args)
+                    
+                    args = update_id, member_id, new_constraints, sampled_points_history, response_history, member, constraint_history, update_id_history, skip_model_history, cluster_id_history, point_probability, team_learning_factor_history
+                    human_model_weight, human_traj, response_type, sampled_points_history, response_history, member, constraint_history, update_id_history, skip_model_history, cluster_id_history, point_probability, team_learning_factor_history = get_human_response(condition, env_idx, particles_team_learner[member_id], opt_traj, test_constraints, team_learning_factor[p], args)
+
+                    if response_type == 'correct':
+                        correct_response[member_id] += 1
+                    elif response_type == 'NA':
+                        print(colored('NO HUMAN MODEL COULD BE SAMPLED!', 'red'))
+                        run_sim = False
+
+                    response_team[member_id] = response_type
+                    human_traj_team[member_id] = human_traj
+
+
+            ## Use the last response to update the particle filter
+            print(colored('Updating PF and learning rate based on team responses' + str(response_team), 'blue') )
+            for p in range(team_size):
+                member_id = 'p' + str(p+1)
+                response_member = response_team[member_id]
+                human_traj_member = human_traj_team[member_id]
+                
+                if response_member == 'correct':
+                    print(colored('Updating PF and learning rate based on correct response. Test constraints: ' + str(test_constraints), 'green'))
+                    team_learning_factor[p] = min(team_learning_factor[p] + team_learning_rate[p, 0], max_learning_factor)
+                    # particles_team_teacher[member_id].update(test_constraints)
+                    particles_team_learner[member_id].update(test_constraints, team_learning_factor[p])
+                    if viz_flag:
+                        team_helpers.visualize_transition(test_constraints, particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = 'Teacher knowledge change after test set ' + str(update_id+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(update_id+1))
+                        team_helpers.visualize_transition(test_constraints, particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = 'Learner knowledge change after test set ' + str(update_id+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(update_id+1))
+                
+                elif response_member == 'incorrect':
+                    
+                    team_learning_factor[p] = team_learning_factor[p] + team_learning_rate[p, 1]
+                    
+                    human_feature_count = test_mdp.accumulate_reward_features(human_traj_member, discount=True)
+                    opt_feature_count = test_mdp.accumulate_reward_features(opt_traj, discount=True)
+                    failed_BEC_constraint = opt_feature_count - human_feature_count
+
+                    print(colored('Updating PF and learning rate based on incorrect response. Failed BEC constraint: ' + str([-failed_BEC_constraint]), 'red'))
+                    # particles_team_teacher[member_id].update([-failed_BEC_constraint])
+                    particles_team_learner[member_id].update([-failed_BEC_constraint], team_learning_factor[p])
+                    
+                    if viz_flag:
+                        team_helpers.visualize_transition([-failed_BEC_constraint], particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = 'Teacher knowledge change after test set ' + str(update_id+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(update_id+1))
+                        team_helpers.visualize_transition([-failed_BEC_constraint], particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = 'Learner knowledge change after test set ' + str(update_id+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(update_id+1))
+                    
+
+            print('update_id', update_id, '. correct_response', correct_response)
+
+        # end simulation
+        run_sim = False
+    
+    print('Set: ', len(update_id_history), 'member: ', len(member), 'learning_factor: ', len(team_learning_factor_history), 'model: ', len(sampled_points_history), 'prob : ', len(point_probability), 'skip_model: ', len(skip_model_history), 'constraint: ', len(constraint_history), 'response: ', len(response_history), 'cluster: ', len(cluster_id_history))
+
+    data_dict = {'update_id': update_id_history, 'member_id': member, 'learning_factor': team_learning_factor_history, 'model': sampled_points_history, 'point_probability': point_probability, 'skip_model': skip_model_history, \
+                 'constraint_flag': constraint_history, 'response': response_history, 'cluster_id': cluster_id_history}
+    
+    
+    debug_data_response = pd.DataFrame(data=data_dict)
+
+    debug_data_response.to_csv(filename)
+
 ##############################################
 
 
@@ -585,41 +742,41 @@ if __name__ == "__main__":
     # demo_constraints = [[np.array([[-1, 0, 0]]), np.array([[-1, 0, 2]])]]
     # test_response = {'p1': np.array([[-1, 0, 2]]), 'p2': np.array([[3, 0, -2]])}
 
-    # team_prior, particles_team = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_prior = params.team_prior)
+    # team_prior, particles_team_teacher = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_prior = params.team_prior)
     
     # print('Team prior: ', team_prior)
-    # print('Team particles: ', particles_team)
+    # print('Team particles: ', particles_team_teacher)
     # print('Demo constraints:', demo_constraints)
 
     # team_knowledge = copy.deepcopy(team_prior)
 
 
 
-    # for member_id in particles_team:
+    # for member_id in particles_team_teacher:
     #     if 'p' in member_id:
     #         team_knowledge = team_helpers.update_team_knowledge(team_knowledge, [test_response[member_id]], params.team_size,  params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
-    #         particles_team[member_id].update([test_response[member_id]])
+    #         particles_team_teacher[member_id].update([test_response[member_id]])
     #     elif member_id == 'common_knowledge':
     #         test_common_constraints = []
     #         for idx, cnt in enumerate(test_response):
     #             test_common_constraints.extend([test_response[cnt]])
     #         print('test_common_constraints: ', test_common_constraints)
     #         team_knowledge = team_helpers.update_team_knowledge(team_knowledge, [], params.team_size,  params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])      
-    #         particles_team[member_id].update(test_common_constraints)
+    #         particles_team_teacher[member_id].update(test_common_constraints)
     #     elif member_id == 'joint_knowledge':
     #         test_joint_constraints = []
     #         for idx, cnt in enumerate(test_response):
     #             test_joint_constraints.append([test_response[cnt]])
     #         print('test_joint_constraints: ', test_joint_constraints)
-    #         particles_team[member_id].update_jk(test_joint_constraints)
+    #         particles_team_teacher[member_id].update_jk(test_joint_constraints)
 
-    # team_helpers.visualize_team_knowledge(particles_team, test_response, params.mdp_class, weights=params.weights['val'], text='Updated team knowledge after test')
+    # team_helpers.visualize_team_knowledge(particles_team_teacher, test_response, params.mdp_class, weights=params.weights['val'], text='Updated team knowledge after test')
     
     
-    # particles_team['joint_knowledge'].update_jk(demo_constraints)
-    # team_helpers.visualize_transition(demo_constraints, particles_team['joint_knowledge'], params.mdp_class, params.weights['val'], text='Demo 1 for JK Type 1')
-    # particles_team['joint_knowledge_2'].update_jk(demo_constraints)
-    # team_helpers.visualize_transition(demo_constraints, particles_team['joint_knowledge_2'], params.mdp_class, params.weights['val'], text = 'Demo 1 for JK Type 2')
+    # particles_team_teacher['joint_knowledge'].update_jk(demo_constraints)
+    # team_helpers.visualize_transition(demo_constraints, particles_team_teacher['joint_knowledge'], params.mdp_class, params.weights['val'], text='Demo 1 for JK Type 1')
+    # particles_team_teacher['joint_knowledge_2'].update_jk(demo_constraints)
+    # team_helpers.visualize_transition(demo_constraints, particles_team_teacher['joint_knowledge_2'], params.mdp_class, params.weights['val'], text = 'Demo 1 for JK Type 2')
 
 
     ######################################
@@ -1283,7 +1440,7 @@ if __name__ == "__main__":
 
 #     # team_knowledge = {'p1': [np.array([[0,  0,  -1]])], 'p2': [np.array([[ 0,  0, -1]])], 'common_knowledge': [np.array([[ 0,  0, -1]])], 'joint_knowledge': [[np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])]]}
 
-#     team_knowledge, particles_team = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_prior = params.team_prior)
+#     team_knowledge, particles_team_teacher = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_prior = params.team_prior)
         
 #     min_BEC_constraints:  [np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
     
@@ -1302,16 +1459,16 @@ if __name__ == "__main__":
 #             for m_id in range(1, 3):
 #                 member_id = 'p' + str(m_id)
 #                 team_knowledge = team_helpers.update_team_knowledge(team_knowledge, cnst[m_id-1], 2, params.weights['val'], params.step_cost_flag, knowledge_to_update=[member_id])
-#                 particles_team[member_id].update(cnst[m_id-1])
-#                 team_helpers.visualize_transition(cnst[m_id-1], particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Knowledge change for set for ' + member_id)
+#                 particles_team_teacher[member_id].update(cnst[m_id-1])
+#                 team_helpers.visualize_transition(cnst[m_id-1], particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = 'Knowledge change for set for ' + member_id)
 #                 team_cnsts.extend(cnst[m_id-1])
 #             team_knowledge = team_helpers.update_team_knowledge(team_knowledge, [], 2, params.weights['val'], params.step_cost_flag, knowledge_to_update=['common_knowledge', 'joint_knowledge'])
 
-#             particles_team['common_knowledge'].update([team_cnsts])
-#             team_helpers.visualize_transition(team_cnsts, particles_team['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Knowledge change for set for common knowledge')
+#             particles_team_teacher['common_knowledge'].update([team_cnsts])
+#             team_helpers.visualize_transition(team_cnsts, particles_team_teacher['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Knowledge change for set for common knowledge')
 
-#             particles_team['joint_knowledge'].update_jk(cnst)
-#             team_helpers.visualize_transition([cnst], particles_team['joint_knowledge'], params.mdp_class, params.weights['val'], text = 'Knowledge change for set for joint knowledge')
+#             particles_team_teacher['joint_knowledge'].update_jk(cnst)
+#             team_helpers.visualize_transition([cnst], particles_team_teacher['joint_knowledge'], params.mdp_class, params.weights['val'], text = 'Knowledge change for set for joint knowledge')
 
 
 
@@ -2049,6 +2206,17 @@ if __name__ == "__main__":
     #                                         [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])]]]}
     
 
+    # team_knowledge = {'p1': [[np.array([[ 0,  0, -1]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])], [np.array([[ 1, -1,  0]])]], 
+    #                 'p2': [[np.array([[ 0,  0, -1]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])], [np.array([[1, 1, 0]])]], 
+    #                 'p3': [[np.array([[ 0,  0, -1]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])], [np.array([[1, 1, 0]])]], 
+    #                 'common_knowledge': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[ 0, -1, -4]]), np.array([[0, 1, 2]])], [np.array([[ 1, -1,  0]])]], 
+    #                 'joint_knowledge': [[[np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])]], 
+    #                                     [[np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])]], 
+    #                                     [[np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])]], 
+    #                                     [[np.array([[ 1, -1,  0]])], [np.array([[1, 1, 0]])], [np.array([[1, 1, 0]])]]]}
+
+
+
 
     # # p3 =  [np.array([[ 0,  0, -1]]), np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]]), np.array([[ 0, -1, -2]]), np.array([[0, 1, 4]])]
     # # p3_min = BEC_helpers.remove_redundant_constraints(p3, params.weights['val'], params.step_cost_flag)
@@ -2233,14 +2401,14 @@ if __name__ == "__main__":
 
     # # min_BEC_constraints_running = [np.array([[0, 0, -1]])]
 
-    # # particles_team = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], 500))
+    # # particles_team_teacher = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], 500))
     # # # particles = pf.Particles(BEC_helpers.sample_human_models_uniform([], 500))
-    # # particles_team.update(min_BEC_constraints_running)
+    # # particles_team_teacher.update(min_BEC_constraints_running)
 
     # # sample_human_models = BEC_helpers.sample_human_models_uniform(min_BEC_constraints_running, 20)
-    # # sample_human_models_pf = BEC_helpers.sample_human_models_pf(particles_team, 20)
+    # # sample_human_models_pf = BEC_helpers.sample_human_models_pf(particles_team_teacher, 20)
 
-    # # team_helpers.plot_sampled_models(particles_team, sample_human_models, weights=params.weights['val'], fig=None, text='Sampled human models')
+    # # team_helpers.plot_sampled_models(particles_team_teacher, sample_human_models, weights=params.weights['val'], fig=None, text='Sampled human models')
 
 
 ###############################
@@ -2379,7 +2547,7 @@ if __name__ == "__main__":
 
     # # knowledge = team_helpers.calc_knowledge_level(team_knowledge, min_KC_constraints)
 
-    # # fig = team_helpers.visualize_team_knowledge_constraints(team_knowledge, params.weights['val'], params.step_cost_flag, particles_team = None, kc_id = None, fig=None, text=None, plot_min_constraints_flag = False, plot_text_flag = False, min_unit_constraints = [], plot_filename = 'team_knowledge_constraints', fig_title = None)
+    # # fig = team_helpers.visualize_team_knowledge_constraints(team_knowledge, params.weights['val'], params.step_cost_flag, particles_team_teacher = None, kc_id = None, fig=None, text=None, plot_min_constraints_flag = False, plot_text_flag = False, min_unit_constraints = [], plot_filename = 'team_knowledge_constraints', fig_title = None)
 
     # # plot_constraints = [np.array([[ 0,  0, -1]]), np.array([[-1,  0,  2]]), np.array([[1,  0,  -1]])]
 
@@ -2454,28 +2622,20 @@ if __name__ == "__main__":
     #                 'joint_knowledge': [[[np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])]], [[np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])]], [[np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])]], [[np.array([[ 2, -1, -2]]), np.array([[-1,  1,  0]]), np.array([[1, 1, 0]])], [np.array([[ 1, -1, -2]]), np.array([[-1,  1,  0]]), np.array([[ 0, -1, -2]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  1,  0]]), np.array([[1, 1, 0]])]]]}
    
 
-    team_knowledge = {'p1': [[np.array([[ 0,  0, -1]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])], [np.array([[ 1, -1,  0]])]], 
-                      'p2': [[np.array([[ 0,  0, -1]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])], [np.array([[1, 1, 0]])]], 
-                      'p3': [[np.array([[ 0,  0, -1]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])], [np.array([[1, 1, 0]])]], 
-                      'common_knowledge': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[ 0, -1, -4]]), np.array([[0, 1, 2]])], [np.array([[ 1, -1,  0]])]], 
-                      'joint_knowledge': [[[np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])]], 
-                                          [[np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])], [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])]], 
-                                          [[np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])]], 
-                                          [[np.array([[ 1, -1,  0]])], [np.array([[1, 1, 0]])], [np.array([[1, 1, 0]])]]]}
 
 
     # min_KC_constraints =  [np.array([[ 1, 0, -4]]), np.array([[-1, 0, 2]])]
 
-    min_KC_constraints = [np.array([[ 1, 1, 0]])]
+    # min_KC_constraints = [np.array([[ 1, 1, 0]])]
 
-    min_BEC_constraints = [np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
+    # min_BEC_constraints = [np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
 
     # unit_knowledge = team_helpers.calc_knowledge_level(team_knowledge, min_KC_constraints, kc_id_list = [1], plot_flag = False, fig_title = 'Unit knowledge')
     # print(colored('unit_knowledge: ', 'blue'), unit_knowledge)
     # BEC_knowledge = team_helpers.calc_knowledge_level(team_knowledge, min_BEC_constraints, plot_flag = False, fig_title = 'BEC knowledge')
     # print(colored('BEC_knowledge: ', 'blue'), BEC_knowledge)
 
-    # team_helpers.visualize_team_knowledge_constraints(team_knowledge, params.weights['val'], params.step_cost_flag, particles_team = None, kc_id = None, fig=None, text=None, plot_min_constraints_flag = False, plot_text_flag = False, min_unit_constraints = [], plot_filename = 'team_knowledge_constraints', fig_title = None)
+    # team_helpers.visualize_team_knowledge_constraints(team_knowledge, params.weights['val'], params.step_cost_flag, particles_team_teacher = None, kc_id = None, fig=None, text=None, plot_min_constraints_flag = False, plot_text_flag = False, min_unit_constraints = [], plot_filename = 'team_knowledge_constraints', fig_title = None)
     # plt.show()
 
     ###################################
@@ -2502,16 +2662,150 @@ if __name__ == "__main__":
 
     #############
 
-    test_constraints_team = [[np.array([[1, -1,  0]])], [np.array([[1, 1, 0]])], [np.array([[1, 1, 0]])]]
+    # test_constraints_team = [[np.array([[1, -1,  0]])], [np.array([[1, 1, 0]])], [np.array([[1, 1, 0]])]]
 
-    test_constraints_team_expanded = [np.array([[1, -1,  0]]), np.array([[1, 1, 0]]), np.array([[1, 1, 0]])]
+    # test_constraints_team_expanded = [np.array([[1, -1,  0]]), np.array([[1, 1, 0]]), np.array([[1, 1, 0]])]
 
-    print(team_helpers.check_for_non_intersecting_constraints(test_constraints_team_expanded, params.weights['val'], params.step_cost_flag))
+    # print(team_helpers.check_for_non_intersecting_constraints(test_constraints_team_expanded, params.weights['val'], params.step_cost_flag))
 
-    alternate_team_constraints, intersecting_cnst = team_helpers.majority_rules_non_intersecting_team_constraints(test_constraints_team, params.weights['val'], params.step_cost_flag, test_flag=True)
+    # alternate_team_constraints, intersecting_cnst = team_helpers.majority_rules_non_intersecting_team_constraints(test_constraints_team, params.weights['val'], params.step_cost_flag, test_flag=True)
 
-    print(alternate_team_constraints)
+    # print(alternate_team_constraints)
 
-    ck = [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[ 0, -1, -4]]), np.array([[0, 1, 2]])], [np.array([[ 1, -1,  0]])]]
+    # ck = [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[ 0, -1, -4]]), np.array([[0, 1, 2]])], [np.array([[ 1, -1,  0]])]]
 
-    print(BEC_helpers.remove_redundant_constraints(test_constraints_team_expanded, params.weights['val'], params.step_cost_flag))
+    # print(BEC_helpers.remove_redundant_constraints(test_constraints_team_expanded, params.weights['val'], params.step_cost_flag))
+
+    
+
+
+
+
+    #####################
+
+    # cluster_centers =  [np.array([[-0.36561398,  0.92025358, -0.13949825]]), np.array([[ 0.27395955, -0.95941006,  0.06692162]]), np.array([[-0.81329844, -0.46925794, -0.34400964]]), np.array([[-0.04074881,  0.99904232,  0.01593643]]), np.array([[-0.90900127, -0.15130474, -0.38836011]]), np.array([[-0.5862364 ,  0.70151052, -0.40522818]]), np.array([[-0.90682321,  0.32305112, -0.27075752]]), np.array([[0.38554191, 0.91876727, 0.08499494]]), np.array([[0.84446519, 0.47512053, 0.24726308]]), np.array([[-0.72330898, -0.66573043, -0.18337695]]), np.array([[-0.90843689,  0.08365214, -0.40956652]]), np.array([[ 0.95200765, -0.15146447,  0.26596984]]), np.array([[-0.67706793,  0.59154605, -0.43778109]]), np.array([[0.97124761, 0.04524453, 0.23373277]]), np.array([[-0.81614882,  0.54558893, -0.19035184]]), np.array([[ 0.81941682, -0.16199308, -0.54983117]])]
+    # cluster_weights =  [0.09345091882181246, 0.35000791333737435, 0.07782068247264634, 0.030308127741402936, 0.027313751989041794, 0.015865863934669912, 0.035659640474367774, 0.13572954461660675, 0.05332447041758329, 0.030667770967512237, 0.040613315323998915, 0.01219089979510014, 0.026997060443025956, 0.03564012147340535, 0.032828183888534555, 0.0015817343029176968]
+    
+    # filename = 'models/augmented_taxi2/gt_policies/wt_vi_traj_params_env' + str(env_idx).zfill(5) + '.pickle'
+    
+    # with open(filename, 'rb') as f:
+    #     wt_vi_traj_env = pickle.load(f)
+
+    # mdp = wt_vi_traj_env[0][1].mdp
+    # agent = FixedPolicyAgent(wt_vi_traj_env[0][1].policy)
+    # mdp.set_init_state(opt_traj[0][0])
+    # traj_opt = mdp_helpers.rollout_policy(mdp, agent)
+    # response_type_array = []
+
+    # for model_idx, human_model_weight in enumerate(cluster_centers):
+    #     print('human_model_weight: ', human_model_weight)
+    #     mdp.weights = human_model_weight
+    #     # vi_human = ValueIteration(mdp, sample_rate=1, max_iterations=100)
+    #     vi_human = ValueIteration(mdp, sample_rate=1)
+    #     vi_human.run_vi()
+
+    #     if not vi_human.stabilized:
+    #         print(colored('Human model with weight, ' + str(human_model_weight) + ', did not converge and skipping for response generation', 'red'))
+    #         skip_human_model = True
+    #     else:
+    #         print(colored('Human model with weight, ' + str(human_model_weight) + ', converged', 'green'))
+    #         skip_human_model = False
+        
+    #     if not skip_human_model:
+    #         cur_state = mdp.get_init_state()
+    #         # print('Current state: ', cur_state)
+    #         human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
+            
+    #         human_traj_rewards = mdp.accumulate_reward_features(human_opt_trajs[0], discount=True)  # just use the first optimal trajectory
+    #         mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
+    #         new_constraint = mu_sa - human_traj_rewards
+
+    #         test_mdp.visualize_trajectory(human_opt_trajs[0])
+
+    #         # print('New constraint: ', new_constraint)
+    #         if (new_constraint == np.array([0, 0, 0])).all():
+    #             if params.debug_hm_sampling:
+    #                 print(colored('Correct response sampled', 'blue'))
+    #             response_type = 'correct'
+    #         else:
+    #             if params.debug_hm_sampling:
+    #                 print(colored('Incorrect response sampled', 'red'))
+    #             response_type = 'incorrect'
+    #     else:
+    #         response_type = 'skipped'
+        
+    #     response_type_array.append(response_type)
+
+    # dict_data = {'points': cluster_centers, 'weights': cluster_weights, 'response_type': response_type_array}
+    # cluster_data = pd.DataFrame(dict_data)
+    # cluster_data.to_csv('models/augmented_taxi2/cluster_data.csv')
+    
+    #####################################################
+
+        
+
+
+    #######################################  test the PF resampling process with Gaussian Noise  ###########
+
+    # with open('models/augmented_taxi2/test_mdp.pickle', 'rb') as f:
+    #     test_mdp = pickle.load(f) 
+    # with open('models/augmented_taxi2/test_constraints.pickle', 'rb') as f:
+    #     test_constraints = pickle.load(f) 
+    # with open('models/augmented_taxi2/opt_traj.pickle', 'rb') as f:
+    #     opt_traj = pickle.load(f)    
+    # with open('models/augmented_taxi2/env_idx.pickle', 'rb') as f:
+    #     env_idx = pickle.load(f)  
+    
+    # # new_constraints = [[np.array([[-1,  0,  2]])]]
+
+    # # particles_team_learner['p1'].update(new_constraints)
+    # # particles_team_learner['p2'].update(new_constraints)
+    # # particles_team_learner['p3'].update(new_constraints)
+
+    # # team_helpers.visualize_transition(new_constraints[0], particles_team_learner['p1'], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for p1' )
+    # # team_helpers.visualize_transition(new_constraints[0], particles_team_learner['p2'], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for p2' )
+    # # team_helpers.visualize_transition(new_constraints[0], particles_team_learner['p3'], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for p3' )
+
+    # new_constraints = [[np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])]]
+    # test_responses_sim = [[np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[1,  0,  -2]]), np.array([[ -1,  0, 4]])], [np.array([[ -1,  0, 4]])]]
+
+    # initial_team_learning_factor = [0.95]
+    # team_learning_factor = copy.deepcopy(initial_team_learning_factor)
+    
+    # particles_team_learner = team_helpers.sample_team_pf(1, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_learning_factor = initial_team_learning_factor, team_prior = params.team_prior, pf_flag='learner')
+
+
+    # run_sim = True
+    # N_updates = 6
+    # viz_flag = True
+    # N_samples = 1
+    # sampling_unit_size = 1
+    # response_id = 0
+    # loop_id = 0
+
+    # while(loop_id < 50):
+        
+    #     # update particles based on demo constraints
+    #     for p in range(1):
+    #         member_id = 'p' + str(p+1)
+    #         particles_team_learner[member_id].update(new_constraints, u_cdf = team_learning_factor[p])
+    #         if viz_flag:
+    #             team_helpers.visualize_transition(new_constraints[0], particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = 'Learner knowledge change after demos set ' + str(loop_id+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(loop_id+1))
+
+    #         particles_team_learner[member_id].update(test_responses_sim[response_id], u_cdf = team_learning_factor[p])
+    #         if viz_flag:
+    #             team_helpers.visualize_transition(test_responses_sim[response_id], particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = 'Learner knowledge change after test set ' + str(loop_id+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(loop_id+1))
+            
+
+    #         if response_id == len(test_responses_sim)-1:
+    #             response_id = 0
+    #         else:
+    #             response_id += 1
+                
+            
+    #     loop_id += 1
+
+
+    #######################################
+
+    x=1

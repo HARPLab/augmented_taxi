@@ -1,17 +1,17 @@
-# def downsample_team_models_pf(particles_team, n_models):
+# def downsample_team_models_pf(particles_team_teacher, n_models):
 
     
 #     sampled_team_models = {}
 #     sampled_team_model_weights = {}
 
-#     for member_id in particles_team:
+#     for member_id in particles_team_teacher:
 #         sampled_human_model_idxs = []
-#         particles_team[member_id].cluster()
-#         if len(particles_team[member_id].cluster_centers) > n_models:
+#         particles_team_teacher[member_id].cluster()
+#         if len(particles_team_teacher[member_id].cluster_centers) > n_models:
 #             # if there are more clusters than number of sought human models, return the spherical centroids of the top n
 #             # most frequently counted cluster indexes selected by systematic resampling
 #             while len(sampled_human_model_idxs) < n_models:
-#                 indexes = p_utils.systematic_resample(particles_team[member_id].cluster_weights)
+#                 indexes = p_utils.systematic_resample(particles_team_teacher[member_id].cluster_weights)
 #                 unique_idxs, counts = np.unique(indexes, return_counts=True)
 #                 # order the unique indexes via their frequency
 #                 unique_idxs_sorted = [x for _, x in sorted(zip(counts, unique_idxs), reverse=True)]
@@ -24,24 +24,24 @@
 #                     if len(sampled_human_model_idxs) == n_models:
 #                         break
 
-#             sampled_human_models = [particles_team[member_id].cluster_centers[i] for i in sampled_human_model_idxs]
-#             sampled_human_model_weights = np.array([particles_team[member_id].cluster_weights[i] for i in sampled_human_model_idxs])
+#             sampled_human_models = [particles_team_teacher[member_id].cluster_centers[i] for i in sampled_human_model_idxs]
+#             sampled_human_model_weights = np.array([particles_team_teacher[member_id].cluster_weights[i] for i in sampled_human_model_idxs])
 #             sampled_human_model_weights /= np.sum(sampled_human_model_weights)  # normalize
-#         elif len(particles_team[member_id].cluster_centers) == n_models:
-#             sampled_human_models = particles_team[member_id].cluster_centers
-#             sampled_human_model_weights = np.array(particles_team[member_id].cluster_weights) # should already be normalized
+#         elif len(particles_team_teacher[member_id].cluster_centers) == n_models:
+#             sampled_human_models = particles_team_teacher[member_id].cluster_centers
+#             sampled_human_model_weights = np.array(particles_team_teacher[member_id].cluster_weights) # should already be normalized
 #         else:
 #             # if there are fewer clusters than number of sought human models, use systematic sampling to determine how many
 #             # particles from each cluster to return (using the k-cities algorithm to ensure that they are diverse)
-#             indexes = p_utils.systematic_resample(particles_team[member_id].cluster_weights, N=n_models)
+#             indexes = p_utils.systematic_resample(particles_team_teacher[member_id].cluster_weights, N=n_models)
 #             unique_idxs, counts = np.unique(indexes, return_counts=True)
 
 #             sampled_human_models = []
 #             sampled_human_model_weights = []
 #             for j, unique_idx in enumerate(unique_idxs):
 #                 # particles of this cluster
-#                 clustered_particles = particles_team[member_id].positions[np.where(particles_team[member_id].cluster_assignments == unique_idx)]
-#                 clustered_particles_weights = particles_team[member_id].weights[np.where(particles_team[member_id].cluster_assignments == unique_idx)]
+#                 clustered_particles = particles_team_teacher[member_id].positions[np.where(particles_team_teacher[member_id].cluster_assignments == unique_idx)]
+#                 clustered_particles_weights = particles_team_teacher[member_id].weights[np.where(particles_team_teacher[member_id].cluster_assignments == unique_idx)]
 
 #                 # use the k-cities algorithm to obtain a diverse sample of weights from this cluster
 #                 pairwise = metrics.pairwise.euclidean_distances(clustered_particles.reshape(-1, 3))
@@ -314,3 +314,171 @@ def majority_rules_non_intersecting_team_constraints(test_constraints_team, weig
     
 
     return alternate_team_constraints, intersecting_cnst
+
+
+
+
+def run_remedial_loop(failed_BEC_constraints_tuple, particles_team_teacher, team_knowledge, min_subset_constraints_record, env_record, traj_record, traj_features_record, test_history, visited_env_traj_idxs, running_variable_filter_unit, mdp_features_record, consistent_state_count, particles_demo, pool, viz_flag = False, experiment_type = 'simulated'):
+    human_history = []
+
+    ## Note: This function is currently not being used!
+
+    # Method 1: Generate remedial demonstration from the combined failed BEC constraints of the team
+    # # print("Here is a remedial demonstration that might be helpful")
+    # min_failed_constraints = BEC_helpers.remove_redundant_constraints(failed_BEC_constraints_team, params.weights['val'], params.step_cost_flag)
+
+    # # print('min_failed_constraints:', min_failed_constraints)
+    
+    # remedial_demos, visited_env_traj_idxs = team_helpers.obtain_remedial_demos_tests(params.data_loc['BEC'], BEC_summary[-1], visited_env_traj_idxs, min_failed_constraints, min_subset_constraints_record, traj_record, traj_features_record, running_variable_filter_unit, mdp_features_record)
+    # # # print(remedial_demos[0])
+
+    # # TODO: Show remedial demonstration
+    # for demo in remedial_demos:
+    #     demo[0].visualize_trajectory(demo[1])
+    #     test_history.extend(demo)
+
+    #     particles_demo.update([demo[3]])
+    #     # # print('remedial demo :', demo)
+    #     # # print('remedial demo constraints:', demo[3])
+    #     if visualize_pf_transition:
+    #         team_helpers.visualize_transition(demo[3], particles_demo, params.mdp_class, params.weights['val'])
+
+    #     with open('models/' + params.data_loc['BEC'] + '/remedial_instruction.pickle', 'wb') as f:
+    #         pickle.dump(demo, f)
+
+
+    # Method 2: Generate remedial demonstration for each individual
+
+    for idx, failed_BEC_cnst_tuple in enumerate(failed_BEC_constraints_tuple):
+        
+
+        member_id = failed_BEC_cnst_tuple[0]
+        
+        remedial_instruction, visited_env_traj_idxs = BEC.obtain_remedial_demonstrations(params.data_loc['BEC'], pool, particles_team_teacher[member_id], params.BEC['n_human_models'], failed_BEC_cnst_tuple[1], min_subset_constraints_record, env_record, traj_record, traj_features_record, test_history, visited_env_traj_idxs, running_variable_filter_unit, mdp_features_record, consistent_state_count, params.weights['val'], params.step_cost_flag, n_human_models_precomputed= params.BEC['n_human_models_precomputed'])
+        remedial_mdp, remedial_traj, _, remedial_constraint, _ = remedial_instruction[0]
+        if viz_flag:
+            remedial_mdp.visualize_trajectory(remedial_traj)
+        test_history.extend(remedial_instruction)
+
+        particles_demo.update([remedial_constraint])
+        if viz_flag:
+            BEC_viz.visualize_pf_transition([remedial_constraint], particles_demo, params.mdp_class, params.weights['val'])
+
+
+        with open('models/' + params.data_loc['BEC'] + '/remedial_instruction.pickle', 'wb') as f:
+            pickle.dump(remedial_instruction, f)
+
+        
+        if experiment_type == 'simulated':
+            N_remedial_tests = random.randint(1, 3)
+            # print('N_remedial_tests: ', N_remedial_tests)
+        remedial_resp_no = 0
+
+        # print("Here is a remedial test to see if you've correctly learned the lesson")
+        remedial_test_end = False
+        while (not remedial_test_end) and (remedial_resp_no < N_remedial_tests): #Note: To be updated. Do not show remedial until they get it right, rather show it until there is common knowledge and joint knowledge
+            # print('Still inside while loop...')
+            remedial_test, visited_env_traj_idxs = BEC.obtain_remedial_demonstrations(params.data_loc['BEC'], pool,
+                                                                                                particles_demo,
+                                                                                                params.BEC['n_human_models'],
+                                                                                                failed_BEC_cnst_tuple[1],
+                                                                                                min_subset_constraints_record,
+                                                                                                env_record,
+                                                                                                traj_record,
+                                                                                                traj_features_record,
+                                                                                                test_history,
+                                                                                                visited_env_traj_idxs,
+                                                                                                running_variable_filter_unit,
+                                                                                                mdp_features_record,
+                                                                                                consistent_state_count,
+                                                                                                params.weights['val'],
+                                                                                                params.step_cost_flag, type='testing', n_human_models_precomputed=params.BEC['n_human_models_precomputed'])
+
+            remedial_mdp, remedial_traj, remedial_env_traj_tuple, remedial_constraint, _ = remedial_test[0]
+            test_history.extend(remedial_test)
+
+
+            if experiment_type == 'simulated':
+                if remedial_resp_no == N_remedial_tests-1:
+                    remedial_response = 'correct'
+                else:
+                    remedial_response = 'mixed' # Note: We assume that one person always gets the remedial test correct and the other person gets it wrong (only for N=2)
+                human_traj_team, human_history = sim_helpers.get_human_response_old(remedial_env_traj_tuple[0], remedial_constraint, remedial_traj, human_history, team_knowledge, team_size = params.team_size, response_distribution = remedial_response)
+                remedial_resp_no += 1
+                # print('Simulating human response for remedial test... Remedial Response no: ', remedial_resp_no, '. Response type: ', remedial_response)
+
+            
+            remedial_constraints_team = []
+            # Show the same test for each person and get test responses of each person in the team
+            p = 1
+            while p <= params.team_size:
+                member_id = 'p' + str(p)
+
+                if experiment_type == 'simulated':
+                    human_traj = human_traj_team[p-1]
+                else:
+                    human_traj, human_history = remedial_mdp.visualize_interaction(
+                        keys_map=params.keys_map)  # the latter is simply the gridworld locations of the agent
+
+
+                human_feature_count = remedial_mdp.accumulate_reward_features(human_traj, discount=True)
+                opt_feature_count = remedial_mdp.accumulate_reward_features(remedial_traj, discount=True)
+
+                if (human_feature_count == opt_feature_count).all():
+                    # print("You got the remedial test correct")
+                    particles_demo.update([remedial_constraint])
+                    remedial_constraints_team.append([remedial_constraint])
+                    if viz_flag:
+                        team_helpers.visualize_transition([remedial_constraint], particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = 'Remedial Test ' + str(remedial_resp_no) + ' for player ' + member_id)
+
+                else:
+                    failed_BEC_constraint = opt_feature_count - human_feature_count
+                    # # print('Optimal traj: ', remedial_traj)
+                    # # print('Human traj: ', human_traj)
+                    if viz_flag:
+                        # print("You got the remedial test wrong. Here's the correct answer")
+                        # print("Failed BEC constraint: {}".format(failed_BEC_constraint))
+                        remedial_mdp.visualize_trajectory_comparison(remedial_traj, human_traj)
+                    # else:
+                        # print("You got the remedial test wrong. Failed BEC constraint: {}".format(failed_BEC_constraint))
+
+                    particles_demo.update([-failed_BEC_constraint])
+                    remedial_constraints_team.append([-failed_BEC_constraint])
+                    if viz_flag:
+                        # BEC_viz.visualize_pf_transition([-failed_BEC_constraint], particles_demo, params.mdp_class, params.weights['val'])
+                        team_helpers.visualize_transition([-failed_BEC_constraint], particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = 'Remedial Test ' + str(remedial_resp_no) + ' for player ' + member_id)
+
+
+                p += 1
+        
+        # Update team knowledge
+        # opposing_constraints_flag, _, _ = team_helpers.check_opposing_constraints(remedial_constraints_team)
+        non_intersecting_constraints_flag, _ = team_helpers.check_for_non_intersecting_constraints(remedial_constraints_team, params.weights['val'], params.step_cost_flag)
+        # print('Opposing constraints remedial loop? ', opposing_constraints_flag)
+
+        if not non_intersecting_constraints_flag:
+            remedial_test_end = True
+            remedial_constraints_team_expanded = []
+            for test_constraints in remedial_constraints_team:
+                remedial_constraints_team_expanded.extend(test_constraints)
+            
+            # Update individual belief
+            p = 1
+            while p <= params.team_size:
+                member_id = 'p' + str(p)
+                team_knowledge = team_helpers.update_team_knowledge(team_knowledge, remedial_constraints_team[p-1], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
+                particles_team_teacher[member_id].update(remedial_constraints_team[p-1])
+                particles_team_teacher[member_id].knowledge_update(team_knowledge[member_id])
+                p += 1
+
+            if viz_flag:
+                team_helpers.visualize_transition(remedial_constraints_team[p-1], particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = 'After Remedial Test for player ' + member_id)
+
+            # Update team beliefs
+            team_knowledge = team_helpers.update_team_knowledge(team_knowledge, [], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = ['common_knowledge', 'joint_knowledge'])
+            particles_team_teacher['common_knowledge'].update(remedial_constraints_team_expanded)
+            particles_team_teacher['common_knowledge'].knowledge_update(team_knowledge['common_knowledge'])
+            particles_team_teacher['joint_knowledge'].update_jk(remedial_constraints_team)
+            particles_team_teacher['joint_knowledge'].knowledge_update(team_knowledge['joint_knowledge'])
+
+    return test_history, visited_env_traj_idxs, particles_team_teacher, team_knowledge, particles_demo, remedial_constraints_team_expanded, remedial_resp_no

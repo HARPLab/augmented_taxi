@@ -755,6 +755,9 @@ def sample_human_models_pf(particles, n_models):
     #
     # c) use mean-shift clustering to sample human models
     particles.cluster()
+
+    print('Number of particle clusters: ', len(particles.cluster_centers))
+
     if len(particles.cluster_centers) > n_models:
         # if there are more clusters than number of sought human models, return the spherical centroids of the top n
         # most frequently counted cluster indexes selected by systematic resampling
@@ -817,7 +820,8 @@ def sample_human_models_pf(particles, n_models):
     # sampled_human_models = particles.positions[indexes[select_idxs]]
     # sampled_human_model_weights = particles.weights[indexes[select_idxs]]
 
-    return sampled_human_models, sampled_human_model_weights
+    return sampled_human_models, select_idxs, sampled_human_model_weights
+
 
 def sample_human_models_uniform(constraints, n_models):
     '''
@@ -892,6 +896,8 @@ def sample_human_models_uniform(constraints, n_models):
         sample_human_models.extend(points)
 
     return sample_human_models
+
+
 
 def selectKcities(n, weights, k):
     '''

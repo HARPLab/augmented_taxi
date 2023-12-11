@@ -154,6 +154,8 @@ def rand_von_mises_fisher(mu, kappa, N=1, halfspace=False):
     p = len(mu)
 
     # Make sure that mu has a shape of px1
+    print('mu: ', mu)
+    print('p: ', p)
     mu = np.reshape(mu, (p, 1))
 
     # Array to store samples

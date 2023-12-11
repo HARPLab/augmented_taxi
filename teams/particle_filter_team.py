@@ -10,6 +10,10 @@ import copy
 from numpy.random import uniform
 from MeanShift import mean_shift as ms
 from scipy.stats import norm
+from scipy import integrate
+from scipy import special
+from scipy.optimize import fsolve
+
 
 import policy_summarization.BEC_helpers as BEC_helpers
 import policy_summarization.BEC_visualization as BEC_viz
@@ -19,7 +23,7 @@ from policy_summarization import particle_filter as pf
 import teams.utils_teams as utils_teams
 
 
-# Used when particles_team class is derived from particles class
+# Used when particles_team_teacher class is derived from particles class
 # class Particles_team(pf.Particles):
 #     def __init__(self, positions):
 #         super().__init__(positions)
@@ -27,13 +31,39 @@ import teams.utils_teams as utils_teams
 
 # Particles_team is defined as a new separate class to avoid any confusion and relevant functions are copied over from the particles class
 class Particles_team():
-    def __init__(self, positions, eps=1e-5):
+    def __init__(self, positions, u_cdf, eps=1e-5):
         self.positions = np.array(positions)
         self.weights = np.ones(len(positions)) / len(positions)
         self.eps = eps
 
         self.positions_prev = self.positions.copy()
         self.weights_prev = self.weights.copy()
+
+        # parameters for the custom uniform + VMF distribution
+        self.integral_prob_uniform = u_cdf
+        self.u_pdf = self.integral_prob_uniform/(2*np.pi)
+
+        self.integral_prob_VMF = 1-u_cdf  # scaled VMF probability mass/CDF
+        self.VMF_kappa, self.x1  = self.solve_for_kappa(u_cdf)
+        self.VMF_pdf = self.calc_VMF_pdf()
+
+        # calculate scaling factors
+        self.x2 = u_cdf/0.5
+        # self.x1 = 1/(4*np.pi*self.VMF_pdf)
+
+
+
+        # # fix the scaling factor and vary kappa according to the uniform cdf.
+        # self.x1 = 6.8224855577801495
+        # self.x2 = 1.6058824379694276
+        # self.integral_prob_uniform = 0.8029412189847138   # the total probability on the uniform half of the custom uniform + VMF distribution
+        # self.integral_prob_VMF = 0.19705878101528612      # the total probability on the VMF half of the custom uniform + VMF distribution
+        # self.VMF_kappa = 4                                # the concentration parameter of the VMF distribution
+        
+
+        print('u_pdf: ', self.u_pdf, 'integral_prob_uniform: ', self.integral_prob_uniform, 'integral_prob_VMF: ', self.integral_prob_VMF, 'VMF_kappa: ', self.VMF_kappa, 'VMF_pdf: ', self.VMF_pdf, 'x1: ', self.x1, 'x2: ', self.x2) 
+
+
 
         self.knowledge_constraints = []
 
@@ -158,14 +188,87 @@ class Particles_team():
         self.bin_particle_mapping = None
         self.bin_weight_mapping = None
 
-        self.integral_prob_uniform = 0.8029412189847138   # the total probability on the uniform half of the custom uniform + VMF distribution
-        self.integral_prob_VMF = 0.19705878101528612      # the total probability on the VMF half of the custom uniform + VMF distribution
-        self.VMF_kappa = 4                                # the concentration parameter of the VMF distribution
-
         # newly added to check reset count
         self.pf_reset_count = 0
         self.reset_constraint = []
 
+    
+    # Calculates Kappa with variable scaling factors - most accurate
+    def solve_for_kappa(self, u_cdf_scaled):
+        # Note u_cdf_scaled > 0.5; u_cdf_scaled = 0.5 results in kappa = 0, fully uniform on both sides of the sphere.
+        
+        # fixed values
+        mu = np.array([1, 0, 0])
+        x = np.array([0, 0, 1])
+        p = 3 # length of x
+        dot = x.dot(mu)
+        
+        # uniform_pdf = 1 / (4 * np.pi)
+        u_pdf = 1 / (4 * np.pi)
+
+        def integrand(phi, theta, kappa):
+            return ( kappa*np.sin(phi)*np.exp(kappa*np.cos(theta)*np.sin(phi)) ) / ( 2*np.pi*(np.exp(kappa)-np.exp(-kappa)) ) #this equation is for mu = [1, 0, 0], but kappa would be same for any mu for a particular cdf.
+
+        def func_solve(vars):
+            kappa, x1 = vars
+            eq1 = integrate.dblquad(integrand, np.pi/2, 3*np.pi/2, 0, np.pi, args = (kappa, ))[0] * x1 - (1-u_cdf_scaled)/(2*u_cdf_scaled)
+            eq2 = ((kappa ** (p / 2 - 1)) / (special.iv((p / 2 - 1), kappa) * (2 * np.pi) ** (p / 2)) * np.exp(kappa * dot)) * x1 - u_pdf
+
+            return [eq1, eq2]
+
+        
+        return fsolve(func_solve, [0.1, 1])
+    
+
+    def calc_VMF_pdf(self):
+        mu = np.array([1, 0, 0])
+        x = np.array([0, 0, 1])
+        dot = x.dot(mu)
+        p = 3 # length of x
+        k = self.VMF_kappa
+        
+        return (k ** (p / 2 - 1)) / (special.iv((p / 2 - 1), k) * (2 * np.pi) ** (p / 2)) * np.exp(k * dot)
+
+    
+    # # Working for fixed sclaing factors, but not needed
+    # def calc_kappa_from_cdf(self, VMF_cdf):
+        
+    #     # Note: The VMF_cdf is unscaled in this case.
+
+    #     # if using u_cdf to calculate kappa
+    #     # if u_cdf == -1:
+    #     #     LHS = 1-self.u_cdf
+    #     # else:
+    #     #     LHS = 1-u_cdf
+
+
+    #     LHS = VMF_cdf
+        
+    #     def integrand(phi, theta, kappa):
+    #         return ( kappa*np.sin(phi)*np.exp(kappa*np.cos(theta)*np.sin(phi)) ) / ( 2*np.pi*(np.exp(kappa)-np.exp(-kappa)) ) #this equation is for mu = [1, 0, 0], but kappa would be same for any mu for a particular cdf.
+
+    #     def func(kappa):
+    #         y, err = integrate.dblquad(integrand, np.pi/2, 3*np.pi/2, 0, np.pi, args = (kappa, )) #these limits are for mu = [1, 0, 0]
+    #         return LHS-y
+        
+    #     return fsolve(func, 0.0001)[0]
+    
+    
+    # def calc_kappa_from_pdf(self, pdf):
+        
+    #     LHS = pdf
+        
+    #     def func(kappa):
+    #         mu = np.array([1, 0, 0])
+    #         x = np.array([0, 0, 1])
+    #         p = 3 # length of x
+    #         dot = x.dot(mu)
+    #         y = (kappa ** (p / 2 - 1)) / (special.iv((p / 2 - 1), kappa) * (2 * np.pi) ** (p / 2)) * np.exp(kappa * dot)
+            
+    #         return LHS-y
+        
+    #     return fsolve(func, 0.0001)[0]
+    
 
     def reinitialize(self, positions):
         self.positions = np.array(positions)
@@ -523,15 +626,7 @@ class Particles_team():
             cluster_weights.append(sum(self.weights[np.where(mean_shift_result.cluster_assignments == j)[0]]))
         self.cluster_weights = cluster_weights
 
-    def reweight(self, constraints):
-        '''
-        :param constraints: normal of constraints / mean direction of VMF
-        :param k: concentration parameter of VMF
-        :return: probability of x under this composite distribution (uniform + VMF)
-        '''
-        for j, x in enumerate(self.positions):
-            self.weights[j] = self.weights[j] * self.observation_probability(x, constraints)
-
+    
     def plot(self, centroid=None, fig=None, ax=None, cluster_centers=None, cluster_weights=None,
                        cluster_assignments=None, plot_prev=False):
         if plot_prev:
@@ -550,10 +645,10 @@ class Particles_team():
         if cluster_centers is not None:
             for cluster_id, cluster_center in enumerate(cluster_centers):
                 ax.scatter(cluster_center[0][0], cluster_center[0][1], cluster_center[0][2],
-                           # s=500 * cluster_weights[cluster_id], c='red', marker='+')
-                           s=1000, c='red', marker='+')
+                           s=500 * cluster_weights[cluster_id], c='red', marker='+')
+                        #    s=50, c='red', marker='+')
 
-            print("# of clusters: {}".format(len(np.unique(cluster_assignments))))
+            # print("# of clusters: {}".format(len(np.unique(cluster_assignments))))
 
         if cluster_assignments is not None:
             # color the particles according to their cluster assignments if provided
@@ -575,6 +670,9 @@ class Particles_team():
             ax.set_zlabel('$\mathregular{w_2}$: Action')
 
     def resample_from_index(self, indexes, K=1):
+        
+        original_positions = copy.deepcopy(self.positions)
+
         # resample
         self.positions = self.positions[indexes]
 
@@ -584,23 +682,53 @@ class Particles_team():
         azimuths = positions_spherical[:, 1]
 
         max_ele_dist = max(elevations) - min(elevations)
+        max_azi_dist = max(azimuths) - min(azimuths)  # 12/10/23. Added to increase noise more equally in both elevation and azimuth directions
+        
 
-        azimuths_sorted = np.sort(azimuths)
-        azi_dists = np.empty(len(azimuths))
-        azi_dists[0:-1] = np.diff(azimuths_sorted)
-        azi_dists[-1] = min(2 * np.pi - (max(azimuths_sorted) - min(azimuths_sorted)), max(azimuths_sorted) - min(azimuths_sorted))
+        # azimuths_sorted = np.sort(azimuths)
+        # azi_dists = np.empty(len(azimuths))
+        # azi_dists[0:-1] = np.diff(azimuths_sorted)
+        # azi_dists[-1] = min(2 * np.pi - (max(azimuths_sorted) - min(azimuths_sorted)), max(azimuths_sorted) - min(azimuths_sorted))
 
-        if np.std(azi_dists[azi_dists > self.eps]) < 0.01 and np.std(azimuths_sorted) > 1:
-            # the particles are relatively evenly spaced out across the full range of azimuth
-            max_azi_dist = 2 * np.pi
-        else:
-            # take the largest gap/azimuth distance between two consecutive particles
-            max_azi_dist = max(azi_dists)
+        # if np.std(azi_dists[azi_dists > self.eps]) < 0.01 and np.std(azimuths_sorted) > 1:
+        #     # the particles are relatively evenly spaced out across the full range of azimuth
+        #     max_azi_dist = 2 * np.pi
+        # else:
+        #     # take the largest gap/azimuth distance between two consecutive particles
+        #     max_azi_dist = max(azi_dists)
+
+        # ######## 12/10/23. added to make noise more isotropic, based on elevation differences between points similar to azimuth
+        # elevations_sorted = np.sort(elevations)
+        # ele_dists = np.empty(len(elevations))
+        # ele_dists[0:-1] = np.diff(elevations_sorted)
+        # ele_dists[-1] = min(np.pi - (max(elevations_sorted) - min(elevations_sorted)), max(elevations_sorted) - min(elevations_sorted))
+
+        # if np.std(ele_dists[ele_dists > self.eps]) < 0.01 and np.std(elevations_sorted) > 0.5:
+        #     # the particles are relatively evenly spaced out across the full range of elevation
+        #     max_ele_dist = np.pi
+        # else:
+        #     # take the largest gap/elevation distance between two consecutive particles
+        #     max_ele_dist = max(ele_dists)
+
+        ########################################
 
         # noise suggested by "Novel approach to nonlinear/non-Gaussian Bayesian state estimation" by Gordon et al.
+        print(colored("max_ele_dist: " + str(max_ele_dist) + ". max_azi_dist: " + str(max_azi_dist), "red"))
+
         noise = np.array([np.random.normal(scale=max_ele_dist, size=len(positions_spherical)),
                           np.random.normal(scale=max_azi_dist, size=len(positions_spherical))]).T
+        
+        noise_before_transform = copy.deepcopy(noise)
+
         noise *= K * positions_spherical.shape[0] ** (-1/positions_spherical.shape[1])
+
+        ########### added for debugging purposes - 12/10
+        positions_before_noise = np.empty_like(self.positions)
+        positions_spherical_before_noise = copy.deepcopy(positions_spherical)
+        for aa in range(0, len(positions_spherical)):
+            positions_before_noise[aa, :] = np.array(cg.sph2cart(positions_spherical_before_noise[aa, :])).reshape(1, -1)
+        #################
+
 
         positions_spherical += noise
 
@@ -609,6 +737,48 @@ class Particles_team():
 
         # reset the weights
         self.weights = np.ones(len(self.positions)) / len(self.positions)
+
+
+        # ###### plots for debugging - 12/10/23 #######
+        # # plot particles
+        # fig = plt.figure()
+        # ax1 = fig.add_subplot(1, 3, 1, projection='3d')
+        # ax2 = fig.add_subplot(1, 3, 2, projection='3d', sharex=ax1, sharey=ax1, sharez=ax1)
+        # ax3 = fig.add_subplot(1, 3, 3, projection='3d', sharex=ax1, sharey=ax1, sharez=ax1)
+        # ax1.title.set_text('Original_positions')
+        # ax2.title.set_text('resampled particles before noise')
+        # ax3.title.set_text('Resampled particles after noise')
+        # ax1.scatter(original_positions[:, 0, 0], original_positions[:, 0, 1], original_positions[:, 0, 2])
+        # ax2.scatter(positions_before_noise[:, 0, 0], positions_before_noise[:, 0, 1], positions_before_noise[:, 0, 2])
+        # ax3.scatter(self.positions[:, 0, 0], self.positions[:, 0, 1], self.positions[:, 0, 2])
+
+
+
+        # # plt.figure()
+        # # plt.scatter(noise[:,0], noise[:,1])
+
+        # fig2, axn = plt.subplots(1, 2)
+        # axn[0].scatter(noise_before_transform[:, 0], noise_before_transform[:, 1])
+        # axn[1].scatter(noise[:, 0], noise[:, 1])
+        # axn[0].title.set_text('noise before transform')
+        # axn[1].title.set_text('noise after transform')
+
+        
+        # # fig3, axn2 = plt.subplots(1, 2)
+        # # axn2[0].plot(np.arange(1, len(elevations_sorted)+1), elevations_sorted)
+        # # axn2[1].plot(np.arange(1, len(azimuths_sorted)+1), azimuths_sorted)
+        # # axn2[0].title.set_text('elevations_sorted')
+        # # axn2[1].title.set_text('azimuths_sorted')
+        # # # print("ele_dists: " + str(ele_dists))
+
+
+        # plt.show()
+
+
+
+
+
+
 
     # http://seismo.berkeley.edu/~kirchner/Toolkits/Toolkit_12.pdf
     def normalized_weighted_variance(self, spherical_centroid=None):
@@ -732,6 +902,8 @@ class Particles_team():
         n_desired_reset_particles_informed = len(resample_indexes)
         print('informed number: {}'.format(n_desired_reset_particles_informed))
 
+        print('constraint: {}'.format(constraint))
+
         # sample from the VMF + uniform distribution
         new_particle_positions_uniform = BEC_helpers.sample_human_models_random(constraint, int(np.ceil(
             n_desired_reset_particles_informed * self.integral_prob_uniform)))
@@ -757,18 +929,21 @@ class Particles_team():
 
 
 
-    def update(self, constraints, c=0.5, reset_threshold_prob=0.001):
+    def update(self, constraints, c=0.5, reset_threshold_prob=0.001, u_cdf = None):
         self.weights_prev = self.weights.copy()
         self.positions_prev = self.positions.copy()
 
         for constraint in constraints:
-            self.reweight(constraint)
+            self.reweight(constraint, u_cdf)
 
             if sum(self.weights) < reset_threshold_prob:
                 self.reset(constraint)
             else:
                 # normalize weights and update particles
+                # print(colored('Normalizing particle weights...', 'red'))
                 self.weights /= sum(self.weights)
+
+                # print('weights sum: ', sum(self.weights))
 
                 n_eff = self.calc_n_eff(self.weights)
                 # print('n_eff: {}'.format(n_eff))
@@ -778,13 +953,48 @@ class Particles_team():
                     # self.resample_from_index(resample_indexes)
 
                     # b) use KLD resampling
+                    # print('Plotting before resampling..')
+                    # self.plot()
+                    print(colored('Resampling...', 'red'))
                     resample_indexes = self.KLD_resampling()
                     self.resample_from_index(np.array(resample_indexes))
+                    # print('Plotting after resampling..')
+                    # self.plot()
 
         self.binned = False
 
+
+    def reweight(self, constraints, u_cdf = None):
+        '''
+        :param constraints: normal of constraints / mean direction of VMF
+        :param k: concentration parameter of VMF
+        :return: probability of x under this composite distribution (uniform + VMF)
+        '''
+
+        if u_cdf is None:
+            u_pdf = self.u_pdf
+            VMF_kappa = self.VMF_kappa
+            x1 = self.x1
+            x2 = self.x2
+        else:
+            u_pdf = u_cdf/(2*np.pi)
+            VMF_kappa, x1 = self.solve_for_kappa(u_cdf)
+            x2 = u_cdf/0.5
+
+        for j, x in enumerate(self.positions):
+            obs_prob = self.observation_probability(u_pdf, VMF_kappa, x, constraints, x1, x2)
+            
+            # print('Old particle weight:', str(self.weights[j]), 'Observation probability:', str(obs_prob))
+            self.weights[j] = self.weights[j] * obs_prob
+            # print('New particle weight:', str(self.weights[j]))
+
+            # self.plot_particles(x, constraints)
+
+            
+
+
     @staticmethod
-    def observation_probability(x, constraints, k=4):
+    def observation_probability(u_pdf, VMF_kappa, x, constraints, x1, x2):
         prob = 1
         p = x.shape[1]
 
@@ -793,10 +1003,12 @@ class Particles_team():
 
             if dot >= 0:
                 # use the uniform dist
-                prob *= 0.12779
+                prob *= u_pdf
             else:
                 # use the VMF dist
-                prob *= p_utils.VMF_pdf(constraint, k, p, x, dot=dot)
+                # prob *= p_utils.VMF_pdf(constraint, VMF_kappa, p, x, dot=dot)
+                prob *= p_utils.VMF_pdf(constraint, VMF_kappa, p, x, dot=dot) * x1 * x2
+
 
         return prob
 
@@ -906,37 +1118,6 @@ class Particles_team():
         :return: probability of x under this composite distribution (uniform + VMF)
         '''
 
-        # this function is primarily for debugging particle update
-        def plot_particles():
-        
-            fig = plt.figure()
-            ax1 = fig.add_subplot(1, 2, 1, projection='3d')
-            ax2 = fig.add_subplot(1, 2, 2, projection='3d')
-
-            constraints_expanded = []
-            for cnst in constraints:
-                constraints_expanded.extend(cnst)
-
-            ax1.title.set_text('Particles before update')
-            self.plot(fig=fig, ax=ax1, plot_prev=True)
-            ax1.scatter(x[0, 0], x[0, 1], x[0, 2], marker='o', c='r', s=100/2)
-            utils_teams.visualize_planes_team(constraints_expanded, fig=fig, ax=ax1)
-            # utils_teams.visualize_planes_team(constraints[0], fig=fig, ax=ax1)
-
-            
-            ax2.title.set_text('Particles after update')
-            self.plot(fig=fig, ax=ax2)
-            ax2.scatter(x[0, 0], x[0, 1], x[0, 2], marker='o', c='r', s=100/2)
-            utils_teams.visualize_planes_team(constraints_expanded, fig=fig, ax=ax2)
-
-            print('Particle ', j, 'with weights ', x)
-            print('Current weight: ', self.weights_prev[j])
-            print('Probability: ', prob)
-            print('Updated weight: ', self.weights[j])
-
-            plt.show()
-
-
         # plot_particles_input = input('Plot particles? (y/n)')
         # if plot_particles_input == 'y':
         #     plot_particles_flag = True
@@ -946,17 +1127,46 @@ class Particles_team():
         
         for j, x in enumerate(self.positions):
             
-            prob = self.observation_probability_jk(x, constraints, plot_particles_flag)
+            prob = self.observation_probability_jk(self.u_pdf, self.VMF_kappa, x, constraints, plot_particles_flag, self.x1, self.x2)
             self.weights[j] = self.weights[j] * prob
             
             # debug (only possible for high von-mises probabilities. should not normllay happen)            
-            if prob > 0.13 or plot_particles_flag:
-                plot_particles()
+            if prob > 0.5 or plot_particles_flag:
+                self.plot_particles(x, constraints)
                 
-        # print('Number of particles with high probability: ', cnt)
+            # print('Particle ', j, 'with weights ', x)
+            # print('Current weight: ', self.weights_prev[j])
+            # print('Probability: ', prob)
+            # print('Updated weight: ', self.weights[j])
+
+
+    # this function is primarily for debugging particle update
+    def plot_particles(self, x, constraints):
+    
+        fig = plt.figure()
+        ax1 = fig.add_subplot(1, 2, 1, projection='3d')
+        ax2 = fig.add_subplot(1, 2, 2, projection='3d')
+
+        ax1.title.set_text('Particles before update')
+        self.plot(fig=fig, ax=ax1, plot_prev=True)
+        ax1.scatter(x[0, 0], x[0, 1], x[0, 2], marker='o', c='r', s=100/2)
+        # for constraint in constraints:
+        BEC_viz.visualize_planes(constraints, fig=fig, ax=ax1)
+        # utils_`teams.visualize_planes_team(constraints, fig=fig, ax=ax1)
+        # utils_teams.visualize_planes_team(constraints[0], fig=fig, ax=ax1)
+
+        ax2.title.set_text('Particles after update')
+        self.plot(fig=fig, ax=ax2)
+        ax2.scatter(x[0, 0], x[0, 1], x[0, 2], marker='o', c='r', s=100/2)
+        # utils_teams.visualize_planes_team(constraints, fig=fig, ax=ax2)
+        # for constraint in constraints:
+        BEC_viz.visualize_planes(constraints, fig=fig, ax=ax2)
+
+        plt.show()
+
 
     @staticmethod
-    def observation_probability_jk(x, joint_constraints, plot_particles_flag, k=4):
+    def observation_probability_jk(u_pdf, VMF_kappa, x, joint_constraints, plot_particles_flag, x1, x2):
         prob = 1
         p = x.shape[1]
 
@@ -975,9 +1185,11 @@ class Particles_team():
 
                 if dot < 0:
                     team_constraint_satisfied_flag[-1] = False
-                    prob_individual[0, ind_id] *= p_utils.VMF_pdf(constraint, k, p, x, dot=dot) # use the von Mises dist
+                    # prob_individual[0, ind_id] *= p_utils.VMF_pdf(constraint, VMF_kappa, p, x, dot=dot) # use the von Mises dist
+                    prob_individual[0, ind_id] *= p_utils.VMF_pdf(constraint, VMF_kappa, p, x, dot=dot) * x1 * x2 # use the von Mises dist
+                    # prob_individual[0, ind_id] *= p_utils.VMF_pdf(constraint, 4, p, x, dot=dot) * x1 * x2 # use the von Mises dist
                 else:
-                    prob_individual[0, ind_id] *= 0.12779 # use the uniform dist
+                    prob_individual[0, ind_id] *= u_pdf # use the uniform dist
 
             ind_id += 1
 

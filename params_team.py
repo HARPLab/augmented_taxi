@@ -379,3 +379,5 @@ max_KC_loops = 10
 max_loops = 30
 learning_goal = 1.0
 loop_threshold_demo_simplification = 100
+default_learning_factor_teacher = 0.8
+max_learning_factor = 0.95

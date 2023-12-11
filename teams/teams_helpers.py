@@ -286,13 +286,13 @@ def check_and_update_variable_filter(min_subset_constraints_record = None, varia
 
 
 
-def find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints, particles_team = None, kc_id=None):
+def find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints, particles_team_teacher = None, kc_id=None):
 
     # Sorts based on ascending order of knowledge
     if kc_id is None:
-        team_knowledge_level = calc_knowledge_level(team_knowledge, min_BEC_constraints, particles_team = None)
+        team_knowledge_level = calc_knowledge_level(team_knowledge, min_BEC_constraints, particles_team_teacher = None)
     else:
-        team_knowledge_level = calc_knowledge_level(team_knowledge, min_BEC_constraints, particles_team = None, kc_id_list=[kc_id])
+        team_knowledge_level = calc_knowledge_level(team_knowledge, min_BEC_constraints, particles_team_teacher = None, kc_id_list=[kc_id])
 
     sorted_kl = dict(sorted(team_knowledge_level.items(), key=lambda item: item[1]))
     print('sorted_kl: ', sorted_kl)
@@ -397,10 +397,46 @@ def check_for_non_intersecting_constraints(constraints, weights, step_cost_flag,
 
 
 
+def calc_expected_learning(team_knowledge_expected, kc_id, particles_team_teacher, min_BEC_constraints, new_constraints, params, loop_count, kc_reset_flag = False, viz_flag = False):
+
+    print(colored('Calculating expected learning for KC ' + str(kc_id) + 'in loop ' + str(loop_count) + '...', 'blue'))
+    # # print('Current expected team knowledge: ', team_knowledge_expected)
+    # # print('New constraints: ', new_constraints)
+    team_knowledge_expected = update_team_knowledge(team_knowledge_expected, kc_id, kc_reset_flag, new_constraints, params.team_size,  params.weights['val'], params.step_cost_flag)
+
+    # # print('Updated expected team knowledge: ', team_knowledge_expected)
+
+    p = 1
+    while p <= params.team_size:
+        member_id = 'p' + str(p)
+        # print('PF update of ', member_id)
+        particles_team_teacher[member_id].update(new_constraints)
+        
+        if viz_flag:
+            visualize_transition(new_constraints, particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set ' + str(loop_count+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(loop_count+1))
+        p += 1
+            
+    # Update common knowledge model
+    particles_team_teacher['common_knowledge'].update(new_constraints) # PF update of common_knowledge
+    # if viz_flag:
+    #     visualize_transition(new_constraints, particles_team_teacher_expected['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set' + str(loop_count+1) + ' for common knowledge', plot_filename ='ek_ck_loop_' + str(loop_count+1))
+    
+    # Method: Use new joint knowledge of team
+    new_constraints_team = []
+    for p in range(params.team_size):
+        new_constraints_team.append(new_constraints)
+    particles_team_teacher['joint_knowledge'].update_jk(new_constraints_team)
+
+    # if viz_flag:
+    #     visualize_transition(new_constraints_team, particles_team_teacher_expected['joint_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set ' + str(loop_count+1) + ' for joint knowledge',  knowledge_type = 'joint_knowledge', plot_filename ='ek_jk_loop_' + str(loop_count+1))
+
+    return team_knowledge_expected, particles_team_teacher
 
 
 
-def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team = None, kc_id_list = None, weights = None, step_cost_flag = False, plot_flag = False, debug_flag=True, fig_title=''):
+
+
+def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team_teacher = None, kc_id_list = None, weights = None, step_cost_flag = False, plot_flag = False, debug_flag=True, fig_title=''):
     
     
     def plot_text(constraints, knowledge, fig, i):
@@ -524,7 +560,7 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team = 
     print('kc_id_list: ', kc_id_list)
 
     if plot_flag:
-        fig = visualize_team_knowledge_constraints(team_knowledge, weights, step_cost_flag, particles_team = particles_team, plot_min_constraints_flag = False, plot_text_flag = False, min_unit_constraints = min_unit_constraints, plot_filename = 'team_knowledge_constraints', fig_title = fig_title)
+        fig = visualize_team_knowledge_constraints(team_knowledge, weights, step_cost_flag, particles_team_teacher = particles_team_teacher, plot_min_constraints_flag = False, plot_text_flag = False, min_unit_constraints = min_unit_constraints, plot_filename = 'team_knowledge_constraints', fig_title = fig_title)
         
 
     plot_id = 0
@@ -825,48 +861,57 @@ def obtain_team_summary(data_loc, min_subset_constraints_record, min_BEC_constra
 
 
 
-def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_prior=None):
+def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_learning_factor=None, team_prior=None, pf_flag = 'teacher'):
 
     particles_team = {}
     
     # particles for individual team members
     for i in range(team_size):
         member_id = 'p' + str(i+1)
-        particles_team[member_id] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles))
+        if pf_flag == 'learner':
+            particles_team[member_id] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), team_learning_factor[i])
+        elif pf_flag == 'teacher':
+            particles_team[member_id] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), params.default_learning_factor_teacher)
 
         if team_prior is not None:
-            for cnst in team_prior[member_id]:  
-                particles_team[member_id].update(cnst)
+            # for cnst in team_prior[member_id]:
+            print('team_prior[member_id]: ', team_prior[member_id])  
+            particles_team[member_id].update(team_prior[member_id], u_cdf = 0.99) # all players irrespective of their learning ability are assumed to have the same prior 
+
+                # visualize_transition(cnst, particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for ' + str(member_id) )
+            
         
         particles_team[member_id].knowledge_update(team_prior[member_id])
 
+
+    if pf_flag == 'teacher':
+        # particles for aggregated team knowledge - common knowledge
+        particles_team['common_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), params.default_learning_factor_teacher)
+        if team_prior is not None:
+            team_prior['common_knowledge'] = [calc_common_knowledge(team_prior, team_size, weights, step_cost_flag)]
+            particles_team['common_knowledge'].update(team_prior['common_knowledge'])
+            particles_team['common_knowledge'].knowledge_update(team_prior['common_knowledge'])
+        
+
+        # particles for aggregated team knowledge - joint knowledge (both methods should produce similar particles; check and if they are similar method 1 is more streamlined)
+        # method 1
+        particles_team['joint_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), params.default_learning_factor_teacher)
+        if team_prior is not None:
+            team_prior['joint_knowledge'] = [calc_joint_knowledge(team_prior, team_size)]
+            particles_team['joint_knowledge'].update_jk(team_prior['joint_knowledge'])
+            particles_team['joint_knowledge'].knowledge_update(team_prior['joint_knowledge'])
     
-    # particles for aggregated team knowledge - common knowledge
-    particles_team['common_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles))
-    if team_prior is not None:
-        team_prior['common_knowledge'] = [calc_common_knowledge(team_prior, team_size, weights, step_cost_flag)]
-        particles_team['common_knowledge'].update(team_prior['common_knowledge'])
-        particles_team['common_knowledge'].knowledge_update(team_prior['common_knowledge'])
+
+        # # method 2
+        # if team_prior is not None:
+        #     team_prior['joint_knowledge'] = calc_joint_knowledge(team_prior, team_size, weights, step_cost_flag)
+        #     particle_positions = sample_human_models_uniform_joint_knowledge(team_prior['joint_knowledge'], n_particles)
+        #     particles_team['joint_knowledge_2'] = pf_team.Particles_team(particle_positions)
+        
+        return team_prior, particles_team
     
-
-    # particles for aggregated team knowledge - joint knowledge (both methods should produce similar particles; check and if they are similar method 1 is more streamlined)
-    # method 1
-    particles_team['joint_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles))
-    if team_prior is not None:
-        team_prior['joint_knowledge'] = [calc_joint_knowledge(team_prior, team_size)]
-        particles_team['joint_knowledge'].update_jk(team_prior['joint_knowledge'])
-        particles_team['joint_knowledge'].knowledge_update(team_prior['joint_knowledge'])
-    
-
-    # # method 2
-    # if team_prior is not None:
-    #     team_prior['joint_knowledge'] = calc_joint_knowledge(team_prior, team_size, weights, step_cost_flag)
-    #     particle_positions = sample_human_models_uniform_joint_knowledge(team_prior['joint_knowledge'], n_particles)
-    #     particles_team['joint_knowledge_2'] = pf_team.Particles_team(particle_positions)
-
-
-
-    return team_prior, particles_team
+    else:
+        return particles_team
 
 
 
@@ -1039,9 +1084,12 @@ def visualize_transition(constraints, particles, mdp_class, weights=None, fig=No
 
     fig.suptitle(text, fontsize=30)
 
+    # cluster particles
+    particles.cluster()
+    print(colored('Cluster centers: ' + str(particles.cluster_centers) + '. Cluster weights: ' + str(particles.cluster_weights), 'blue'))
     # plot particles before and after the constraints
     particles.plot(fig=fig, ax=ax1, plot_prev=True)
-    particles.plot(fig=fig, ax=ax3)
+    particles.plot(fig=fig, ax=ax3, cluster_centers = particles.cluster_centers, cluster_weights = particles.cluster_weights)
 
     ## plot the constraints
     # for constraints in [constraints]:
@@ -1112,7 +1160,7 @@ def visualize_transition(constraints, particles, mdp_class, weights=None, fig=No
 
 
 
-def visualize_team_knowledge_constraints(team_knowledge, weights, step_cost_flag, particles_team = None, kc_id = None, fig=None, text=None, plot_min_constraints_flag = False, plot_text_flag = False, min_unit_constraints = [], plot_filename = 'team_knowledge_constraints', fig_title = None):
+def visualize_team_knowledge_constraints(team_knowledge, weights, step_cost_flag, particles_team_teacher = None, kc_id = None, fig=None, text=None, plot_min_constraints_flag = False, plot_text_flag = False, min_unit_constraints = [], plot_filename = 'team_knowledge_constraints', fig_title = None):
 
     ###########  functions ###################
     def label_axes(ax, mdp_class, weights=None):
@@ -1304,8 +1352,8 @@ def visualize_team_knowledge_constraints(team_knowledge, weights, step_cost_flag
             BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=plot_ax, plot_ref_sphere=False, color = 'b')
 
         # plot particles
-        if particles_team is not None:
-            particles_team[knowledge_type].plot(fig=fig, ax=plot_ax)
+        if particles_team_teacher is not None:
+            particles_team_teacher[knowledge_type].plot(fig=fig, ax=plot_ax)
 
         # plot text
         plot_ax.set_title(knowledge_type)
@@ -2516,7 +2564,52 @@ def obtain_diagnostic_tests(data_loc, previous_demos, visited_env_traj_idxs, min
 
     return preliminary_tests, visited_env_traj_idxs
 
-######################################
+
+
+
+
+def simulate_team_learning(kc_id, particles_team_learner, new_constraints, params, loop_count, kc_reset_flag=True, viz_flag=False):
+
+
+    print(colored('Simulating team learning for KC ' + str(kc_id) + 'in loop ' + str(loop_count) + '...', 'red'))
+
+    p = 1
+    while p <= params.team_size:
+        member_id = 'p' + str(p)
+        # print('PF update of ', member_id)
+        particles_team_learner[member_id].update(new_constraints)
+        
+        if viz_flag:
+            visualize_transition(new_constraints, particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for set ' + str(loop_count+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(loop_count+1))
+        p += 1
+            
+
+    return particles_team_learner
+
+
+
+############################################################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # def obtain_remedial_demos_tests(data_loc, previous_demos, visited_env_traj_idxs, min_BEC_constraints, min_subset_constraints_record, traj_record, traj_features_record, variable_filter, mdp_features_record, downsample_threshold=float("inf"), opt_simplicity=True, opt_similarity=True, type = 'training'):

@@ -30,9 +30,6 @@ def visualize_planes_team(constraints, fig=None, ax=None, alpha=0.5, color=None)
 
     X_xy, Y_xy, = np.meshgrid(x, y)
 
-
-    
-
     for constraint in constraints:
         if constraint[0, 2] != 0:
             Z = (-constraint[0, 0] * X_xy - constraint[0, 1] * Y_xy) / constraint[0, 2]
