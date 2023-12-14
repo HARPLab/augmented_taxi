@@ -503,8 +503,8 @@ def run_sim(condition, filename):
 
 
     sampling_unit_size = 1
-    N_samples = 20
-    N_updates = 4
+    N_samples = 100
+    N_updates = 5
     viz_flag = False
 
     prior = [np.array([[0, 0, -1]])]
@@ -518,7 +518,8 @@ def run_sim(condition, filename):
 
     initial_team_learning_factor = np.array([0.65, 0.7, 0.75, 0.8, 0.85])
     max_learning_factor = 0.95
-    team_learning_rate = np.hstack((0.025*np.ones([team_size, 1]), 0*np.ones([team_size, 1])))
+    # team_learning_rate = np.hstack((0.025*np.ones([team_size, 1]), 0*np.ones([team_size, 1])))
+    team_learning_rate = np.hstack((0*np.ones([team_size, 1]), 0*np.ones([team_size, 1])))  # No learning!
     team_learning_factor = copy.deepcopy(initial_team_learning_factor)
     sampled_points_history = []
     team_learning_factor_history = []
@@ -621,6 +622,69 @@ def run_sim(condition, filename):
     debug_data_response = pd.DataFrame(data=data_dict)
 
     debug_data_response.to_csv(filename)
+
+
+
+
+def check_VMF_distribution():
+
+    viz_flag = True
+    team_size = 5
+    initial_team_learning_factor =  np.array([0.65, 0.7, 0.75, 0.8, 0.85])
+    particles_team_learner = team_helpers.sample_team_pf(team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_learning_factor = initial_team_learning_factor, pf_flag='learner')
+
+    prior = np.array([[0, 0, -1]])
+    team_size = 5
+    team_prior = {}
+    for i in range(team_size):
+        member_id = 'p' + str(i+1)
+        team_prior[member_id] = [prior]
+        particles_team_learner[member_id].update([prior])
+
+        if viz_flag:
+            team_helpers.visualize_transition([prior], particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = 'Learner knowledge change after test set for player ' + member_id)
+
+        # calculate proportion of particles in uniform and VMF side
+        vmf_count = 0
+        uniform_count = 0
+        vmf_particles = []
+        uniform_particles = []
+        N_particles = len(particles_team_learner[member_id].positions)
+        for particle_id in range(N_particles):
+            pos  = particles_team_learner[member_id].positions[particle_id]
+            weight = particles_team_learner[member_id].weights[particle_id]
+
+            dot = prior.dot(pos.T)
+
+            if dot >= 0:
+                uniform_count += 1
+                uniform_particles.append([pos, weight])
+            else:
+                vmf_count += 1
+                vmf_particles.append([pos, weight])
+
+        
+
+        # plot uniform and vmf particles
+        fig, ax = plt.subplots(ncols=2, figsize=(10,6))
+        uniform_prob = []
+        for particle in uniform_particles:
+            uniform_prob.append(particle[1])
+        vmf_prob = []
+        for particle in vmf_particles:
+            vmf_prob.append(particle[1])
+
+        ax[0].hist(uniform_prob)
+        ax[0].set_title('Uniform particles')
+        ax[1].hist(vmf_prob)
+        ax[1].set_title('VMF particles')
+
+        print('uniform_particles prob: ', sum(uniform_prob), 'VMF particle prob: ', sum(vmf_prob))
+
+        plt.show()
+
+
+
 
 ##############################################
 
@@ -2654,30 +2718,7 @@ if __name__ == "__main__":
     # print(x)
     # print(BEC_helpers.calc_solid_angles([x]))
 
-    ##########################
-
-    # x = [ np.array([[ 0,  0, -1]]), np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]]), np.array([[ 0, -1, -2]]), np.array([[ 0,  1,  4]]) ]
-
-    # print(team_helpers.check_for_non_intersecting_constraints(x, params.weights['val'], params.step_cost_flag))
-
-    #############
-
-    # test_constraints_team = [[np.array([[1, -1,  0]])], [np.array([[1, 1, 0]])], [np.array([[1, 1, 0]])]]
-
-    # test_constraints_team_expanded = [np.array([[1, -1,  0]]), np.array([[1, 1, 0]]), np.array([[1, 1, 0]])]
-
-    # print(team_helpers.check_for_non_intersecting_constraints(test_constraints_team_expanded, params.weights['val'], params.step_cost_flag))
-
-    # alternate_team_constraints, intersecting_cnst = team_helpers.majority_rules_non_intersecting_team_constraints(test_constraints_team, params.weights['val'], params.step_cost_flag, test_flag=True)
-
-    # print(alternate_team_constraints)
-
-    # ck = [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[ 0, -1, -4]]), np.array([[0, 1, 2]])], [np.array([[ 1, -1,  0]])]]
-
-    # print(BEC_helpers.remove_redundant_constraints(test_constraints_team_expanded, params.weights['val'], params.step_cost_flag))
-
-    
-
+ 
 
 
 

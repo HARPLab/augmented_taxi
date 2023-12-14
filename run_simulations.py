@@ -43,16 +43,18 @@ from main_team import run_reward_teaching
 from analyze_sim_data import run_analysis_script
 
 
-def get_sim_conditions(team_composition_list, dem_strategy_list, N_runs, run_start_id):
+def get_sim_conditions(team_composition_list, dem_strategy_list, sampling_condition_list, N_runs, run_start_id):
     sim_conditions = []
     team_comp_id = 0
     dem_strategy_id = 0
+    sampling_cond_id = 0
     
     for run_id in range(run_start_id, run_start_id+N_runs):
         
         team_composition_for_run = team_composition_list[team_comp_id]
         dem_strategy = dem_strategy_list[dem_strategy_id]
-        sim_conditions.append([run_id, team_composition_for_run, dem_strategy])
+        sampling_cond = sampling_condition_list[sampling_cond_id]
+        sim_conditions.append([run_id, team_composition_for_run, dem_strategy, sampling_cond])
         
         # update sim params for next run
         if dem_strategy_id == len(dem_strategy_list)-1:
@@ -60,11 +62,17 @@ def get_sim_conditions(team_composition_list, dem_strategy_list, N_runs, run_sta
         else:
             dem_strategy_id += 1
 
-        if run_id % len(team_composition_list) == (len(team_composition_list)-1):
+        if run_id % len(dem_strategy_list) == (len(dem_strategy_list)-1):
             if team_comp_id == len(team_composition_list)-1:
                 team_comp_id = 0
             else:
                 team_comp_id += 1
+
+        if run_id % len(dem_strategy_list) == (len(dem_strategy_list)-1):
+            if sampling_cond_id == len(sampling_condition_list)-1:
+                sampling_cond_id = 0
+            else:
+                sampling_cond_id += 1
 
 
     return sim_conditions
@@ -78,7 +86,7 @@ if __name__ == "__main__":
 
     
 
-    team_params_learning = {'low': [0.65, 0.025], 'med': [0.65, 0.025], 'high': [0.8, 0.025]}
+    team_params_learning = {'low': [0.65, 0.0], 'med': [0.65, 0.0], 'high': [0.8, 0.0]}
     # team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
     # dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
 
@@ -87,18 +95,19 @@ if __name__ == "__main__":
     team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
 
     dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
-    sampling_condition = 'particles'  # sampling of human responses from learner PF models
+    sampling_condition_list = ['particles','cluster_random']  # Conditions: ['particles', 'cluster_random', 'cluster_weight']sampling of human responses from learner PF models
  
     sim_params = {'min_correct_likelihood': 0.6}
     
-    N_runs = 40
-    run_start_id = 21
+    N_runs = 80
+    run_start_id = 1
 
-    file_prefix = 'trials_12_10_set_3'
+    file_prefix = 'trials_12_13_set_1'
+    
     path = 'models/augmented_taxi2'
 
 
-    sim_conditions = get_sim_conditions(team_composition_list, dem_strategy_list, N_runs, run_start_id)
+    sim_conditions = get_sim_conditions(team_composition_list, dem_strategy_list, sampling_condition_list, N_runs, run_start_id)
     print('sim_conditions: ', sim_conditions)
 
     for run_id in range(run_start_id, run_start_id+N_runs):
@@ -106,6 +115,7 @@ if __name__ == "__main__":
         if run_id == sim_conditions[run_id - run_start_id][0]:
             team_composition_for_run = sim_conditions[run_id - run_start_id][1]
             dem_strategy_for_run = sim_conditions[run_id - run_start_id][2]
+            sampling_cond_for_run = sim_conditions[run_id - run_start_id][3]
         else:
             print('run_id: ', run_id, 'sim_conditions[run_id][0]: ', sim_conditions[run_id - run_start_id][0])
             RuntimeError('Error in sim conditions')
@@ -147,7 +157,7 @@ if __name__ == "__main__":
         print(colored('Simulation run: ' + str(run_id) + '. Demo strategy: ' + str(dem_strategy_for_run) + '. Team composition:' + str(team_composition_for_run), 'red'))
         # run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', team_learning_factor = team_learning_factor, viz_flag=[False, False, False], run_no = run_id, vars_filename=file_prefix)
         run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', initial_team_learning_factor = ilcr, team_learning_rate = rlcr, \
-                            viz_flag=[False, False, False], run_no = run_id, vars_filename=file_prefix, response_sampling_condition=sampling_condition, team_composition=team_composition_for_run)
+                            viz_flag=[False, False, False], run_no = run_id, vars_filename=file_prefix, response_sampling_condition=sampling_cond_for_run, team_composition=team_composition_for_run)
 
 
         # file_name = [file_prefix + '_' + str(run_id) + '.csv']

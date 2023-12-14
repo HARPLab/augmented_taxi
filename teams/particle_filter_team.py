@@ -669,6 +669,8 @@ class Particles_team():
             ax.set_ylabel('$\mathregular{w_1}$: Recharge')
             ax.set_zlabel('$\mathregular{w_2}$: Action')
 
+
+
     def resample_from_index(self, indexes, K=1):
         
         original_positions = copy.deepcopy(self.positions)
@@ -751,7 +753,6 @@ class Particles_team():
         # ax1.scatter(original_positions[:, 0, 0], original_positions[:, 0, 1], original_positions[:, 0, 2])
         # ax2.scatter(positions_before_noise[:, 0, 0], positions_before_noise[:, 0, 1], positions_before_noise[:, 0, 2])
         # ax3.scatter(self.positions[:, 0, 0], self.positions[:, 0, 1], self.positions[:, 0, 2])
-
 
 
         # # plt.figure()

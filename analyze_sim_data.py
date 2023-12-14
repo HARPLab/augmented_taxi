@@ -89,9 +89,9 @@ def normalize_knowledge(knowledge):
 
 
 def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], runs_to_analyze_list = []):
-     # print(files)
+    
+    print(files)
 
-     
     team_unit_knowledge_level = pd.DataFrame()
     team_BEC_knowledge_level_expected = pd.DataFrame()
     team_BEC_knowledge_level = pd.DataFrame()
@@ -118,8 +118,10 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
             # print('len(runs_to_analyze_list[prefix_id]) > 0: ', len(runs_to_analyze_list[prefix_id]) > 0)
             # print('sim_vars[run_no][0] in runs_to_analyze_list: ', sim_vars['run_no'][0] in runs_to_analyze_list[prefix_id])
             print('prefix_id: ', prefix_id)
-            if (len(runs_to_analyze_list) > 0 and len(runs_to_analyze_list[prefix_id]) > 0 and sim_vars['run_no'][0] in runs_to_analyze_list[prefix_id]) or \
-                (len(runs_to_analyze_list) == 0 and ( len(runs_to_exclude_list) == 0 or len(runs_to_exclude_list[prefix_id]) == 0 or sim_vars['run_no'][0] not in runs_to_exclude_list[prefix_id]) ):
+            # if (len(runs_to_analyze_list) > 0 and len(runs_to_analyze_list[prefix_id]) > 0 and sim_vars['run_no'][0] in runs_to_analyze_list[prefix_id]) or \
+            #     (len(runs_to_analyze_list) == 0 and ( len(runs_to_exclude_list) == 0 or len(runs_to_exclude_list[prefix_id]) == 0 or sim_vars['run_no'][0] not in runs_to_exclude_list[prefix_id]) ):
+
+            if True:
 
             # if sim_vars['run_no'][0] not in runs_to_exclude[0]:
 
@@ -132,11 +134,12 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
                     bec_k = sim_vars['BEC_knowledge_level'][i]
                     bec_k_e = sim_vars['BEC_knowledge_level_expected'][i]
                     tkc = sim_vars['team_knowledge'][i]
-                    ilv = sim_vars['initial_likelihood_vars'][i]
-                    lcr = sim_vars['likelihood_correct_response'][i]
+                    # ilv = sim_vars['initial_likelihood_vars'][i]
+                    # lcr = sim_vars['likelihood_correct_response'][i]
 
 
-                    if type(tk) == str and type(bec_k) == str and type(bec_k_e) == str and type(tkc) == str and type(ilv) == str and type(lcr) == str:
+                    # if type(tk) == str and type(bec_k) == str and type(bec_k_e) == str and type(tkc) == str and type(ilv) == str and type(lcr) == str:
+                    if type(tk) == str and type(bec_k) == str and type(bec_k_e) == str and type(tkc) == str:
                         run_id = file_prefix_list[prefix_id] + '_' + str(sim_vars['run_no'][i])
                         print(colored('Parsing run id: ' + run_id, 'blue'))
                         
@@ -153,6 +156,7 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
                         BEC_team_knowledge_dict['loop_count'] = int(sim_vars['loop_count'][i])
                         BEC_team_knowledge_dict['demo_strategy'] = sim_vars['demo_strategy'][i]
                         BEC_team_knowledge_dict['knowledge_comp_id'] = int(sim_vars['knowledge_comp_id'][i])
+                        BEC_team_knowledge_dict['team_composition'] = sim_vars['team_composition'][i]
                         team_BEC_knowledge_level = team_BEC_knowledge_level.append(BEC_team_knowledge_dict, ignore_index=True)
                     
                         # expected BEC knowledge level
@@ -164,13 +168,13 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
                         team_BEC_knowledge_level_expected = team_BEC_knowledge_level_expected.append(BEC_team_knowledge_dict_expected, ignore_index=True)
 
 
-                        # knowledge mix condition
-                        learning_rate_dict = str_to_dict(ilv, var_type = 'array', splitter='),')
-                        learning_rate_dict['run_no'] = run_id
-                        learning_rate_dict['loop_count'] = int(sim_vars['loop_count'][i])
-                        learning_rate_dict['demo_strategy'] = sim_vars['demo_strategy'][i]
-                        learning_rate = learning_rate.append(learning_rate_dict, ignore_index=True)
-                        # print('learning_rate_dict: ', learning_rate_dict)
+                        # # knowledge mix condition
+                        # learning_rate_dict = str_to_dict(ilv, var_type = 'array', splitter='),')
+                        # learning_rate_dict['run_no'] = run_id
+                        # learning_rate_dict['loop_count'] = int(sim_vars['loop_count'][i])
+                        # learning_rate_dict['demo_strategy'] = sim_vars['demo_strategy'][i]
+                        # learning_rate = learning_rate.append(learning_rate_dict, ignore_index=True)
+                        # # print('learning_rate_dict: ', learning_rate_dict)
 
                         # team knowledge constraints
                         team_knowledge_dict = str_to_dict(tkc, splitter = ', \'')
@@ -181,24 +185,24 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
 
         
 
-                        # likelihood response
-                        team_likelihood_correct_response_dict = {}
-                        # print('lcr before: ', lcr)
-                        lcr = lcr.strip('[]')
-                        lcr = lcr.split(' ')
-                        lcr = [i for i in lcr if i != '']
-                        # print('lcr: ', lcr)
-                        lcr_array = np.array(list(lcr), dtype=float)
-                        # print('lcr_array: ', lcr_array)
-                        team_likelihood_correct_response_dict['p1'] = lcr_array[0]
-                        team_likelihood_correct_response_dict['p2'] = lcr_array[1]
-                        team_likelihood_correct_response_dict['p3'] = lcr_array[2]
-                        team_likelihood_correct_response_dict['common_knowledge'] = []
-                        team_likelihood_correct_response_dict['joint_knowledge'] = []
-                        team_likelihood_correct_response_dict['run_no'] = run_id
-                        team_likelihood_correct_response_dict['demo_strategy'] = sim_vars['demo_strategy'][i]
-                        team_likelihood_correct_response_dict['loop_count'] = int(sim_vars['loop_count'][i])
-                        likelihood_correct_response = likelihood_correct_response.append(team_likelihood_correct_response_dict, ignore_index=True)
+                        # # likelihood response
+                        # team_likelihood_correct_response_dict = {}
+                        # # print('lcr before: ', lcr)
+                        # lcr = lcr.strip('[]')
+                        # lcr = lcr.split(' ')
+                        # lcr = [i for i in lcr if i != '']
+                        # # print('lcr: ', lcr)
+                        # lcr_array = np.array(list(lcr), dtype=float)
+                        # # print('lcr_array: ', lcr_array)
+                        # team_likelihood_correct_response_dict['p1'] = lcr_array[0]
+                        # team_likelihood_correct_response_dict['p2'] = lcr_array[1]
+                        # team_likelihood_correct_response_dict['p3'] = lcr_array[2]
+                        # team_likelihood_correct_response_dict['common_knowledge'] = []
+                        # team_likelihood_correct_response_dict['joint_knowledge'] = []
+                        # team_likelihood_correct_response_dict['run_no'] = run_id
+                        # team_likelihood_correct_response_dict['demo_strategy'] = sim_vars['demo_strategy'][i]
+                        # team_likelihood_correct_response_dict['loop_count'] = int(sim_vars['loop_count'][i])
+                        # likelihood_correct_response = likelihood_correct_response.append(team_likelihood_correct_response_dict, ignore_index=True)
 
 
                     else:
@@ -252,7 +256,7 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
 
 
     # add this to current dfs
-    team_BEC_knowledge_level['team_mix'] = learning_rate_index
+    # team_BEC_knowledge_level['team_mix'] = learning_rate_index
 
     # print('learning_rate_index:', learning_rate_index)
 
@@ -266,8 +270,8 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
         BEC_knowledge_level.extend(team_BEC_knowledge_level[know_id])
         BEC_knowledge_level_expected.extend(team_BEC_knowledge_level_expected[know_id])
         ind_knowledge_type.extend([know_id]*len(team_BEC_knowledge_level[know_id]))
-        lcr_var.extend(likelihood_correct_response[know_id])
-        team_mix_var.extend(learning_rate_index)
+        # lcr_var.extend(likelihood_correct_response[know_id])
+        # team_mix_var.extend(learning_rate_index)
         
         if 'p' in know_id:
             knowledge_type.extend(['individual']*len(team_BEC_knowledge_level[know_id]))
@@ -279,9 +283,9 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
     team_knowledge_level_long['BEC_knowledge_level_expected'] = BEC_knowledge_level_expected
     team_knowledge_level_long['knowledge_type'] = knowledge_type
     team_knowledge_level_long['ind_knowledge_type'] = ind_knowledge_type
-    team_knowledge_level_long['likelihood_correct_response'] = lcr_var
+    # team_knowledge_level_long['likelihood_correct_response'] = lcr_var
     team_knowledge_level_long['normalized_loop_count'] = normalized_loop_count
-    team_knowledge_level_long['team_mix'] = team_mix_var
+    # team_knowledge_level_long['team_mix'] = team_mix_var
 
     
     team_knowledge_level_long.to_csv('models/augmented_taxi2/team_knowledge_level_long.csv')
@@ -294,12 +298,14 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
     unique_ids = team_knowledge_level_long['run_no'].unique()
     interaction_count = pd.DataFrame()
 
+    print(team_BEC_knowledge_level)
+
     for id in unique_ids:
         interaction_count_dict = {}
         for c_id in range(len(concept_ids)):
             interaction_count_dict['run_no'] = id
             interaction_count_dict['demo_strategy'] = team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['demo_strategy'].iloc[0]
-            interaction_count_dict['team_mix'] = team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['team_mix'].iloc[0]
+            interaction_count_dict['team_composition'] = team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['team_composition'].iloc[0]
             
             print('A: ', team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['loop_count'])
             print('run_no: ', id, ' c_id: ', c_id, ' concept_ids[c_id+1]: ', concept_ids[c_id])
@@ -323,7 +329,7 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
         run_data_dict['run_no'] = id
         run_data_dict['demo_strategy'] = team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['demo_strategy'].iloc[0]
         run_data_dict['max_loop_count'] = team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['loop_count'].iloc[-1]
-        run_data_dict['team_mix'] = team_knowledge_level_long[team_knowledge_level_long['run_no'] == id]['team_mix'].iloc[0]
+        run_data_dict['team_composition'] = team_knowledge_level_long[team_knowledge_level_long['run_no'] == id]['team_composition'].iloc[0]
         
         run_data = run_data.append(run_data_dict, ignore_index=True)
 
@@ -591,43 +597,41 @@ def analyze_concept_data(file):
 
     plt.show()
 
-def analyze_human_response_simulation(path, files):
+
+
+
+def analyze_human_response_simulation(path, files, file_prefix):
 
 
     response_data = pd.DataFrame()
 
     
     for file in files:
-        sim_vars = pd.read_csv(path + '/' + file)
-        condition = file.replace('.csv', '')
-        condition = condition.replace('_full_12_10', '')
-        condition = condition.replace('debug_data_response_', '')
-        print('condition: ', condition)
 
-        for i in range(len(sim_vars)):
-            # response data
-            response_data_dict = {}
+        if file_prefix in file and '.csv' in file:
+            print('Reading file: ', file)
+            sim_vars = pd.read_csv(path + '/' + file)
+            condition = file.replace('.csv', '')
+            condition = condition.replace(file_prefix + '_', '')
+            condition = condition.replace('_set_', '')
+            condition = ''.join([i for i in condition if not i.isdigit()])
+            print('condition: ', condition)
 
-            response_data_dict['update_id'] = sim_vars['update_id'][i]
-            response_data_dict['member_id'] = sim_vars['member_id'][i]
-            response_data_dict['learning_factor'] = sim_vars['learning_factor'][i]
-            response_data_dict['cluster_id'] = sim_vars['cluster_id'][i]
-            response_data_dict['point_probability'] = sim_vars['point_probability'][i]
-            response_data_dict['response_type'] = sim_vars['response'][i]
-            response_data_dict['skip_model_flag'] = sim_vars['skip_model'][i]
-            response_data_dict['constraint_flag'] = sim_vars['constraint_flag'][i]
-            response_data_dict['condition'] = condition
+            for i in range(len(sim_vars)):
+                # response data
+                response_data_dict = {}
 
-            response_data = response_data.append(response_data_dict, ignore_index=True)
+                response_data_dict['update_id'] = sim_vars['update_id'][i]
+                response_data_dict['member_id'] = sim_vars['member_id'][i]
+                response_data_dict['learning_factor'] = sim_vars['learning_factor'][i]
+                response_data_dict['cluster_id'] = sim_vars['cluster_id'][i]
+                response_data_dict['point_probability'] = sim_vars['point_probability'][i]
+                response_data_dict['response_type'] = sim_vars['response'][i]
+                response_data_dict['skip_model_flag'] = sim_vars['skip_model'][i]
+                response_data_dict['constraint_flag'] = sim_vars['constraint_flag'][i]
+                response_data_dict['condition'] = condition
 
-
-
-            
-
-
-
-
-
+                response_data = response_data.append(response_data_dict, ignore_index=True)
 
     return response_data
 
@@ -636,68 +640,73 @@ def analyze_human_response_simulation(path, files):
 if __name__ == "__main__":
 
     # process team knowledge data
-    # path = 'models/augmented_taxi2'
-    # files = os.listdir(path)
+    path = 'models/augmented_taxi2'
+    files = os.listdir(path)
     # files = ['debug_obj_func_1.csv']
 
-    # all_file_prefix_list = ['trials_set_1', 'trial_set_5', 'trial_set_6', 'trial_set_7', 'trial_set_8', 'trial_set_9', 'trial_set_10', 'trial_set_11', \
-    #                         'trial_set_12', 'trial_set_13', 'trial_set_14', 'trial_set_16', 'trial_set_17', 'trial_set_18', 'trial_set_19']
+    all_file_prefix_list = ['trials_12_10']
     # all_runs_to_exclude_list = [[3, 12, 24, 7], [1,4,6,8], [], [1,3, 11, 12, 16, 18], [17, 21, 35], [], [], [], \
     #                             [], [], [], [], [], [], []]
-    
+    all_runs_to_exclude_list = []
 
-    # sets_to_consider = [14]
+    sets_to_consider = [14]
 
     # file_prefix_list = [all_file_prefix_list[i] for i in sets_to_consider]
     # runs_to_exclude_list = [all_runs_to_exclude_list[i] for i in sets_to_consider]
 
-    # print(file_prefix_list)
-    # print(runs_to_exclude_list)
+    file_prefix_list = ['trials_12_10']
+    runs_to_exclude_list = []
+
+    print(file_prefix_list)
+    print(runs_to_exclude_list)
     
-    # runs_to_analyze_list = []
+    runs_to_analyze_list = []
 
-    # run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list = runs_to_exclude_list, runs_to_analyze_list = runs_to_analyze_list)
+    run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list = runs_to_exclude_list, runs_to_analyze_list = runs_to_analyze_list)
 
-    # analyze_run_data('models/augmented_taxi2/run_data.csv')
+    analyze_run_data('models/augmented_taxi2/run_data.csv')
 
-    # analyze_concept_data('models/augmented_taxi2/interaction_count.csv')
 
-    path = 'models/augmented_taxi2'
-    files = ['debug_data_response_particles_full_12_10.csv', 'debug_data_response_cluster_random_full_12_10.csv', 'debug_data_response_cluster_weights_full_12_10.csv']
-    response_data = analyze_human_response_simulation(path, files)
-    response_data['learning_factor'] = np.round(response_data['learning_factor'].astype(float), 3)
-    cols = ['condition', 'update_id', 'learning_factor', 'skip_model_flag', 'response_type', 'cluster_id']
-    response_data_selected = response_data[cols]
 
-    print('response_data_selected: ', response_data_selected)
 
-    response_data_valid = response_data_selected[response_data_selected['skip_model_flag'] == False]
-    print('response_data_valid: ', response_data_valid)
+    # ##############################
+    # path = 'models/augmented_taxi2'
+    # # files = ['debug_data_response_particles_full_12_10.csv', 'debug_data_response_cluster_random_full_12_10.csv', 'debug_data_response_cluster_weights_full_12_10.csv']
+    # files = os.listdir(path)
+    # file_prefix = 'debug_response'
+    # response_data = analyze_human_response_simulation(path, files, file_prefix)
+    # response_data['learning_factor'] = np.round(response_data['learning_factor'].astype(float), 3)
+    # cols = ['condition', 'update_id', 'learning_factor', 'skip_model_flag', 'response_type', 'cluster_id']
+    # response_data_selected = response_data[cols]
 
-    response_data_correct = response_data_selected[response_data_selected['response_type'] == 'correct']
-    print('response_data_correct: ', response_data_correct)
+    # print('response_data_selected: ', response_data_selected)
 
-    response_prob = response_data_correct.groupby(['condition', 'update_id', 'learning_factor']).agg({'cluster_id':'count'})
+    # response_data_valid = response_data_selected[response_data_selected['skip_model_flag'] == False]
+    # print('response_data_valid: ', response_data_valid)
+
+    # response_data_correct = response_data_selected[response_data_selected['response_type'] == 'correct']
+    # print('response_data_correct: ', response_data_correct)
+
+    # response_prob = response_data_correct.groupby(['condition', 'update_id', 'learning_factor']).agg({'cluster_id':'count'})
                                                                                                      
-    response_prob_den = response_data_valid.groupby(['condition', 'update_id', 'learning_factor']).agg({'cluster_id':'count'})
+    # response_prob_den = response_data_valid.groupby(['condition', 'update_id', 'learning_factor']).agg({'cluster_id':'count'})
+
+    # response_prob['probability'] = response_prob['cluster_id']/response_prob_den['cluster_id']
 
 
-    response_prob['probability'] = response_prob['cluster_id']/response_prob_den['cluster_id']
+    # # response_prob.rename(columns={'cluster_id': 'correct_test_probability'}, inplace=True)
 
 
-    # response_prob.rename(columns={'cluster_id': 'correct_test_probability'}, inplace=True)
+    # print('response_prob: ', response_prob)
+    # # print('response_prob_num: ', response_prob_num)
+    # # print('response_prob_den: ', response_prob_den)
 
 
-    print('response_prob: ', response_prob)
-    # print('response_prob_num: ', response_prob_num)
-    # print('response_prob_den: ', response_prob_den)
-
-
-    f, ax = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(10,6))
-    plt.subplots_adjust(wspace=0.1, hspace=0.1)        
-    sns.lineplot(response_prob, x = 'learning_factor', y = 'probability', hue = 'condition', ax=ax[0], legend=True).set(title='Learning factor vs. probability of correct response for various sampling conditions')
-    sns.lineplot(response_prob, x = 'learning_factor', y = 'probability', hue = 'update_id', ax=ax[1], legend=True).set(title='Learning factor vs. probability of correct response based on number of PF updates/interactions')
-    plt.show()
+    # f, ax = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(10,6))
+    # plt.subplots_adjust(wspace=0.1, hspace=0.1)        
+    # sns.lineplot(response_prob, x = 'learning_factor', y = 'probability', hue = 'condition', ax=ax[0], legend=True).set(title='Learning factor vs. probability of correct response for various sampling conditions')
+    # sns.lineplot(response_prob, x = 'learning_factor', y = 'probability', hue = 'update_id', ax=ax[1], legend=True).set(title='Learning factor vs. probability of correct response based on number of PF updates/interactions')
+    # plt.show()
 
 
     

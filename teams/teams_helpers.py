@@ -880,8 +880,7 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_learnin
 
                 # visualize_transition(cnst, particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for ' + str(member_id) )
             
-        
-        particles_team[member_id].knowledge_update(team_prior[member_id])
+            particles_team[member_id].knowledge_update(team_prior[member_id])
 
 
     if pf_flag == 'teacher':
