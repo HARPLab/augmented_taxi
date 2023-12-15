@@ -630,7 +630,11 @@ def process_human_scores_f23(test_env_dict, type='binary'):
         df_trials.at[i, 'human_reward'] = human_reward[0][0]
 
         # record the difference
-        df_trials.at[i, 'reward_diff'] = abs(human_reward[0][0] - df_trials['opt_traj_reward'][i])
+        reward_diff = df_trials['opt_traj_reward'][i] - human_reward[0][0]
+        df_trials.at[i, 'reward_diff'] = reward_diff
+        if reward_diff < 0:
+            print('negative reward difference (i.e. regret), something is wrong!')
+
         # df_trials.at[i, 'scaled_diff'] = 1 - ((human_reward[0][0] - df_trials['opt_traj_reward'][i]) / df_trials['opt_traj_reward'][i])
         df_trials.at[i, 'regret_norm'] = (human_reward[0][0] - df_trials['opt_traj_reward'][i]) / df_trials['opt_traj_reward'][i] # normalized regret
 
