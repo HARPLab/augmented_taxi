@@ -134,7 +134,13 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                             'pf_reset_count': np.zeros(params.team_size+2, dtype=int),
                             'initial_team_learning_factor': np.zeros(params.team_size, dtype=int),
                             'team_learning_factor': np.zeros(params.team_size, dtype=int),
-                            'team_composition': None
+                            'team_composition': None,
+                            'sampling_condition': None,
+                            'particles_prob_teacher_demo': None,
+                            'particles_prob_learner_demo': None,
+                            'cluster_prob_learner_demo': None,
+                            'particles_prob_teacher_test': None,
+                            'particles_prob_learner_test': None
                             }
     
 
@@ -220,6 +226,16 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
             # Simulate actual learning
             particles_team_learner = team_helpers.simulate_team_learning(kc_id, particles_team_learner, min_KC_constraints, params, loop_count, kc_reset_flag=True, viz_flag=knowledge_viz_flag)
 
+            ############ debug - update demo probabilities
+            particles_teacher_prob_demo = {}
+            particles_learner_prob_demo = {}
+            for i in range(params.team_size):
+                member_id = 'p' + str(i+1)
+                particles_teacher_prob_demo[member_id] = particles_team_teacher[member_id].particles_prob_correct
+                particles_learner_prob_demo[member_id] = particles_team_learner[member_id].particles_prob_correct
+
+            ############################################################
+
 
             # obtain the diagnostic tests that will test the human's understanding of the unit's constraints
             preliminary_tests, visited_env_traj_idxs = team_helpers.obtain_diagnostic_tests(params.data_loc['BEC'], BEC_summary[-1], visited_env_traj_idxs, min_KC_constraints, min_subset_constraints_record, traj_record, traj_features_record, running_variable_filter_unit, mdp_features_record)
@@ -257,7 +273,9 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
         
                     human_traj_team = []
                     response_type_team = []
+                    cluster_prob_learner_demo = []
 
+                
                     # team_likelihood_correct_response_temp = [1, 0.1]
                     for i in range(params.team_size):
                         print('Simulating response for player ', i+1, 'for constraint', test_constraints[0])
@@ -265,9 +283,31 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
 
                         # New method - Sampling based on learner PF model
                         member_id = 'p' + str(i+1)
+                        particles_team_learner[member_id].cluster()
                         human_traj, response_type = sim_helpers.get_human_response(response_sampling_condition, env_idx, particles_team_learner[member_id], opt_traj, test_constraints, team_learning_factor[i])
                         human_traj_team.append(human_traj)
                         response_type_team.append(response_type)
+
+                        ## particles have been clustered in 'get_human_response' function. Calculate cluster correct probability
+                        
+
+                        ########## debugging - calculate probability of clusters that are within the BEC
+                        N_clusters = len(particles_team_learner[member_id].cluster_centers)
+                        uniform_clusters_id = []
+                        for cluster_id in range(N_clusters):
+                            cluster  = particles_team_learner[member_id].cluster_centers[cluster_id]
+                            in_BEC_area_flag = True
+                            for constraint in min_KC_constraints:
+                                dot = constraint.dot(cluster.T)
+                                if dot < 0:
+                                    in_BEC_area_flag = False
+                            
+                            if not in_BEC_area_flag:
+                                uniform_clusters_id.append(cluster_id)
+                        
+                        particles_team_learner[member_id].clusters_prob_correct = sum(particles_team_learner[member_id].cluster_weights[uniform_clusters_id])
+                        cluster_prob_learner_demo[member_id] = particles_team_learner[member_id].clusters_prob_correct
+                        ##########################
 
 
                         ######## Old Method - Sampling based on likelihood of correct response
@@ -297,6 +337,8 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                     resp_no += 1
                         
 
+                particles_prob_teacher_test = {}
+                particles_prob_learner_test = {}
 
                 # Show the same test for each person and get test responses of each person in the team
                 p = 1
@@ -346,7 +388,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
 
                         # updated learner model
                         team_learning_factor[p-1] = min(team_learning_factor[p-1] + team_learning_rate[p-1, 0], max_learning_factor)
-                        particles_team_learner[member_id].update(test_constraints, team_learning_factor[p-1])       
+                        particles_team_learner[member_id].update(test_constraints, learning_factor=team_learning_factor[p-1])       
                         if knowledge_viz_flag:
                             team_helpers.visualize_transition(test_constraints, particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change after test set ' + str(loop_count+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(loop_count+1))
                     
@@ -391,7 +433,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
 
                         # updated learner model
                         team_learning_factor[p-1] = min(team_learning_factor[p-1] + team_learning_rate[p-1, 1], max_learning_factor)
-                        particles_team_learner[member_id].update([-failed_BEC_constraint], team_learning_factor[p-1])       
+                        particles_team_learner[member_id].update([-failed_BEC_constraint], learning_factor=team_learning_factor[p-1])       
                         if knowledge_viz_flag:
                             team_helpers.visualize_transition([-failed_BEC_constraint], particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change after test set ' + str(loop_count+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(loop_count+1))
                     
@@ -421,7 +463,50 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                         # # print('Human traj: ', human_traj)
 
                     # update 
+                    print(colored('team_knowledge[member_id]: ' + str(team_knowledge[member_id]), 'green'))
                     particles_team_teacher[member_id].knowledge_update(team_knowledge[member_id])
+
+
+                    # debug - update probabilities
+                    ########## debugging - calculate proportion of particles that are within the BEC
+                    # teacher
+                    N_particles = len(particles_team_teacher[member_id].positions)
+                    uniform_particles_id = []
+                    for particle_id in range(N_particles):
+                        pos  = particles_team_teacher[member_id].positions[particle_id]
+                        in_BEC_area_flag = True
+                        for constraint in new_constraints:
+                            dot = constraint.dot(pos.T)
+                            if dot < 0:
+                                in_BEC_area_flag = False
+                        
+                        if not in_BEC_area_flag:
+                            uniform_particles_id.append(particle_id)
+                    
+                    particles_team_teacher[member_id].particles_prob_correct = sum(particles_team_teacher[member_id].weights[uniform_particles_id])
+
+                    # learner
+                    N_particles = len(particles_team_learner[member_id].positions)
+                    uniform_particles_id = []
+                    for particle_id in range(N_particles):
+                        pos  = particles_team_learner[member_id].positions[particle_id]
+                        in_BEC_area_flag = True
+                        for constraint in new_constraints:
+                            dot = constraint.dot(pos.T)
+                            if dot < 0:
+                                in_BEC_area_flag = False
+                        
+                        if not in_BEC_area_flag:
+                            uniform_particles_id.append(particle_id)
+                    
+                    particles_team_learner[member_id].particles_prob_correct = sum(particles_team_learner[member_id].weights[uniform_particles_id])
+                    ##########################
+                    particles_prob_learner_test[member_id] = particles_team_learner[member_id].particles_prob_correct
+                    particles_prob_teacher_test[member_id] = particles_team_teacher[member_id].particles_prob_correct
+                    ##########################
+
+
+
                     p += 1
                 
                 # Update test number
@@ -476,7 +561,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
 
 
                     print(colored('Updated team knowledge for common knowledge: ', 'blue'))
-                    print(team_knowledge)
+                    print(team_knowledge['common_knowledge'])
                     
 
                     ## update joint knowledge
@@ -484,7 +569,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                     
 
                     print(colored('Updated team knowledge for joint knowledge: ', 'blue'))
-                    print(team_knowledge)
+                    print(team_knowledge['common_knowledge'])
 
                     particles_team_teacher['common_knowledge'].knowledge_update(team_knowledge['common_knowledge'])
                     particles_team_teacher['joint_knowledge'].knowledge_update(team_knowledge['joint_knowledge'])
@@ -590,6 +675,12 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
             loop_vars['initial_team_learning_factor'] = copy.deepcopy(initial_team_learning_factor)
             loop_vars['team_learning_factor'] = copy.deepcopy(team_learning_factor)
             loop_vars['team_composition'] = team_composition
+            loop_vars['sampling_condition'] = response_sampling_condition
+            loop_vars['particles_prob_learner_test'] = copy.deepcopy(particles_prob_learner_test)
+            loop_vars['particles_prob_teacher_test'] = copy.deepcopy(particles_prob_teacher_test)
+            loop_vars['cluster_prob_learner_demo'] = copy.deepcopy(cluster_prob_learner_demo)
+            loop_vars['particles_prob_learner_demo'] = copy.deepcopy(particles_learner_prob_demo)
+            loop_vars['particles_prob_teacher_demo'] = copy.deepcopy(particles_teacher_prob_demo)
 
 
             print(colored('Unit knowledge level: ' + str(loop_vars['unit_knowledge_level']), 'red'))
@@ -719,7 +810,7 @@ if __name__ == "__main__":
     
     # viz_flag = [demo_viz, test_viz, pf_knowledge_viz]
     sim_params = {'min_correct_likelihood': 0.5}
-    run_reward_teaching(params, pool, sim_params, demo_strategy = 'individual_knowledge_low', experiment_type = 'simulated', run_no = 1, viz_flag=[True, True, True], vars_filename = 'new_hlm_4', response_sampling_condition = 'particles', team_composition = None)
+    run_reward_teaching(params, pool, sim_params, demo_strategy = 'individual_knowledge_low', experiment_type = 'simulated', run_no = 1, viz_flag=[True, True, True], vars_filename = '12_15_sim_debug', response_sampling_condition = 'particles', team_composition = None)
 
     
     pool.close()

@@ -495,7 +495,7 @@ def run_sim(condition, filename):
     # team_helpers.visualize_transition(new_constraints[0], particles_team_learner['p2'], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for p2' )
     # team_helpers.visualize_transition(new_constraints[0], particles_team_learner['p3'], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for p3' )
 
-    new_constraints = [[np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])]]
+    new_constraints = [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])]
     # test_responses_sim = [ [[np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[1,  0,  -2]])]],
     #                     [[np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[3,  0,  -2]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])]], 
     #                     [[np.array([[-1,  0, 4]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])]], 
@@ -503,12 +503,12 @@ def run_sim(condition, filename):
 
 
     sampling_unit_size = 1
-    N_samples = 100
+    N_samples = 20
     N_updates = 5
     viz_flag = False
 
     prior = [np.array([[0, 0, -1]])]
-    team_size = 5
+    team_size = 10
     team_prior = {}
     for i in range(team_size):
         member_id = 'p' + str(i+1)
@@ -516,7 +516,7 @@ def run_sim(condition, filename):
 
     
 
-    initial_team_learning_factor = np.array([0.65, 0.7, 0.75, 0.8, 0.85])
+    initial_team_learning_factor = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1])
     max_learning_factor = 0.95
     # team_learning_rate = np.hstack((0.025*np.ones([team_size, 1]), 0*np.ones([team_size, 1])))
     team_learning_rate = np.hstack((0*np.ones([team_size, 1]), 0*np.ones([team_size, 1])))  # No learning!
@@ -531,8 +531,8 @@ def run_sim(condition, filename):
     cluster_id_history = []
     point_probability = []
     run_sim = True
-    response_team = {'p1': [], 'p2': [], 'p3': [], 'p4': [], 'p5': []}
-    human_traj_team = {'p1': [], 'p2': [], 'p3': [], 'p4': [], 'p5': []}
+    response_team = {'p1': [], 'p2': [], 'p3': [], 'p4': [], 'p5': [], 'p6': [], 'p7': [], 'p8': [], 'p9': [], 'p10': []}
+    human_traj_team = {'p1': [], 'p2': [], 'p3': [], 'p4': [], 'p5': [], 'p6': [], 'p7': [], 'p8': [], 'p9': [], 'p10': []}
 
     team_prior, particles_team_teacher = team_helpers.sample_team_pf(team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_prior = team_prior)
     particles_team_learner = team_helpers.sample_team_pf(team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_learning_factor = initial_team_learning_factor, team_prior = team_prior, pf_flag='learner')
@@ -544,13 +544,13 @@ def run_sim(condition, filename):
     while(run_sim):
         for update_id in range(N_updates):
            
-            correct_response = {'p1': 0, 'p2': 0, 'p3': 0, 'p4': 0, 'p5': 0}
+            correct_response = {'p1': 0, 'p2': 0, 'p3': 0, 'p4': 0, 'p5': 0, 'p6': 0, 'p7': 0, 'p8': 0, 'p9': 0, 'p10': 0}
 
             # update particles based on demo constraints
             for p in range(team_size):
                 member_id = 'p' + str(p+1)
                 # particles_team_teacher[member_id].update(new_constraints)
-                particles_team_learner[member_id].update(new_constraints, team_learning_factor[p])
+                particles_team_learner[member_id].update(new_constraints, learning_factor = team_learning_factor[p])
                 particles_team_learner[member_id].cluster()
                 if viz_flag:
                     team_helpers.visualize_transition(new_constraints[0], particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = 'Teacher knowledge change after demos set ' + str(update_id+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(update_id+1))
@@ -586,7 +586,7 @@ def run_sim(condition, filename):
                     print(colored('Updating PF and learning rate based on correct response. Test constraints: ' + str(test_constraints), 'green'))
                     team_learning_factor[p] = min(team_learning_factor[p] + team_learning_rate[p, 0], max_learning_factor)
                     # particles_team_teacher[member_id].update(test_constraints)
-                    particles_team_learner[member_id].update(test_constraints, team_learning_factor[p])
+                    particles_team_learner[member_id].update(test_constraints, learning_factor=team_learning_factor[p])
                     if viz_flag:
                         team_helpers.visualize_transition(test_constraints, particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = 'Teacher knowledge change after test set ' + str(update_id+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(update_id+1))
                         team_helpers.visualize_transition(test_constraints, particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = 'Learner knowledge change after test set ' + str(update_id+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(update_id+1))
@@ -601,7 +601,7 @@ def run_sim(condition, filename):
 
                     print(colored('Updating PF and learning rate based on incorrect response. Failed BEC constraint: ' + str([-failed_BEC_constraint]), 'red'))
                     # particles_team_teacher[member_id].update([-failed_BEC_constraint])
-                    particles_team_learner[member_id].update([-failed_BEC_constraint], team_learning_factor[p])
+                    particles_team_learner[member_id].update([-failed_BEC_constraint], learning_factor=team_learning_factor[p])
                     
                     if viz_flag:
                         team_helpers.visualize_transition([-failed_BEC_constraint], particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = 'Teacher knowledge change after test set ' + str(update_id+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(update_id+1))
@@ -629,12 +629,13 @@ def run_sim(condition, filename):
 def check_VMF_distribution():
 
     viz_flag = True
-    team_size = 5
-    initial_team_learning_factor =  np.array([0.65, 0.7, 0.75, 0.8, 0.85])
-    particles_team_learner = team_helpers.sample_team_pf(team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_learning_factor = initial_team_learning_factor, pf_flag='learner')
+    team_size = 6
+    # N_particles = params.BEC['n_particles']
+    N_particles = 500
+    initial_team_learning_factor =  np.array([0.2, 0.3, 0.5, 0.6, 0.7, 0.8])
+    particles_team_learner = team_helpers.sample_team_pf(team_size, N_particles , params.weights['val'], params.step_cost_flag, team_learning_factor = initial_team_learning_factor, pf_flag='learner')
 
     prior = np.array([[0, 0, -1]])
-    team_size = 5
     team_prior = {}
     for i in range(team_size):
         member_id = 'p' + str(i+1)
@@ -647,9 +648,10 @@ def check_VMF_distribution():
         # calculate proportion of particles in uniform and VMF side
         vmf_count = 0
         uniform_count = 0
-        vmf_particles = []
-        uniform_particles = []
+        vmf_particles_id = []
+        uniform_particles_id = []
         N_particles = len(particles_team_learner[member_id].positions)
+
         for particle_id in range(N_particles):
             pos  = particles_team_learner[member_id].positions[particle_id]
             weight = particles_team_learner[member_id].weights[particle_id]
@@ -658,28 +660,72 @@ def check_VMF_distribution():
 
             if dot >= 0:
                 uniform_count += 1
-                uniform_particles.append([pos, weight])
+                uniform_particles_id.append(particle_id)
             else:
                 vmf_count += 1
-                vmf_particles.append([pos, weight])
+                vmf_particles_id.append(particle_id)
 
-        
 
-        # plot uniform and vmf particles
+        uniform_particles = particles_team_learner[member_id].positions[uniform_particles_id]
+        vmf_particles = particles_team_learner[member_id].positions[vmf_particles_id]
+        uniform_prob = particles_team_learner[member_id].weights[uniform_particles_id]
+        vmf_prob = particles_team_learner[member_id].weights[vmf_particles_id]
+
+        # print('particles_team_learner[member_id].positions: ', type(particles_team_learner[member_id].positions), particles_team_learner[member_id].positions)
+        print('uniform_particles: ', len(uniform_particles), 'uniform_prob: ', len(uniform_prob))
+
+
+        # plot uniform and vmf particle distribution
         fig, ax = plt.subplots(ncols=2, figsize=(10,6))
-        uniform_prob = []
-        for particle in uniform_particles:
-            uniform_prob.append(particle[1])
-        vmf_prob = []
-        for particle in vmf_particles:
-            vmf_prob.append(particle[1])
-
         ax[0].hist(uniform_prob)
         ax[0].set_title('Uniform particles')
         ax[1].hist(vmf_prob)
         ax[1].set_title('VMF particles')
 
         print('uniform_particles prob: ', sum(uniform_prob), 'VMF particle prob: ', sum(vmf_prob))
+
+        # plot particles
+        fig2 = plt.figure()
+        ax1 = fig2.add_subplot(projection='3d')
+
+        BEC_viz.visualize_planes([prior], fig=fig2, ax=ax1)
+
+        vis_scale_factor = 10 * len(uniform_particles)
+        print('vis_scale_factor: ', vis_scale_factor)
+
+        plt.set_cmap("gist_rainbow")
+        ax1.scatter(uniform_particles[:, 0, 0], uniform_particles[:, 0, 1], uniform_particles[:, 0, 2],
+                    s=uniform_prob * vis_scale_factor, c='green')
+
+        vis_scale_factor = 10 * len(vmf_particles)
+        ax1.scatter(vmf_particles[:, 0, 0], vmf_particles[:, 0, 1], vmf_particles[:, 0, 2],
+                    s=vmf_prob * vis_scale_factor, c='red')
+
+
+        mu = np.array([1, 0, 0])
+        vmf = vonmises_fisher(mu, particles_team_learner[member_id].VMF_kappa)
+        rng = np.random.default_rng()
+
+        # Number of points for the plot
+        num_points = 2000
+
+        # Generate random samples from the von Mises-Fisher distribution
+        samples = vmf.rvs(size=num_points, random_state=rng)
+
+        # Plot the samples on a unit sphere
+        # fig3 = plt.figure(figsize=(8, 8))
+        # ax3 = fig3.add_subplot(111, projection='3d')
+
+        ax1.scatter(samples[:, 0], samples[:, 1], samples[:, 2], marker='o', s=vis_scale_factor/1000, label='von Mises-Fisher Samples')
+
+        # Plot the mean direction vector
+        ax1.quiver(0, 0, 0, mu[0], mu[1], mu[2], color='r', label='Mean Direction')
+
+        ax1.set_title('von Mises-Fisher Distribution')
+        ax1.set_xlabel('X-axis')
+        ax1.set_ylabel('Y-axis')
+        ax1.set_zlabel('Z-axis')
+        ax1.legend()
 
         plt.show()
 

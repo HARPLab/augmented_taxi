@@ -23,13 +23,10 @@ def VMF_pdf(mu, k, p, x, dot=None):
     return (k ** (p / 2 - 1)) / (special.iv((p / 2 - 1), k) * (2 * np.pi) ** (p / 2)) * np.exp(k * dot)
 
 
-def calc_kappa_from_cdf(self, VMF_cdf):
+def calc_kappa_from_cdf(VMF_cdf):
 
-        # if using u_cdf to calculate kappa
-        # if u_cdf == -1:
-        #     LHS = 1-self.u_cdf
-        # else:
-        #     LHS = 1-u_cdf
+        phi_lim = [0, np.pi]
+        theta_lim = [np.pi/2, 3*np.pi/2]
 
         LHS = VMF_cdf
         
@@ -37,36 +34,81 @@ def calc_kappa_from_cdf(self, VMF_cdf):
             return ( kappa*np.sin(phi)*np.exp(kappa*np.cos(theta)*np.sin(phi)) ) / ( 2*np.pi*(np.exp(kappa)-np.exp(-kappa)) ) #this equation is for mu = [1, 0, 0], but kappa would be same for any mu for a particular cdf.
 
         def func(kappa):
-            y, err = integrate.dblquad(integrand, np.pi/2, 3*np.pi/2, 0, np.pi, args = (kappa, )) #these limits are for mu = [1, 0, 0]
+            y, err = integrate.dblquad(integrand, theta_lim[0], theta_lim[1], phi_lim[0], phi_lim[1], args = (kappa, )) #these limits are for mu = [1, 0, 0]; limits for 2nd variable first
             return LHS-y
         
         return fsolve(func, 0.0001)[0]
 
 
+def solve_for_distribution_params(u_cdf_scaled, k_sol_flag = 'discontinuous'):
+    
+    if k_sol_flag == 'continuous':
+        kappa, x1 =  solve_for_kappa_continuous(u_cdf_scaled)
+    else:
+        kappa, x1 =  solve_for_kappa_discontinous(u_cdf_scaled)
 
-def solve_for_kappa(u_cdf_scaled):
+    return kappa, x1
+    
+
+
+
+def solve_for_kappa_continuous(u_cdf_scaled):
      
     # fixed values
     mu = np.array([1, 0, 0])
     x = np.array([0, 0, 1])
     p = 3 # length of x
     dot = x.dot(mu)
+    phi_lim = [0, np.pi]
+    theta_lim = [np.pi/2, 3*np.pi/2]
+
+    if u_cdf_scaled > 0.5:
+        # uniform_pdf = 1 / (4 * np.pi)
+        u_pdf = 1 / (4 * np.pi)
+
+        def integrand(phi, theta, kappa):
+            return ( kappa*np.sin(phi)*np.exp(kappa*np.cos(theta)*np.sin(phi)) ) / ( 2*np.pi*(np.exp(kappa)-np.exp(-kappa)) ) #this equation is for mu = [1, 0, 0], but kappa would be same for any mu for a particular cdf.
+
+        def func_solve(vars):
+            kappa, x1 = vars
+            eq1 = integrate.dblquad(integrand, theta_lim[0], theta_lim[1], phi_lim[0], phi_lim[1], args = (kappa, ))[0] * x1 - (1-u_cdf_scaled)/(2*u_cdf_scaled)  # limits for 2nd variable first
+            eq2 = ((kappa ** (p / 2 - 1)) / (special.iv((p / 2 - 1), kappa) * (2 * np.pi) ** (p / 2)) * np.exp(kappa * dot)) * x1 - u_pdf
+
+            return [eq1, eq2]
+        
+
+        return fsolve(func_solve, [0.1, 1])
+        
+    else:
+        print('u_cdf_scaled should be greater than 0.5')
+        return [None, None]
+        
+
+        
+def solve_for_kappa_discontinous(u_cdf_scaled):
     
-    # uniform_pdf = 1 / (4 * np.pi)
-    u_pdf = 1 / (4 * np.pi)
 
-    def integrand(phi, theta, kappa):
-        return ( kappa*np.sin(phi)*np.exp(kappa*np.cos(theta)*np.sin(phi)) ) / ( 2*np.pi*(np.exp(kappa)-np.exp(-kappa)) ) #this equation is for mu = [1, 0, 0], but kappa would be same for any mu for a particular cdf.
-
-    def func_solve(vars):
-        kappa, x1 = vars
-        eq1 = integrate.dblquad(integrand, np.pi/2, 3*np.pi/2, 0, np.pi, args = (kappa, ))[0] * x1 - (1-u_cdf_scaled)/(2*u_cdf_scaled)
-        eq2 = ((kappa ** (p / 2 - 1)) / (special.iv((p / 2 - 1), kappa) * (2 * np.pi) ** (p / 2)) * np.exp(kappa * dot)) * x1 - u_pdf
-
-        return [eq1, eq2]
+    # fixed values
+    mu = np.array([1, 0, 0])
+    x = np.array([0, 0, 1])
+    p = 3 # length of x
+    dot = x.dot(mu)
+    phi_lim = [0, np.pi]
+    theta_lim = [np.pi/2, 3*np.pi/2]
+    
+    
+    if u_cdf_scaled > 0.5:
+        kappa = calc_kappa_from_cdf(1-u_cdf_scaled)
+        x1 = 1
+    else:
+        kappa = calc_kappa_from_cdf(0.49)
+        f = lambda phi, theta: kappa*np.exp(kappa*np.array([np.cos(theta)* np.sin(phi), np.sin(theta) * np.sin(phi), np.cos(phi)]).dot(mu))*np.sin(phi)/(2*np.pi*(np.exp(kappa)-np.exp(-kappa)))
+        VMF_cdf, err = integrate.dblquad(f, theta_lim[0], theta_lim[1], phi_lim[0], phi_lim[1])  # limits for 2nd argument first; https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.dblquad.html
+        print('VMF_cdf: ', VMF_cdf)
+        x1 = (1-u_cdf_scaled)/VMF_cdf
 
     
-    return fsolve(func_solve, [0.1, 1])
+    return kappa, x1
 
 
     
@@ -108,12 +150,14 @@ if __name__ == '__main__':
     # int_probability_uniform = 0.5
     ################################
 
-    ### When kappa is unknown: calculate for Kappa, x1, and x2 jointly!
-    u_cdf_scaled_input = 0.51
-    kappa, x1 = solve_for_kappa(u_cdf_scaled_input)
+    # ### When kappa is unknown: calculate for Kappa, x1, and x2 jointly!
+    u_cdf_scaled_input = 0.4
+    sampling_flag = 'continuous' # 'continuous' or 'discontinuous'
+    kappa, x1 = solve_for_distribution_params(u_cdf_scaled_input, k_sol_flag=sampling_flag)
     print('kappa: ', kappa)
     print('x1_sol: ', x1)
 
+    # kappa = 4
     # for verification
     mu = np.array([1, 0, 0])
     x = np.array([0, 0, 1])
@@ -123,19 +167,24 @@ if __name__ == '__main__':
     pdf_vmf = vmf.pdf(x)
 
     f = lambda phi, theta: kappa*np.exp(kappa*np.array([np.cos(theta)* np.sin(phi), np.sin(theta) * np.sin(phi), np.cos(phi)]).dot(mu))*np.sin(phi)/(2*np.pi*(np.exp(kappa)-np.exp(-kappa)))
+    # f = lambda phi, theta: ( kappa*np.sin(phi)*np.exp(kappa*np.cos(theta)*np.sin(phi)) ) / ( 2*np.pi*(np.exp(kappa)-np.exp(-kappa)) )
     cdf_vmf, err = integrate.dblquad(f, theta_lim[0], theta_lim[1], phi_lim[0], phi_lim[1])
-    cdf_uniform = 0.5
+    # cdf_uniform = 0.5
 
-    x1_2 = 1 / (4 * np.pi * pdf_vmf)
-    x2 = 1 / (cdf_vmf * x1 + 0.5)
+    # x1_2 = 1 / (4 * np.pi * pdf_vmf)
+    # x2 = 1 / (cdf_vmf * x1 + 0.5)
+    if sampling_flag == 'continuous':
+        x2 = u_cdf_scaled_input/0.5
+    else:
+        x2 = 1 
 
     print('pdf_vmf: ', pdf_vmf)
     print('pdf_uniform: ', 1/(4*np.pi))
-    print('x1_sol: ', x1, 'x1_2: ', x1_2)
-    print('x2: ', x2)
-    print('cdf_uniform: ', cdf_uniform)
+    # print('x1_sol: ', x1, 'x1_2: ', x1_2)
+    # print('x2: ', x2)
+    print('cdf_uniform: ', u_cdf_scaled_input)
     print('cdf_vmf: ', cdf_vmf)
-    print('cdf_uniform_scaled: ', cdf_uniform * x2)
+    # print('cdf_uniform_scaled: ', cdf_uniform * x2)
     print('cdf_vmf_scaled: ', cdf_vmf * x1 * x2)
 
 
@@ -143,7 +192,7 @@ if __name__ == '__main__':
 
 
 
-    #### Manual calculation for specific kappa values
+    ############ Manual calculation for specific kappa values
     # # k = 2
     # # For calculating the constants I should multiply uniform (x2) and VMF (x1 * x2) pdfs by to get a new valid pdf
     # pdf_vmf = 0.0438822907955184         # value of pdf of VMF at edge / border with uniform

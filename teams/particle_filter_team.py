@@ -21,6 +21,7 @@ import policy_summarization.computational_geometry as cg
 from policy_summarization import probability_utils as p_utils
 from policy_summarization import particle_filter as pf
 import teams.utils_teams as utils_teams
+import params_team as params
 
 
 # Used when particles_team_teacher class is derived from particles class
@@ -31,7 +32,7 @@ import teams.utils_teams as utils_teams
 
 # Particles_team is defined as a new separate class to avoid any confusion and relevant functions are copied over from the particles class
 class Particles_team():
-    def __init__(self, positions, u_cdf, eps=1e-5):
+    def __init__(self, positions, learning_factor, eps=1e-5):
         self.positions = np.array(positions)
         self.weights = np.ones(len(positions)) / len(positions)
         self.eps = eps
@@ -40,16 +41,28 @@ class Particles_team():
         self.weights_prev = self.weights.copy()
 
         # parameters for the custom uniform + VMF distribution
-        self.integral_prob_uniform = u_cdf
-        self.u_pdf = self.integral_prob_uniform/(2*np.pi)
+        # fix sampling type
+        sampling_flag = 'discontinuous' # 'continuous' or 'discontinuous'
+        
+        self.u_prob_mass_scaled = learning_factor
+        self.u_pdf_scaled = self.u_prob_mass_scaled/(2*np.pi)
 
-        self.integral_prob_VMF = 1-u_cdf  # scaled VMF probability mass/CDF
-        self.VMF_kappa, self.x1  = self.solve_for_kappa(u_cdf)
+        self.VMF_prob_mass_scaled = 1-learning_factor  # scaled VMF probability mass/CDF
+        self.VMF_kappa, self.x1  = self.solve_for_distribution_params(learning_factor, k_sol_flag = sampling_flag)
         self.VMF_pdf = self.calc_VMF_pdf()
 
+        # for debugging purposes
+        self.particles_prob_correct = 0
+        self.clusters_prob_correct = 0
+
+        
+
         # calculate scaling factors
-        self.x2 = u_cdf/0.5
-        # self.x1 = 1/(4*np.pi*self.VMF_pdf)
+        if sampling_flag == 'continuous':
+            self.x2 = learning_factor/0.5
+        else:
+            self.x2 = 1   # only scale the VMF (x1) and not the entire VMF+uniform distribution
+
 
 
 
@@ -61,7 +74,7 @@ class Particles_team():
         # self.VMF_kappa = 4                                # the concentration parameter of the VMF distribution
         
 
-        print('u_pdf: ', self.u_pdf, 'integral_prob_uniform: ', self.integral_prob_uniform, 'integral_prob_VMF: ', self.integral_prob_VMF, 'VMF_kappa: ', self.VMF_kappa, 'VMF_pdf: ', self.VMF_pdf, 'x1: ', self.x1, 'x2: ', self.x2) 
+        print('u_pdf_scaled: ', self.u_pdf_scaled, 'u_prob_mass_scaled: ', self.u_prob_mass_scaled, 'VMF_prob_mass_scaled: ', self.VMF_prob_mass_scaled, 'VMF_kappa: ', self.VMF_kappa, 'VMF_pdf: ', self.VMF_pdf, 'x1: ', self.x1, 'x2: ', self.x2) 
 
 
 
@@ -192,33 +205,87 @@ class Particles_team():
         self.pf_reset_count = 0
         self.reset_constraint = []
 
-    
-    # Calculates Kappa with variable scaling factors - most accurate
-    def solve_for_kappa(self, u_cdf_scaled):
-        # Note u_cdf_scaled > 0.5; u_cdf_scaled = 0.5 results in kappa = 0, fully uniform on both sides of the sphere.
+    def calc_kappa_from_cdf(self, VMF_cdf):
+        phi_lim = [0, np.pi]
+        theta_lim = [np.pi/2, 3*np.pi/2]
+
+        LHS = VMF_cdf
+        
+        def integrand(phi, theta, kappa):
+            return ( kappa*np.sin(phi)*np.exp(kappa*np.cos(theta)*np.sin(phi)) ) / ( 2*np.pi*(np.exp(kappa)-np.exp(-kappa)) ) #this equation is for mu = [1, 0, 0], but kappa would be same for any mu for a particular cdf.
+
+        def func(kappa):
+            y, err = integrate.dblquad(integrand, theta_lim[0], theta_lim[1], phi_lim[0], phi_lim[1], args = (kappa, )) #these limits are for mu = [1, 0, 0]; limits for 2nd variable first
+            return LHS-y
+        
+        return fsolve(func, 0.0001)[0]
+
+
+    def solve_for_distribution_params(self, u_cdf_scaled, k_sol_flag = 'discontinuous'):
+        
+        if k_sol_flag == 'continuous':
+            kappa, x1 =  self.solve_for_kappa_continuous(u_cdf_scaled)
+        else:
+            kappa, x1 =  self.solve_for_kappa_discontinous(u_cdf_scaled)
+
+        return kappa, x1
+        
+
+
+
+    def solve_for_kappa_continuous(self, u_cdf_scaled):
         
         # fixed values
         mu = np.array([1, 0, 0])
         x = np.array([0, 0, 1])
         p = 3 # length of x
         dot = x.dot(mu)
+        phi_lim = [0, np.pi]
+        theta_lim = [np.pi/2, 3*np.pi/2]
+
+        if u_cdf_scaled > 0.5:
+            u_pdf = 1 / (4 * np.pi)
+
+            def integrand(phi, theta, kappa):
+                return ( kappa*np.sin(phi)*np.exp(kappa*np.cos(theta)*np.sin(phi)) ) / ( 2*np.pi*(np.exp(kappa)-np.exp(-kappa)) ) #this equation is for mu = [1, 0, 0], but kappa would be same for any mu for a particular cdf.
+
+            def func_solve(vars):
+                kappa, x1 = vars
+                eq1 = integrate.dblquad(integrand, theta_lim[0], theta_lim[1], phi_lim[0], phi_lim[1], args = (kappa, ))[0] * x1 - (1-u_cdf_scaled)/(2*u_cdf_scaled)  # limits for 2nd variable first
+                eq2 = ((kappa ** (p / 2 - 1)) / (special.iv((p / 2 - 1), kappa) * (2 * np.pi) ** (p / 2)) * np.exp(kappa * dot)) * x1 - u_pdf
+
+                return [eq1, eq2]
+            
+            return fsolve(func_solve, [0.1, 1])
+            
+        else:
+            print('u_cdf_scaled should be greater than 0.5')
+            return [None, None]
+            
+
+            
+    def solve_for_kappa_discontinous(self, u_cdf_scaled):
         
-        # uniform_pdf = 1 / (4 * np.pi)
-        u_pdf = 1 / (4 * np.pi)
 
-        def integrand(phi, theta, kappa):
-            return ( kappa*np.sin(phi)*np.exp(kappa*np.cos(theta)*np.sin(phi)) ) / ( 2*np.pi*(np.exp(kappa)-np.exp(-kappa)) ) #this equation is for mu = [1, 0, 0], but kappa would be same for any mu for a particular cdf.
-
-        def func_solve(vars):
-            kappa, x1 = vars
-            eq1 = integrate.dblquad(integrand, np.pi/2, 3*np.pi/2, 0, np.pi, args = (kappa, ))[0] * x1 - (1-u_cdf_scaled)/(2*u_cdf_scaled)
-            eq2 = ((kappa ** (p / 2 - 1)) / (special.iv((p / 2 - 1), kappa) * (2 * np.pi) ** (p / 2)) * np.exp(kappa * dot)) * x1 - u_pdf
-
-            return [eq1, eq2]
+        # fixed values
+        mu = np.array([1, 0, 0])
+        x = np.array([0, 0, 1])
+        phi_lim = [0, np.pi]
+        theta_lim = [np.pi/2, 3*np.pi/2]
+        
+        if u_cdf_scaled > 0.5:
+            kappa = self.calc_kappa_from_cdf(1-u_cdf_scaled)
+            x1 = 1
+        else:
+            kappa = self.calc_kappa_from_cdf(0.49)
+            f = lambda phi, theta: kappa*np.exp(kappa*np.array([np.cos(theta)* np.sin(phi), np.sin(theta) * np.sin(phi), np.cos(phi)]).dot(mu))*np.sin(phi)/(2*np.pi*(np.exp(kappa)-np.exp(-kappa)))
+            VMF_cdf, err = integrate.dblquad(f, theta_lim[0], theta_lim[1], phi_lim[0], phi_lim[1])  # limits for 2nd argument first; https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.dblquad.html
+            print('VMF_cdf: ', VMF_cdf)
+            x1 = (1-u_cdf_scaled)/VMF_cdf
 
         
-        return fsolve(func_solve, [0.1, 1])
-    
+        return kappa, x1
+
 
     def calc_VMF_pdf(self):
         mu = np.array([1, 0, 0])
@@ -229,31 +296,108 @@ class Particles_team():
         
         return (k ** (p / 2 - 1)) / (special.iv((p / 2 - 1), k) * (2 * np.pi) ** (p / 2)) * np.exp(k * dot)
 
-    
-    # # Working for fixed sclaing factors, but not needed
-    # def calc_kappa_from_cdf(self, VMF_cdf):
+
+
+    # def solve_for_distribution_params(self, u_cdf_scaled, k_sol_flag = 'discontinuous'):
         
-    #     # Note: The VMF_cdf is unscaled in this case.
-
-    #     # if using u_cdf to calculate kappa
-    #     # if u_cdf == -1:
-    #     #     LHS = 1-self.u_cdf
-    #     # else:
-    #     #     LHS = 1-u_cdf
+    #     if k_sol_flag == 'continuous':
+    #         kappa, x1 =  self.solve_for_kappa_continuous(u_cdf_scaled)
+    #     else:
+    #         kappa, x1 =  self.solve_for_kappa_discontinous(u_cdf_scaled)
 
 
-    #     LHS = VMF_cdf
+    #     return kappa, x1
+
+
+
+    # def solve_for_kappa_continuous(self, u_cdf_scaled):
         
+    #     # fixed values
+    #     mu = np.array([1, 0, 0])
+    #     x = np.array([0, 0, 1])
+    #     p = 3 # length of x
+    #     dot = x.dot(mu)
+        
+
+    #     if u_cdf_scaled > 0.5:
+    #         # uniform_pdf = 1 / (4 * np.pi)
+    #         u_pdf = 1 / (4 * np.pi)
+
+    #         def integrand(phi, theta, kappa):
+    #             return ( kappa*np.sin(phi)*np.exp(kappa*np.cos(theta)*np.sin(phi)) ) / ( 2*np.pi*(np.exp(kappa)-np.exp(-kappa)) ) #this equation is for mu = [1, 0, 0], but kappa would be same for any mu for a particular cdf.
+
+    #         def func_solve(vars):
+    #             kappa, x1 = vars
+    #             eq1 = integrate.dblquad(integrand, np.pi/2, 3*np.pi/2, 0, np.pi, args = (kappa, ))[0] * x1 - (1-u_cdf_scaled)/(2*u_cdf_scaled)
+    #             eq2 = ((kappa ** (p / 2 - 1)) / (special.iv((p / 2 - 1), kappa) * (2 * np.pi) ** (p / 2)) * np.exp(kappa * dot)) * x1 - u_pdf
+
+    #             return [eq1, eq2]
+            
+
+    #         return fsolve(func_solve, [0.1, 1])
+            
+    #     else:
+    #         print('u_cdf_scaled should be greater than 0.5')
+    #         return None, None
+            
+
+        
+    # def solve_for_kappa_discontinous(self, u_cdf_scaled):
+        
+
+    #     # fixed values
+    #     mu = np.array([1, 0, 0])
+    #     x = np.array([0, 0, 1])
+    #     p = 3 # length of x
+    #     dot = x.dot(mu)
+    #     phi_lim = [0, np.pi]
+    #     theta_lim = [np.pi/2, 3*np.pi/2]
+        
+        
+    #     if u_cdf_scaled > 0.5:
+    #         kappa = self.calc_kappa_from_cdf(1-u_cdf_scaled)
+    #         x1 = 1
+    #     else:
+    #         prob_mass = 0.49
+    #         kappa = self.calc_kappa_from_cdf(prob_mass)  # use a probability mass that is close to uniform. This suggests that there is no learning (everything is equally bad on this side of the constraint) and then scale it according to the required prob mass
+    #         # f = lambda phi, theta: kappa*np.exp(kappa*np.array([np.cos(theta)* np.sin(phi), np.sin(theta) * np.sin(phi), np.cos(phi)]).dot(mu))*np.sin(phi)/(2*np.pi*(np.exp(kappa)-np.exp(-kappa)))
+    #         f = lambda phi, theta: ( kappa*np.sin(phi)*np.exp(kappa*np.cos(theta)*np.sin(phi)) ) / ( 2*np.pi*(np.exp(kappa)-np.exp(-kappa)) )
+    #         VMF_cdf, err = integrate.dblquad(f, phi_lim[0], phi_lim[1], theta_lim[0], theta_lim[1])
+    #         print('VMF_cdf: ', VMF_cdf)
+    #         x1 = (1-u_cdf_scaled)/prob_mass
+
+        
+    #     return kappa, x1
+    #######################################################################
+
+    # # Calculates Kappa with variable scaling factors - most accurate
+    # def solve_for_kappa(self, u_cdf_scaled):
+    #     # Note u_cdf_scaled > 0.5; u_cdf_scaled = 0.5 results in kappa = 0, fully uniform on both sides of the sphere.
+        
+    #     # fixed values
+    #     mu = np.array([1, 0, 0])
+    #     x = np.array([0, 0, 1])
+    #     p = 3 # length of x
+    #     dot = x.dot(mu)
+        
+    #     # uniform_pdf = 1 / (4 * np.pi)
+    #     u_pdf = 1 / (4 * np.pi)
+
     #     def integrand(phi, theta, kappa):
     #         return ( kappa*np.sin(phi)*np.exp(kappa*np.cos(theta)*np.sin(phi)) ) / ( 2*np.pi*(np.exp(kappa)-np.exp(-kappa)) ) #this equation is for mu = [1, 0, 0], but kappa would be same for any mu for a particular cdf.
 
-    #     def func(kappa):
-    #         y, err = integrate.dblquad(integrand, np.pi/2, 3*np.pi/2, 0, np.pi, args = (kappa, )) #these limits are for mu = [1, 0, 0]
-    #         return LHS-y
+    #     def func_solve(vars):
+    #         kappa, x1 = vars
+    #         eq1 = integrate.dblquad(integrand, np.pi/2, 3*np.pi/2, 0, np.pi, args = (kappa, ))[0] * x1 - (1-u_cdf_scaled)/(2*u_cdf_scaled)
+    #         eq2 = ((kappa ** (p / 2 - 1)) / (special.iv((p / 2 - 1), kappa) * (2 * np.pi) ** (p / 2)) * np.exp(kappa * dot)) * x1 - u_pdf
+
+    #         return [eq1, eq2]
+
         
-    #     return fsolve(func, 0.0001)[0]
+    #     return fsolve(func_solve, [0.1, 1])
+
     
-    
+    # # Working for fixed scaling factors, but not needed   
     # def calc_kappa_from_pdf(self, pdf):
         
     #     LHS = pdf
@@ -636,7 +780,7 @@ class Particles_team():
             particle_positions = self.positions
             particle_weights = self.weights
 
-        vis_scale_factor = 10 * len(particle_positions)
+        vis_scale_factor = 10 * len(particle_positions) * (1/sum(particle_weights))
         if fig == None:
             fig = plt.figure()
         if ax == None:
@@ -907,11 +1051,11 @@ class Particles_team():
 
         # sample from the VMF + uniform distribution
         new_particle_positions_uniform = BEC_helpers.sample_human_models_random(constraint, int(np.ceil(
-            n_desired_reset_particles_informed * self.integral_prob_uniform)))
+            n_desired_reset_particles_informed * self.u_prob_mass_scaled)))
 
         mu_constraint = constraint[0] / np.linalg.norm(constraint[0])
         new_particle_positions_VMF = p_utils.rand_von_mises_fisher(mu_constraint, kappa=self.VMF_kappa, N=int(
-            np.ceil(n_desired_reset_particles_informed * self.integral_prob_VMF)),
+            np.ceil(n_desired_reset_particles_informed * self.VMF_prob_mass_scaled)),
                                                                    halfspace=True)
         new_particle_positions = np.vstack(
             (np.array(new_particle_positions_uniform), np.expand_dims(new_particle_positions_VMF, 1)))
@@ -924,18 +1068,85 @@ class Particles_team():
         self.reset_constraint = [constraint[0]]
 
     
-    # currently unused - will be needed when particles are reset based on all prior knowledge instead of just the last constraint
     def knowledge_update(self, knowledge_constraints):
         self.knowledge_constraints = copy.deepcopy(knowledge_constraints)
 
 
 
-    def update(self, constraints, c=0.5, reset_threshold_prob=0.001, u_cdf = None):
+    def update(self, constraints, c=0.5, reset_threshold_prob=0.001, learning_factor = None):
         self.weights_prev = self.weights.copy()
         self.positions_prev = self.positions.copy()
+        print(colored('constraints: ' + str(constraints), 'red'))
+
+
+        # plot particles functions
+        def label_axes(ax, mdp_class, weights=None):
+            fs = 12
+            ax.set_facecolor('white')
+            ax.xaxis.pane.fill = False
+            ax.yaxis.pane.fill = False
+            ax.zaxis.pane.fill = False
+            if weights is not None:
+                ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100/2)
+            if mdp_class == 'augmented_taxi2':
+                ax.set_xlabel(r'$\mathregular{w_0}$: Mud', fontsize = fs)
+                ax.set_ylabel(r'$\mathregular{w_1}$: Recharge', fontsize = fs)
+            elif mdp_class == 'colored_tiles':
+                ax.set_xlabel('X: Tile A (brown)')
+                ax.set_ylabel('Y: Tile B (green)')
+            else:
+                ax.set_xlabel('X: Goal')
+                ax.set_ylabel('Y: Skateboard')
+            ax.set_zlabel('$\mathregular{w_2}$: Action', fontsize = fs)
+
+            ax.view_init(elev=16, azim=-160)
+        
+        # https://stackoverflow.com/questions/41167196/using-matplotlib-3d-axes-how-to-drag-two-axes-at-once
+        # link the pan of the three axes together
+        # def on_move(event):
+        #     if event.inaxes == ax1:
+        #         ax2.view_init(elev=ax1.elev, azim=ax1.azim)
+        #         ax3.view_init(elev=ax1.elev, azim=ax1.azim)
+        #     elif event.inaxes == ax2:
+        #         ax1.view_init(elev=ax2.elev, azim=ax2.azim)
+        #         ax3.view_init(elev=ax2.elev, azim=ax2.azim)
+        #     elif event.inaxes == ax3:
+        #         ax1.view_init(elev=ax3.elev, azim=ax3.azim)
+        #         ax2.view_init(elev=ax3.elev, azim=ax3.azim)
+        #         return
+        #     fig.canvas.draw_idle()
+
+        fig = plt.figure()
+        ax = []
+        cnst_id = 0
+        plt_id = 1
+        N = len(constraints)
+        ##########################################
+
 
         for constraint in constraints:
-            self.reweight(constraint, u_cdf)
+
+            self.reweight(constraint, learning_factor)
+
+            print('constraint: {}'.format(constraint))
+
+            #### plot
+            ax.append(fig.add_subplot(N, 3, plt_id, projection='3d'))
+            plt_id += 1
+            ax.append(fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
+            plt_id += 1
+            ax.append(fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
+            plt_id += 1
+            ax[cnst_id*3].title.set_text('Particles before reweighting')
+            ax[cnst_id*3 + 1].title.set_text('Particles after reweighting')
+            ax[cnst_id*3 + 2].title.set_text('Particles after resampling')
+
+            self.plot(fig=fig, ax=ax[cnst_id*3], plot_prev=True)
+            BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3])
+            self.plot(fig=fig, ax=ax[cnst_id*3 + 1])
+            BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3 + 1])
+            ##########################################
+
 
             if sum(self.weights) < reset_threshold_prob:
                 self.reset(constraint)
@@ -960,30 +1171,48 @@ class Particles_team():
                     resample_indexes = self.KLD_resampling()
                     self.resample_from_index(np.array(resample_indexes))
                     # print('Plotting after resampling..')
-                    # self.plot()
+                    self.plot(fig=fig, ax=ax[cnst_id*3 + 2])
+                    BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3 + 2])
+
+
+            cnst_id += 1
+
+            # fig.canvas.mpl_connect('motion_notify_event', on_move)
+
+            
+        # plot the spherical polygon corresponding to the constraints
+        if len(constraints) > 0:
+            ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints)
+            poly = Polyhedron.Polyhedron(ieqs=ieqs)
+            for ax_n in ax:
+                BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax_n, plot_ref_sphere=False, alpha=0.75)
+                label_axes(ax_n, params.mdp_class, params.weights['val'])
+
+        plt.show()
 
         self.binned = False
 
 
-    def reweight(self, constraints, u_cdf = None):
+
+    def reweight(self, constraint, learning_factor = None):
         '''
         :param constraints: normal of constraints / mean direction of VMF
         :param k: concentration parameter of VMF
         :return: probability of x under this composite distribution (uniform + VMF)
         '''
 
-        if u_cdf is None:
-            u_pdf = self.u_pdf
+        if learning_factor is None:
+            u_pdf_scaled = self.u_pdf_scaled
             VMF_kappa = self.VMF_kappa
             x1 = self.x1
             x2 = self.x2
         else:
-            u_pdf = u_cdf/(2*np.pi)
-            VMF_kappa, x1 = self.solve_for_kappa(u_cdf)
-            x2 = u_cdf/0.5
+            u_pdf_scaled = learning_factor/(2*np.pi)
+            VMF_kappa, x1 = self.solve_for_distribution_params(learning_factor)
+            x2 = learning_factor/0.5
 
         for j, x in enumerate(self.positions):
-            obs_prob = self.observation_probability(u_pdf, VMF_kappa, x, constraints, x1, x2)
+            obs_prob = self.observation_probability(u_pdf_scaled, VMF_kappa, x, constraint, x1, x2)
             
             # print('Old particle weight:', str(self.weights[j]), 'Observation probability:', str(obs_prob))
             self.weights[j] = self.weights[j] * obs_prob
@@ -995,23 +1224,27 @@ class Particles_team():
 
 
     @staticmethod
-    def observation_probability(u_pdf, VMF_kappa, x, constraints, x1, x2):
+    def observation_probability(u_pdf_scaled, VMF_kappa, x, constraint, x1, x2):
         prob = 1
         p = x.shape[1]
 
-        for constraint in constraints:
-            dot = constraint.dot(x.T)
+        # the shape of constraints should be (1, p)
 
-            if dot >= 0:
-                # use the uniform dist
-                prob *= u_pdf
-            else:
-                # use the VMF dist
-                # prob *= p_utils.VMF_pdf(constraint, VMF_kappa, p, x, dot=dot)
-                prob *= p_utils.VMF_pdf(constraint, VMF_kappa, p, x, dot=dot) * x1 * x2
+        # for constraint in constraints:
 
+        dot = constraint.dot(x.T)
+
+        if dot >= 0:
+            # use the uniform dist
+            prob *= u_pdf_scaled
+        else:
+            # use the VMF dist
+            # prob *= p_utils.VMF_pdf(constraint, VMF_kappa, p, x, dot=dot)
+            # prob *= p_utils.VMF_pdf(constraint, VMF_kappa, p, x, dot=dot) * x1 * x2
+            prob *= p_utils.VMF_pdf(constraint[0], VMF_kappa, p, x, dot=dot) * x1 * x2   # only when for loop is not used.
 
         return prob
+
 
     @staticmethod
     def calc_n_eff(weights):
@@ -1083,11 +1316,11 @@ class Particles_team():
         for individual_constraints in joint_constraints:
             for constraint in individual_constraints:
                 new_particle_positions_uniform = BEC_helpers.sample_human_models_random(constraint, int(np.ceil(
-                n_desired_reset_particles_informed * self.integral_prob_uniform)))
+                n_desired_reset_particles_informed * self.u_prob_mass_scaled)))
 
                 mu_constraint = constraint[0] / np.linalg.norm(constraint[0])
                 new_particle_positions_VMF = p_utils.rand_von_mises_fisher(mu_constraint, kappa=self.VMF_kappa, N=int(
-                np.ceil(n_desired_reset_particles_informed * self.integral_prob_VMF)),
+                np.ceil(n_desired_reset_particles_informed * self.VMF_prob_mass_scaled)),
                                                                    halfspace=True)
                 
                 if i == 0:
@@ -1128,7 +1361,7 @@ class Particles_team():
         
         for j, x in enumerate(self.positions):
             
-            prob = self.observation_probability_jk(self.u_pdf, self.VMF_kappa, x, constraints, plot_particles_flag, self.x1, self.x2)
+            prob = self.observation_probability_jk(self.u_pdf_scaled, self.VMF_kappa, x, constraints, plot_particles_flag, self.x1, self.x2)
             self.weights[j] = self.weights[j] * prob
             
             # debug (only possible for high von-mises probabilities. should not normllay happen)            
@@ -1167,7 +1400,7 @@ class Particles_team():
 
 
     @staticmethod
-    def observation_probability_jk(u_pdf, VMF_kappa, x, joint_constraints, plot_particles_flag, x1, x2):
+    def observation_probability_jk(u_pdf_scaled, VMF_kappa, x, joint_constraints, plot_particles_flag, x1, x2):
         prob = 1
         p = x.shape[1]
 
@@ -1190,7 +1423,7 @@ class Particles_team():
                     prob_individual[0, ind_id] *= p_utils.VMF_pdf(constraint, VMF_kappa, p, x, dot=dot) * x1 * x2 # use the von Mises dist
                     # prob_individual[0, ind_id] *= p_utils.VMF_pdf(constraint, 4, p, x, dot=dot) * x1 * x2 # use the von Mises dist
                 else:
-                    prob_individual[0, ind_id] *= u_pdf # use the uniform dist
+                    prob_individual[0, ind_id] *= u_pdf_scaled # use the uniform dist
 
             ind_id += 1
 

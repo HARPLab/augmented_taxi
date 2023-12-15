@@ -57,7 +57,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 def calc_common_knowledge(team_knowledge, team_size, weights, step_cost_flag, kc_id=None):
 
-    # print('Team knowledge: ', team_knowledge)
+    print('Team knowledge: ', team_knowledge)
 
     for i in range(team_size):
         member_id = 'p' + str(i+1)
@@ -411,6 +411,23 @@ def calc_expected_learning(team_knowledge_expected, kc_id, particles_team_teache
         member_id = 'p' + str(p)
         # print('PF update of ', member_id)
         particles_team_teacher[member_id].update(new_constraints)
+        
+        ########## debugging - calculate proportion of particles that are within the BEC
+        N_particles = len(particles_team_teacher[member_id].positions)
+        uniform_particles_id = []
+        for particle_id in range(N_particles):
+            pos  = particles_team_teacher[member_id].positions[particle_id]
+            in_BEC_area_flag = True
+            for constraint in new_constraints:
+                dot = constraint.dot(pos.T)
+                if dot < 0:
+                    in_BEC_area_flag = False
+            
+            if not in_BEC_area_flag:
+                uniform_particles_id.append(particle_id)
+        
+        particles_team_teacher[member_id].particles_prob_correct = sum(particles_team_teacher[member_id].weights[uniform_particles_id])
+        ##########################
         
         if viz_flag:
             visualize_transition(new_constraints, particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set ' + str(loop_count+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(loop_count+1))
@@ -875,8 +892,8 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_learnin
 
         if team_prior is not None:
             # for cnst in team_prior[member_id]:
-            print('team_prior[member_id]: ', team_prior[member_id])  
-            particles_team[member_id].update(team_prior[member_id], u_cdf = 0.99) # all players irrespective of their learning ability are assumed to have the same prior 
+            print('team_prior[member_id]: ', team_prior[member_id])  # team prior is in team knowledge format. Hence use kc_id = 0 to get prior
+            particles_team[member_id].update(team_prior[member_id][0], learning_factor = 0.99) # all players irrespective of their learning ability are assumed to have the same prior 
 
                 # visualize_transition(cnst, particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for ' + str(member_id) )
             
@@ -1153,7 +1170,7 @@ def visualize_transition(constraints, particles, mdp_class, weights=None, fig=No
     fig.canvas.mpl_connect('motion_notify_event', on_move)
 
     plt.show()
-    fig.savefig('plots/' + plot_filename +'.png', dpi=300)
+    # fig.savefig('plots/' + plot_filename +'.png', dpi=300)
     # plt.pause(10)
     # plt.close()
 
@@ -1554,7 +1571,7 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, member_id, vari
     # if len(min_BEC_constraints_running) == 0:
     #     min_BEC_constraints_running = copy.deepcopy(params.prior) # impose prior
 
-    # Run not with minimum BEC constraints but with the particles knowledge
+    # Sample counterfactual models not with minimum BEC constraints but from the individual knowledge (from their constraints)
     constraint_space_to_sample_human_models = []
     
     kc_id_list = range(len(particles_demo.knowledge_constraints))
@@ -1570,7 +1587,7 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, member_id, vari
                     constraint_space_to_sample_human_models[i].extend(particles_demo.knowledge_constraints[kc_index][i])
             first_index = False
         else:
-            # print('team_knowledge[knowledge_type][kc_index]: ', team_knowledge[knowledge_type][kc_index])
+            print('particles_demo.knowledge_constraints[kc_index] ', particles_demo.knowledge_constraints[kc_index])
             if len(constraint_space_to_sample_human_models) == 0:
                 constraint_space_to_sample_human_models = copy.deepcopy(particles_demo.knowledge_constraints[kc_index])
             else:
@@ -1614,7 +1631,7 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, member_id, vari
             sample_human_models = BEC_helpers.sample_human_models_uniform(constraint_space_to_sample_human_models, n_human_models)
         else:
             for i in range(len(constraint_space_to_sample_human_models)):
-                # print('constraint_space_to_sample_human_models[i]: ', constraint_space_to_sample_human_models[i])
+                print('constraint_space_to_sample_human_models[i]: ', constraint_space_to_sample_human_models[i])
                 if len(sample_human_models) == 0:
                     sample_human_models.extend(BEC_helpers.sample_human_models_uniform(constraint_space_to_sample_human_models[i], int(n_human_models/len(constraint_space_to_sample_human_models))))
                 else:
@@ -1864,8 +1881,10 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, member_id, vari
             
             print('Updating particles with constraint: ', new_constraint)
             particles_demo.update(new_constraint)
+
             
-            # added newly to separate sampling space and demo info space
+            # added newly (12/1/23) to separate sampling space and demo info space
+            print('constraint_space_to_sample_human_models: ', constraint_space_to_sample_human_models)
             constraint_space_to_sample_human_models.extend(new_constraint)
             constraint_space_to_sample_human_models = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, weights, step_cost_flag)
             
@@ -2577,6 +2596,23 @@ def simulate_team_learning(kc_id, particles_team_learner, new_constraints, param
         member_id = 'p' + str(p)
         # print('PF update of ', member_id)
         particles_team_learner[member_id].update(new_constraints)
+
+        ########## debugging - calculate proportion of particles that are within the BEC
+        N_particles = len(particles_team_learner[member_id].positions)
+        uniform_particles_id = []
+        for particle_id in range(N_particles):
+            pos  = particles_team_learner[member_id].positions[particle_id]
+            in_BEC_area_flag = True
+            for constraint in new_constraints:
+                dot = constraint.dot(pos.T)
+                if dot < 0:
+                    in_BEC_area_flag = False
+            
+            if not in_BEC_area_flag:
+                uniform_particles_id.append(particle_id)
+        
+        particles_team_learner[member_id].particles_prob_correct = sum(particles_team_learner[member_id].weights[uniform_particles_id])
+        ##########################
         
         if viz_flag:
             visualize_transition(new_constraints, particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for set ' + str(loop_count+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(loop_count+1))

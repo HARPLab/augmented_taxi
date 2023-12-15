@@ -402,10 +402,10 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
 
     ###############################################################################################
     know_list_full = ['individual', 'common_knowledge', 'joint_knowledge']
-    team_mix_full = [[0,0,0], [0,0,1], [0,1,1], [1,1,1]]
+    team_mix_full = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
 
     know_list = know_list_full[0:]
-    team_mix = [team_mix_full[2]]
+    team_mix = [team_mix_full[3]]
 
     # filter run_id
     # run_ids = []
@@ -421,14 +421,14 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
     for team_mix_cond in team_mix:
         col_id = 0
         for know_id in know_list:    
-            plot_data = team_knowledge_level_long[(team_knowledge_level_long['knowledge_type']==know_id) & (team_knowledge_level_long['team_mix']==str(team_mix_cond))]
+            plot_data = team_knowledge_level_long[(team_knowledge_level_long['knowledge_type']==know_id) & (team_knowledge_level_long['team_composition']==str(team_mix_cond))]
             
             # plot_data.to_csv('models/augmented_taxi2/plot_data_' + know_id + '_' + str(team_mix_cond) + '.csv')
             print('Plotting  ', 'row_id: ', row_id, ' col_id: ', col_id, ' know_id: ', know_id, ' team_mix_cond: ', team_mix_cond)
             print('plot_data length: ', len(plot_data))
             print('plot_data type: ', type(plot_data))
             print('plot_data: ', plot_data)
-            sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[col_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge'], legend=False).set(title='Knowledge level for ' + know_id + ' with a team mix: ' + str(team_mix_cond))
+            sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[col_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge']).set(title='Knowledge level for ' + know_id + ' with a team mix: ' + str(team_mix_cond))
             # sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[row_id, col_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge'], legend=False).set(title='Knowledge level for ' + know_id + ' with a team mix: ' + str(team_mix_cond))
 
             col_id += 1 
@@ -522,7 +522,7 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
 
     # plot interaction count overall
     f, ax_c = plt.subplots(ncols=1)
-    sns.barplot(data = run_data, x = 'demo_strategy', y = 'max_loop_count', hue = 'team_mix', ax=ax_c, errorbar=('se',1)).set(title='Max number of interactions')
+    sns.barplot(data = run_data, x = 'demo_strategy', y = 'max_loop_count', hue = 'team_composition', ax=ax_c, errorbar=('se',1)).set(title='Max number of interactions')
 
     # simulation run conditions
     dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
@@ -530,7 +530,7 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
     for team_composition in team_mix_full:
         for dem_strategy in dem_strategy_list:
             print('team_composition: ', team_composition, ' dem_strategy: ', dem_strategy)
-            print('Number of runs: ', len(run_data[(run_data['team_mix']==str(team_composition)) & (run_data['demo_strategy']==dem_strategy)]))
+            print('Number of runs: ', len(run_data[(run_data['team_composition']==str(team_composition)) & (run_data['demo_strategy']==dem_strategy)]))
 
 
     plt.show()
@@ -639,74 +639,74 @@ def analyze_human_response_simulation(path, files, file_prefix):
 
 if __name__ == "__main__":
 
-    # process team knowledge data
-    path = 'models/augmented_taxi2'
-    files = os.listdir(path)
-    # files = ['debug_obj_func_1.csv']
+    # # process team knowledge data
+    # path = 'models/augmented_taxi2'
+    # files = os.listdir(path)
+    # # files = ['debug_obj_func_1.csv']
 
-    all_file_prefix_list = ['trials_12_10']
-    # all_runs_to_exclude_list = [[3, 12, 24, 7], [1,4,6,8], [], [1,3, 11, 12, 16, 18], [17, 21, 35], [], [], [], \
-    #                             [], [], [], [], [], [], []]
-    all_runs_to_exclude_list = []
+    # all_file_prefix_list = ['trials_12_10']
+    # # all_runs_to_exclude_list = [[3, 12, 24, 7], [1,4,6,8], [], [1,3, 11, 12, 16, 18], [17, 21, 35], [], [], [], \
+    # #                             [], [], [], [], [], [], []]
+    # all_runs_to_exclude_list = []
 
-    sets_to_consider = [14]
+    # sets_to_consider = [14]
 
-    # file_prefix_list = [all_file_prefix_list[i] for i in sets_to_consider]
-    # runs_to_exclude_list = [all_runs_to_exclude_list[i] for i in sets_to_consider]
+    # # file_prefix_list = [all_file_prefix_list[i] for i in sets_to_consider]
+    # # runs_to_exclude_list = [all_runs_to_exclude_list[i] for i in sets_to_consider]
 
-    file_prefix_list = ['trials_12_10']
-    runs_to_exclude_list = []
+    # file_prefix_list = ['trials_12_10']
+    # runs_to_exclude_list = []
 
-    print(file_prefix_list)
-    print(runs_to_exclude_list)
+    # print(file_prefix_list)
+    # print(runs_to_exclude_list)
     
-    runs_to_analyze_list = []
+    # runs_to_analyze_list = []
 
-    run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list = runs_to_exclude_list, runs_to_analyze_list = runs_to_analyze_list)
+    # run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list = runs_to_exclude_list, runs_to_analyze_list = runs_to_analyze_list)
 
-    analyze_run_data('models/augmented_taxi2/run_data.csv')
+    # analyze_run_data('models/augmented_taxi2/run_data.csv')
 
 
 
 
     # ##############################
-    # path = 'models/augmented_taxi2'
-    # # files = ['debug_data_response_particles_full_12_10.csv', 'debug_data_response_cluster_random_full_12_10.csv', 'debug_data_response_cluster_weights_full_12_10.csv']
-    # files = os.listdir(path)
-    # file_prefix = 'debug_response'
-    # response_data = analyze_human_response_simulation(path, files, file_prefix)
-    # response_data['learning_factor'] = np.round(response_data['learning_factor'].astype(float), 3)
-    # cols = ['condition', 'update_id', 'learning_factor', 'skip_model_flag', 'response_type', 'cluster_id']
-    # response_data_selected = response_data[cols]
+    path = 'models/augmented_taxi2'
+    # files = ['debug_data_response_particles_full_12_10.csv', 'debug_data_response_cluster_random_full_12_10.csv', 'debug_data_response_cluster_weights_full_12_10.csv']
+    files = os.listdir(path)
+    file_prefix = 'debug_response_N100_no_learning'
+    response_data = analyze_human_response_simulation(path, files, file_prefix)
+    response_data['learning_factor'] = np.round(response_data['learning_factor'].astype(float), 3)
+    cols = ['condition', 'update_id', 'learning_factor', 'skip_model_flag', 'response_type', 'cluster_id']
+    response_data_selected = response_data[cols]
 
-    # print('response_data_selected: ', response_data_selected)
+    print('response_data_selected: ', response_data_selected)
 
-    # response_data_valid = response_data_selected[response_data_selected['skip_model_flag'] == False]
-    # print('response_data_valid: ', response_data_valid)
+    response_data_valid = response_data_selected[response_data_selected['skip_model_flag'] == False]
+    print('response_data_valid: ', response_data_valid)
 
-    # response_data_correct = response_data_selected[response_data_selected['response_type'] == 'correct']
-    # print('response_data_correct: ', response_data_correct)
+    response_data_correct = response_data_selected[response_data_selected['response_type'] == 'correct']
+    print('response_data_correct: ', response_data_correct)
 
-    # response_prob = response_data_correct.groupby(['condition', 'update_id', 'learning_factor']).agg({'cluster_id':'count'})
+    response_prob = response_data_correct.groupby(['condition', 'update_id', 'learning_factor']).agg({'cluster_id':'count'})
                                                                                                      
-    # response_prob_den = response_data_valid.groupby(['condition', 'update_id', 'learning_factor']).agg({'cluster_id':'count'})
+    response_prob_den = response_data_valid.groupby(['condition', 'update_id', 'learning_factor']).agg({'cluster_id':'count'})
 
-    # response_prob['probability'] = response_prob['cluster_id']/response_prob_den['cluster_id']
-
-
-    # # response_prob.rename(columns={'cluster_id': 'correct_test_probability'}, inplace=True)
+    response_prob['probability'] = response_prob['cluster_id']/response_prob_den['cluster_id']
 
 
-    # print('response_prob: ', response_prob)
-    # # print('response_prob_num: ', response_prob_num)
-    # # print('response_prob_den: ', response_prob_den)
+    # response_prob.rename(columns={'cluster_id': 'correct_test_probability'}, inplace=True)
 
 
-    # f, ax = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(10,6))
-    # plt.subplots_adjust(wspace=0.1, hspace=0.1)        
-    # sns.lineplot(response_prob, x = 'learning_factor', y = 'probability', hue = 'condition', ax=ax[0], legend=True).set(title='Learning factor vs. probability of correct response for various sampling conditions')
-    # sns.lineplot(response_prob, x = 'learning_factor', y = 'probability', hue = 'update_id', ax=ax[1], legend=True).set(title='Learning factor vs. probability of correct response based on number of PF updates/interactions')
-    # plt.show()
+    print('response_prob: ', response_prob)
+    # print('response_prob_num: ', response_prob_num)
+    # print('response_prob_den: ', response_prob_den)
+
+
+    f, ax = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(10,6))
+    plt.subplots_adjust(wspace=0.1, hspace=0.1)        
+    sns.lineplot(response_prob, x = 'learning_factor', y = 'probability', hue = 'condition', ax=ax[0], legend=True).set(title='Learning factor vs. probability of correct response for various sampling conditions')
+    sns.lineplot(response_prob, x = 'learning_factor', y = 'probability', hue = 'update_id', ax=ax[1], legend=True).set(title='Learning factor vs. probability of correct response based on number of PF updates/interactions')
+    plt.show()
 
 
     
