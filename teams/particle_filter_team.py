@@ -827,35 +827,42 @@ class Particles_team():
         elevations = positions_spherical[:, 0]
         azimuths = positions_spherical[:, 1]
 
-        max_ele_dist = max(elevations) - min(elevations)
-        max_azi_dist = max(azimuths) - min(azimuths)  # 12/10/23. Added to increase noise more equally in both elevation and azimuth directions
+        ############## Calculate maximum noise
+        # # Method 1: use the maximum distance between any two particles in the current set of particles
+        # max_ele_dist = max(elevations) - min(elevations)
+        # max_azi_dist = max(azimuths) - min(azimuths)  # 12/10/23. Added to increase noise more equally in both elevation and azimuth directions
+        # ###
         
+        # Method 2: use the maximum distance between any two CONSECUTIVE particles in the original set of particles
+        azimuths_sorted = np.sort(azimuths)
+        azi_dists = np.empty(len(azimuths))
+        azi_dists[0:-1] = np.diff(azimuths_sorted)
+        azi_dists[-1] = min(2 * np.pi - (max(azimuths_sorted) - min(azimuths_sorted)), max(azimuths_sorted) - min(azimuths_sorted))
 
-        # azimuths_sorted = np.sort(azimuths)
-        # azi_dists = np.empty(len(azimuths))
-        # azi_dists[0:-1] = np.diff(azimuths_sorted)
-        # azi_dists[-1] = min(2 * np.pi - (max(azimuths_sorted) - min(azimuths_sorted)), max(azimuths_sorted) - min(azimuths_sorted))
+        if np.std(azi_dists[azi_dists > self.eps]) < 0.01 and np.std(azimuths_sorted) > 1:
+            # the particles are relatively evenly spaced out across the full range of azimuth
+            max_azi_dist = 2 * np.pi
+        else:
+            # take the largest gap/azimuth distance between two consecutive particles
+            max_azi_dist = max(azi_dists)
 
-        # if np.std(azi_dists[azi_dists > self.eps]) < 0.01 and np.std(azimuths_sorted) > 1:
-        #     # the particles are relatively evenly spaced out across the full range of azimuth
-        #     max_azi_dist = 2 * np.pi
-        # else:
-        #     # take the largest gap/azimuth distance between two consecutive particles
-        #     max_azi_dist = max(azi_dists)
+        ######## 12/10/23. added to make noise more isotropic, based on elevation differences between points similar to azimuth
+        elevations_sorted = np.sort(elevations)
+        ele_dists = np.empty(len(elevations))
+        ele_dists[0:-1] = np.diff(elevations_sorted)
+        ele_dists[-1] = min(np.pi - (max(elevations_sorted) - min(elevations_sorted)), max(elevations_sorted) - min(elevations_sorted))
 
-        # ######## 12/10/23. added to make noise more isotropic, based on elevation differences between points similar to azimuth
-        # elevations_sorted = np.sort(elevations)
-        # ele_dists = np.empty(len(elevations))
-        # ele_dists[0:-1] = np.diff(elevations_sorted)
-        # ele_dists[-1] = min(np.pi - (max(elevations_sorted) - min(elevations_sorted)), max(elevations_sorted) - min(elevations_sorted))
+        if np.std(ele_dists[ele_dists > self.eps]) < 0.01 and np.std(elevations_sorted) > 1:
+            # the particles are relatively evenly spaced out across the full range of elevation
+            max_ele_dist = np.pi
+        else:
+            # take the largest gap/elevation distance between two consecutive particles
+            max_ele_dist = max(ele_dists)
+        ###
 
-        # if np.std(ele_dists[ele_dists > self.eps]) < 0.01 and np.std(elevations_sorted) > 0.5:
-        #     # the particles are relatively evenly spaced out across the full range of elevation
-        #     max_ele_dist = np.pi
-        # else:
-        #     # take the largest gap/elevation distance between two consecutive particles
-        #     max_ele_dist = max(ele_dists)
-
+        ##### Method 2b 12/17/23. Added to make noise more isotropic.
+        max_azi_dist = max(max_azi_dist, max_ele_dist)  # make azimuth atleast as wide as elevation
+        
         ########################################
 
         # noise suggested by "Novel approach to nonlinear/non-Gaussian Bayesian state estimation" by Gordon et al.
@@ -1047,8 +1054,6 @@ class Particles_team():
         n_desired_reset_particles_informed = len(resample_indexes)
         print('informed number: {}'.format(n_desired_reset_particles_informed))
 
-        print('constraint: {}'.format(constraint))
-
         # sample from the VMF + uniform distribution
         new_particle_positions_uniform = BEC_helpers.sample_human_models_random(constraint, int(np.ceil(
             n_desired_reset_particles_informed * self.u_prob_mass_scaled)))
@@ -1072,15 +1077,57 @@ class Particles_team():
         self.knowledge_constraints = copy.deepcopy(knowledge_constraints)
 
 
+    ################ These functions are primarily for debugging purposes. To calculate what proportion of particles are in the correct halfspace
+    def calc_particles_probability(self, constraints):
+        N_particles = len(self.positions)
+        uniform_particles_id = []
+        for particle_id in range(N_particles):
+            pos  = self.positions[particle_id]
+            in_BEC_area_flag = True
+            for constraint in constraints:
+                dot = constraint.dot(pos.T)
+                if dot < 0:
+                    in_BEC_area_flag = False
+            
+            if in_BEC_area_flag:
+                uniform_particles_id.append(particle_id)
+        
+        self.particles_prob_correct = sum([self.weights[i] for i in uniform_particles_id])
 
-    def update(self, constraints, c=0.5, reset_threshold_prob=0.001, learning_factor = None):
+
+
+    def calc_clusters_probability(self, constraints):
+        if self.cluster_centers is not None:
+            N_clusters = len(self.cluster_centers)
+            uniform_clusters_id = []
+            for cluster_id in range(N_clusters):
+                cluster  = self.cluster_centers[cluster_id]
+                in_BEC_area_flag = True
+                for constraint in constraints:
+                    dot = constraint.dot(cluster.T)
+                    if dot < 0:
+                        in_BEC_area_flag = False
+                
+                if in_BEC_area_flag:
+                    uniform_clusters_id.append(cluster_id)
+        
+            self.clusters_prob_correct = sum([self.cluster_weights[i] for i in uniform_clusters_id])
+        else:
+            self.clusters_prob_correct = []
+            
+
+
+    ################################################################################################
+
+
+    def update(self, constraints, c=0.5, reset_threshold_prob=0.001, learning_factor = None, plot_title = None):
         self.weights_prev = self.weights.copy()
         self.positions_prev = self.positions.copy()
         print(colored('constraints: ' + str(constraints), 'red'))
 
 
         # plot particles functions
-        def label_axes(ax, mdp_class, weights=None):
+        def label_axes(ax, mdp_class, weights=None, view_params = None):
             fs = 12
             ax.set_facecolor('white')
             ax.xaxis.pane.fill = False
@@ -1099,22 +1146,15 @@ class Particles_team():
                 ax.set_ylabel('Y: Skateboard')
             ax.set_zlabel('$\mathregular{w_2}$: Action', fontsize = fs)
 
-            ax.view_init(elev=16, azim=-160)
+            # ax.view_init(elev=16, azim=-160)
+            if not view_params is None:
+                elev = view_params[0]
+                azim = view_params[1]
+            else:
+                elev=16
+                azim = -160
+            ax.view_init(elev=elev, azim=azim)
         
-        # https://stackoverflow.com/questions/41167196/using-matplotlib-3d-axes-how-to-drag-two-axes-at-once
-        # link the pan of the three axes together
-        # def on_move(event):
-        #     if event.inaxes == ax1:
-        #         ax2.view_init(elev=ax1.elev, azim=ax1.azim)
-        #         ax3.view_init(elev=ax1.elev, azim=ax1.azim)
-        #     elif event.inaxes == ax2:
-        #         ax1.view_init(elev=ax2.elev, azim=ax2.azim)
-        #         ax3.view_init(elev=ax2.elev, azim=ax2.azim)
-        #     elif event.inaxes == ax3:
-        #         ax1.view_init(elev=ax3.elev, azim=ax3.azim)
-        #         ax2.view_init(elev=ax3.elev, azim=ax3.azim)
-        #         return
-        #     fig.canvas.draw_idle()
 
         fig = plt.figure()
         ax = []
@@ -1125,30 +1165,55 @@ class Particles_team():
 
 
         for constraint in constraints:
-
+            # print('constraint: {}'.format(constraint))
+            
             self.reweight(constraint, learning_factor)
 
-            print('constraint: {}'.format(constraint))
+            
 
-            #### plot
-            ax.append(fig.add_subplot(N, 3, plt_id, projection='3d'))
-            plt_id += 1
-            ax.append(fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
-            plt_id += 1
-            ax.append(fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
-            plt_id += 1
-            ax[cnst_id*3].title.set_text('Particles before reweighting')
-            ax[cnst_id*3 + 1].title.set_text('Particles after reweighting')
-            ax[cnst_id*3 + 2].title.set_text('Particles after resampling')
+            ############ plot
+            if len(constraint) > 0:
+                ax.append(fig.add_subplot(N, 3, plt_id, projection='3d'))
+                plt_id += 1
+                ax.append(fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
+                plt_id += 1
+                ax.append(fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
+                plt_id += 1
+                ax[cnst_id*3].title.set_text('Particles before reweighting')
+                ax[cnst_id*3 + 1].title.set_text('Particles after reweighting')
+                ax[cnst_id*3 + 2].title.set_text('Particles after resampling')
 
-            self.plot(fig=fig, ax=ax[cnst_id*3], plot_prev=True)
-            BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3])
-            self.plot(fig=fig, ax=ax[cnst_id*3 + 1])
-            BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3 + 1])
+                self.plot(fig=fig, ax=ax[cnst_id*3], plot_prev=True)
+                BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3])
+                self.plot(fig=fig, ax=ax[cnst_id*3 + 1])
+                BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3 + 1])
+
+                # plot the spherical polygon corresponding to the constraints
+                ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraint)
+                poly = Polyhedron.Polyhedron(ieqs=ieqs)
+                BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax[cnst_id*3 + 1], plot_ref_sphere=False, alpha=0.75)
+
+                if constraint[0][0] == 0:
+                    view_params = [16, -160]
+                elif constraint[0][1] == 0:
+                    view_params = [2, -100]
+                elif constraint[0][2] == 0:
+                    view_params = [2, -60]
+                else:
+                    view_params = [16, -160]
+
+                label_axes(ax[cnst_id*3], params.mdp_class, params.weights['val'], view_params = view_params)
+                label_axes(ax[cnst_id*3 + 1], params.mdp_class, params.weights['val'], view_params = view_params)
+                label_axes(ax[cnst_id*3 + 2], params.mdp_class, params.weights['val'], view_params = view_params)
+
+                if plot_title is not None:
+                    fig.suptitle(plot_title, fontsize=16)
+
             ##########################################
 
 
             if sum(self.weights) < reset_threshold_prob:
+                print('Resetting... Constraint: {}'.format(constraint))
                 self.reset(constraint)
             else:
                 # normalize weights and update particles
@@ -1168,25 +1233,43 @@ class Particles_team():
                     # print('Plotting before resampling..')
                     # self.plot()
                     print(colored('Resampling...', 'red'))
+                    # for debugging purposes
+                    self.calc_particles_probability([constraint])
+                    self.cluster()
+                    self.calc_clusters_probability([constraint])
+                    print(colored('Particles prob before resampling: ' + str(self.particles_prob_correct) + '. Clusters prob before resampling: ' + str(self.clusters_prob_correct), 'red'))
+                    self.plot(fig=fig, ax=ax[cnst_id*3 + 1], cluster_centers=self.cluster_centers, cluster_weights=self.cluster_weights)
+
                     resample_indexes = self.KLD_resampling()
                     self.resample_from_index(np.array(resample_indexes))
-                    # print('Plotting after resampling..')
-                    self.plot(fig=fig, ax=ax[cnst_id*3 + 2])
+
+                    # For debugging purposes
+                    self.calc_particles_probability([constraint])
+                    self.cluster()
+                    self.calc_clusters_probability([constraint])
+                    print(colored('Particles prob after resampling: ' + str(self.particles_prob_correct) + '. Clusters prob after resampling: ' + str(self.clusters_prob_correct), 'red'))
+                    self.plot(fig=fig, ax=ax[cnst_id*3 + 2], cluster_centers=self.cluster_centers, cluster_weights=self.cluster_weights)
                     BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3 + 2])
 
 
-            cnst_id += 1
-
+            # # https://stackoverflow.com/questions/41167196/using-matplotlib-3d-axes-how-to-drag-two-axes-at-once
+            # # link the pan of the three axes together
+            # def on_move(event):
+            #     if event.inaxes == ax[cnst_id*3]:
+            #         ax[cnst_id*3+1].view_init(elev=ax[cnst_id*3].elev, azim=ax[cnst_id*3].azim)
+            #         ax[cnst_id*3+2].view_init(elev=ax[cnst_id*3].elev, azim=ax[cnst_id*3].azim)
+            #     elif event.inaxes == ax[cnst_id*3+1]:
+            #         ax[cnst_id*3].view_init(elev=ax[cnst_id*3+1].elev, azim=ax[cnst_id*3+1].azim)
+            #         ax[cnst_id*3+2].view_init(elev=ax[cnst_id*3+1].elev, azim=ax[cnst_id*3+1].azim)
+            #     elif event.inaxes == ax[cnst_id*3+2]:
+            #         ax[cnst_id*3].view_init(elev=ax[cnst_id*3+2].elev, azim=ax[cnst_id*3+2].azim)
+            #         ax[cnst_id*3+1].view_init(elev=ax[cnst_id*3+2].elev, azim=ax[cnst_id*3+2].azim)
+            #         return
+            #     fig.canvas.draw_idle()
+            
             # fig.canvas.mpl_connect('motion_notify_event', on_move)
 
-            
-        # plot the spherical polygon corresponding to the constraints
-        if len(constraints) > 0:
-            ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints)
-            poly = Polyhedron.Polyhedron(ieqs=ieqs)
-            for ax_n in ax:
-                BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax_n, plot_ref_sphere=False, alpha=0.75)
-                label_axes(ax_n, params.mdp_class, params.weights['val'])
+            cnst_id += 1
 
         plt.show()
 

@@ -675,6 +675,18 @@ def check_VMF_distribution():
         print('uniform_particles: ', len(uniform_particles), 'uniform_prob: ', len(uniform_prob))
 
 
+
+        # check if particle filter probability calculation function is working
+        particles_team_learner[member_id].cluster()
+        particles_team_learner[member_id].calc_clusters_probability([prior])
+        particles_team_learner[member_id].calc_particles_probability([prior])
+
+
+        print(colored('particles_team_learner[member_id].particles_prob_correct: ' + str(particles_team_learner[member_id].particles_prob_correct) + \
+              'particles_team_learner[member_id].clusters_prob_correct: ' + str(particles_team_learner[member_id].clusters_prob_correct), 'green'))
+
+
+
         # plot uniform and vmf particle distribution
         fig, ax = plt.subplots(ncols=2, figsize=(10,6))
         ax[0].hist(uniform_prob)
@@ -728,6 +740,118 @@ def check_VMF_distribution():
         ax1.legend()
 
         plt.show()
+
+
+def func_to_choose_plot_view_params():
+
+    def label_axes(ax, mdp_class, weights=None, view_params = None):
+        fs = 12
+        ax.set_facecolor('white')
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
+        if weights is not None:
+            ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100/2)
+        if mdp_class == 'augmented_taxi2':
+            ax.set_xlabel(r'$\mathregular{w_0}$: Mud', fontsize = fs)
+            ax.set_ylabel(r'$\mathregular{w_1}$: Recharge', fontsize = fs)
+        elif mdp_class == 'colored_tiles':
+            ax.set_xlabel('X: Tile A (brown)')
+            ax.set_ylabel('Y: Tile B (green)')
+        else:
+            ax.set_xlabel('X: Goal')
+            ax.set_ylabel('Y: Skateboard')
+        ax.set_zlabel('$\mathregular{w_2}$: Action', fontsize = fs)
+
+        # ax.view_init(elev=16, azim=-160)
+        if not view_params is None:
+            elev = view_params[0]
+            azim = view_params[1]
+        else:
+            elev=16
+            azim = -160
+        ax.view_init(elev=elev, azim=azim)
+
+    team_size = 1
+    N_particles = 500
+    particles_team_learner = team_helpers.sample_team_pf(team_size, N_particles, params.weights['val'], params.step_cost_flag, pf_flag='learner')
+    constraints_list = [params.prior, [np.array([[-1,  0,  2]])], [np.array([[ 1,  0, -4]])], [np.array([[ 0, -1, -2]])], [np.array([[0, 1, 4]])], \
+                        [np.array([[-2, -1,  0]])], [np.array([[1, 1, 0]])] ]
+    print('constraints_list: ', constraints_list)
+    fig = plt.figure()
+    ax = []
+    N = len(constraints_list)
+    plt_id = 1
+
+    # for [0, x, x]: [16, -160], for [x, 0, x]: [2, -100], for [x, x, 0]: [2, -60]
+    view_params = [2, -60]
+    
+    for i in range(team_size):
+        member_id = 'p' + str(i+1)
+        for constraint in constraints_list:
+            ax.append(fig.add_subplot(2, 4, plt_id, projection='3d'))
+            particles_team_learner[member_id].plot(fig=fig, ax=ax[plt_id-1])
+            BEC_viz.visualize_planes(constraint, fig=fig, ax=ax[plt_id-1])
+            ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraint)
+            poly = Polyhedron.Polyhedron(ieqs=ieqs)
+            BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax[plt_id-1], plot_ref_sphere=False, alpha=0.75)
+            # label_axes(ax[plt_id-1], params.mdp_class, params.weights['val'])
+            label_axes(ax[plt_id-1], params.mdp_class, params.weights['val'], view_params)
+            plt_id +=1 
+
+    plt.show()
+
+
+
+
+def check_resampling_gaussian_noise():
+
+    with open('models/augmented_taxi2/test_mdp.pickle', 'rb') as f:
+        test_mdp = pickle.load(f) 
+    with open('models/augmented_taxi2/test_constraints.pickle', 'rb') as f:
+        test_constraints = pickle.load(f) 
+    with open('models/augmented_taxi2/opt_traj.pickle', 'rb') as f:
+        opt_traj = pickle.load(f)    
+    with open('models/augmented_taxi2/env_idx.pickle', 'rb') as f:
+        env_idx = pickle.load(f)  
+    
+
+    new_constraints = [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])]
+    test_responses_sim = [[np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[1,  0,  -2]]), np.array([[ -1,  0, 4]])], [np.array([[ -1,  0, 4]])]]
+
+    initial_team_learning_factor = [0.95]
+    team_learning_factor = copy.deepcopy(initial_team_learning_factor)
+    
+    particles_team_learner = team_helpers.sample_team_pf(1, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_learning_factor = initial_team_learning_factor, team_prior = params.team_prior, pf_flag='learner')
+
+    viz_flag = True
+    response_id = 0
+    loop_id = 0
+
+    while(loop_id < 5):
+        
+        # update particles based on demo constraints
+        for p in range(1):
+            member_id = 'p' + str(p+1)
+            particles_team_learner[member_id].update(new_constraints, learning_factor = team_learning_factor[p])
+            if viz_flag:
+                team_helpers.visualize_transition(new_constraints, particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = 'Learner knowledge change after demos set ' + str(loop_id+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(loop_id+1))
+
+            particles_team_learner[member_id].update(test_responses_sim[response_id], learning_factor = team_learning_factor[p])
+            if viz_flag:
+                team_helpers.visualize_transition(test_responses_sim[response_id], particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = 'Learner knowledge change after test set ' + str(loop_id+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(loop_id+1))
+            
+            if response_id == len(test_responses_sim)-1:
+                response_id = 0
+            else:
+                response_id += 1
+                
+        loop_id += 1
+
+
+    #######################################
+
+
 
 
 
@@ -2834,65 +2958,6 @@ if __name__ == "__main__":
 
     #######################################  test the PF resampling process with Gaussian Noise  ###########
 
-    # with open('models/augmented_taxi2/test_mdp.pickle', 'rb') as f:
-    #     test_mdp = pickle.load(f) 
-    # with open('models/augmented_taxi2/test_constraints.pickle', 'rb') as f:
-    #     test_constraints = pickle.load(f) 
-    # with open('models/augmented_taxi2/opt_traj.pickle', 'rb') as f:
-    #     opt_traj = pickle.load(f)    
-    # with open('models/augmented_taxi2/env_idx.pickle', 'rb') as f:
-    #     env_idx = pickle.load(f)  
     
-    # # new_constraints = [[np.array([[-1,  0,  2]])]]
-
-    # # particles_team_learner['p1'].update(new_constraints)
-    # # particles_team_learner['p2'].update(new_constraints)
-    # # particles_team_learner['p3'].update(new_constraints)
-
-    # # team_helpers.visualize_transition(new_constraints[0], particles_team_learner['p1'], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for p1' )
-    # # team_helpers.visualize_transition(new_constraints[0], particles_team_learner['p2'], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for p2' )
-    # # team_helpers.visualize_transition(new_constraints[0], particles_team_learner['p3'], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for p3' )
-
-    # new_constraints = [[np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])]]
-    # test_responses_sim = [[np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[1,  0,  -2]]), np.array([[ -1,  0, 4]])], [np.array([[ -1,  0, 4]])]]
-
-    # initial_team_learning_factor = [0.95]
-    # team_learning_factor = copy.deepcopy(initial_team_learning_factor)
-    
-    # particles_team_learner = team_helpers.sample_team_pf(1, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_learning_factor = initial_team_learning_factor, team_prior = params.team_prior, pf_flag='learner')
-
-
-    # run_sim = True
-    # N_updates = 6
-    # viz_flag = True
-    # N_samples = 1
-    # sampling_unit_size = 1
-    # response_id = 0
-    # loop_id = 0
-
-    # while(loop_id < 50):
-        
-    #     # update particles based on demo constraints
-    #     for p in range(1):
-    #         member_id = 'p' + str(p+1)
-    #         particles_team_learner[member_id].update(new_constraints, u_cdf = team_learning_factor[p])
-    #         if viz_flag:
-    #             team_helpers.visualize_transition(new_constraints[0], particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = 'Learner knowledge change after demos set ' + str(loop_id+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(loop_id+1))
-
-    #         particles_team_learner[member_id].update(test_responses_sim[response_id], u_cdf = team_learning_factor[p])
-    #         if viz_flag:
-    #             team_helpers.visualize_transition(test_responses_sim[response_id], particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = 'Learner knowledge change after test set ' + str(loop_id+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(loop_id+1))
-            
-
-    #         if response_id == len(test_responses_sim)-1:
-    #             response_id = 0
-    #         else:
-    #             response_id += 1
-                
-            
-    #     loop_id += 1
-
-
-    #######################################
 
     x=1

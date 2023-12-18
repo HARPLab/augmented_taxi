@@ -288,9 +288,8 @@ def get_human_response(condition, env_idx, particles_to_sample, opt_traj, test_c
     points_to_avoid = []
 
     # particles_to_sample.cluster()  ## Cluster happens here!
-
-    print('Cluster centers: ', len(particles_to_sample.cluster_centers))
-    print('Cluster weights: ', len(particles_to_sample.cluster_weights))
+    # print('Cluster centers: ', len(particles_to_sample.cluster_centers))
+    # print('Cluster weights: ', len(particles_to_sample.cluster_weights))
 
     while skip_human_model:
 
