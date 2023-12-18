@@ -86,7 +86,7 @@ if __name__ == "__main__":
 
     
 
-    team_params_learning = {'low': [0.65, 0.0], 'med': [0.65, 0.0], 'high': [0.8, 0.0]}
+    team_params_learning = {'low': [0.65, 0.05], 'med': [0.65, 0.05], 'high': [0.8, 0.05]}
     # team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
     # dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
 
@@ -99,10 +99,10 @@ if __name__ == "__main__":
  
     sim_params = {'min_correct_likelihood': 0.6}
     
-    N_runs = 80
+    N_runs = 16
     run_start_id = 1
 
-    file_prefix = 'trials_12_13_set_1'
+    file_prefix = 'trials_12_17_set_1'
     
     path = 'models/augmented_taxi2'
 
