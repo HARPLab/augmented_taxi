@@ -1172,42 +1172,42 @@ class Particles_team():
             
 
             ############ plot
-            if len(constraint) > 0:
-                ax.append(fig.add_subplot(N, 3, plt_id, projection='3d'))
-                plt_id += 1
-                ax.append(fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
-                plt_id += 1
-                ax.append(fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
-                plt_id += 1
-                ax[cnst_id*3].title.set_text('Particles before reweighting')
-                ax[cnst_id*3 + 1].title.set_text('Particles after reweighting')
-                ax[cnst_id*3 + 2].title.set_text('Particles after resampling')
+            # if len(constraint) > 0:
+            #     ax.append(fig.add_subplot(N, 3, plt_id, projection='3d'))
+            #     plt_id += 1
+            #     ax.append(fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
+            #     plt_id += 1
+            #     ax.append(fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
+            #     plt_id += 1
+            #     ax[cnst_id*3].title.set_text('Particles before reweighting')
+            #     ax[cnst_id*3 + 1].title.set_text('Particles after reweighting')
+            #     ax[cnst_id*3 + 2].title.set_text('Particles after resampling')
 
-                self.plot(fig=fig, ax=ax[cnst_id*3], plot_prev=True)
-                BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3])
-                self.plot(fig=fig, ax=ax[cnst_id*3 + 1])
-                BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3 + 1])
+            #     self.plot(fig=fig, ax=ax[cnst_id*3], plot_prev=True)
+            #     BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3])
+            #     self.plot(fig=fig, ax=ax[cnst_id*3 + 1])
+            #     BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3 + 1])
 
-                # plot the spherical polygon corresponding to the constraints
-                ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraint)
-                poly = Polyhedron.Polyhedron(ieqs=ieqs)
-                BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax[cnst_id*3 + 1], plot_ref_sphere=False, alpha=0.75)
+            #     # plot the spherical polygon corresponding to the constraints
+            #     ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraint)
+            #     poly = Polyhedron.Polyhedron(ieqs=ieqs)
+            #     BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax[cnst_id*3 + 1], plot_ref_sphere=False, alpha=0.75)
 
-                if constraint[0][0] == 0:
-                    view_params = [16, -160]
-                elif constraint[0][1] == 0:
-                    view_params = [2, -100]
-                elif constraint[0][2] == 0:
-                    view_params = [2, -60]
-                else:
-                    view_params = [16, -160]
+            #     if constraint[0][0] == 0:
+            #         view_params = [16, -160]
+            #     elif constraint[0][1] == 0:
+            #         view_params = [2, -100]
+            #     elif constraint[0][2] == 0:
+            #         view_params = [2, -60]
+            #     else:
+            #         view_params = [16, -160]
 
-                label_axes(ax[cnst_id*3], params.mdp_class, params.weights['val'], view_params = view_params)
-                label_axes(ax[cnst_id*3 + 1], params.mdp_class, params.weights['val'], view_params = view_params)
-                label_axes(ax[cnst_id*3 + 2], params.mdp_class, params.weights['val'], view_params = view_params)
+            #     label_axes(ax[cnst_id*3], params.mdp_class, params.weights['val'], view_params = view_params)
+            #     label_axes(ax[cnst_id*3 + 1], params.mdp_class, params.weights['val'], view_params = view_params)
+            #     label_axes(ax[cnst_id*3 + 2], params.mdp_class, params.weights['val'], view_params = view_params)
 
-                if plot_title is not None:
-                    fig.suptitle(plot_title, fontsize=16)
+            #     if plot_title is not None:
+            #         fig.suptitle(plot_title, fontsize=16)
 
             ##########################################
 
@@ -1271,7 +1271,7 @@ class Particles_team():
 
             cnst_id += 1
 
-        plt.show()
+        # plt.show()
 
         self.binned = False
 
