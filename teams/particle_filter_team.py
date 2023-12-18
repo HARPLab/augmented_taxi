@@ -1238,18 +1238,18 @@ class Particles_team():
                     self.cluster()
                     self.calc_clusters_probability([constraint])
                     print(colored('Particles prob before resampling: ' + str(self.particles_prob_correct) + '. Clusters prob before resampling: ' + str(self.clusters_prob_correct), 'red'))
-                    self.plot(fig=fig, ax=ax[cnst_id*3 + 1], cluster_centers=self.cluster_centers, cluster_weights=self.cluster_weights)
+                    # self.plot(fig=fig, ax=ax[cnst_id*3 + 1], cluster_centers=self.cluster_centers, cluster_weights=self.cluster_weights)
 
                     resample_indexes = self.KLD_resampling()
                     self.resample_from_index(np.array(resample_indexes))
 
-                    # For debugging purposes
+                    # # For debugging purposes
                     self.calc_particles_probability([constraint])
                     self.cluster()
                     self.calc_clusters_probability([constraint])
                     print(colored('Particles prob after resampling: ' + str(self.particles_prob_correct) + '. Clusters prob after resampling: ' + str(self.clusters_prob_correct), 'red'))
-                    self.plot(fig=fig, ax=ax[cnst_id*3 + 2], cluster_centers=self.cluster_centers, cluster_weights=self.cluster_weights)
-                    BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3 + 2])
+                    # self.plot(fig=fig, ax=ax[cnst_id*3 + 2], cluster_centers=self.cluster_centers, cluster_weights=self.cluster_weights)
+                    # BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3 + 2])
 
 
             # # https://stackoverflow.com/questions/41167196/using-matplotlib-3d-axes-how-to-drag-two-axes-at-once
