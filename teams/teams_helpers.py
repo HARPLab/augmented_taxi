@@ -686,7 +686,7 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team_te
         if plot_flag:
             plot_text(team_knowledge_constraints, knowledge_level[knowledge_type], fig, plot_id)
             plot_id += 1
-
+            plt.show()
 
         # # print(colored('Calculated knowledge level for: ', 'blue'), knowledge_type)
         # # print('min_unit_constraints: ', min_unit_constraints)
@@ -698,10 +698,6 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team_te
         # # print('min_unit_BEC_knowledge_union: ', min_unit_BEC_knowledge_union)
         # # print('knowledge_level_unit: ', knowledge_level[knowledge_type])
 
-
-        plt.show()
-
-        
 
     return knowledge_level
 

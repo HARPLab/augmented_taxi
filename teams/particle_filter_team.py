@@ -1156,11 +1156,11 @@ class Particles_team():
             ax.view_init(elev=elev, azim=azim)
         
 
-        fig = plt.figure()
-        ax = []
+        # fig = plt.figure()
+        # ax = []
+        # plt_id = 1
+        # N = len(constraints)
         cnst_id = 0
-        plt_id = 1
-        N = len(constraints)
         ##########################################
 
 
