@@ -74,7 +74,7 @@ def sample_from_distribution(condition, points, probabilities, points_to_avoid =
         loop_count += 1
 
     
-    return sampled_point, i, probabilities_sorted[i]
+    return sampled_point, i, probabilities_sorted[i], r
 
 
 # def sample_from_distribution_cluster(particles, clusters_to_avoid = []):
@@ -261,7 +261,8 @@ def sample_from_cluster(particles_to_sample, cluster_id, mdp):
 def get_human_response(condition, env_idx, particles_to_sample, opt_traj, test_constraints, learning_factor, args = []):
 
     if len(args) != 0:
-        set_id, member_id, test_constraints, sampled_points_history, response_history, member, constraint_history, set_id_history, skip_model_history, cluster_id_history, point_probability, team_learning_factor_history = args
+        set_id, member_id, test_constraints, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, set_id_history, skip_model_history, cluster_id_history, point_probability, team_learning_factor_history, demo_prob, learner_member_prob_test, \
+            particles_learner_prob_demo_history, particles_learner_prob_test_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, prob_reweight_history, prob_resample_history, resample_flag_history, update_type, update_sequence_history = args
 
 
 # def get_human_response(env_idx, particles_to_sample, opt_traj, test_constraints, learning_factor):
@@ -324,9 +325,9 @@ def get_human_response(condition, env_idx, particles_to_sample, opt_traj, test_c
         elif condition == 'particles':
             sampled_point_flag = False
             while not sampled_point_flag:
-                human_model_weight, cluster_id, rew_weight_prob = sample_from_distribution(condition, particles_to_sample.positions, particles_to_sample.weights, points_to_avoid = points_to_avoid)
+                human_model_weight, cluster_id, rew_weight_prob, rand_number = sample_from_distribution(condition, particles_to_sample.positions, particles_to_sample.weights, points_to_avoid = points_to_avoid)
                 
-                print('Sampled point: ', human_model_weight, 'Sampled point probability: ', rew_weight_prob, 'Cluster id: ', cluster_id)
+                print('Sampled point: ', human_model_weight, 'Sampled point probability: ', rew_weight_prob, 'rand_number: ', rand_number)
                 if len(points_to_avoid) > 0:
                     for point_avd in points_to_avoid:
                         if not (human_model_weight == point_avd).all():
@@ -341,14 +342,14 @@ def get_human_response(condition, env_idx, particles_to_sample, opt_traj, test_c
 
         # Method 3: Sampling from clusters and weight-based sampling of particles within the cluster
         elif condition == 'cluster_weight':
-            human_model_weight, cluster_id, rew_weight_prob = sample_from_distribution(condition, particles_to_sample.cluster_centers, particles_to_sample.cluster_weights)
+            human_model_weight, cluster_id, rew_weight_prob, rand_number = sample_from_distribution(condition, particles_to_sample.cluster_centers, particles_to_sample.cluster_weights)
             clusters_to_avoid.append(cluster_id)
 
             if loop_count > 0:
                 if skip_cluster and len(clusters_to_avoid) < len(particles_to_sample.cluster_centers):
                     print('Sampling from a new cluster ... Max no. of clusters: ', len(particles_to_sample.cluster_centers), '. Clusters to avoid: ', clusters_to_avoid)
                     skip_cluster = False
-                    human_model_weight, cluster_id, rew_weight_prob = sample_from_distribution(condition, particles_to_sample.cluster_centers, particles_to_sample.cluster_weights, points_to_avoid = clusters_to_avoid)
+                    human_model_weight, cluster_id, rew_weight_prob, rand_number = sample_from_distribution(condition, particles_to_sample.cluster_centers, particles_to_sample.cluster_weights, points_to_avoid = clusters_to_avoid)
                     clusters_to_avoid.append(cluster_id)
                 else:
                     skip_human_model = False
@@ -440,12 +441,20 @@ def get_human_response(condition, env_idx, particles_to_sample, opt_traj, test_c
                 sampled_points_history.append(human_model_weight)
                 response_history.append(response_type)
                 member.append(member_id)
-                constraint_history.append(constraint_flag)
+                constraint_history.append(test_constraints)
+                constraint_flag_history.append(constraint_flag)
                 set_id_history.append(set_id)
                 cluster_id_history.append(cluster_id)
                 skip_model_history.append(skip_human_model)
                 point_probability.append(rew_weight_prob)
                 team_learning_factor_history.append(learning_factor)
+                particles_learner_prob_demo_history.append(demo_prob)
+                particles_learner_prob_test_history.append(learner_member_prob_test)
+                prob_initial_history.append(prob_initial) 
+                prob_reweight_history.append(prob_reweight) 
+                prob_resample_history.append(prob_resample) 
+                resample_flag_history.append(resample_flag)
+                update_sequence_history.append(update_type)
 
             loop_count += 1
         
@@ -457,7 +466,6 @@ def get_human_response(condition, env_idx, particles_to_sample, opt_traj, test_c
     # human_traj_overlap_pct = BEC_helpers.calculate_counterfactual_overlap_pct(human_opt_trajs[0], traj_opt)
     # print('human traj overlap pct: ', human_traj_overlap_pct)
 
-    # return human_opt_trajs, response_type, likely_correct_response_count, likely_incorrect_response_count, initial_likely_response_type
 
     # plot cluster centers and sampled particle
     # fig = plt.figure()
@@ -472,7 +480,9 @@ def get_human_response(condition, env_idx, particles_to_sample, opt_traj, test_c
 
 
     if len(args) != 0:
-        return human_model_weight, human_opt_trajs[0], response_type, sampled_points_history, response_history, member, constraint_history, set_id_history, skip_model_history, cluster_id_history, point_probability, team_learning_factor_history
+        return human_model_weight, human_opt_trajs[0], response_type, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, set_id_history, skip_model_history, cluster_id_history, \
+            point_probability, team_learning_factor_history, particles_learner_prob_demo_history, particles_learner_prob_test_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, \
+                prob_reweight_history, prob_resample_history, resample_flag_history, update_sequence_history
     else:
         return human_opt_trajs[0], response_type
 

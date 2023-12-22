@@ -13,6 +13,8 @@ import os
 from termcolor import colored
 import warnings
 
+from ast import literal_eval
+
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
@@ -239,20 +241,18 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
     print('team_knowledge_level_min columns: ', team_knowledge_level_min.columns)
     team_knowledge_level_min = team_knowledge_level_min.drop(['p1', 'p2', 'p3', 'common_knowledge', 'joint_knowledge'], axis=1)
 
-    learning_rate_index = []
-
-
-    for i in range(len(learning_rate)):
-        ilcr = learning_rate['ilcr'][i]
-        lr_index = []
-        for j in ilcr:
-            if j >= 0.7:
-                lr_index.extend([2])
-            elif j >= 0.6:
-                lr_index.extend([1])
-            elif j >= 0.5:
-                lr_index.extend([0])
-        learning_rate_index.append(str(lr_index))
+    # learning_rate_index = []
+    # for i in range(len(learning_rate)):
+    #     ilcr = learning_rate['ilcr'][i]
+    #     lr_index = []
+    #     for j in ilcr:
+    #         if j >= 0.7:
+    #             lr_index.extend([2])
+    #         elif j >= 0.6:
+    #             lr_index.extend([1])
+    #         elif j >= 0.5:
+    #             lr_index.extend([0])
+    #     learning_rate_index.append(str(lr_index))
 
 
     # add this to current dfs
@@ -288,41 +288,47 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
     # team_knowledge_level_long['team_mix'] = team_mix_var
 
     
-    team_knowledge_level_long.to_csv('models/augmented_taxi2/team_knowledge_level_long.csv')
-    team_knowledge_level_long.describe(include='all').to_csv('models/augmented_taxi2/descriptives.csv')
+    team_knowledge_level_long.to_csv(path + '/team_knowledge_level_long.csv')
+    team_knowledge_level_long.describe(include='all').to_csv(path + '/descriptives.csv')
     # team_knowledge_level_long = pd.read_csv('models/augmented_taxi2/team_knowledge_level_long.csv')
 
     
-    ## concept-wise interaction count
-    concept_ids = team_BEC_knowledge_level['knowledge_comp_id'].unique()
-    unique_ids = team_knowledge_level_long['run_no'].unique()
-    interaction_count = pd.DataFrame()
+    # ############## concept-wise interaction count
+    # concept_ids = team_BEC_knowledge_level['knowledge_comp_id'].unique()
+    # unique_ids = team_knowledge_level_long['run_no'].unique()
+    # interaction_count = pd.DataFrame()
 
-    print(team_BEC_knowledge_level)
+    # print(team_BEC_knowledge_level)
 
-    for id in unique_ids:
-        interaction_count_dict = {}
-        for c_id in range(len(concept_ids)):
-            interaction_count_dict['run_no'] = id
-            interaction_count_dict['demo_strategy'] = team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['demo_strategy'].iloc[0]
-            interaction_count_dict['team_composition'] = team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['team_composition'].iloc[0]
+    # for id in unique_ids:
+    #     interaction_count_dict = {}
+    #     for c_id in range(len(concept_ids)):
+    #         interaction_count_dict['run_no'] = id
+    #         interaction_count_dict['demo_strategy'] = team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['demo_strategy'].iloc[0]
+    #         interaction_count_dict['team_composition'] = team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['team_composition'].iloc[0]
             
-            print('A: ', team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['loop_count'])
-            print('run_no: ', id, ' c_id: ', c_id, ' concept_ids[c_id+1]: ', concept_ids[c_id])
+    #         print('A: ', team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['loop_count'])
+    #         print('run_no: ', id, ' c_id: ', c_id, ' concept_ids[c_id+1]: ', concept_ids[c_id])
             
-            max_loop_id = team_BEC_knowledge_level[(team_BEC_knowledge_level['run_no'] == id) & (team_BEC_knowledge_level['knowledge_comp_id'] == concept_ids[c_id])]['loop_count'].iloc[-1]
-            max_loop_count = max_loop_id - team_BEC_knowledge_level[(team_BEC_knowledge_level['run_no'] == id) & (team_BEC_knowledge_level['knowledge_comp_id'] == concept_ids[c_id])]['loop_count'].iloc[0] + 1
+    #         if concept_ids[c_id] <= team_BEC_knowledge_level['knowledge_comp_id'].iloc[-1]:
+    #             max_loop_id = team_BEC_knowledge_level[(team_BEC_knowledge_level['run_no'] == id) & (team_BEC_knowledge_level['knowledge_comp_id'] == concept_ids[c_id])]['loop_count'].iloc[-1]
+    #             max_loop_count = max_loop_id - team_BEC_knowledge_level[(team_BEC_knowledge_level['run_no'] == id) & (team_BEC_knowledge_level['knowledge_comp_id'] == concept_ids[c_id])]['loop_count'].iloc[0] + 1
+            
+    #         # else:
+    #         #     max_loop_id = []
+    #         #     max_loop_count = 0
 
-            interaction_count_dict['Int_end_id_concept_'+str(concept_ids[c_id])] = max_loop_id
-            interaction_count_dict['N_int_concept_'+str(concept_ids[c_id])] = max_loop_count    
+    #         interaction_count_dict['Int_end_id_concept_'+str(concept_ids[c_id])] = max_loop_id
+    #         interaction_count_dict['N_int_concept_'+str(concept_ids[c_id])] = max_loop_count    
 
-        interaction_count = interaction_count.append(interaction_count_dict, ignore_index=True)
+    #     interaction_count = interaction_count.append(interaction_count_dict, ignore_index=True)
 
-    print('interaction_count: ', interaction_count)
-    interaction_count.to_csv('models/augmented_taxi2/interaction_count.csv')
-
+    # print('interaction_count: ', interaction_count)
+    # interaction_count.to_csv('models/augmented_taxi2/interaction_count.csv')
+    # ######################################################################
     
     ## run-wise data
+    unique_ids = team_knowledge_level_long['run_no'].unique()
     run_data = pd.DataFrame()
     for id in unique_ids:
         run_data_dict = {}
@@ -333,7 +339,7 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
         
         run_data = run_data.append(run_data_dict, ignore_index=True)
 
-    run_data.to_csv('models/augmented_taxi2/run_data.csv')
+    run_data.to_csv(path + '/run_data.csv')
 
     print(colored('Number of runs processed: ' + str(len(run_data)), 'red'))
 
@@ -405,7 +411,7 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
     team_mix_full = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
 
     know_list = know_list_full[0:]
-    team_mix = [team_mix_full[3]]
+    team_mix = [team_mix_full[0]]
 
     # filter run_id
     # run_ids = []
@@ -537,9 +543,9 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
 
 
 
-def analyze_run_data(file):
+def analyze_run_data(path, file):
 
-    pd.read_csv(file).describe(include='all').to_csv('models/augmented_taxi2/descriptives_run_data.csv')
+    pd.read_csv(file).describe(include='all').to_csv(path + '/descriptives_run_data.csv')
 
 #
 #  def concept_label(value):
@@ -592,23 +598,21 @@ def analyze_concept_data(file):
     sns.boxplot(data = concept_data_plot_max_int_melt, x = 'Max_int_concept', y = 'Concept_id', orient = 'h').set(title='Number of interactions to learn concepts')
 
 
-
-
-
     plt.show()
 
 
 
 
-def analyze_human_response_simulation(path, files, file_prefix):
+def analyze_human_response_simulation(path, files, file_prefix, file_to_avoid):
 
 
     response_data = pd.DataFrame()
+    const_prob_data = pd.DataFrame()
 
     
     for file in files:
-
-        if file_prefix in file and '.csv' in file:
+        
+        if file_prefix in file and '.csv' in file and (file_to_avoid == '' or file_to_avoid not in file):
             print('Reading file: ', file)
             sim_vars = pd.read_csv(path + '/' + file)
             condition = file.replace('.csv', '')
@@ -617,10 +621,16 @@ def analyze_human_response_simulation(path, files, file_prefix):
             condition = ''.join([i for i in condition if not i.isdigit()])
             print('condition: ', condition)
 
+            set_id = file.replace('.csv', '')
+            set_id = set_id.replace(file_prefix + '_', '')
+            set_id = set_id.replace(condition + '_', '')
+            set_id = set_id.replace('set_', '')
+
             for i in range(len(sim_vars)):
                 # response data
                 response_data_dict = {}
 
+                response_data_dict['set_id'] = set_id
                 response_data_dict['update_id'] = sim_vars['update_id'][i]
                 response_data_dict['member_id'] = sim_vars['member_id'][i]
                 response_data_dict['learning_factor'] = sim_vars['learning_factor'][i]
@@ -629,32 +639,147 @@ def analyze_human_response_simulation(path, files, file_prefix):
                 response_data_dict['response_type'] = sim_vars['response'][i]
                 response_data_dict['skip_model_flag'] = sim_vars['skip_model'][i]
                 response_data_dict['constraint_flag'] = sim_vars['constraint_flag'][i]
-                response_data_dict['condition'] = condition
+                prob_all_cnsts_combo = sim_vars['particles_learner_prob_test_history'][i]
+                prob_all_cnsts_combo = prob_all_cnsts_combo.strip('[]')
+
+                response_data_dict['particles_prob'] = np.round(float(prob_all_cnsts_combo.split(', ')[-1]), 3)
+                # response_data_dict['condition'] = condition
 
                 response_data = response_data.append(response_data_dict, ignore_index=True)
 
-    return response_data
 
+                ###########
+                cnsts = sim_vars['constraints'][i]
+                # print('cnsts: ', cnsts)
+                chars_to_remove = ['(', ')', 'a','r','y']
+                cnsts = ''.join([char for char in cnsts if char not in chars_to_remove])
+                cnsts = cnsts.split('], ')
+                # print('cnsts: ', cnsts)
+                
+                prob_initial = sim_vars['prob_initial_history'][i]
+                # print('prob_initial: ', prob_initial)
+                chars_to_remove = ['[', ']']
+                prob_initial = ''.join([char for char in prob_initial if char not in chars_to_remove])
+                prob_initial = prob_initial.split(', ')
+                # print('prob_initial: ', prob_initial)
+
+                prob_reweight = sim_vars['prob_reweight_history'][i]
+                # print('prob_reweight: ', prob_reweight)
+                chars_to_remove = ['[', ']']
+                prob_reweight = ''.join([char for char in prob_reweight if char not in chars_to_remove])
+                prob_reweight = prob_reweight.split(', ')
+                # print('prob_reweight: ', prob_reweight)
+
+                prob_resample = sim_vars['prob_resample_history'][i]
+                # print('prob_resample: ', prob_resample)
+                chars_to_remove = ['[', ']']
+                prob_resample = ''.join([char for char in prob_resample if char not in chars_to_remove])
+                prob_resample = prob_resample.split(', ')
+                # print('prob_resample: ', prob_resample) 
+
+
+                for cnst_id in range(len(cnsts)):
+                    cnst_prob_dict = {}
+                    cnst_prob_dict['set_id'] = set_id
+                    cnst_prob_dict['update_id'] = sim_vars['update_id'][i]
+                    cnst_prob_dict['member_id'] = sim_vars['member_id'][i]
+                    cnst_prob_dict['cluster_id'] = sim_vars['cluster_id'][i]
+                    cnst_prob_dict['learning_factor'] = sim_vars['learning_factor'][i]
+                    cnst_prob_dict['response_type'] = sim_vars['response'][i]
+                    cnst_prob_dict['skip_model_flag'] = sim_vars['skip_model'][i]
+                    # cnst_prob_dict['condition'] = sim_vars['condition'][i]
+                    cnst_prob_dict['constraint'] = cnsts[cnst_id]
+                    cnst_prob_dict['prob_initial'] = np.round(float(prob_initial[cnst_id]), 3)
+                    cnst_prob_dict['prob_reweight'] = np.round(float(prob_reweight[cnst_id]), 3)
+                    cnst_prob_dict['prob_resample'] = np.round(float(prob_resample[cnst_id]), 3)
+
+                    const_prob_data = const_prob_data.append(cnst_prob_dict, ignore_index=True)
+
+
+
+    return response_data, const_prob_data
+
+
+
+
+
+def check_pf_particles_sampling(path, files, file_prefix):
+
+    pos_df = pd.DataFrame()
+    for file in files:
+        if file_prefix in file and '.csv' in file:
+            print('Reading file: ', file)
+            sim_vars = pd.read_csv(path + '/' + file)
+
+            set_id = file.replace('.csv', '')
+            set_id = set_id.replace(file_prefix + '_', '')
+            set_id = set_id.replace('set_', '')
+            set_id, player_id = set_id.split('_')
+
+            for i in range(len(sim_vars)):
+                pos_dict = {}
+                pos_dict['set_id'] = set_id
+                pos_dict['player_id'] = player_id
+                pos_dict['position'] = np.fromstring(sim_vars['Position'][i].strip('[]'), sep=' ')
+                pos_df = pos_df.append(pos_dict, ignore_index=True)
+
+
+
+            # pos_df['position'] = sim_vars['Position'].apply(lambda x: np.fromstring(x, sep=' '))
+
+    
+    print('pos_df: ', pos_df)
+    pos_df.to_csv(path + '/pos_df.csv')
+    
+    pos_diff_df = pd.DataFrame()
+    ## check if sampled particles are similar
+
+    for set_id in pos_df['set_id'].unique():
+        if set_id != '1':
+            print('Reading set_id: ', set_id)
+            pos_diff_dict = {}
+            for player_id in pos_df['player_id'].unique():
+                pos_df_set1 =  pos_df_data = pos_df[(pos_df['set_id'] == '1') & (pos_df['player_id'] == player_id)]
+                pos_df_data = pos_df[(pos_df['set_id'] == set_id) & (pos_df['player_id'] == player_id)]
+                print('pos_df_data: ', pos_df_data)
+                print('pos_df_set1: ', pos_df_set1)
+
+                print(type(pos_df_set1['position'].iloc[0]))
+                pos_diff_sum = 0
+                for i in range(len(pos_df_set1)):
+                    pos_diff_sum += np.linalg.norm(pos_df_data['position'].iloc[i] - pos_df_set1['position'].iloc[i])
+                
+                print('pos_diff_sum: ', pos_diff_sum)
+
+                pos_diff_dict['set_id'] = set_id
+                pos_diff_dict['player_id'] = player_id
+                pos_diff_dict['pos_diff'] = pos_diff_sum
+
+                pos_diff_df = pos_diff_df.append(pos_diff_dict, ignore_index=True)
+
+    print('pos_diff_df: ', pos_diff_df)
+    pos_diff_df.to_csv(path + '/pos_diff_df.csv')
+
+####################################################
 
 
 if __name__ == "__main__":
 
     # # process team knowledge data
-    # path = 'models/augmented_taxi2'
+    # path = 'data/simulation/sim_experiments'
     # files = os.listdir(path)
     # # files = ['debug_obj_func_1.csv']
 
-    # all_file_prefix_list = ['trials_12_10']
+    # # all_file_prefix_list = ['trials_12_17']
     # # all_runs_to_exclude_list = [[3, 12, 24, 7], [1,4,6,8], [], [1,3, 11, 12, 16, 18], [17, 21, 35], [], [], [], \
     # #                             [], [], [], [], [], [], []]
     # all_runs_to_exclude_list = []
 
-    # sets_to_consider = [14]
-
+    # # sets_to_consider = [14]
     # # file_prefix_list = [all_file_prefix_list[i] for i in sets_to_consider]
     # # runs_to_exclude_list = [all_runs_to_exclude_list[i] for i in sets_to_consider]
 
-    # file_prefix_list = ['trials_12_10']
+    # file_prefix_list = ['trials_12_17']
     # runs_to_exclude_list = []
 
     # print(file_prefix_list)
@@ -664,35 +789,46 @@ if __name__ == "__main__":
 
     # run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list = runs_to_exclude_list, runs_to_analyze_list = runs_to_analyze_list)
 
-    # analyze_run_data('models/augmented_taxi2/run_data.csv')
+    # analyze_run_data(path, path + '/run_data.csv')
 
 
 
 
-    # ##############################
-    path = 'models/augmented_taxi2'
+    ##############################
+    path = 'data/simulation/sampling_tests'
     # files = ['debug_data_response_particles_full_12_10.csv', 'debug_data_response_cluster_random_full_12_10.csv', 'debug_data_response_cluster_weights_full_12_10.csv']
     files = os.listdir(path)
-    file_prefix = 'debug_response_N100_no_learning'
-    response_data = analyze_human_response_simulation(path, files, file_prefix)
+    file_prefix = 'debug_response_no_learning_pf_prob_w_noise_k_49_all_correct'
+    file_to_avoid = ''
+    response_data, const_prob_data = analyze_human_response_simulation(path, files, file_prefix, file_to_avoid)
     response_data['learning_factor'] = np.round(response_data['learning_factor'].astype(float), 3)
-    cols = ['condition', 'update_id', 'learning_factor', 'skip_model_flag', 'response_type', 'cluster_id']
+    const_prob_data['learning_factor'] = np.round(const_prob_data['learning_factor'].astype(float), 3)
+
+
+    print('const_prob_data: ', const_prob_data)
+
+    ## process response data
+    # cols = ['condition', 'update_id', 'learning_factor', 'skip_model_flag', 'response_type', 'cluster_id', 'particles_prob']
+    cols = ['set_id', 'update_id', 'learning_factor', 'skip_model_flag', 'response_type', 'cluster_id', 'particles_prob']
     response_data_selected = response_data[cols]
 
-    print('response_data_selected: ', response_data_selected)
+    # print('response_data_selected: ', response_data_selected)
 
     response_data_valid = response_data_selected[response_data_selected['skip_model_flag'] == False]
-    print('response_data_valid: ', response_data_valid)
+    # print('response_data_valid: ', response_data_valid)
 
     response_data_correct = response_data_selected[response_data_selected['response_type'] == 'correct']
-    print('response_data_correct: ', response_data_correct)
+    # print('response_data_correct: ', response_data_correct)
 
-    response_prob = response_data_correct.groupby(['condition', 'update_id', 'learning_factor']).agg({'cluster_id':'count'})
-                                                                                                     
-    response_prob_den = response_data_valid.groupby(['condition', 'update_id', 'learning_factor']).agg({'cluster_id':'count'})
+    # response_prob = response_data_correct.groupby(['condition', 'update_id', 'learning_factor', 'particles_prob']).agg({'cluster_id':'count'})                                                                                                 
+    # response_prob_den = response_data_valid.groupby(['condition', 'update_id', 'learning_factor','particles_prob']).agg({'cluster_id':'count'})
 
-    response_prob['probability'] = response_prob['cluster_id']/response_prob_den['cluster_id']
+    response_prob_num = response_data_correct.groupby(['set_id', 'learning_factor', 'update_id']).agg({'cluster_id':'count', 'particles_prob': 'mean'})                                                                                                 
+    response_prob = response_data_valid.groupby(['set_id', 'learning_factor', 'update_id']).agg({'cluster_id':'count', 'particles_prob': 'mean'})
 
+    response_prob['probability'] = response_prob_num['cluster_id']/response_prob['cluster_id']
+    response_prob['probability'] = response_prob['probability'].fillna(0)
+    response_prob.to_csv(path + '/response_prob.csv')
 
     # response_prob.rename(columns={'cluster_id': 'correct_test_probability'}, inplace=True)
 
@@ -700,22 +836,100 @@ if __name__ == "__main__":
     print('response_prob: ', response_prob)
     # print('response_prob_num: ', response_prob_num)
     # print('response_prob_den: ', response_prob_den)
+    #########
+
+    ## process constraint prob data
+    cols = ['set_id', 'update_id', 'learning_factor', 'skip_model_flag', 'response_type', 'constraint', 'cluster_id', 'prob_initial', 'prob_reweight', 'prob_resample']
+    cnst_data_selected = const_prob_data[cols]
+    cnst_data_selected_valid = cnst_data_selected[cnst_data_selected['skip_model_flag'] == False]    
+    cnst_data_selected_correct = cnst_data_selected[cnst_data_selected['response_type'] == 'correct']
+
+    cnst_prob = cnst_data_selected_correct.groupby(['set_id', 'learning_factor',  'update_id', 'constraint']).agg({'cluster_id':'count', 'prob_initial': 'mean', 'prob_reweight': 'mean', 'prob_resample': 'mean'})                                                                                                 
+    cnst_prob_den = cnst_data_selected_valid.groupby(['set_id', 'learning_factor',  'update_id', 'constraint']).agg({'cluster_id':'count'})
+
+    cnst_prob['probability'] = cnst_prob['cluster_id']/cnst_prob_den['cluster_id']
+    # print('cnst_prob: ', cnst_prob.columns)
+    cnst_prob['update_prob_delta'] = cnst_prob['prob_reweight'] - cnst_prob['prob_initial']
 
 
-    f, ax = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(10,6))
+    ###### plot response data
+    f3, ax3 = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(10,6))
     plt.subplots_adjust(wspace=0.1, hspace=0.1)        
-    sns.lineplot(response_prob, x = 'learning_factor', y = 'probability', hue = 'condition', ax=ax[0], legend=True).set(title='Learning factor vs. probability of correct response for various sampling conditions')
-    sns.lineplot(response_prob, x = 'learning_factor', y = 'probability', hue = 'update_id', ax=ax[1], legend=True).set(title='Learning factor vs. probability of correct response based on number of PF updates/interactions')
-    plt.show()
-
-
+    sns.lineplot(response_prob, x = 'learning_factor', y = 'particles_prob', ax=ax3[0], legend=True).set(title='Learning factor vs. particles_probability')
+    sns.lineplot(response_prob, x = 'learning_factor', y = 'particles_prob', hue = 'update_id', ax=ax3[1], legend=True).set(title='particles_probability vs. probability of correct response based on number of PF updates/interactions')
+ 
+    # f, ax = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(10,6))
+    # plt.subplots_adjust(wspace=0.1, hspace=0.1)        
+    # sns.lineplot(response_prob, x = 'learning_factor', y = 'probability', ax=ax[0], legend=True).set(title='Learning factor vs. probability of correct response')
+    # sns.lineplot(response_prob, x = 'learning_factor', y = 'probability', hue = 'update_id', ax=ax[1], legend=True).set(title='Learning factor vs. probability of correct response based on number of PF updates/interactions')
     
+    # f2, ax2 = plt.subplots(ncols=1, sharex=True, sharey=True, figsize=(10,6))
+    # plt.subplots_adjust(wspace=0.1, hspace=0.1)        
+    # sns.regplot(response_prob, x = 'particles_prob', y = 'probability', ax=ax2).set(title='particles_probability vs. probability of correct response')
+    # # sns.lmplot(response_prob, x = 'particles_prob', y = 'probability', col='update_id').set(title='particles_probability vs. probability of correct response based on number of PF updates/interactions')
+    # # sns.scatterplot(response_prob, x = 'particles_prob', y = 'probability', hue='update_id').set(title='particles_probability vs. probability of correct response based on number of PF updates/interactions')
+
+    # # sns.regplot(data=response_prob[response_prob['update_id']==0], x = 'particles_prob', y = 'probability', ax=ax2[1]).set(title='particles_probability vs. probability of correct response based on number of PF updates/interactions')
+    # # sns.regplot(data=response_prob[response_prob['update_id']==1], x = 'particles_prob', y = 'probability', ax=ax2[1])
+    # # sns.regplot(data=response_prob[response_prob['update_id']==2], x = 'particles_prob', y = 'probability', ax=ax2[1])
+    # # sns.regplot(data=response_prob[response_prob['update_id']==3], x = 'particles_prob', y = 'probability', ax=ax2[1])
+    # # sns.regplot(data=response_prob[response_prob['update_id']==4], x = 'particles_prob', y = 'probability', ax=ax2[1])
+
+    # # plt.show()
+
+    # ##################
+
+    ###### plot constraint data
+    # f4, ax4 = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(10,6))
+    # plt.subplots_adjust(wspace=0.1, hspace=0.1)        
+    # sns.regplot(cnst_prob, x = 'prob_initial', y = 'prob_reweight', ax=ax4[0]).set(title='prob_initial vs. prob_reweight')
+    # sns.regplot(data=cnst_prob[cnst_prob['update_id']==0], x = 'prob_initial', y = 'prob_reweight', ax=ax4[1]).set(title='prob_initial vs. prob_reweight based on number of PF updates/interactions')
+    # sns.regplot(data=cnst_prob[cnst_prob['update_id']==1], x = 'prob_initial', y = 'prob_reweight', ax=ax4[1])
+    # sns.regplot(data=cnst_prob[cnst_prob['update_id']==2], x = 'prob_initial', y = 'prob_reweight', ax=ax4[1])
+    # sns.regplot(data=cnst_prob[cnst_prob['update_id']==3], x = 'prob_initial', y = 'prob_reweight', ax=ax4[1])
+    # sns.regplot(data=cnst_prob[cnst_prob['update_id']==4], x = 'prob_initial', y = 'prob_reweight', ax=ax4[1])
+
+    # f5, ax5 = plt.subplots(ncols=1, sharex=True, sharey=True, figsize=(10,6))
+    # sns.histplot(cnst_prob, x = 'update_prob_delta', hue = 'update_id', ax=ax5, legend=True).set(title='Change in probability of constraint after reweighting')
+    # sns.histplot(cnst_prob, x = 'update_prob_delta', ax=ax5, legend=True).set(title='Change in probability of constraint after reweighting')
+    # sns.scatterplot(cnst_prob, x = 'learning_factor', y = 'update_prob_delta', ax=ax5, legend=True).set(title='Change in probability of constraint after reweighting')
+
+    # f2, ax2 = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(10,6))
+    # plt.subplots_adjust(wspace=0.1, hspace=0.1)        
+    # sns.lineplot(response_prob, x = 'particles_prob', y = 'probability', ax=ax2[0], legend=True).set(title='particles_probability vs. probability of correct response for various sampling conditions')
+    # sns.lineplot(response_prob, x = 'particles_prob', y = 'probability', hue = 'update_id', ax=ax2[1], legend=True).set(title='particles_probability vs. probability of correct response based on number of PF updates/interactions')
+    
+    # f, ax = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(10,6))
+    # plt.subplots_adjust(wspace=0.1, hspace=0.1)        
+    # sns.lineplot(response_prob, x = 'learning_factor', y = 'probability', ax=ax[0], legend=True).set(title='Learning factor vs. probability of correct response for various sampling conditions')
+    # sns.lineplot(response_prob, x = 'learning_factor', y = 'probability', hue = 'update_id', ax=ax[1], legend=True).set(title='Learning factor vs. probability of correct response based on number of PF updates/interactions')
+  
+    plt.show()
 
     # # plot concept interaction data
     # team_long_data = pd.read_csv('models/augmented_taxi2/team_knowledge_level_long.csv')
     # sns.boxplot(team_long_data, x='loop_count'y='knowledge_comp_id')
 
-   
+    ##################
+
+    # path = 'data/simulation/sampling_tests'
+    # files = os.listdir(path)
+    # file_prefix = 'particles_positions'
+    # check_pf_particles_sampling(path, files, file_prefix)
+
+
+
+
+
+
+
+
+
+
+
+    ##################
+    x = 1
+
 
 
 

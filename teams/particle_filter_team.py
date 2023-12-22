@@ -272,16 +272,26 @@ class Particles_team():
         x = np.array([0, 0, 1])
         phi_lim = [0, np.pi]
         theta_lim = [np.pi/2, 3*np.pi/2]
+
+        # fix unscaled vmf_mass instead of making it variable
+        vmf_mass = 0.49
         
         if u_cdf_scaled > 0.5:
             kappa = self.calc_kappa_from_cdf(1-u_cdf_scaled)
             x1 = 1
         else:
-            kappa = self.calc_kappa_from_cdf(0.49)
+            kappa = self.calc_kappa_from_cdf(vmf_mass)
             f = lambda phi, theta: kappa*np.exp(kappa*np.array([np.cos(theta)* np.sin(phi), np.sin(theta) * np.sin(phi), np.cos(phi)]).dot(mu))*np.sin(phi)/(2*np.pi*(np.exp(kappa)-np.exp(-kappa)))
             VMF_cdf, err = integrate.dblquad(f, theta_lim[0], theta_lim[1], phi_lim[0], phi_lim[1])  # limits for 2nd argument first; https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.dblquad.html
             print('VMF_cdf: ', VMF_cdf)
             x1 = (1-u_cdf_scaled)/VMF_cdf
+        ###################
+
+        # kappa = self.calc_kappa_from_cdf(vmf_mass)
+        # f = lambda phi, theta: kappa*np.exp(kappa*np.array([np.cos(theta)* np.sin(phi), np.sin(theta) * np.sin(phi), np.cos(phi)]).dot(mu))*np.sin(phi)/(2*np.pi*(np.exp(kappa)-np.exp(-kappa)))
+        # VMF_cdf, err = integrate.dblquad(f, theta_lim[0], theta_lim[1], phi_lim[0], phi_lim[1])  # limits for 2nd argument first; https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.dblquad.html
+        # print('VMF_cdf: ', VMF_cdf)
+        # x1 = (1-u_cdf_scaled)/VMF_cdf
 
         
         return kappa, x1
@@ -815,9 +825,17 @@ class Particles_team():
 
 
 
-    def resample_from_index(self, indexes, K=1):
+    def resample_from_index(self, indexes, model_type, K=1, constraint = None):
         
         original_positions = copy.deepcopy(self.positions)
+
+        # #################
+        # #  added for debugging purposes - 12/21
+        # if constraint is not None:
+        #     self.calc_particles_probability(constraint)
+        #     print('Prob before normalizing weights: ', self.particles_prob_correct)
+        # #################
+
 
         # resample
         self.positions = self.positions[indexes]
@@ -868,20 +886,28 @@ class Particles_team():
         # noise suggested by "Novel approach to nonlinear/non-Gaussian Bayesian state estimation" by Gordon et al.
         print(colored("max_ele_dist: " + str(max_ele_dist) + ". max_azi_dist: " + str(max_azi_dist), "red"))
 
-        noise = np.array([np.random.normal(scale=max_ele_dist, size=len(positions_spherical)),
-                          np.random.normal(scale=max_azi_dist, size=len(positions_spherical))]).T
+        if model_type == 'noise':
+            noise = np.array([np.random.normal(scale=max_ele_dist, size=len(positions_spherical)),
+                            np.random.normal(scale=max_azi_dist, size=len(positions_spherical))]).T
+            print('Resampling with noise...')
+        else:
+            noise = np.array([np.zeros(len(positions_spherical)),
+                            np.zeros(len(positions_spherical))]).T
+            print('Resampling without noise...')
         
         noise_before_transform = copy.deepcopy(noise)
 
         noise *= K * positions_spherical.shape[0] ** (-1/positions_spherical.shape[1])
 
-        ########### added for debugging purposes - 12/10
-        positions_before_noise = np.empty_like(self.positions)
-        positions_spherical_before_noise = copy.deepcopy(positions_spherical)
-        for aa in range(0, len(positions_spherical)):
-            positions_before_noise[aa, :] = np.array(cg.sph2cart(positions_spherical_before_noise[aa, :])).reshape(1, -1)
-        #################
-
+        # ########### added for debugging purposes - 12/10
+        # positions_before_noise = np.empty_like(self.positions)
+        # positions_spherical_before_noise = copy.deepcopy(positions_spherical)
+        # for aa in range(0, len(positions_spherical)):
+        #     positions_before_noise[aa, :] = np.array(cg.sph2cart(positions_spherical_before_noise[aa, :])).reshape(1, -1)
+        # #################
+        #  added for debugging purposes - 12/21
+        # print('Noise: ', noise)
+        ################
 
         positions_spherical += noise
 
@@ -891,6 +917,12 @@ class Particles_team():
         # reset the weights
         self.weights = np.ones(len(self.positions)) / len(self.positions)
 
+        # #333333  added for debugging purposes - 12/21
+        # print('Pos after noise: ', self.positions)
+        # if constraint is not None:
+        #     self.calc_particles_probability(constraint)
+        #     print('Prob after normalizing weights: ', self.particles_prob_correct)
+        ##############
 
         # ###### plots for debugging - 12/10/23 #######
         # # plot particles
@@ -1055,13 +1087,20 @@ class Particles_team():
         print('informed number: {}'.format(n_desired_reset_particles_informed))
 
         # sample from the VMF + uniform distribution
-        new_particle_positions_uniform = BEC_helpers.sample_human_models_random(constraint, int(np.ceil(
-            n_desired_reset_particles_informed * self.u_prob_mass_scaled)))
+        if  self.u_prob_mass_scaled > 0:
+            new_particle_positions_uniform = BEC_helpers.sample_human_models_random(constraint, int(np.ceil(
+                n_desired_reset_particles_informed * self.u_prob_mass_scaled)))
+        else:
+            new_particle_positions_uniform = []
 
         mu_constraint = constraint[0] / np.linalg.norm(constraint[0])
-        new_particle_positions_VMF = p_utils.rand_von_mises_fisher(mu_constraint, kappa=self.VMF_kappa, N=int(
-            np.ceil(n_desired_reset_particles_informed * self.VMF_prob_mass_scaled)),
-                                                                   halfspace=True)
+        if self.VMF_prob_mass_scaled > 0:
+            new_particle_positions_VMF = p_utils.rand_von_mises_fisher(mu_constraint, kappa=self.VMF_kappa, N=int(
+                np.ceil(n_desired_reset_particles_informed * self.VMF_prob_mass_scaled)),
+                                                                    halfspace=True)
+        else:
+            new_particle_positions_VMF = []
+
         new_particle_positions = np.vstack(
             (np.array(new_particle_positions_uniform), np.expand_dims(new_particle_positions_VMF, 1)))
 
@@ -1081,6 +1120,10 @@ class Particles_team():
     def calc_particles_probability(self, constraints):
         N_particles = len(self.positions)
         uniform_particles_id = []
+
+        print('N_particles: ', N_particles)
+        print('N_weights: ', len(self.weights))
+
         for particle_id in range(N_particles):
             pos  = self.positions[particle_id]
             in_BEC_area_flag = True
@@ -1120,7 +1163,7 @@ class Particles_team():
     ################################################################################################
 
 
-    def update(self, constraints, c=0.5, reset_threshold_prob=0.001, learning_factor = None, plot_title = None):
+    def update(self, constraints, c=0.5, reset_threshold_prob=0.001, learning_factor = None, plot_title = None, model_type = 'noise', viz_flag = False):
         self.weights_prev = self.weights.copy()
         self.positions_prev = self.positions.copy()
         print(colored('constraints: ' + str(constraints), 'red'))
@@ -1156,60 +1199,78 @@ class Particles_team():
             ax.view_init(elev=elev, azim=azim)
         
 
-        # fig = plt.figure()
-        # ax = []
-        # plt_id = 1
-        # N = len(constraints)
-        cnst_id = 0
+        if viz_flag:
+            fig = plt.figure()
+            ax = []
+            plt_id = 1
+            N = len(constraints)
         ##########################################
 
+        # variables for debugging probability update
+        prob_initial = []
+        prob_reweight = []
+        prob_resample = []
+        resample_flag = []
 
-        for constraint in constraints:
+
+        for cnst_id in range(len(constraints)):
             # print('constraint: {}'.format(constraint))
+            constraint = constraints[cnst_id]
+            self.calc_particles_probability([constraint])
+            prob_initial.append(self.particles_prob_correct)
             
             self.reweight(constraint, learning_factor)
-
             
 
-            ############ plot
-            # if len(constraint) > 0:
-            #     ax.append(fig.add_subplot(N, 3, plt_id, projection='3d'))
-            #     plt_id += 1
-            #     ax.append(fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
-            #     plt_id += 1
-            #     ax.append(fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
-            #     plt_id += 1
-            #     ax[cnst_id*3].title.set_text('Particles before reweighting')
-            #     ax[cnst_id*3 + 1].title.set_text('Particles after reweighting')
-            #     ax[cnst_id*3 + 2].title.set_text('Particles after resampling')
 
-            #     self.plot(fig=fig, ax=ax[cnst_id*3], plot_prev=True)
-            #     BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3])
-            #     self.plot(fig=fig, ax=ax[cnst_id*3 + 1])
-            #     BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3 + 1])
+            ########### plot
+            if viz_flag and len(constraint) > 0:
+                ax.append(fig.add_subplot(N, 3, plt_id, projection='3d'))
+                plt_id += 1
+                ax.append(fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
+                plt_id += 1
+                ax.append(fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
+                plt_id += 1
+                ax[cnst_id*3].title.set_text('Particles before reweighting')
+                ax[cnst_id*3 + 1].title.set_text('Particles after reweighting')
+                ax[cnst_id*3 + 2].title.set_text('Particles after resampling')
 
-            #     # plot the spherical polygon corresponding to the constraints
-            #     ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraint)
-            #     poly = Polyhedron.Polyhedron(ieqs=ieqs)
-            #     BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax[cnst_id*3 + 1], plot_ref_sphere=False, alpha=0.75)
+                self.plot(fig=fig, ax=ax[cnst_id*3], plot_prev=True)
+                BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3])
 
-            #     if constraint[0][0] == 0:
-            #         view_params = [16, -160]
-            #     elif constraint[0][1] == 0:
-            #         view_params = [2, -100]
-            #     elif constraint[0][2] == 0:
-            #         view_params = [2, -60]
-            #     else:
-            #         view_params = [16, -160]
+                self.plot(fig=fig, ax=ax[cnst_id*3 + 1])
+                BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3 + 1])
+                # plot the spherical polygon corresponding to the constraints
+                ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraint)
+                poly = Polyhedron.Polyhedron(ieqs=ieqs)
+                BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax[cnst_id*3 + 1], plot_ref_sphere=False, alpha=0.75)
+                ## debug
+                vis_scale_factor = 10 * len(self.positions) * (1/sum(self.weights))
+                for particle_id in range(len(self.positions)):
+                    pos = self.positions[particle_id]
+                    weight = self.weights[particle_id]
+                    dot = constraint.dot(pos.T)
+                    if dot < 0:
+                        ax[cnst_id*3+1].scatter(pos[0][0], pos[0][1], pos[0][2], marker='o', c='r', s=weight*vis_scale_factor)
 
-            #     label_axes(ax[cnst_id*3], params.mdp_class, params.weights['val'], view_params = view_params)
-            #     label_axes(ax[cnst_id*3 + 1], params.mdp_class, params.weights['val'], view_params = view_params)
-            #     label_axes(ax[cnst_id*3 + 2], params.mdp_class, params.weights['val'], view_params = view_params)
+                # set view
+                if constraint[0][0] == 0:
+                    view_params = [16, -160]
+                elif constraint[0][1] == 0:
+                    view_params = [2, -100]
+                elif constraint[0][2] == 0:
+                    view_params = [2, -60]
+                else:
+                    view_params = [16, -160]
 
-            #     if plot_title is not None:
-            #         fig.suptitle(plot_title, fontsize=16)
+                label_axes(ax[cnst_id*3], params.mdp_class, params.weights['val'], view_params = view_params)
+                label_axes(ax[cnst_id*3 + 1], params.mdp_class, params.weights['val'], view_params = view_params)
+                label_axes(ax[cnst_id*3 + 2], params.mdp_class, params.weights['val'], view_params = view_params)
 
-            ##########################################
+                if plot_title is not None:
+                    fig.suptitle(plot_title, fontsize=16)
+
+            #########################################
 
 
             if sum(self.weights) < reset_threshold_prob:
@@ -1220,7 +1281,11 @@ class Particles_team():
                 # print(colored('Normalizing particle weights...', 'red'))
                 self.weights /= sum(self.weights)
 
-                # print('weights sum: ', sum(self.weights))
+                # calculate probability after weights have been normalized
+                self.calc_particles_probability([constraint])
+                prob_reweight.append(self.particles_prob_correct)
+                print(colored('Constraint: ' + str(constraint) + '. Prob before reweighting: ' + str(prob_initial[cnst_id]) + '. Prob after reweighting: ' + str(prob_reweight[cnst_id]), 'green' ))
+                    
 
                 n_eff = self.calc_n_eff(self.weights)
                 # print('n_eff: {}'.format(n_eff))
@@ -1233,24 +1298,39 @@ class Particles_team():
                     # print('Plotting before resampling..')
                     # self.plot()
                     print(colored('Resampling...', 'red'))
+                    
                     # for debugging purposes
-                    self.calc_particles_probability([constraint])
                     # self.cluster()
-                    self.calc_clusters_probability([constraint])
-                    print(colored('Particles prob before resampling: ' + str(self.particles_prob_correct) + '. Clusters prob before resampling: ' + str(self.clusters_prob_correct), 'red'))
+                    # self.calc_clusters_probability([constraint])
+                    # print(colored('Particles prob before resampling: ' + str(self.particles_prob_correct) + '. Clusters prob before resampling: ' + str(self.clusters_prob_correct), 'red'))
                     # self.plot(fig=fig, ax=ax[cnst_id*3 + 1], cluster_centers=self.cluster_centers, cluster_weights=self.cluster_weights)
 
                     resample_indexes = self.KLD_resampling()
-                    self.resample_from_index(np.array(resample_indexes))
+                    self.resample_from_index(np.array(resample_indexes), model_type, constraint=constraint)
 
-                    # # For debugging purposes
+                    ### For debugging purposes
                     self.calc_particles_probability([constraint])
                     # self.cluster()
-                    self.calc_clusters_probability([constraint])
-                    print(colored('Particles prob after resampling: ' + str(self.particles_prob_correct) + '. Clusters prob after resampling: ' + str(self.clusters_prob_correct), 'red'))
-                    # self.plot(fig=fig, ax=ax[cnst_id*3 + 2], cluster_centers=self.cluster_centers, cluster_weights=self.cluster_weights)
-                    # BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3 + 2])
+                    # self.calc_clusters_probability([constraint])
+                    resample_flag.append(True)
+                    prob_resample.append(self.particles_prob_correct)
+                    print(colored('Constraint: ' + str(constraint) + '. Prob before reweighting: ' + str(prob_initial[cnst_id]) + '. Prob after reweighting: ' + str(prob_reweight[cnst_id]) + \
+                                  '. Prob after resampling: ' + str(prob_resample[cnst_id]), 'green' ))
+                    
+                    if viz_flag:
+                        self.plot(fig=fig, ax=ax[cnst_id*3 + 2], cluster_centers=self.cluster_centers, cluster_weights=self.cluster_weights)
+                        BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3 + 2])
+                        vis_scale_factor = 10 * len(self.positions) * (1/sum(self.weights))
+                        for particle_id in range(len(self.positions)):
+                            pos = self.positions[particle_id]
+                            weight = self.weights[particle_id]
+                            dot = constraint.dot(pos.T)
+                            if dot < 0:
+                                ax[cnst_id*3+2].scatter(pos[0][0], pos[0][1], pos[0][2], marker='o', c='r', s=weight*vis_scale_factor)
 
+                else:
+                    resample_flag.append(False)
+                    prob_resample.append(self.particles_prob_correct) # will give the same value as prob_reweight
 
             # # https://stackoverflow.com/questions/41167196/using-matplotlib-3d-axes-how-to-drag-two-axes-at-once
             # # link the pan of the three axes together
@@ -1269,11 +1349,13 @@ class Particles_team():
             
             # fig.canvas.mpl_connect('motion_notify_event', on_move)
 
-            cnst_id += 1
 
-        # plt.show()
+        if viz_flag:
+            plt.show()
 
         self.binned = False
+
+        return prob_initial, prob_reweight, prob_resample, resample_flag
 
 
 
@@ -1283,7 +1365,7 @@ class Particles_team():
         :param k: concentration parameter of VMF
         :return: probability of x under this composite distribution (uniform + VMF)
         '''
-
+        print(colored('Rewifghting particles for learning factor: ' + str(learning_factor), 'red'))
         if learning_factor is None:
             u_pdf_scaled = self.u_pdf_scaled
             VMF_kappa = self.VMF_kappa

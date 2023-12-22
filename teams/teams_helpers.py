@@ -17,6 +17,7 @@ import os
 import itertools
 from sklearn import metrics
 import random
+import csv
 
 
 # Other imports.
@@ -46,6 +47,7 @@ from scipy.spatial import geometric_slerp
 import matplotlib.tri as mtri
 from sklearn.metrics.pairwise import haversine_distances
 from numpy import linalg as LA
+import pandas as pd
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -881,12 +883,26 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_learnin
             particles_team[member_id] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), learning_factor)
         elif pf_flag == 'teacher':
             particles_team[member_id] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), params.default_learning_factor_teacher)
+        
+        
+        #### debug - save particles!
+        # pf_particles = pd.DataFrame({'Pos': str(particles_team[member_id].positions)})
+        # pf_particles.to_csv()
+
+        # with open('data/simulation/sampling_tests/particles_set_4_' + member_id + '.csv', 'w', newline='') as csv_file:
+        #     csv_writer = csv.writer(csv_file)
+        #     csv_writer.writerow(['Position'])  # Write header
+        #     csv_writer.writerows(particles_team[member_id].positions)  # Write data rows
+            # for i in range(len(particles_team[member_id].positions)):
+            #     csv_writer.writerow(particles_team[member_id].positions[i])  # Write data rows
+        #######################
+
 
         if team_prior is not None:
             # for cnst in team_prior[member_id]:
             print('team_prior[member_id]: ', team_prior[member_id]) 
             plot_title = 'Teacher belief for player ' + str(member_id) + 'for prior'
-            particles_team[member_id].update(team_prior[member_id][0], learning_factor = 0.99, plot_title = plot_title) # team prior is in team knowledge format. Hence use kc_id = 0 to get prior
+            particles_team[member_id].update(team_prior[member_id][0], learning_factor = 1, plot_title = plot_title, viz_flag = False) # team prior is in team knowledge format. Hence use kc_id = 0 to get prior
 
                 # visualize_transition(cnst, particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for ' + str(member_id) )
             
@@ -899,7 +915,7 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_learnin
         if team_prior is not None:
             team_prior['common_knowledge'] = [calc_common_knowledge(team_prior, team_size, weights, step_cost_flag)]
             plot_title = 'Teacher belief for common knowledge for prior'
-            particles_team['common_knowledge'].update(team_prior['common_knowledge'][0], plot_title=plot_title)  # team prior is in team knowledge format. Hence use kc_id = 0 to get prior
+            particles_team['common_knowledge'].update(team_prior['common_knowledge'][0], plot_title=plot_title, viz_flag = False)  # team prior is in team knowledge format. Hence use kc_id = 0 to get prior
             particles_team['common_knowledge'].knowledge_update(team_prior['common_knowledge'])
         
 
@@ -1124,13 +1140,23 @@ def visualize_transition(constraints, particles, mdp_class, weights=None, fig=No
                 for constraint in constraints:
                     BEC_viz.visualize_planes(constraint, fig=fig, ax=ax_n)
             else:
-                for constraints in [constraints]:
+                if len(constraints) > 1:
                     BEC_viz.visualize_planes(constraints, fig=fig, ax=ax_n)
                     if constraints[0][0][0] == 0:
                         view_params = [16, -160]
                     elif constraints[0][0][1] == 0:
                         view_params = [2, -100]
                     elif constraints[0][0][2] == 0:
+                        view_params = [2, -60]
+                    else:
+                        view_params = [16, -160]
+                else:
+                    BEC_viz.visualize_planes([constraints], fig=fig, ax=ax_n)
+                    if constraints[0][0] == 0:
+                        view_params = [16, -160]
+                    elif constraints[0][1] == 0:
+                        view_params = [2, -100]
+                    elif constraints[0][2] == 0:
                         view_params = [2, -60]
                     else:
                         view_params = [16, -160]

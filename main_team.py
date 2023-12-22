@@ -233,7 +233,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                 member_id = 'p' + str(i+1)
                 particles_teacher_prob_demo[member_id] = particles_team_teacher[member_id].particles_prob_correct
                 particles_learner_prob_demo[member_id] = particles_team_learner[member_id].particles_prob_correct
-            print(colored('particles_teacher_prob_demo for player ' + member_id + ': ' + str(particles_teacher_prob_demo[member_id]) + '. particles_learner_prob_demo for player ' + member_id + ': ' + str(particles_learner_prob_demo[member_id]), 'green'))
+                print(colored('particles_teacher_prob_demo for player ' + member_id + ': ' + str(particles_teacher_prob_demo[member_id]) + '. particles_learner_prob_demo for player ' + member_id + ': ' + str(particles_learner_prob_demo[member_id]), 'green'))
             ############################################################
 
 

@@ -91,18 +91,18 @@ if __name__ == "__main__":
     # dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
 
     # team_params_learning = {'low': 0.5, 'med': 0.65, 'high': 0.8}
-    # team_composition_list = [[0,0,2]]
-    team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
+    team_composition_list = [[0,0,2]]
+    # team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
 
     dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
-    sampling_condition_list = ['particles','cluster_random']  # Conditions: ['particles', 'cluster_random', 'cluster_weight']sampling of human responses from learner PF models
+    sampling_condition_list = ['particles']  # Conditions: ['particles', 'cluster_random', 'cluster_weight']sampling of human responses from learner PF models
  
     sim_params = {'min_correct_likelihood': 0.6}
     
-    N_runs = 16
+    N_runs = 1
     run_start_id = 1
 
-    file_prefix = 'trials_12_17_set_1'
+    file_prefix = 'trials_12_17_debug'
     
     path = 'models/augmented_taxi2'
 
