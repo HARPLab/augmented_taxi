@@ -42,23 +42,24 @@ class Particles_team():
 
         # parameters for the custom uniform + VMF distribution
         # fix sampling type
-        sampling_flag = 'discontinuous' # 'continuous' or 'discontinuous'
+        self.sampling_flag = 'discontinuous' # 'continuous' or 'discontinuous'
         
         self.u_prob_mass_scaled = learning_factor
         self.u_pdf_scaled = self.u_prob_mass_scaled/(2*np.pi)
 
         self.VMF_prob_mass_scaled = 1-learning_factor  # scaled VMF probability mass/CDF
-        self.VMF_kappa, self.x1  = self.solve_for_distribution_params(learning_factor, k_sol_flag = sampling_flag)
+        self.VMF_kappa, self.x1  = self.solve_for_distribution_params(learning_factor, k_sol_flag = self.sampling_flag)
         self.VMF_pdf = self.calc_VMF_pdf()
 
         # for debugging purposes
         self.particles_prob_correct = 0
         self.clusters_prob_correct = 0
+        self.noise_measures = [0, 0]
 
         
 
         # calculate scaling factors
-        if sampling_flag == 'continuous':
+        if self.sampling_flag == 'continuous':
             self.x2 = learning_factor/0.5
         else:
             self.x2 = 1   # only scale the VMF (x1) and not the entire VMF+uniform distribution
@@ -274,7 +275,7 @@ class Particles_team():
         theta_lim = [np.pi/2, 3*np.pi/2]
 
         # fix unscaled vmf_mass instead of making it variable
-        vmf_mass = 0.49
+        vmf_mass = 0.25
         
         if u_cdf_scaled > 0.5:
             kappa = self.calc_kappa_from_cdf(1-u_cdf_scaled)
@@ -828,6 +829,7 @@ class Particles_team():
     def resample_from_index(self, indexes, model_type, K=1, constraint = None):
         
         original_positions = copy.deepcopy(self.positions)
+        # print('model_type: ', model_type)
 
         # #################
         # #  added for debugging purposes - 12/21
@@ -899,15 +901,21 @@ class Particles_team():
 
         noise *= K * positions_spherical.shape[0] ** (-1/positions_spherical.shape[1])
 
-        # ########### added for debugging purposes - 12/10
-        # positions_before_noise = np.empty_like(self.positions)
-        # positions_spherical_before_noise = copy.deepcopy(positions_spherical)
-        # for aa in range(0, len(positions_spherical)):
-        #     positions_before_noise[aa, :] = np.array(cg.sph2cart(positions_spherical_before_noise[aa, :])).reshape(1, -1)
+        ##
+        noise = noise/10 # 12/26/23. Added to reduce noise
+
+        ########### added for debugging purposes - 12/10
+        positions_before_noise = np.empty_like(self.positions)
+        positions_spherical_before_noise = copy.deepcopy(positions_spherical)
+        for aa in range(0, len(positions_spherical)):
+            positions_before_noise[aa, :] = np.array(cg.sph2cart(positions_spherical_before_noise[aa, :])).reshape(1, -1)
         # #################
         #  added for debugging purposes - 12/21
         # print('Noise: ', noise)
         ################
+        noise_norm = np.linalg.norm(noise, axis=1)
+        self.noise_measures = [np.mean(noise_norm), np.std(noise_norm)]
+        print('Noise mean: ', self.noise_measures[0], '. Noise std: ', self.noise_measures[1])
 
         positions_spherical += noise
 
@@ -917,7 +925,7 @@ class Particles_team():
         # reset the weights
         self.weights = np.ones(len(self.positions)) / len(self.positions)
 
-        # #333333  added for debugging purposes - 12/21
+        # #  added for debugging purposes - 12/21
         # print('Pos after noise: ', self.positions)
         # if constraint is not None:
         #     self.calc_particles_probability(constraint)
@@ -925,11 +933,11 @@ class Particles_team():
         ##############
 
         # ###### plots for debugging - 12/10/23 #######
-        # # plot particles
+        # # # plot particles
         # fig = plt.figure()
         # ax1 = fig.add_subplot(1, 3, 1, projection='3d')
-        # ax2 = fig.add_subplot(1, 3, 2, projection='3d', sharex=ax1, sharey=ax1, sharez=ax1)
-        # ax3 = fig.add_subplot(1, 3, 3, projection='3d', sharex=ax1, sharey=ax1, sharez=ax1)
+        # ax2 = fig.add_subplot(1, 3, 2, projection='3d')
+        # ax3 = fig.add_subplot(1, 3, 3, projection='3d')
         # ax1.title.set_text('Original_positions')
         # ax2.title.set_text('resampled particles before noise')
         # ax3.title.set_text('Resampled particles after noise')
@@ -938,8 +946,8 @@ class Particles_team():
         # ax3.scatter(self.positions[:, 0, 0], self.positions[:, 0, 1], self.positions[:, 0, 2])
 
 
-        # # plt.figure()
-        # # plt.scatter(noise[:,0], noise[:,1])
+        # plt.figure()
+        # plt.scatter(noise[:,0], noise[:,1])
 
         # fig2, axn = plt.subplots(1, 2)
         # axn[0].scatter(noise_before_transform[:, 0], noise_before_transform[:, 1])
@@ -948,12 +956,12 @@ class Particles_team():
         # axn[1].title.set_text('noise after transform')
 
         
-        # # fig3, axn2 = plt.subplots(1, 2)
-        # # axn2[0].plot(np.arange(1, len(elevations_sorted)+1), elevations_sorted)
-        # # axn2[1].plot(np.arange(1, len(azimuths_sorted)+1), azimuths_sorted)
-        # # axn2[0].title.set_text('elevations_sorted')
-        # # axn2[1].title.set_text('azimuths_sorted')
-        # # # print("ele_dists: " + str(ele_dists))
+        # fig3, axn2 = plt.subplots(1, 2)
+        # axn2[0].plot(np.arange(1, len(elevations_sorted)+1), elevations_sorted)
+        # axn2[1].plot(np.arange(1, len(azimuths_sorted)+1), azimuths_sorted)
+        # axn2[0].title.set_text('elevations_sorted')
+        # axn2[1].title.set_text('azimuths_sorted')
+        # # print("ele_dists: " + str(ele_dists))
 
 
         # plt.show()
@@ -1168,6 +1176,9 @@ class Particles_team():
         self.positions_prev = self.positions.copy()
         print(colored('constraints: ' + str(constraints), 'red'))
 
+        # debug - reset noise measures
+        self.noise_measures = [0, 0]
+
 
         # plot particles functions
         def label_axes(ax, mdp_class, weights=None, view_params = None):
@@ -1201,6 +1212,8 @@ class Particles_team():
 
         if viz_flag:
             fig = plt.figure()
+            fig2 = plt.figure()
+            ax2 = []
             ax = []
             plt_id = 1
             N = len(constraints)
@@ -1218,7 +1231,13 @@ class Particles_team():
             constraint = constraints[cnst_id]
             self.calc_particles_probability([constraint])
             prob_initial.append(self.particles_prob_correct)
+
+            if viz_flag:
+                ax2.append(fig2.add_subplot(N, 3, plt_id))
+                ax2[cnst_id*3].hist(self.weights, bins=20)
+                ax2[cnst_id*3].title.set_text('Particle distribution before reweighting')
             
+
             self.reweight(constraint, learning_factor)
             
 
@@ -1228,8 +1247,10 @@ class Particles_team():
                 ax.append(fig.add_subplot(N, 3, plt_id, projection='3d'))
                 plt_id += 1
                 ax.append(fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
+                ax2.append(fig2.add_subplot(N, 3, plt_id))
                 plt_id += 1
                 ax.append(fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
+                ax2.append(fig2.add_subplot(N, 3, plt_id))
                 plt_id += 1
                 ax[cnst_id*3].title.set_text('Particles before reweighting')
                 ax[cnst_id*3 + 1].title.set_text('Particles after reweighting')
@@ -1252,6 +1273,9 @@ class Particles_team():
                     dot = constraint.dot(pos.T)
                     if dot < 0:
                         ax[cnst_id*3+1].scatter(pos[0][0], pos[0][1], pos[0][2], marker='o', c='r', s=weight*vis_scale_factor)
+
+                ax2[cnst_id*3+1].hist(self.weights, bins=20)
+                ax2[cnst_id*3+1].title.set_text('Particle distribution after reweighting')
 
                 # set view
                 if constraint[0][0] == 0:
@@ -1276,6 +1300,12 @@ class Particles_team():
             if sum(self.weights) < reset_threshold_prob:
                 print('Resetting... Constraint: {}'.format(constraint))
                 self.reset(constraint)
+
+                # calculate probability after reset
+                self.calc_particles_probability([constraint])
+                prob_reweight.append(self.particles_prob_correct)
+                prob_resample.append(self.particles_prob_correct)
+                print(colored('Constraint: ' + str(constraint) + '. Prob before reset: ' + str(prob_initial[cnst_id]) + '. Prob after reset: ' + str(prob_reweight[cnst_id]), 'red' ))
             else:
                 # normalize weights and update particles
                 # print(colored('Normalizing particle weights...', 'red'))
@@ -1327,6 +1357,10 @@ class Particles_team():
                             dot = constraint.dot(pos.T)
                             if dot < 0:
                                 ax[cnst_id*3+2].scatter(pos[0][0], pos[0][1], pos[0][2], marker='o', c='r', s=weight*vis_scale_factor)
+                        
+                        ax2[cnst_id*3+2].hist(self.weights, bins=20)
+                        ax2[cnst_id*3+2].title.set_text('Particle distribution after reweighting')
+                        
 
                 else:
                     resample_flag.append(False)
@@ -1355,7 +1389,7 @@ class Particles_team():
 
         self.binned = False
 
-        return prob_initial, prob_reweight, prob_resample, resample_flag
+        return prob_initial, prob_reweight, prob_resample, resample_flag, self.noise_measures
 
 
 
@@ -1374,7 +1408,10 @@ class Particles_team():
         else:
             u_pdf_scaled = learning_factor/(2*np.pi)
             VMF_kappa, x1 = self.solve_for_distribution_params(learning_factor)
-            x2 = learning_factor/0.5
+            if self.sampling_flag == 'continuous':
+                x2 = learning_factor/0.5
+            else:
+                x2 = 1 
 
         for j, x in enumerate(self.positions):
             obs_prob = self.observation_probability(u_pdf_scaled, VMF_kappa, x, constraint, x1, x2)

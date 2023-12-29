@@ -540,7 +540,7 @@ def run_sim(condition, filename):
     
 
 
-    max_learning_factor = 0.95
+    max_learning_factor = 1
     # team_learning_rate = np.hstack((0.025*np.ones([team_size, 1]), 0*np.ones([team_size, 1])))
     team_learning_rate = np.hstack((0*np.ones([team_size, 1]), 0*np.ones([team_size, 1])))  # No learning!
     team_learning_factor = copy.deepcopy(initial_team_learning_factor)
@@ -562,6 +562,7 @@ def run_sim(condition, filename):
     resample_flag_history = []
     particles_learner_prob_demo_history = [] 
     particles_learner_prob_test_history = []
+    resample_noise_history = []
     
     run_sim = True
     
@@ -586,16 +587,17 @@ def run_sim(condition, filename):
             for p in range(team_size):
                 member_id = 'p' + str(p+1)
                 demo_prob = []
-                prob_initial, prob_reweight, prob_resample, resample_flag = [], [], [], []
+                prob_initial, prob_reweight, prob_resample, resample_flag, noise_measures = [], [], [], [], []
                 for new_cnst in new_constraints:
-                    if resampling_noise:
-                        prob_initial_cnst, prob_reweight_cnst, prob_resample_cnst, resample_flag_cnst = particles_team_learner[member_id].update([new_cnst], learning_factor = team_learning_factor[p], model_type = 'no_noise')
+                    if not resampling_noise:
+                        prob_initial_cnst, prob_reweight_cnst, prob_resample_cnst, resample_flag_cnst, noise_measures_cnst = particles_team_learner[member_id].update([new_cnst], learning_factor = team_learning_factor[p], model_type = 'no_noise')
                     else:
-                        prob_initial_cnst, prob_reweight_cnst, prob_resample_cnst, resample_flag_cnst = particles_team_learner[member_id].update([new_cnst], learning_factor = team_learning_factor[p])
+                        prob_initial_cnst, prob_reweight_cnst, prob_resample_cnst, resample_flag_cnst, noise_measures_cnst = particles_team_learner[member_id].update([new_cnst], learning_factor = team_learning_factor[p])
                     prob_initial.append(prob_initial_cnst)
                     prob_reweight.append(prob_reweight_cnst)
                     prob_resample.append(prob_resample_cnst)
                     resample_flag.append(resample_flag_cnst)
+                    noise_measures.extend(noise_measures_cnst)
                     
                     particles_team_learner[member_id].calc_particles_probability(new_cnst) # for each constraint
                     demo_prob.append(particles_team_learner[member_id].particles_prob_correct)
@@ -625,9 +627,11 @@ def run_sim(condition, filename):
                     print(colored('Sampling test response for set id ' + str(update_id) + 'for sample ' + str(sample_id) + ' for Player ' + str(member_id) + ' with learning factor ' + str(team_learning_factor[p]), 'yellow'))
                                         
                     args = update_id, member_id, new_constraints, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, update_id_history, skip_model_history, cluster_id_history, point_probability, \
-                        team_learning_factor_history, demo_prob, learner_member_prob_test, particles_learner_prob_demo_history, particles_learner_prob_test_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, prob_reweight_history, prob_resample_history, resample_flag_history, update_type, update_sequence_history
+                        team_learning_factor_history, demo_prob, learner_member_prob_test, particles_learner_prob_demo_history, particles_learner_prob_test_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, \
+                            prob_reweight_history, prob_resample_history, resample_flag_history, update_type, update_sequence_history, noise_measures, resample_noise_history
+                    
                     human_model_weight, human_traj, response_type, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, update_id_history, skip_model_history, cluster_id_history, point_probability, team_learning_factor_history, particles_learner_prob_demo_history, \
-                        particles_learner_prob_test_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, prob_reweight_history, prob_resample_history, resample_flag_history, update_sequence_history = get_human_response(condition, env_idx, particles_team_learner[member_id], opt_traj, test_constraints, team_learning_factor[p], args)
+                        particles_learner_prob_test_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, prob_reweight_history, prob_resample_history, resample_flag_history, update_sequence_history, resample_noise_history = get_human_response(condition, env_idx, particles_team_learner[member_id], opt_traj, test_constraints, team_learning_factor[p], args)
 
                     if response_type == 'correct':
                         correct_response[member_id] += 1
@@ -657,7 +661,7 @@ def run_sim(condition, filename):
                 if response_member == 'correct':
                     print(colored('Updating PF and learning rate based on correct response. Test constraints: ' + str(test_constraints), 'green'))
                     team_learning_factor[p] = min(team_learning_factor[p] + team_learning_rate[p, 0], max_learning_factor)
-                    if resampling_noise:
+                    if not resampling_noise:
                         particles_team_learner[member_id].update(test_constraints, learning_factor=team_learning_factor[p], model_type = 'no_noise')
                     else:
                         particles_team_learner[member_id].update(test_constraints, learning_factor=team_learning_factor[p])
@@ -674,7 +678,7 @@ def run_sim(condition, filename):
                     failed_BEC_constraint = opt_feature_count - human_feature_count
 
                     print(colored('Updating PF and learning rate based on incorrect response. Failed BEC constraint: ' + str([-failed_BEC_constraint]), 'red'))
-                    if resampling_noise:
+                    if not resampling_noise:
                         particles_team_learner[member_id].update([-failed_BEC_constraint], learning_factor=team_learning_factor[p], model_type = 'no_noise')
                     else:
                         particles_team_learner[member_id].update([-failed_BEC_constraint], learning_factor=team_learning_factor[p])
@@ -696,7 +700,7 @@ def run_sim(condition, filename):
     data_dict = {'update_id': update_id_history, 'member_id': member, 'learning_factor': team_learning_factor_history, 'model': sampled_points_history, 'point_probability': point_probability, 'skip_model': skip_model_history, \
                  'constraints': constraint_history, 'constraint_flag': constraint_flag_history, 'response': response_history, 'cluster_id': cluster_id_history, 'particles_learner_prob_demo_history': particles_learner_prob_demo_history, \
                 'particles_learner_prob_test_history': particles_learner_prob_demo_history, 'prob_initial_history': prob_initial_history, 'prob_reweight_history': prob_reweight_history, 'prob_resample_history': prob_resample_history, \
-                    'resample_flag_history': resample_flag_history, 'update_type': update_sequence_history}
+                    'resample_flag_history': resample_flag_history, 'update_type': update_sequence_history, 'resample_noise': resample_noise_history}
     
     
     debug_data_response = pd.DataFrame(data=data_dict)
@@ -3065,6 +3069,65 @@ if __name__ == "__main__":
 
     #######################################  test the PF resampling process with Gaussian Noise  ###########
 
-    
 
-    x=1
+    ## check knowledge calculation from demo constraints
+
+    # constraints = [np.array([[1, 1, 0]]), np.array([[ -2,  -1, -10]]), np.array([[-2, -1, -2]]), np.array([[-1, -1, -2]]), np.array([[  0,  -1, -10]]), np.array([[ 0, -1, -4]])]
+
+    # min_cnsts = BEC_helpers.remove_redundant_constraints(constraints,  params.weights['val'], params.step_cost_flag)
+
+    # print(min_cnsts)
+
+    #########################
+
+    # ## plot optimal trajectories
+    # env_idx = [37, 5]
+    # traj_idx = [58, 67]
+    # unit_constraints = []
+
+    # with open('models/' + params.data_loc['BEC'] + '/team_base_constraints.pickle', 'rb') as f:
+    #         policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count = pickle.load(f)
+
+
+    # for idx in range(len(env_idx)):
+
+    #     filename = 'models/augmented_taxi2/gt_policies/wt_vi_traj_params_env' + str(env_idx[idx]).zfill(5) + '.pickle'
+        
+    #     with open(filename, 'rb') as f:
+    #         wt_vi_traj_env = pickle.load(f)
+
+    #     mdp = wt_vi_traj_env[0][1].mdp
+        
+
+    #     demo_traj = traj_record[env_idx[idx]][traj_idx[idx]]
+
+    #     mdp.visualize_trajectory(demo_traj)
+
+        # mdp.set_init_state(demo_traj[0][0])
+        # agent = FixedPolicyAgent( wt_vi_traj_env[0][1].policy)
+        # traj_opt = mdp_helpers.rollout_policy(mdp, agent)
+        # mdp.visualize_trajectory(traj_opt)
+        
+
+        # unit_constraints.append()
+
+
+
+
+    # mdp.set_init_state(demo_traj[0][0])
+    # traj_opt = mdp_helpers.rollout_policy(mdp, agent)
+    ###############################################
+
+    team_knowledge = {'p1': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[0, 1, 0]]), np.array([[0, 1, 2]])]], 
+    'p2': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[0, 1, 0]]), np.array([[0, 1, 2]])]], 
+    'p3': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[0, 1, 0]]), np.array([[ 0, -1, -2]])]], 
+    'common_knowledge': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[0, 1, 2]]), np.array([[0, 1, 0]])]], 
+    'joint_knowledge': [[[np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])]], [[np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])]], [[np.array([[0, 1, 0]]), np.array([[0, 1, 2]])], [np.array([[0, 1, 0]]), np.array([[0, 1, 2]])], [np.array([[0, 1, 0]]), np.array([[ 0, -1, -2]])]]]}
+
+    
+    min_unit_constraints = [np.array([[0, 1, 2]]), np.array([[0, 1, 0]])]
+
+    print('reduced min unit constraints:', BEC_helpers.remove_redundant_constraints(min_unit_constraints, params.weights['val'], params.step_cost_flag))
+
+
+    print(team_helpers.calc_knowledge_level(team_knowledge, min_unit_constraints))

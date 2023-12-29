@@ -16,7 +16,7 @@ if __name__ == "__main__":
         print('run: ', run_id)
         
         for condition in condition_list:
-            filename = path + '/debug_response_no_learning_pf_prob_w_noise_k_49_all_correct_ml_095_' + condition + '_set_' + str(run_id) + '.csv'
+            filename = path + '/debug_response_no_learning_pf_prob_red_noise_k_25_all_correct_trial_update_fixed_prior_1_' + condition + '_set_' + str(run_id) + '.csv'
             dt.run_sim(condition, filename)
     #################################
 

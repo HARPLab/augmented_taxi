@@ -413,19 +413,19 @@ def calc_expected_learning(team_knowledge_expected, kc_id, particles_team_teache
         member_id = 'p' + str(p)
         # print('PF update of ', member_id)
         plot_title = 'Teacher belief (Expected knowledge change) for loop ' + str(loop_count+1) + ' for player ' + member_id
-        particles_team_teacher[member_id].update(new_constraints, plot_title = plot_title)
+        particles_team_teacher[member_id].update(new_constraints, plot_title = plot_title, viz_flag = viz_flag)
         
         ########## debugging - calculate proportion of particles that are within the BEC
         particles_team_teacher[member_id].calc_particles_probability(new_constraints)
         ##########################
         
         if viz_flag:
-            visualize_transition(new_constraints, particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set ' + str(loop_count+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(loop_count+1))
+            visualize_transition(new_constraints[0], particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set ' + str(loop_count+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(loop_count+1))
         p += 1
             
     # Update common knowledge model
     plot_title = 'Teacher belief (Expected knowledge change) for loop ' + str(loop_count+1) + ' for common knowledge'
-    particles_team_teacher['common_knowledge'].update(new_constraints, plot_title = plot_title) # PF update of common_knowledge
+    particles_team_teacher['common_knowledge'].update(new_constraints, plot_title = plot_title, viz_flag = viz_flag) # PF update of common_knowledge
     # if viz_flag:
     #     visualize_transition(new_constraints, particles_team_teacher_expected['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set' + str(loop_count+1) + ' for common knowledge', plot_filename ='ek_ck_loop_' + str(loop_count+1))
     
@@ -457,17 +457,6 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team_te
         for cnst in constraints:
             fig.text(x_loc[i], y_loc, s=str(cnst), fontsize=12)
             y_loc -= 0.02
-        
-        
-    def calc_inverse_constraints():
-        inv_constraints = []
-        for k_id, k_type in enumerate(team_knowledge):
-            if 'p' in k_type:
-                inv_constraints.extend([-x for x in team_knowledge[k_type]])
-
-        inv_joint_constraints = BEC_helpers.remove_redundant_constraints(inv_constraints, weights, step_cost_flag)
-
-        return inv_constraints, inv_joint_constraints
 
 
     def calc_recursive_intersection_area(constraint_list, N_intersecting_sets, weights, step_cost_flag, fixed_constraint = []):
@@ -579,33 +568,7 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team_te
         # combine constraints of all KCs
         team_knowledge_constraints = []
         
-        
-        # for kc_index in kc_id_list:
-        #     # print('KC index: ', kc_index)
-        #     # print('Knowledge type: ', knowledge_type)
-        #     if knowledge_type == 'joint_knowledge':
-        #         # # print('team_knowledge[knowledge_type][kc_index]: ', team_knowledge[knowledge_type][kc_index])
-                
-        #         for i in range(len(team_knowledge[knowledge_type][kc_index])):
-        #             # # print('team_knowledge[knowledge_type][kc_index][i]: ', team_knowledge[knowledge_type][kc_index][i])
-        #             # if len(team_knowledge_constraints) == 0:
-        #             if first_index:
-        #                 team_knowledge_constraints.append(utils_teams.flatten_list(copy.deepcopy(team_knowledge[knowledge_type][kc_index][i])))
-        #                 # team_knowledge_constraints = copy.deepcopy(team_knowledge[knowledge_type][kc_index][i])
-        #                 # # print(colored('team_knowledge_constraints flattened: ' + str(team_knowledge_constraints), 'blue' ))
-        #             else:
-        #                 # # print(colored('team_knowledge_constraints: ' + str(team_knowledge_constraints), 'blue' ))
-        #                 # # print('i: ', i)
-        #                 team_knowledge_constraints[i].extend(team_knowledge[knowledge_type][kc_index][i])
-        #             first_index = False
-        #     else:
-        #         # print('team_knowledge[knowledge_type][kc_index]: ', team_knowledge[knowledge_type][kc_index])
-        #         if len(team_knowledge_constraints) == 0:
-        #             team_knowledge_constraints = copy.deepcopy(team_knowledge[knowledge_type][kc_index])
-        #         else:
-        #             team_knowledge_constraints.extend(team_knowledge[knowledge_type][kc_index])
-
-
+        # combine knowledge constraints
         if knowledge_type == 'joint_knowledge':
             # for each player
             for mem_id in range(len(team_knowledge[knowledge_type][kc_id_list[0]])):
@@ -624,7 +587,7 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team_te
 
         print(colored('team_knowledge_constraints: ', 'blue'), team_knowledge_constraints)
 
- 
+        # calculate knowledge level
         if knowledge_type == 'joint_knowledge':
             ## Knowledge metric for joint knowledge
             knowledge_level[knowledge_type] = calc_joint_knowledge_separately(team_knowledge_constraints, min_unit_constraints, weights, step_cost_flag)
@@ -641,11 +604,8 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team_te
                 print('unit_intersection_constraints before update: ', min_unit_intersection_constraints)
                 min_unit_intersection_constraints.extend(team_knowledge_constraints)
                 print('unit_intersection_constraints after update: ', min_unit_intersection_constraints)
-
-                # if not check_opposing_constraints(min_unit_intersection_constraints)[0]:
-                #     # # print('min_unit_intersection_constraints: ', min_unit_intersection_constraints)
-                #     # min_unit_intersection_constraints = BEC_helpers.remove_redundant_constraints(min_unit_intersection_constraints, weights, step_cost_flag)
-                    
+                
+                # if non-intersecting constraints are found, then calculate knowledge level
                 if not check_for_non_intersecting_constraints(min_unit_intersection_constraints, weights, step_cost_flag)[0]:
                     # remove redundant constraints before calculating area
                     min_unit_intersection_constraints = BEC_helpers.remove_redundant_constraints(min_unit_intersection_constraints, weights, step_cost_flag)
@@ -658,6 +618,7 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team_te
 
                     # check if the knowledge area is a subset of the BEC area
                     if np.abs(min_unit_BEC_knowledge_intersection - knowledge_area) < 0.001:
+                        print('Knowledge area is a subset of the BEC area!..')
                         knowledge_level[knowledge_type] = [np.array(1.0)]
                     else:
                         kl = min_unit_BEC_knowledge_intersection/min_unit_BEC_knowledge_union
@@ -902,7 +863,7 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_learnin
             # for cnst in team_prior[member_id]:
             print('team_prior[member_id]: ', team_prior[member_id]) 
             plot_title = 'Teacher belief for player ' + str(member_id) + 'for prior'
-            particles_team[member_id].update(team_prior[member_id][0], learning_factor = 1, plot_title = plot_title, viz_flag = False) # team prior is in team knowledge format. Hence use kc_id = 0 to get prior
+            particles_team[member_id].update(team_prior[member_id][0], learning_factor = 1 , plot_title = plot_title, viz_flag = False) # team prior is in team knowledge format. Hence use kc_id = 0 to get prior
 
                 # visualize_transition(cnst, particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for ' + str(member_id) )
             
@@ -2624,7 +2585,7 @@ def obtain_diagnostic_tests(data_loc, previous_demos, visited_env_traj_idxs, min
 
 
 
-def simulate_team_learning(kc_id, particles_team_learner, new_constraints, params, loop_count, kc_reset_flag=True, viz_flag=False):
+def simulate_team_learning(kc_id, particles_team_learner, new_constraints, params, loop_count, kc_reset_flag=True, viz_flag=False, learner_update_type = 'noise'):
 
 
     print(colored('Simulating team learning for KC ' + str(kc_id) + 'in loop ' + str(loop_count) + '...', 'red'))
@@ -2634,12 +2595,12 @@ def simulate_team_learning(kc_id, particles_team_learner, new_constraints, param
         member_id = 'p' + str(p)
         # print('PF update of ', member_id)
         plot_title = 'Learner belief update after demonstration for loop ' + str(loop_count+1) + ' for player ' + member_id
-        particles_team_learner[member_id].update(new_constraints, plot_title = plot_title)
+        particles_team_learner[member_id].update(new_constraints, plot_title = plot_title, model_type = learner_update_type, viz_flag = viz_flag)
         particles_team_learner[member_id].calc_particles_probability(new_constraints)
         ##########################
         
         if viz_flag:
-            visualize_transition(new_constraints, particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for set ' + str(loop_count+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(loop_count+1))
+            visualize_transition(new_constraints[0], particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for set ' + str(loop_count+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(loop_count+1))
         p += 1
             
 
