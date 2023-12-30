@@ -343,7 +343,7 @@ test_env_traj_tracers = {
 ### Added for robot teaching to team situation
 
 # for debugging
-debug_flag = True
+debug_flag = False
 debug_kl_calc = False
 debug_hm_sampling = False
 plot_sampled_models_flag = False

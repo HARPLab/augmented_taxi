@@ -7,8 +7,8 @@ if __name__ == "__main__":
     
     ## run response sampling code
     path = 'data/simulation/sampling_tests'
-    N_runs = 2
-    run_start_id = 1
+    N_runs = 1
+    run_start_id = 3
     # condition_list = ['cluster_random', 'cluster_weight', 'particles']
     condition_list = ['particles']
 
@@ -16,7 +16,7 @@ if __name__ == "__main__":
         print('run: ', run_id)
         
         for condition in condition_list:
-            filename = path + '/debug_response_no_learning_pf_prob_red_noise_k_25_all_correct_trial_update_fixed_prior_1_' + condition + '_set_' + str(run_id) + '.csv'
+            filename = path + '/debug_trial_12_29_noise_' + condition + '_set_' + str(run_id) + '.csv'
             dt.run_sim(condition, filename)
     #################################
 

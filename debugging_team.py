@@ -513,7 +513,7 @@ def run_sim(condition, filename):
     # update_sequence = ['incorrect', 'correct','incorrect', 'correct', 'correct']
     update_sequence = ['correct', 'correct','correct', 'correct', 'correct']
     resampling_noise = True
-    # initial_team_learning_factor = np.array([0.1, 0.1])
+    # initial_team_learning_factor = np.array([1.0])
 
 
 
@@ -588,23 +588,40 @@ def run_sim(condition, filename):
                 member_id = 'p' + str(p+1)
                 demo_prob = []
                 prob_initial, prob_reweight, prob_resample, resample_flag, noise_measures = [], [], [], [], []
-                for new_cnst in new_constraints:
-                    if not resampling_noise:
-                        prob_initial_cnst, prob_reweight_cnst, prob_resample_cnst, resample_flag_cnst, noise_measures_cnst = particles_team_learner[member_id].update([new_cnst], learning_factor = team_learning_factor[p], model_type = 'no_noise')
-                    else:
-                        prob_initial_cnst, prob_reweight_cnst, prob_resample_cnst, resample_flag_cnst, noise_measures_cnst = particles_team_learner[member_id].update([new_cnst], learning_factor = team_learning_factor[p])
-                    prob_initial.append(prob_initial_cnst)
-                    prob_reweight.append(prob_reweight_cnst)
-                    prob_resample.append(prob_resample_cnst)
-                    resample_flag.append(resample_flag_cnst)
-                    noise_measures.extend(noise_measures_cnst)
+                
+                
+                # ## For calculating probabilities after each constraint update
+                # for new_cnst in new_constraints:
+                #     if not resampling_noise:
+                #         prob_initial_cnst, prob_reweight_cnst, prob_resample_cnst, resample_flag_cnst, noise_measures_cnst = particles_team_learner[member_id].update([new_cnst], learning_factor = team_learning_factor[p], model_type = 'no_noise')
+                #     else:
+                #         prob_initial_cnst, prob_reweight_cnst, prob_resample_cnst, resample_flag_cnst, noise_measures_cnst = particles_team_learner[member_id].update([new_cnst], learning_factor = team_learning_factor[p], model_type = 'noise')
+                #     prob_initial.append(prob_initial_cnst)
+                #     prob_reweight.append(prob_reweight_cnst)
+                #     prob_resample.append(prob_resample_cnst)
+                #     resample_flag.append(resample_flag_cnst)
+                #     noise_measures.extend(noise_measures_cnst)
                     
-                    particles_team_learner[member_id].calc_particles_probability(new_cnst) # for each constraint
-                    demo_prob.append(particles_team_learner[member_id].particles_prob_correct)
+                #     particles_team_learner[member_id].calc_particles_probability(new_cnst) # for each constraint
+                #     demo_prob.append(particles_team_learner[member_id].particles_prob_correct)
+
+                ## For calculating probabilities after entire update
+                if not resampling_noise:
+                    prob_initial_cnst, prob_reweight_cnst, prob_resample_cnst, resample_flag_cnst, noise_measures_cnst = particles_team_learner[member_id].update(new_constraints, learning_factor = team_learning_factor[p], model_type = 'no_noise')
+                else:
+                    prob_initial_cnst, prob_reweight_cnst, prob_resample_cnst, resample_flag_cnst, noise_measures_cnst = particles_team_learner[member_id].update(new_constraints, learning_factor = team_learning_factor[p], model_type = 'noise')
+                prob_initial.append(prob_initial_cnst)
+                prob_reweight.append(prob_reweight_cnst)
+                prob_resample.append(prob_resample_cnst)
+                resample_flag.append(resample_flag_cnst)
+                noise_measures.extend(noise_measures_cnst)
+                
+                #####
 
                 particles_team_learner[member_id].calc_particles_probability(new_constraints) # for all constraints jointly
                 demo_prob.append(particles_team_learner[member_id].particles_prob_correct)
                 
+
                 learner_member_prob_test = []
                 # for individual test constraints
                 for test_cnst in test_constraints:
@@ -620,7 +637,7 @@ def run_sim(condition, filename):
                 
                 if viz_flag:
                     # team_helpers.visualize_transition(new_constraints[0], particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = 'Teacher knowledge change after demos set ' + str(update_id+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(update_id+1))
-                    team_helpers.visualize_transition(new_constraints[0], particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = 'Learner knowledge change after demos set ' + str(update_id+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(update_id+1))
+                    team_helpers.visualize_transition(new_constraints, particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = 'Learner knowledge change after demos set ' + str(update_id+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(update_id+1))
                 
                 # Sample responses
                 for sample_id in range(int(N_samples/sampling_unit_size)):

@@ -855,9 +855,10 @@ class Particles_team():
         
         # Method 2: use the maximum distance between any two CONSECUTIVE particles in the original set of particles
         azimuths_sorted = np.sort(azimuths)
-        azi_dists = np.empty(len(azimuths))
-        azi_dists[0:-1] = np.diff(azimuths_sorted)
-        azi_dists[-1] = min(2 * np.pi - (max(azimuths_sorted) - min(azimuths_sorted)), max(azimuths_sorted) - min(azimuths_sorted))
+        # azi_dists = np.empty(len(azimuths))
+        # azi_dists[0:-1] = np.diff(azimuths_sorted)
+        azi_dists = np.diff(azimuths_sorted)
+        # azi_dists[-1] = min(2 * np.pi - (max(azimuths_sorted) - min(azimuths_sorted)), max(azimuths_sorted) - min(azimuths_sorted))
 
         if np.std(azi_dists[azi_dists > self.eps]) < 0.01 and np.std(azimuths_sorted) > 1:
             # the particles are relatively evenly spaced out across the full range of azimuth
@@ -868,10 +869,14 @@ class Particles_team():
 
         ######## 12/10/23. added to make noise more isotropic, based on elevation differences between points similar to azimuth
         elevations_sorted = np.sort(elevations)
-        ele_dists = np.empty(len(elevations))
-        ele_dists[0:-1] = np.diff(elevations_sorted)
-        ele_dists[-1] = min(np.pi - (max(elevations_sorted) - min(elevations_sorted)), max(elevations_sorted) - min(elevations_sorted))
+        # ele_dists = np.empty(len(elevations))
+        # ele_dists[0:-1] = np.diff(elevations_sorted)
+        ele_dists = np.diff(elevations_sorted)
 
+        # print('ele_dists: ', ele_dists)
+        # ele_dists[-1] = min(np.pi - (max(elevations_sorted) - min(elevations_sorted)), max(elevations_sorted) - min(elevations_sorted))
+        # print('azi_dists: ', azi_dists)
+        
         if np.std(ele_dists[ele_dists > self.eps]) < 0.01 and np.std(elevations_sorted) > 1:
             # the particles are relatively evenly spaced out across the full range of elevation
             max_ele_dist = np.pi
@@ -902,7 +907,7 @@ class Particles_team():
         noise *= K * positions_spherical.shape[0] ** (-1/positions_spherical.shape[1])
 
         ##
-        noise = noise/10 # 12/26/23. Added to reduce noise
+        # noise = noise/10 # 12/26/23. Added to reduce noise
 
         ########### added for debugging purposes - 12/10
         positions_before_noise = np.empty_like(self.positions)
@@ -1130,7 +1135,7 @@ class Particles_team():
         uniform_particles_id = []
 
         print('N_particles: ', N_particles)
-        print('N_weights: ', len(self.weights))
+        # print('N_weights: ', len(self.weights))
 
         for particle_id in range(N_particles):
             pos  = self.positions[particle_id]
@@ -1174,7 +1179,7 @@ class Particles_team():
     def update(self, constraints, c=0.5, reset_threshold_prob=0.001, learning_factor = None, plot_title = None, model_type = 'noise', viz_flag = False):
         self.weights_prev = self.weights.copy()
         self.positions_prev = self.positions.copy()
-        print(colored('constraints: ' + str(constraints), 'red'))
+        # print(colored('constraints: ' + str(constraints), 'red'))
 
         # debug - reset noise measures
         self.noise_measures = [0, 0]
@@ -1305,7 +1310,7 @@ class Particles_team():
                 self.calc_particles_probability([constraint])
                 prob_reweight.append(self.particles_prob_correct)
                 prob_resample.append(self.particles_prob_correct)
-                print(colored('Constraint: ' + str(constraint) + '. Prob before reset: ' + str(prob_initial[cnst_id]) + '. Prob after reset: ' + str(prob_reweight[cnst_id]), 'red' ))
+                # print(colored('Constraint: ' + str(constraint) + '. Prob before reset: ' + str(prob_initial[cnst_id]) + '. Prob after reset: ' + str(prob_reweight[cnst_id]), 'red' ))
             else:
                 # normalize weights and update particles
                 # print(colored('Normalizing particle weights...', 'red'))
@@ -1314,7 +1319,7 @@ class Particles_team():
                 # calculate probability after weights have been normalized
                 self.calc_particles_probability([constraint])
                 prob_reweight.append(self.particles_prob_correct)
-                print(colored('Constraint: ' + str(constraint) + '. Prob before reweighting: ' + str(prob_initial[cnst_id]) + '. Prob after reweighting: ' + str(prob_reweight[cnst_id]), 'green' ))
+                # print(colored('Constraint: ' + str(constraint) + '. Prob before reweighting: ' + str(prob_initial[cnst_id]) + '. Prob after reweighting: ' + str(prob_reweight[cnst_id]), 'green' ))
                     
 
                 n_eff = self.calc_n_eff(self.weights)
@@ -1344,8 +1349,8 @@ class Particles_team():
                     # self.calc_clusters_probability([constraint])
                     resample_flag.append(True)
                     prob_resample.append(self.particles_prob_correct)
-                    print(colored('Constraint: ' + str(constraint) + '. Prob before reweighting: ' + str(prob_initial[cnst_id]) + '. Prob after reweighting: ' + str(prob_reweight[cnst_id]) + \
-                                  '. Prob after resampling: ' + str(prob_resample[cnst_id]), 'green' ))
+                    # print(colored('Constraint: ' + str(constraint) + '. Prob before reweighting: ' + str(prob_initial[cnst_id]) + '. Prob after reweighting: ' + str(prob_reweight[cnst_id]) + \
+                    #               '. Prob after resampling: ' + str(prob_resample[cnst_id]), 'green' ))
                     
                     if viz_flag:
                         self.plot(fig=fig, ax=ax[cnst_id*3 + 2], cluster_centers=self.cluster_centers, cluster_weights=self.cluster_weights)
@@ -1399,7 +1404,7 @@ class Particles_team():
         :param k: concentration parameter of VMF
         :return: probability of x under this composite distribution (uniform + VMF)
         '''
-        print(colored('Rewifghting particles for learning factor: ' + str(learning_factor), 'red'))
+        print(colored('Reweighting particles for learning factor: ' + str(learning_factor), 'red'))
         if learning_factor is None:
             u_pdf_scaled = self.u_pdf_scaled
             VMF_kappa = self.VMF_kappa
@@ -1660,11 +1665,11 @@ class Particles_team():
         # Method 2: Use maximum probability distribution
         prob = np.max(prob_individual)
 
-        if plot_particles_flag:
-            print('Individual probabilities: ', prob_individual)
-            print('All constraints: ', joint_constraints)
-            print('final constraint_satisfied_flag: ', team_constraint_satisfied_flag)
-            print('Prob: ', prob)
+        # if plot_particles_flag:
+        #     print('Individual probabilities: ', prob_individual)
+        #     print('All constraints: ', joint_constraints)
+        #     print('final constraint_satisfied_flag: ', team_constraint_satisfied_flag)
+        #     print('Prob: ', prob)
 
 
         return prob

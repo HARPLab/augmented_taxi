@@ -46,7 +46,7 @@ def sample_from_distribution(condition, points, probabilities, points_to_avoid =
 
     while not sampling_complete and loop_count < 100:
         r = random.uniform(0, 1)
-        print('Loop count: ', loop_count)
+        # print('Loop count: ', loop_count)
         for i, cumulative_prob in enumerate(cdf):
             if cumulative_prob >= r:
                 pot_sampled_point = points_sorted[i]
@@ -54,7 +54,7 @@ def sample_from_distribution(condition, points, probabilities, points_to_avoid =
                 if condition == 'cluster_random' or condition == 'cluster_weight':
                     # Method 1/3: Sample from clusters. Here the points are cluster centers
                     cluster_id = [j for j, x in enumerate(points) if (x == pot_sampled_point).all()]
-                    print('Sampled cluster_id: ', cluster_id)
+                    # print('Sampled cluster_id: ', cluster_id)
                     if cluster_id not in points_to_avoid:
                         print('Sampled point id: ', i, 'Sampled point: ', pot_sampled_point, 'Sampled point probability: ', probabilities_sorted[i])
                         sampling_complete = True
@@ -64,7 +64,7 @@ def sample_from_distribution(condition, points, probabilities, points_to_avoid =
                     # Method 2: Sample from all particles
                     check_sampled = [j for j, x in enumerate(points_to_avoid) if (x == pot_sampled_point).all()]
                     if len(check_sampled)==0:
-                        print('Sampled point id: ', i, 'Sampled point: ', pot_sampled_point, 'Sampled point probability: ', probabilities_sorted[i])
+                        # print('Sampled point id: ', i, 'Sampled point: ', pot_sampled_point, 'Sampled point probability: ', probabilities_sorted[i])
                         sampled_point = pot_sampled_point
                         sampling_complete = True 
                         break   # from for loop
@@ -295,77 +295,79 @@ def get_human_response(condition, env_idx, particles_to_sample, opt_traj, test_c
 
     while skip_human_model:
 
-        # # ## Method 1: Sampling from clusters based on weights and random sampling of particles within the cluster
-        if condition == 'cluster_random':
-            human_model_weight, cluster_id, rew_weight_prob = sample_from_distribution(condition, particles_to_sample.cluster_centers, particles_to_sample.cluster_weights)
+        # # # ## Method 1: Sampling from clusters based on weights and random sampling of particles within the cluster
+        # if condition == 'cluster_random':
+        #     human_model_weight, cluster_id, rew_weight_prob = sample_from_distribution(condition, particles_to_sample.cluster_centers, particles_to_sample.cluster_weights)
             
-            if loop_count > 0:
-                if skip_cluster and len(clusters_to_avoid) < len(particles_to_sample.cluster_centers):
-                    print('Sampling from a new cluster ... Max no. of clusters: ', len(particles_to_sample.cluster_centers), '. Clusters to avoid: ', clusters_to_avoid)
-                    clusters_to_avoid.append(cluster_id)
-                    cluster_sample = []
-                    skip_cluster = False
-                    human_model_weight, cluster_id, rew_weight_prob = sample_from_distribution(condition, particles_to_sample.cluster_centers, particles_to_sample.cluster_weights, points_to_avoid = clusters_to_avoid)
-                else:
-                    print('Sampling from the same cluster ...')
-                    human_model_weight, skip_cluster, rew_weight_prob = sample_from_cluster(particles_to_sample, cluster_id, mdp)
-                    if loop_count - last_skip_cluster_loop > max_loop_count:
-                        skip_cluster = True
-                        last_skip_cluster_loop = loop_count
+        #     if loop_count > 0:
+        #         if skip_cluster and len(clusters_to_avoid) < len(particles_to_sample.cluster_centers):
+        #             print('Sampling from a new cluster ... Max no. of clusters: ', len(particles_to_sample.cluster_centers), '. Clusters to avoid: ', clusters_to_avoid)
+        #             clusters_to_avoid.append(cluster_id)
+        #             cluster_sample = []
+        #             skip_cluster = False
+        #             human_model_weight, cluster_id, rew_weight_prob = sample_from_distribution(condition, particles_to_sample.cluster_centers, particles_to_sample.cluster_weights, points_to_avoid = clusters_to_avoid)
+        #         else:
+        #             print('Sampling from the same cluster ...')
+        #             human_model_weight, skip_cluster, rew_weight_prob = sample_from_cluster(particles_to_sample, cluster_id, mdp)
+        #             if loop_count - last_skip_cluster_loop > max_loop_count:
+        #                 skip_cluster = True
+        #                 last_skip_cluster_loop = loop_count
 
-                    if len(clusters_to_avoid) >= len(particles_to_sample.cluster_centers):
-                        human_model_weight = []
-                        cluster_id = []
-                        rew_weight_prob = []
-                        skip_human_model = False
+        #             if len(clusters_to_avoid) >= len(particles_to_sample.cluster_centers):
+        #                 human_model_weight = []
+        #                 cluster_id = []
+        #                 rew_weight_prob = []
+        #                 skip_human_model = False
 
     #######################
 
         # # Method 2: Sampling from all particles
         
-        elif condition == 'particles':
+        if condition == 'particles':
             sampled_point_flag = False
             while not sampled_point_flag:
                 human_model_weight, cluster_id, rew_weight_prob, rand_number = sample_from_distribution(condition, particles_to_sample.positions, particles_to_sample.weights, points_to_avoid = points_to_avoid)
                 
-                print('Sampled point: ', human_model_weight, 'Sampled point probability: ', rew_weight_prob, 'rand_number: ', rand_number)
+                # print('Sampled point: ', human_model_weight, 'Sampled point probability: ', rew_weight_prob, 'rand_number: ', rand_number)
                 if len(points_to_avoid) > 0:
                     for point_avd in points_to_avoid:
                         if not (human_model_weight == point_avd).all():
                             sampled_point_flag = True
-                            print('Point sampled!')
+                            # print('Point sampled!')
                             break
                 else:
                     sampled_point_flag = True
-                    print('Point sampled!')
+                    # print('Point sampled!')
+        else:
+            RuntimeError('Invalid condition for sampling human response')
 
     ############################
 
-        # Method 3: Sampling from clusters and weight-based sampling of particles within the cluster
-        elif condition == 'cluster_weight':
-            human_model_weight, cluster_id, rew_weight_prob, rand_number = sample_from_distribution(condition, particles_to_sample.cluster_centers, particles_to_sample.cluster_weights)
-            clusters_to_avoid.append(cluster_id)
+        # # Method 3: Sampling from clusters and weight-based sampling of particles within the cluster
+        # elif condition == 'cluster_weight':
+        #     human_model_weight, cluster_id, rew_weight_prob, rand_number = sample_from_distribution(condition, particles_to_sample.cluster_centers, particles_to_sample.cluster_weights)
+        #     clusters_to_avoid.append(cluster_id)
 
-            if loop_count > 0:
-                if skip_cluster and len(clusters_to_avoid) < len(particles_to_sample.cluster_centers):
-                    print('Sampling from a new cluster ... Max no. of clusters: ', len(particles_to_sample.cluster_centers), '. Clusters to avoid: ', clusters_to_avoid)
-                    skip_cluster = False
-                    human_model_weight, cluster_id, rew_weight_prob, rand_number = sample_from_distribution(condition, particles_to_sample.cluster_centers, particles_to_sample.cluster_weights, points_to_avoid = clusters_to_avoid)
-                    clusters_to_avoid.append(cluster_id)
-                else:
-                    skip_human_model = False
-                    print('Sampling from the same cluster ...')
-                    human_model_weight, skip_cluster, rew_weight_prob = sample_from_cluster_prob(particles_to_sample, cluster_id, mdp)
+        #     if loop_count > 0:
+        #         if skip_cluster and len(clusters_to_avoid) < len(particles_to_sample.cluster_centers):
+        #             print('Sampling from a new cluster ... Max no. of clusters: ', len(particles_to_sample.cluster_centers), '. Clusters to avoid: ', clusters_to_avoid)
+        #             skip_cluster = False
+        #             human_model_weight, cluster_id, rew_weight_prob, rand_number = sample_from_distribution(condition, particles_to_sample.cluster_centers, particles_to_sample.cluster_weights, points_to_avoid = clusters_to_avoid)
+        #             clusters_to_avoid.append(cluster_id)
+        #         else:
+        #             skip_human_model = False
+        #             print('Sampling from the same cluster ...')
+        #             human_model_weight, skip_cluster, rew_weight_prob = sample_from_cluster_prob(particles_to_sample, cluster_id, mdp)
                     
-                    print('last_skip_cluster_loop: ', last_skip_cluster_loop, 'loop_count: ', loop_count, 'max_loop_count: ', max_loop_count)
-                    if loop_count - last_skip_cluster_loop > max_loop_count:
-                        skip_cluster = True
-                        last_skip_cluster_loop = loop_count
-                    if len(clusters_to_avoid) >= len(particles_to_sample.cluster_centers):
-                        human_model_weight = []
-                        cluster_id = []
-                        rew_weight_prob = []
-                        skip_human_model = False
+        #             print('last_skip_cluster_loop: ', last_skip_cluster_loop, 'loop_count: ', loop_count, 'max_loop_count: ', max_loop_count)
+        #             if loop_count - last_skip_cluster_loop > max_loop_count:
+        #                 skip_cluster = True
+        #                 last_skip_cluster_loop = loop_count
+        #             if len(clusters_to_avoid) >= len(particles_to_sample.cluster_centers):
+        #                 human_model_weight = []
+        #                 cluster_id = []
+        #                 rew_weight_prob = []
+        #                 skip_human_model = False
 
                     
     #######################
@@ -386,16 +388,19 @@ def get_human_response(condition, env_idx, particles_to_sample, opt_traj, test_c
             vi_human.run_vi()
 
             if not vi_human.stabilized:
-                print(colored('Human model with weight, ' + str(human_model_weight) + ', did not converge and skipping for response generation', 'red'))
+                # print(colored('Human model with weight, ' + str(human_model_weight) + ', did not converge and skipping for response generation', 'red'))
                 skip_human_model = True
             else:
-                print(colored('Human model with weight, ' + str(human_model_weight) + ', converged', 'green'))
+                # print(colored('Human model with weight, ' + str(human_model_weight) + ', converged', 'green'))
                 skip_human_model = False
             
             if not skip_human_model:
                 cur_state = mdp.get_init_state()
                 # print('Current state: ', cur_state)
                 human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
+
+                # get trajectory from precomputed models
+
                 
                 human_traj_rewards = mdp.accumulate_reward_features(human_opt_trajs[0], discount=True)  # just use the first optimal trajectory
                 mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)

@@ -89,40 +89,36 @@ if __name__ == "__main__":
     team_params_learning = {'low': [0.65, 0.05], 'med': [0.65, 0.05], 'high': [0.8, 0.05]}
 
     # team_params_learning = {'low': 0.5, 'med': 0.65, 'high': 0.8}
-    # team_composition_list = [[0,2,2]]
+    team_composition_list = [[0,2,2], [2,2,2]]
     # dem_strategy_list = ['joint_knowledge']
 
-    team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
+    # team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
     dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
     
     sampling_condition_list = ['particles']  # Conditions: ['particles', 'cluster_random', 'cluster_weight']sampling of human responses from learner PF models
     sim_params = {'min_correct_likelihood': 0}
     
     
-    N_runs = 16
-    run_start_id = 17
+    N_runs = 8
+    run_start_id = 9
+    learner_update_type = 'noise'
 
-    file_prefix = 'trials_12_28'
+    file_prefix = 'trials_12_29_w_updated_noise'
     
     path = 'data/simulation/sim_experiments'
 
 
     sim_conditions = get_sim_conditions(team_composition_list, dem_strategy_list, sampling_condition_list, N_runs, run_start_id)
-    print('sim_conditions: ', sim_conditions)
 
     for run_id in range(run_start_id, run_start_id+N_runs):
-        print('sim_conditions[run_id]:', sim_conditions[run_id - run_start_id] )
+        print('sim_conditions run_id:', sim_conditions[run_id - run_start_id], '. sim_conditions: ', sim_conditions )
         if run_id == sim_conditions[run_id - run_start_id][0]:
             team_composition_for_run = sim_conditions[run_id - run_start_id][1]
             dem_strategy_for_run = sim_conditions[run_id - run_start_id][2]
             sampling_cond_for_run = sim_conditions[run_id - run_start_id][3]
         else:
-            print('run_id: ', run_id, 'sim_conditions[run_id][0]: ', sim_conditions[run_id - run_start_id][0])
             RuntimeError('Error in sim conditions')
             break
-
-
-        print('team_composition_for_run: ', team_composition_for_run)
 
         ilcr = np.zeros(params.team_size)
         rlcr = np.zeros([params.team_size, 2])
@@ -140,24 +136,11 @@ if __name__ == "__main__":
                 ilcr[j] = team_params_learning['high'][0]
                 rlcr[j,0] = team_params_learning['high'][1]
                 rlcr[j,1] = 0
-
-        # print(colored('Simulation run: ' + str(run_id) + '. Demo strategy: ' + str(dem_strategy_for_run) + 'initial lcr: ' + str(ilcr) + 'rate lcr: ' + str(rlcr), 'red'))
-        # viz_flag = [demo_viz, test_viz, pf_knowledge_viz]
-        # run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', team_likelihood_correct_response = ilcr,  team_learning_rate = rlcr, viz_flag=[False, False, True], run_no = run_id, vars_filename=file_prefix)
-        
-        # team_learning_factor = []
-        # for j in range(params.team_size):
-        #     if team_composition_for_run[j] == 0: 
-        #         team_learning_factor.append(team_params_learning['low'])
-        #     elif team_composition_for_run[j] == 1:
-        #         team_learning_factor.append(team_params_learning['med'])
-        #     elif team_composition_for_run[j] == 2:
-        #         team_learning_factor.append(team_params_learning['high'])
         
         print(colored('Simulation run: ' + str(run_id) + '. Demo strategy: ' + str(dem_strategy_for_run) + '. Team composition:' + str(team_composition_for_run), 'red'))
         # run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', team_learning_factor = team_learning_factor, viz_flag=[False, False, False], run_no = run_id, vars_filename=file_prefix)
         run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', initial_team_learning_factor = ilcr, team_learning_rate = rlcr, \
-                            viz_flag=[False, False, False], run_no = run_id, vars_filename=file_prefix, response_sampling_condition=sampling_cond_for_run, team_composition=team_composition_for_run, learner_update_type = 'noise')
+                            viz_flag=[True, True, True], run_no = run_id, vars_filename=file_prefix, response_sampling_condition=sampling_cond_for_run, team_composition=team_composition_for_run, learner_update_type = learner_update_type)
 
 
         # file_name = [file_prefix + '_' + str(run_id) + '.csv']

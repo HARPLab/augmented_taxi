@@ -189,7 +189,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
         
 
         # update demo PF model with the teacher's estimate of appropriate team/individual PF model based on the demo strategy
-        print(colored('Updating demo particles with particles for: ', 'red'), knowledge_id)
+        # print(colored('Updating demo particles with particles for: ', 'red'), knowledge_id)
         particles_demo = copy.deepcopy(particles_team_teacher[knowledge_id])
 
         ################################################
@@ -220,7 +220,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
 
         if len(BEC_summary) > prev_summary_len:
             
-            print('Showing demo....')
+            # print('Showing demo....')
             
             unit_constraints, demo_ids, running_variable_filter_unit = team_helpers.show_demonstrations(BEC_summary[-1], particles_demo, params.mdp_class, params.weights['val'], loop_count, viz_flag = demo_viz_flag)
             
@@ -228,7 +228,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
 
             # check if variable filter matches the running variable filter
             if (variable_filter != running_variable_filter_unit).any():
-                print('Knowledge component / Variable filter:', variable_filter)
+                # print('Knowledge component / Variable filter:', variable_filter)
                 RuntimeError('Running variable filter does not match:', running_variable_filter_unit)
 
             
@@ -341,10 +341,10 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                 # Show the same test for each person and get test responses of each person in the team
                 while p <= params.team_size:
                     member_id = 'p' + str(p)
-                    print("Here is a diagnostic test for this unit for player ", p)
+                    # print("Here is a diagnostic test for this unit for player ", p)
 
                     if experiment_type != 'simulated':
-                        print('Test for response type: ', experiment_type)
+                        # print('Test for response type: ', experiment_type)
                         human_traj, _ = test_mdp.visualize_interaction(keys_map=params.keys_map) # the latter is simply the gridworld locations of the agent
                     else:
                         human_traj = human_traj_team[p-1]
@@ -361,14 +361,13 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                             test_constraints_team.append(copy.deepcopy(test_constraints))
                         else:
                             test_constraints_team[p-1].extend(copy.deepcopy(test_constraints))
-                        print(colored('Correct response!!! ', 'green'))
                         print('Test constraints: ', test_constraints, '. Test constraints team: ', test_constraints_team, 'for test no: ', test_no)
                         
                         # update team knowledge
-                        print(colored('Current team knowledge for member id ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
-                        print('test_constraints: ', test_constraints, 'kc_reset_flag: ', kc_reset_flag)
+                        # print(colored('Current team knowledge for member id ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
+                        # print('test_constraints: ', test_constraints, 'kc_reset_flag: ', kc_reset_flag)
                         team_knowledge = team_helpers.update_team_knowledge(team_knowledge, kc_id, kc_reset_flag, test_constraints, params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
-                        print(colored('Updated team knowledge for member id  ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
+                        # print(colored('Updated team knowledge for member id  ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
 
                         # update teacher model
                         plot_title = 'Teacher belief for player ' + member_id + ' after test ' + str(test_no) + ' of Unit ' + str(loop_count)
@@ -403,14 +402,13 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                             test_constraints_team.append(copy.deepcopy([-failed_BEC_constraint]))
                         else:
                             test_constraints_team[p-1].extend(copy.deepcopy([-failed_BEC_constraint]))
-                        print(colored('Incorrect response!!! ', 'red'))
                         print('Test constraints: ', -failed_BEC_constraint, 'Test constraints team: ', test_constraints_team, 'for test no: ', test_no)
                         
                         
                         # update team knowledge
-                        print(colored('Current team knowledge for member id ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
+                        # print(colored('Current team knowledge for member id ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
                         team_knowledge = team_helpers.update_team_knowledge(team_knowledge, kc_id, kc_reset_flag, [-failed_BEC_constraint], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
-                        print(colored('Updated team knowledge for member id ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
+                        # print(colored('Updated team knowledge for member id ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
 
                         # update teacher model
                         plot_title = 'Teacher belief for player ' + member_id + ' after test ' + str(test_no) + ' of Unit ' + str(loop_count)
@@ -446,7 +444,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                     ####################################
                     
                     # update team knowlegde in PF model
-                    print(colored('team_knowledge for member ' + str(member_id) + ': ' + str(team_knowledge[member_id]), 'green'))
+                    # print(colored('team_knowledge for member ' + str(member_id) + ': ' + str(team_knowledge[member_id]), 'green'))
                     particles_team_teacher[member_id].knowledge_update(team_knowledge[member_id])
 
 
@@ -457,7 +455,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                     particles_prob_teacher_test[member_id] = particles_team_teacher[member_id].particles_prob_correct
                     particles_prob_learner_test[member_id] = particles_team_learner[member_id].particles_prob_correct
 
-                    print(colored('particles_prob_teacher_test for player : ' + member_id +   str(particles_prob_teacher_test[member_id]) + '. particles_prob_learner_test for player : ' + member_id + str(particles_prob_learner_test[member_id]), 'green'))
+                    # print(colored('particles_prob_teacher_test for player : ' + member_id +   str(particles_prob_teacher_test[member_id]) + '. particles_prob_learner_test for player : ' + member_id + str(particles_prob_learner_test[member_id]), 'green'))
                     ##########################
 
 
@@ -475,19 +473,19 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
             if params.team_size > 1:
                 
                 ## Check if there are non-intersecting constraints and go to fall-back teaching behavior
-                print('test_constraints_team for recent test: ', test_constraints_team)
+                # print('test_constraints_team for recent test: ', test_constraints_team)
                 test_constraints_team_expanded = []
                 for ind_test_constraints in test_constraints_team:
                     test_constraints_team_expanded.extend(ind_test_constraints)
-                print('test_constraints_team_expanded: ', test_constraints_team_expanded)
+                # print('test_constraints_team_expanded: ', test_constraints_team_expanded)
                 non_intersecting_constraints_flag, non_intersecting_constraints_count = team_helpers.check_for_non_intersecting_constraints(test_constraints_team_expanded, params.weights['val'], params.step_cost_flag, non_intersecting_constraints_count)
                 # print('Non-intersecting constraints normal loop? ', non_intersecting_constraints_flag)
                 
                 ## Assign majority rules and update common knowledge and joint knowledge accordingly
                 if non_intersecting_constraints_flag:
                     test_constraints_team_expanded, intersecting_constraints = team_helpers.majority_rules_non_intersecting_team_constraints(test_constraints_team, params.weights['val'], params.step_cost_flag, test_flag = True)
-                    print('Majority rules for non intersecting contraints...')
-                    print('Team constraints team expanded after processing: ', test_constraints_team_expanded)
+                    # print('Majority rules for non intersecting contraints...')
+                    # print('Team constraints team expanded after processing: ', test_constraints_team_expanded)
                 
                 # if there are no constraints after majority rules non intersecting constraints! just an additional check so that simulation does not stop
                 if len(test_constraints_team_expanded) == 0:
@@ -506,13 +504,13 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
 
                     min_new_common_knowledge = BEC_helpers.remove_redundant_constraints(test_constraints_team_expanded, params.weights['val'], params.step_cost_flag)
                     
-                    print('Updating common knowledge...')
+                    # print('Updating common knowledge...')
                     if kc_id == len(team_knowledge['common_knowledge']):
                         # # print('Appendin common knowledge...')
                         team_knowledge['common_knowledge'].append(min_new_common_knowledge)
                     else:
                         team_knowledge['common_knowledge'][kc_id] = copy.deepcopy(min_new_common_knowledge)
-                    print(colored('Updated team knowledge for common knowledge: ' + str(team_knowledge['common_knowledge']), 'blue'))
+                    # print(colored('Updated team knowledge for common knowledge: ' + str(team_knowledge['common_knowledge']), 'blue'))
                     
 
                     ## update joint knowledge
@@ -624,8 +622,8 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                     loop_vars['pf_reset_count'][i] = particles_team_teacher['joint_knowledge'].pf_reset_count
 
 
-            print(colored('Unit knowledge level: ' + str(loop_vars['unit_knowledge_level']), 'red'))
-            print(colored('BEC knowledge level: ' + str(loop_vars['BEC_knowledge_level']), 'red'))
+            # print(colored('Unit knowledge level: ' + str(loop_vars['unit_knowledge_level']), 'red'))
+            # print(colored('BEC knowledge level: ' + str(loop_vars['BEC_knowledge_level']), 'red'))
             
             vars_to_save = vars_to_save.append(loop_vars, ignore_index=True)
             
@@ -670,9 +668,11 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                 # Update expected knowledge with actual knowledge for next iteration
                 team_knowledge_expected = copy.deepcopy(team_knowledge)
 
+                # update obj_func_prop (is ths needed?)
                 if loop_count - next_unit_loop_id > params.loop_threshold_demo_simplification:
                     obj_func_prop = 0.5     # reduce informativeness from demos if they have not learned
-                    print(colored('updated obj_func_prop: ' + str(obj_func_prop), 'red') )
+                    # print(colored('updated obj_func_prop: ' + str(obj_func_prop), 'red') )
+                    RuntimeError('obj_func_prop needs to be reduced since the team is not learning!')
 
                 # check if number of max interactions sets have been reached
                 if loop_count > params.max_loops:
@@ -692,7 +692,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                 if kc_id == len(team_knowledge['p1'])-1:
                     next_kc_flag = True
                     obj_func_prop = 1.0
-                    print(colored('updated obj_func_prop for new KC: ' + str(obj_func_prop), 'red') )
+                    # print(colored('updated obj_func_prop for new KC: ' + str(obj_func_prop), 'red') )
 
             if teaching_complete_flag:
                 print(colored('Teaching completed for run: ', 'blue'), run_no,'. Saving session data...')
