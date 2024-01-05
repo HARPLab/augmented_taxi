@@ -258,15 +258,12 @@ def sample_from_cluster(particles_to_sample, cluster_id, mdp):
 
 
 
-def get_human_response(condition, env_idx, particles_to_sample, opt_traj, test_constraints, learning_factor, args = []):
+def get_human_response_each_test(condition, env_idx, particles_to_sample, opt_traj, test_constraints, learning_factor, args = []):
 
     if len(args) != 0:
         set_id, member_id, test_constraints, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, set_id_history, skip_model_history, cluster_id_history, point_probability, team_learning_factor_history, demo_prob, \
             learner_member_prob_test, particles_learner_prob_demo_history, particles_learner_prob_test_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, prob_reweight_history, prob_resample_history, resample_flag_history, \
                 update_type, update_sequence_history, noise_measures, resample_noise_history = args
-
-
-# def get_human_response(env_idx, particles_to_sample, opt_traj, test_constraints, learning_factor):
 
 
     filename = 'models/augmented_taxi2/gt_policies/wt_vi_traj_params_env' + str(env_idx).zfill(5) + '.pickle'
@@ -277,7 +274,8 @@ def get_human_response(condition, env_idx, particles_to_sample, opt_traj, test_c
     mdp = wt_vi_traj_env[0][1].mdp
     agent = FixedPolicyAgent(wt_vi_traj_env[0][1].policy)
     mdp.set_init_state(opt_traj[0][0])
-    traj_opt = mdp_helpers.rollout_policy(mdp, agent)
+    # traj_opt = mdp_helpers.rollout_policy(mdp, agent)
+    traj_opt = opt_traj
 
     skip_human_model = True
     skip_cluster = False
@@ -399,8 +397,6 @@ def get_human_response(condition, env_idx, particles_to_sample, opt_traj, test_c
                 # print('Current state: ', cur_state)
                 human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
 
-                # get trajectory from precomputed models
-
                 
                 human_traj_rewards = mdp.accumulate_reward_features(human_opt_trajs[0], discount=True)  # just use the first optimal trajectory
                 mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
@@ -424,10 +420,11 @@ def get_human_response(condition, env_idx, particles_to_sample, opt_traj, test_c
 
 
             else:
+                human_opt_trajs = [None]
                 response_type = 'NA'
-                # visualize skipped trajectories
-                cur_state = mdp.get_init_state()
-                human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
+                ## visualize skipped trajectories
+                # cur_state = mdp.get_init_state()
+                # human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
                 # mdp.visualize_trajectory(human_opt_trajs[0])
                 # plt.show()
             
@@ -462,6 +459,7 @@ def get_human_response(condition, env_idx, particles_to_sample, opt_traj, test_c
                 resample_flag_history.append(resample_flag)
                 resample_noise_history.append(noise_measures)
                 update_sequence_history.append(update_type)
+            
 
             loop_count += 1
         
@@ -492,7 +490,195 @@ def get_human_response(condition, env_idx, particles_to_sample, opt_traj, test_c
                 prob_reweight_history, prob_resample_history, resample_flag_history, update_sequence_history, resample_noise_history
     else:
         return human_opt_trajs[0], response_type
+#################################################
+    
 
+
+def get_human_response_all_tests(particles_to_sample, preliminary_tests, learning_factor, args = []):
+
+    if len(args) != 0:
+        set_id, member_id, test_constraints, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, set_id_history, skip_model_history, cluster_id_history, point_probability, team_learning_factor_history, demo_prob, \
+            learner_member_prob_test, particles_learner_prob_demo_history, particles_learner_prob_test_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, prob_reweight_history, prob_resample_history, resample_flag_history, \
+                update_type, update_sequence_history, noise_measures, resample_noise_history = args
+
+    test_mdp = {}
+    test_opt_traj = {}
+    test_agent = {}
+
+    for test_id, test in enumerate(preliminary_tests):
+       
+        env_idx, traj_idx = test[2]
+        opt_traj = test[1]
+
+        print('test ', test)
+
+        filename = 'models/augmented_taxi2/gt_policies/wt_vi_traj_params_env' + str(env_idx).zfill(5) + '.pickle'
+
+        # print('filename: ', filename)
+    
+        with open(filename, 'rb') as f:
+            wt_vi_traj_env = pickle.load(f)
+
+        # print('wt_vi_traj_env[0][1].mdp: ', wt_vi_traj_env[0][1].mdp)
+
+        # mdp = wt_vi_traj_env[0][1].mdp
+        # agent = FixedPolicyAgent(wt_vi_traj_env[0][1].policy)
+        # mdp.set_init_state(opt_traj[0][0])
+
+        test_mdp[test_id] = wt_vi_traj_env[0][1].mdp
+        test_agent[test_id] = FixedPolicyAgent(wt_vi_traj_env[0][1].policy)
+        test_mdp[test_id].set_init_state(opt_traj[0][0])
+        # test_opt_traj[test_id] = mdp_helpers.rollout_policy(test_mdp[test_id], test_agent[test_id])
+        test_opt_traj[test_id] = opt_traj
+
+        # print('test_mdp: ', test_mdp)
+        # print('test_agent: ', test_agent)
+        # print('test_opt_traj: ', test_opt_traj)
+
+
+
+    skip_human_model = True
+
+    loop_count = 0
+    max_loop_count = 1
+    differing_response_model_idx = []
+    points_to_avoid = []
+
+    human_opt_trajs_all_tests = []
+    response_type_all_tests = []
+    human_model_weight_all_tests = []
+
+    # sample human models
+    while skip_human_model:
+
+        ## Method 2: Sampling from all particles
+        sampled_point_flag = False
+        while not sampled_point_flag:
+            human_model_weight, cluster_id, rew_weight_prob, rand_number = sample_from_distribution('particles', particles_to_sample.positions, particles_to_sample.weights, points_to_avoid = points_to_avoid)
+            
+            # print('Sampled point: ', human_model_weight, 'Sampled point probability: ', rew_weight_prob, 'rand_number: ', rand_number)
+            if len(points_to_avoid) > 0:
+                for point_avd in points_to_avoid:
+                    if not (human_model_weight == point_avd).all():
+                        sampled_point_flag = True
+                        # print('Point sampled!')
+                        break
+            else:
+                sampled_point_flag = True
+                # print('Point sampled!')
+
+    ############################
+        
+        if len(human_model_weight) != 0:
+            points_to_avoid.append(human_model_weight)
+
+            for test_id in range(len(preliminary_tests)):
+                test_constraints = preliminary_tests[test_id][3]
+                test_mdp[test_id].weights = human_model_weight
+                vi_human = ValueIteration(test_mdp[test_id], sample_rate=1, max_iterations=100)
+                vi_human.run_vi()
+
+                if not vi_human.stabilized:
+                    # print(colored('Human model with weight, ' + str(human_model_weight) + ', did not converge and skipping for response generation', 'red'))
+                    skip_human_model = True
+                else:
+                    # print(colored('Human model with weight, ' + str(human_model_weight) + ', converged', 'green'))
+                    skip_human_model = False
+                
+
+                if not skip_human_model:
+                    cur_state = test_mdp[test_id].get_init_state()
+                    # print('Current state: ', cur_state)
+                    human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
+
+                    # get trajectory from precomputed models
+
+                    
+                    human_traj_rewards = test_mdp[test_id].accumulate_reward_features(human_opt_trajs[0], discount=True)  # just use the first optimal trajectory
+                    mu_sa = test_mdp[test_id].accumulate_reward_features(test_opt_traj[test_id], discount=True)
+                    new_constraint = mu_sa - human_traj_rewards
+
+                    # print('New constraint: ', new_constraint)
+                    if (new_constraint == np.array([0, 0, 0])).all():
+                        if params.debug_hm_sampling:
+                            print(colored('Correct response sampled', 'blue'))
+                        response_type = 'correct'
+                    else:
+                        if params.debug_hm_sampling:
+                            print(colored('Incorrect response sampled', 'red'))
+                        response_type = 'incorrect'
+
+
+                    # mdp.visualize_trajectory(traj_opt)
+                    # plt.show()
+                    # mdp.visualize_trajectory(human_opt_trajs[0])
+                    # plt.show()
+
+
+                else:
+                    response_type = 'NA'
+                    # visualize skipped trajectories
+                    cur_state = test_mdp[test_id].get_init_state()
+                    human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
+                    # mdp.visualize_trajectory(human_opt_trajs[0])
+                    # plt.show()
+                
+                # check for constraint satisfaction
+                if len(args) != 0:
+                    constraint_flag = True
+                    for constraint in test_constraints[0]:
+                        if constraint.dot(human_model_weight.T) < 0:
+                            constraint_flag = False
+                else:
+                    constraint_flag = True
+                    for constraint in test_constraints:
+                        if constraint.dot(human_model_weight.T) < 0:
+                            constraint_flag = False
+                
+                if len(args) != 0:
+                    sampled_points_history.append(human_model_weight)
+                    response_history.append(response_type)
+                    member.append(member_id)
+                    constraint_history.append(test_constraints)
+                    constraint_flag_history.append(constraint_flag)
+                    set_id_history.append(set_id)
+                    cluster_id_history.append(cluster_id)
+                    skip_model_history.append(skip_human_model)
+                    point_probability.append(rew_weight_prob)
+                    team_learning_factor_history.append(learning_factor)
+                    particles_learner_prob_demo_history.append(demo_prob)
+                    particles_learner_prob_test_history.append(learner_member_prob_test)
+                    prob_initial_history.append(prob_initial) 
+                    prob_reweight_history.append(prob_reweight) 
+                    prob_resample_history.append(prob_resample) 
+                    resample_flag_history.append(resample_flag)
+                    resample_noise_history.append(noise_measures)
+                    update_sequence_history.append(update_type)
+                
+
+                loop_count += 1
+
+                human_opt_trajs_all_tests.append(human_opt_trajs[0])
+                response_type_all_tests.append(response_type)
+                human_model_weight_all_tests.append(human_model_weight)
+
+            
+        else:
+            human_opt_trajs_all_tests = [None]
+            response_type_all_tests = 'NA'
+            human_model_weight_all_tests = [None]
+            break
+
+
+
+
+
+    if len(args) != 0:
+        return human_model_weight_all_tests, human_opt_trajs_all_tests, response_type_all_tests, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, set_id_history, skip_model_history, cluster_id_history, \
+            point_probability, team_learning_factor_history, particles_learner_prob_demo_history, particles_learner_prob_test_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, \
+                prob_reweight_history, prob_resample_history, resample_flag_history, update_sequence_history, resample_noise_history
+    else:
+        return human_opt_trajs_all_tests, response_type_all_tests
 
 
 # def get_human_response_old(env_idx, env_cnst, opt_traj, likelihood_correct_response):

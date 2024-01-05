@@ -1364,7 +1364,7 @@ class Particles_team():
                                 ax[cnst_id*3+2].scatter(pos[0][0], pos[0][1], pos[0][2], marker='o', c='r', s=weight*vis_scale_factor)
                         
                         ax2[cnst_id*3+2].hist(self.weights, bins=20)
-                        ax2[cnst_id*3+2].title.set_text('Particle distribution after reweighting')
+                        ax2[cnst_id*3+2].title.set_text('Particle distribution after resampling')
                         
 
                 else:

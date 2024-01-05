@@ -482,3 +482,33 @@ def run_remedial_loop(failed_BEC_constraints_tuple, particles_team_teacher, team
             particles_team_teacher['joint_knowledge'].knowledge_update(team_knowledge['joint_knowledge'])
 
     return test_history, visited_env_traj_idxs, particles_team_teacher, team_knowledge, particles_demo, remedial_constraints_team_expanded, remedial_resp_no
+
+
+
+############################################
+
+### Sample human responses based on likelihood of correct response
+
+    ######## Old Method - Sampling based on likelihood of correct response
+    # human_traj, response_type = sim_helpers.get_human_response(env_idx, test_constraints[0], opt_traj, team_likelihood_correct_response[i])
+    # # print(colored('Got human response!', 'green'))
+    # # human_traj, response_type = sim_helpers.get_human_response(env_idx, test_constraints[0], opt_traj, team_likelihood_correct_response_temp[i]) # for testing effects of specific response combinations
+    # human_traj_team.append(human_traj)
+    # response_type_team.append(response_type)
+
+    # # update likelihood of correct response
+    # if response_type == 'correct':
+    #     # print('Current team likelihood correct response: ', team_likelihood_correct_response)
+    #     team_likelihood_correct_response[i] = max(min(1, team_likelihood_correct_response[i] + team_learning_rate[i, 0]), sim_params['min_correct_likelihood']) # have a minimum likelihood so that people can still learn
+    #     # print('Updating LCR (correct) for player ', i+1, 'to ', team_likelihood_correct_response[i], 'using learning rate ', team_learning_rate[i, 0])
+    #     print("tkinter  a correct response!")
+    # else:
+    #     # print('Current team likelihood correct response: ', team_likelihood_correct_response)
+    #     team_likelihood_correct_response[i] = max(min(1, team_likelihood_correct_response[i] + team_learning_rate[i, 1]), sim_params['min_correct_likelihood']) # have a minimum likelihood so that people can still learn
+    #     # print('Updating LCR (incorrect) for player ', i+1, 'to ', team_likelihood_correct_response[i], 'using learning rate ', team_learning_rate[i, 1])
+    #     print("Sampled an incorrect response!")
+
+    # # if len(test_constraints) > 1:
+    #     # print(colored('Multiple test constraints!', 'red'))
+    #     # print('Test constraints: ', test_constraints)
+    ########################################

@@ -85,6 +85,10 @@ if __name__ == "__main__":
     os.makedirs('models/' + params.data_loc['BEC'], exist_ok=True)
 
     
+    # fixed parameters
+    sampling_condition_list = ['particles']  # Conditions: ['particles', 'cluster_random', 'cluster_weight']sampling of human responses from learner PF models
+    sim_params = {'min_correct_likelihood': 0}
+
 
     team_params_learning = {'low': [0.65, 0.05], 'med': [0.65, 0.05], 'high': [0.8, 0.05]}
 
@@ -95,68 +99,70 @@ if __name__ == "__main__":
     # team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
     dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
     
-    sampling_condition_list = ['particles']  # Conditions: ['particles', 'cluster_random', 'cluster_weight']sampling of human responses from learner PF models
-    sim_params = {'min_correct_likelihood': 0}
+
     
     
-    N_runs = 1
+    N_runs = 9
     run_start_id = 1
     learner_update_type = 'noise'
 
-    file_prefix = 'debug_trials_01_05_w_sample_all_tests'
+    file_prefix = 'trials_01_04_w_updated_noise'
     
-    path = 'data/simulation/sim_experiments'
+    path = 'data/simulation/sim_experiments/sensitivity_analysis/'
 
 
     sim_conditions = get_sim_conditions(team_composition_list, dem_strategy_list, sampling_condition_list, N_runs, run_start_id)
 
-    for run_id in range(run_start_id, run_start_id+N_runs):
-        print('sim_conditions run_id:', sim_conditions[run_id - run_start_id], '. sim_conditions: ', sim_conditions )
-        if run_id == sim_conditions[run_id - run_start_id][0]:
-            team_composition_for_run = sim_conditions[run_id - run_start_id][1]
-            dem_strategy_for_run = sim_conditions[run_id - run_start_id][2]
-            sampling_cond_for_run = sim_conditions[run_id - run_start_id][3]
-        else:
-            RuntimeError('Error in sim conditions')
-            break
 
-        ilcr = np.zeros(params.team_size)
-        rlcr = np.zeros([params.team_size, 2])
 
-        for j in range(params.team_size):
-            if team_composition_for_run[j] == 0: 
-                ilcr[j] = team_params_learning['low'][0]
-                rlcr[j,0] = team_params_learning['low'][1]
-                rlcr[j,1] = 0     
-            elif team_composition_for_run[j] == 1:
-                ilcr[j] = team_params_learning['med'][0]
-                rlcr[j,0] = team_params_learning['med'][1]
-                rlcr[j,1] = 0
-            elif team_composition_for_run[j] == 2:
-                ilcr[j] = team_params_learning['high'][0]
-                rlcr[j,0] = team_params_learning['high'][1]
-                rlcr[j,1] = 0
+
+    # for run_id in range(run_start_id, run_start_id+N_runs):
+    #     print('sim_conditions run_id:', sim_conditions[run_id - run_start_id], '. sim_conditions: ', sim_conditions )
+    #     if run_id == sim_conditions[run_id - run_start_id][0]:
+    #         team_composition_for_run = sim_conditions[run_id - run_start_id][1]
+    #         dem_strategy_for_run = sim_conditions[run_id - run_start_id][2]
+    #         sampling_cond_for_run = sim_conditions[run_id - run_start_id][3]
+    #     else:
+    #         RuntimeError('Error in sim conditions')
+    #         break
+
+    #     ilcr = np.zeros(params.team_size)
+    #     rlcr = np.zeros([params.team_size, 2])
+
+    #     for j in range(params.team_size):
+    #         if team_composition_for_run[j] == 0: 
+    #             ilcr[j] = team_params_learning['low'][0]
+    #             rlcr[j,0] = team_params_learning['low'][1]
+    #             rlcr[j,1] = 0     
+    #         elif team_composition_for_run[j] == 1:
+    #             ilcr[j] = team_params_learning['med'][0]
+    #             rlcr[j,0] = team_params_learning['med'][1]
+    #             rlcr[j,1] = 0
+    #         elif team_composition_for_run[j] == 2:
+    #             ilcr[j] = team_params_learning['high'][0]
+    #             rlcr[j,0] = team_params_learning['high'][1]
+    #             rlcr[j,1] = 0
         
-        print(colored('Simulation run: ' + str(run_id) + '. Demo strategy: ' + str(dem_strategy_for_run) + '. Team composition:' + str(team_composition_for_run), 'red'))
-        # run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', team_learning_factor = team_learning_factor, viz_flag=[False, False, False], run_no = run_id, vars_filename=file_prefix)
-        run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', initial_team_learning_factor = ilcr, team_learning_rate = rlcr, \
-                            viz_flag=[True, True, True], run_no = run_id, vars_filename=file_prefix, response_sampling_condition=sampling_cond_for_run, team_composition=team_composition_for_run, learner_update_type = learner_update_type)
+    #     print(colored('Simulation run: ' + str(run_id) + '. Demo strategy: ' + str(dem_strategy_for_run) + '. Team composition:' + str(team_composition_for_run), 'red'))
+    #     # run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', team_learning_factor = team_learning_factor, viz_flag=[False, False, False], run_no = run_id, vars_filename=file_prefix)
+    #     run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', initial_team_learning_factor = ilcr, team_learning_rate = rlcr, \
+    #                         viz_flag=[False, False, False], run_no = run_id, vars_filename=file_prefix, response_sampling_condition=sampling_cond_for_run, team_composition=team_composition_for_run, learner_update_type = learner_update_type)
 
 
-        # file_name = [file_prefix + '_' + str(run_id) + '.csv']
-        # print('Running analysis script... Reading data from: ', file_name)
-        # run_analysis_script(path, file_name, file_prefix)
+    #     # file_name = [file_prefix + '_' + str(run_id) + '.csv']
+    #     # print('Running analysis script... Reading data from: ', file_name)
+    #     # run_analysis_script(path, file_name, file_prefix)
 
     
-    # # save all the variables
-    # vars_to_save.to_csv('models/augmented_taxi2/vars_to_save.csv', index=False)
-    # with open('models/augmented_taxi2/vars_to_save.pickle', 'wb') as f:
-    #     pickle.dump(vars_to_save, f)
+    # # # save all the variables
+    # # vars_to_save.to_csv('models/augmented_taxi2/vars_to_save.csv', index=False)
+    # # with open('models/augmented_taxi2/vars_to_save.pickle', 'wb') as f:
+    # #     pickle.dump(vars_to_save, f)
     
-    print('All simulation runs completed..')
+    # print('All simulation runs completed..')
     
-    # pool.close()
-    # pool.join()
+    # # pool.close()
+    # # pool.join()
 
 
     

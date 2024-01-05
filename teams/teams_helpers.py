@@ -407,13 +407,13 @@ def calc_expected_learning(team_knowledge_expected, kc_id, particles_team_teache
     team_knowledge_expected = update_team_knowledge(team_knowledge_expected, kc_id, kc_reset_flag, new_constraints, params.team_size,  params.weights['val'], params.step_cost_flag)
 
     # # print('Updated expected team knowledge: ', team_knowledge_expected)
-
+    pf_update_args = [] 
     p = 1
     while p <= params.team_size:
         member_id = 'p' + str(p)
         # print('PF update of ', member_id)
         plot_title = 'Teacher belief (Expected knowledge change) for loop ' + str(loop_count+1) + ' for player ' + member_id
-        particles_team_teacher[member_id].update(new_constraints, plot_title = plot_title, viz_flag = viz_flag)
+        pf_update_args.append(particles_team_teacher[member_id].update(new_constraints, plot_title = plot_title, viz_flag = viz_flag))
         
         ########## debugging - calculate proportion of particles that are within the BEC
         particles_team_teacher[member_id].calc_particles_probability(new_constraints)
@@ -438,7 +438,7 @@ def calc_expected_learning(team_knowledge_expected, kc_id, particles_team_teache
     # if viz_flag:
     #     visualize_transition(new_constraints_team, particles_team_teacher_expected['joint_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set ' + str(loop_count+1) + ' for joint knowledge',  knowledge_type = 'joint_knowledge', plot_filename ='ek_jk_loop_' + str(loop_count+1))
 
-    return team_knowledge_expected, particles_team_teacher
+    return team_knowledge_expected, particles_team_teacher, pf_update_args
 
 
 
@@ -875,7 +875,7 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_learnin
         if team_prior is not None:
             team_prior['common_knowledge'] = [calc_common_knowledge(team_prior, team_size, weights, step_cost_flag)]
             plot_title = 'Teacher belief for common knowledge for prior'
-            particles_team['common_knowledge'].update(team_prior['common_knowledge'][0], plot_title=plot_title, viz_flag = False)  # team prior is in team knowledge format. Hence use kc_id = 0 to get prior
+            particles_team['common_knowledge'].update(team_prior['common_knowledge'][0], learning_factor = 1, plot_title=plot_title, viz_flag = False)  # team prior is in team knowledge format. Hence use kc_id = 0 to get prior
             particles_team['common_knowledge'].knowledge_update(team_prior['common_knowledge'])
         
 

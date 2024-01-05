@@ -41,16 +41,35 @@ def find_human_response():
     # dfs_f23_3.to_csv(path + '/dfs_f23_3.csv')
 
     dfs_trials_processed_at = dfs_trials_processed[(dfs_trials_processed['domain'] == 'at')]
+    dfs_trials_processed_at.to_csv(path + '/dfs_trials_processed_at.csv')
 
     # print(dfs_trials_processed_at)
 
     unique_user_ids = dfs_trials_processed_at['user_id'].unique()
     N_interactions = []
     N_final_correct = []
+    user_ids_low_learners = []
+    user_ids_high_learners = []
+    N_interactions_low_learners = []
+    N_interactions_high_learners = []
     for user_id in unique_user_ids:
-        N_interactions.append(len(dfs_trials_processed_at[dfs_trials_processed_at['user_id'] == user_id]) - 6) # remove 6 final tests
-        N_final_correct.append(len(dfs_trials_processed_at[(dfs_trials_processed_at['user_id'] == user_id) & (dfs_trials_processed_at['interaction_type'] == 'final test') & (dfs_trials_processed_at['is_opt_response'] == 1)]))
-    
+
+        N_interactions_user = len(dfs_trials_processed_at[dfs_trials_processed_at['user_id'] == user_id]) - 6
+        N_interactions.append(N_interactions_user) # remove 6 final tests
+
+        N_final_correct_user = len(dfs_trials_processed_at[(dfs_trials_processed_at['user_id'] == user_id) & (dfs_trials_processed_at['interaction_type'] == 'final test') & (dfs_trials_processed_at['is_opt_response'] == 1)])
+        N_final_correct.append(N_interactions_user)
+
+        if N_final_correct_user < 5:
+            user_ids_low_learners.append(user_id)
+            N_interactions_low_learners.append(N_interactions_user)
+        else:
+            user_ids_high_learners.append(user_id)
+            N_interactions_high_learners.append(N_interactions_user)
+
+        
+
+
 
     valid_data_idx = np.where(np.array(N_interactions) != 0)[0]
     print('valid_data_idx: ', len(valid_data_idx))
@@ -61,12 +80,24 @@ def find_human_response():
     # print('N_interactions: ', N_interactions[valid_data_idx], 'len unique_user_ids: ', len(unique_user_ids[valid_data_idx]), 'len N_interactions: ', len(N_interactions[valid_data_idx]))
 
     # plot
-    fig, ax = plt.subplots()
-    ax.hist(valid_N_interactions, bins='auto')
-    ax.set_title('Histogram of learning interactions for each user')
-    ax.set_xlabel('Number of interactions')
-    ax.set_ylabel('Count')
-    ax.grid(True)
+    fig, ax = plt.subplots(ncols=3)
+    ax[0].hist(valid_N_interactions, bins='auto')
+    ax[0].set_title('Histogram of learning interactions for each user')
+    ax[0].set_xlabel('Number of interactions')
+    ax[0].set_ylabel('Count')
+    ax[0].grid(True)
+
+    ax[1].hist(np.array(N_interactions_low_learners)[np.where(np.array(N_interactions_low_learners) != 0)[0]], bins='auto')
+    ax[1].set_title('Number of interactions for low leaners')
+    ax[1].set_xlabel('Number of interactions')
+    ax[1].set_ylabel('Count')
+    ax[1].grid(True)
+
+    ax[2].hist(np.array(N_interactions_high_learners)[np.where(np.array(N_interactions_high_learners) != 0)[0]], bins='auto')
+    ax[2].set_title('Number of interactions for high leaners')
+    ax[2].set_xlabel('Number of interactions')
+    ax[2].set_ylabel('Count')
+    ax[2].grid(True)
 
     fig2, ax2 = plt.subplots()
     ax2.hist(valid_N_final_correct, bins='auto')

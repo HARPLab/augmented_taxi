@@ -6,18 +6,18 @@ import debugging_team as dt
 if __name__ == "__main__":
     
     ## run response sampling code
-    path = 'data/simulation/sampling_tests'
-    N_runs = 1
-    run_start_id = 3
-    # condition_list = ['cluster_random', 'cluster_weight', 'particles']
-    condition_list = ['particles']
+    # path = 'data/simulation/sampling_tests'
+    # N_runs = 1
+    # run_start_id = 3
+    # # condition_list = ['cluster_random', 'cluster_weight', 'particles']
+    # condition_list = ['particles']
 
-    for run_id in range(run_start_id, run_start_id + N_runs):
-        print('run: ', run_id)
+    # for run_id in range(run_start_id, run_start_id + N_runs):
+    #     print('run: ', run_id)
         
-        for condition in condition_list:
-            filename = path + '/debug_trial_12_29_noise_' + condition + '_set_' + str(run_id) + '.csv'
-            dt.run_sim(condition, filename)
+    #     for condition in condition_list:
+    #         filename = path + '/debug_trial_12_29_noise_' + condition + '_set_' + str(run_id) + '.csv'
+    #         dt.run_sim(condition, filename)
     #################################
 
 
@@ -31,3 +31,7 @@ if __name__ == "__main__":
     # dt.check_resampling_gaussian_noise()
 
     # dt.check_pf_update()
+    #################################
+
+    ## debug knowledge calculation
+    dt.debug_knowledge_calculation()

@@ -381,3 +381,8 @@ learning_goal = 1.0
 loop_threshold_demo_simplification = 100
 default_learning_factor_teacher = 0.8
 max_learning_factor = 1.0
+response_generation_type = 'All_tests'
+
+sens_low_learner_learning_factor_range = [0.55, 0.7]
+sens_high_learner_learning_factor_range = [0.75, 0.9]
+sens_learning_rate_range = [0, 0.1]
