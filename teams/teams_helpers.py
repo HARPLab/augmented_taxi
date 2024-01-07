@@ -399,7 +399,7 @@ def check_for_non_intersecting_constraints(constraints, weights, step_cost_flag,
 
 
 
-def calc_expected_learning(team_knowledge_expected, kc_id, particles_team_teacher, min_BEC_constraints, new_constraints, params, loop_count, kc_reset_flag = False, viz_flag = False):
+def calc_expected_learning(team_knowledge_expected, kc_id, particles_team_teacher, min_BEC_constraints, new_constraints, params, loop_count, kc_reset_flag = False, viz_flag = False, vars_filename='sim_run'):
 
     # print(colored('Calculating expected learning for KC ' + str(kc_id) + 'in loop ' + str(loop_count) + '...', 'blue'))
     # # print('Current expected team knowledge: ', team_knowledge_expected)
@@ -412,20 +412,21 @@ def calc_expected_learning(team_knowledge_expected, kc_id, particles_team_teache
     while p <= params.team_size:
         member_id = 'p' + str(p)
         # print('PF update of ', member_id)
-        plot_title = 'Teacher belief (Expected knowledge change) for loop ' + str(loop_count+1) + ' for player ' + member_id
-        pf_update_args.append(particles_team_teacher[member_id].update(new_constraints, plot_title = plot_title, viz_flag = viz_flag))
+        plot_title = 'Interaction No. ' + str(loop_count+1) + '. Teacher belief (Expected knowledge change) for KC ' + str(kc_id) + ' for player ' + member_id
+        pf_update_args.append(particles_team_teacher[member_id].update(new_constraints, plot_title = plot_title, viz_flag = viz_flag, vars_filename = vars_filename))
         
         ########## debugging - calculate proportion of particles that are within the BEC
         particles_team_teacher[member_id].calc_particles_probability(new_constraints)
         ##########################
         
         if viz_flag:
-            visualize_transition(new_constraints[0], particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set ' + str(loop_count+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(loop_count+1))
+            plot_title = 'Interaction no. ' + str(loop_count+1) + '.Expected knowledge change for KC ' + str(kc_id) + ' for player ' + member_id
+            visualize_transition(new_constraints, particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = plot_title, vars_filename=vars_filename)
         p += 1
             
     # Update common knowledge model
-    plot_title = 'Teacher belief (Expected knowledge change) for loop ' + str(loop_count+1) + ' for common knowledge'
-    particles_team_teacher['common_knowledge'].update(new_constraints, plot_title = plot_title, viz_flag = viz_flag) # PF update of common_knowledge
+    plot_title = 'Interaction No. ' + str(loop_count+1) + '. Teacher belief (Expected knowledge change) for loop ' + str(loop_count+1) + ' for common knowledge'
+    particles_team_teacher['common_knowledge'].update(new_constraints, plot_title = plot_title, viz_flag = viz_flag, vars_filename=vars_filename)  # PF update of common_knowledge
     # if viz_flag:
     #     visualize_transition(new_constraints, particles_team_teacher_expected['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set' + str(loop_count+1) + ' for common knowledge', plot_filename ='ek_ck_loop_' + str(loop_count+1))
     
@@ -444,7 +445,7 @@ def calc_expected_learning(team_knowledge_expected, kc_id, particles_team_teache
 
 
 
-def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team_teacher = None, kc_id_list = None, weights = None, step_cost_flag = False, plot_flag = False, debug_flag=True, fig_title=''):
+def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team_teacher = None, kc_id_list = None, weights = None, step_cost_flag = False, plot_flag = False, debug_flag=True, fig_title='', vars_filename = 'sim_run'):
     
     
     def plot_text(constraints, knowledge, fig, i):
@@ -556,7 +557,7 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team_te
 
     if plot_flag:
         fig = visualize_team_knowledge_constraints(team_knowledge, weights, step_cost_flag, particles_team_teacher = particles_team_teacher, plot_min_constraints_flag = False, plot_text_flag = False, min_unit_constraints = min_unit_constraints, plot_filename = 'team_knowledge_constraints', fig_title = fig_title)
-        
+
 
     plot_id = 0
     for knowledge_id, knowledge_type in enumerate(team_knowledge):
@@ -648,7 +649,12 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team_te
         if plot_flag:
             plot_text(team_knowledge_constraints, knowledge_level[knowledge_type], fig, plot_id)
             plot_id += 1
-            plt.show()
+            
+    if params.show_plots_flag:
+        plt.show()
+    
+    if params.save_plots_flag:
+        plt.savefig('plots/' + vars_filename + '_' + fig_title + '.png')
 
         # # print(colored('Calculated knowledge level for: ', 'blue'), knowledge_type)
         # # print('min_unit_constraints: ', min_unit_constraints)
@@ -800,7 +806,7 @@ def sample_valid_region_jk(joint_constraints, min_azi, max_azi, min_ele, max_ele
 
 
 def obtain_team_summary(data_loc, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
-                        n_train_demos, particles_demo, knowledge_id, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, obj_func_proportion=1):
+                        n_train_demos, particles_demo, knowledge_id, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, obj_func_proportion=1, vars_filename='sim_run'):
 
 
     summary_variant = 'counterfactual' # uses min_BEC_constraints_running to sample human models and could sample models from 
@@ -816,7 +822,7 @@ def obtain_team_summary(data_loc, min_subset_constraints_record, min_BEC_constra
 
     if summary_variant == 'counterfactual':
         BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = obtain_summary_counterfactual_team(data_loc, particles_demo, knowledge_id, variable_filter, nonzero_counter, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
-                       BEC_summary, summary_count, min_BEC_constraints_running, params.BEC['n_human_models_precomputed'], visited_env_traj_idxs = visited_env_traj_idxs, n_train_demos=np.inf, downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=obj_func_proportion)
+                       BEC_summary, summary_count, min_BEC_constraints_running, params.BEC['n_human_models_precomputed'], visited_env_traj_idxs = visited_env_traj_idxs, n_train_demos=np.inf, downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=obj_func_proportion, vars_filename = vars_filename)
 
         
 
@@ -825,7 +831,7 @@ def obtain_team_summary(data_loc, min_subset_constraints_record, min_BEC_constra
 
 
 
-def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_learning_factor=None, team_prior=None, pf_flag = 'teacher'):
+def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_learning_factor=None, team_prior=None, pf_flag = 'teacher', vars_filename='sim_run'):
 
     particles_team = {}
     
@@ -862,7 +868,7 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_learnin
             # for cnst in team_prior[member_id]:
             # print('team_prior[member_id]: ', team_prior[member_id]) 
             plot_title = 'Teacher belief for player ' + str(member_id) + 'for prior'
-            particles_team[member_id].update(team_prior[member_id][0], learning_factor = 1 , plot_title = plot_title, viz_flag = False) # team prior is in team knowledge format. Hence use kc_id = 0 to get prior
+            particles_team[member_id].update(team_prior[member_id][0], learning_factor = 1 , plot_title = plot_title, viz_flag = False, vars_filename=vars_filename) # team prior is in team knowledge format. Hence use kc_id = 0 to get prior
 
                 # visualize_transition(cnst, particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for ' + str(member_id) )
             
@@ -875,7 +881,7 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_learnin
         if team_prior is not None:
             team_prior['common_knowledge'] = [calc_common_knowledge(team_prior, team_size, weights, step_cost_flag)]
             plot_title = 'Teacher belief for common knowledge for prior'
-            particles_team['common_knowledge'].update(team_prior['common_knowledge'][0], learning_factor = 1, plot_title=plot_title, viz_flag = False)  # team prior is in team knowledge format. Hence use kc_id = 0 to get prior
+            particles_team['common_knowledge'].update(team_prior['common_knowledge'][0], learning_factor = 1, plot_title=plot_title, viz_flag = False, vars_filename=vars_filename)  # team prior is in team knowledge format. Hence use kc_id = 0 to get prior
             particles_team['common_knowledge'].knowledge_update(team_prior['common_knowledge'])
         
 
@@ -1030,7 +1036,7 @@ def visualize_spherical_polygon_jk(poly, fig=None, ax=None, alpha=1.0, color='y'
 
 
 
-def visualize_transition(constraints, particles, mdp_class, weights=None, fig=None, text=None, knowledge_type = 'common_knowledge', plot_filename = 'transition'):
+def visualize_transition(constraints, particles, mdp_class, weights=None, fig=None, text=None, knowledge_type = 'common_knowledge', plot_filename = 'transition', vars_filename = 'sim_run'):
 
     # From BEC_viz.visualize_pf_transition function
    
@@ -1111,12 +1117,24 @@ def visualize_transition(constraints, particles, mdp_class, weights=None, fig=No
                     else:
                         view_params = [16, -160]
                 else:
-                    BEC_viz.visualize_planes([constraints], fig=fig, ax=ax_n)
-                    if constraints[0][0] == 0:
+                    print('Only one constraints: ', constraints)
+
+                    # BEC_viz.visualize_planes([constraints], fig=fig, ax=ax_n)
+                    # if constraints[0][0] == 0:
+                    #     view_params = [16, -160]
+                    # elif constraints[0][1] == 0:
+                    #     view_params = [2, -100]
+                    # elif constraints[0][2] == 0:
+                    #     view_params = [2, -60]
+                    # else:
+                    #     view_params = [16, -160]
+
+                    BEC_viz.visualize_planes(constraints, fig=fig, ax=ax_n)
+                    if constraints[0][0][0] == 0:
                         view_params = [16, -160]
-                    elif constraints[0][1] == 0:
+                    elif constraints[0][0][1] == 0:
                         view_params = [2, -100]
-                    elif constraints[0][2] == 0:
+                    elif constraints[0][0][2] == 0:
                         view_params = [2, -60]
                     else:
                         view_params = [16, -160]
@@ -1166,14 +1184,17 @@ def visualize_transition(constraints, particles, mdp_class, weights=None, fig=No
 
     fig.canvas.mpl_connect('motion_notify_event', on_move)
 
-    plt.show()
+    if params.show_plots_flag:
+        plt.show()
+    if params.save_plots_flag:
+        fig.savefig('plots/' + vars_filename + '_' + text +'.png', dpi=300)
     # fig.savefig('plots/' + plot_filename +'.png', dpi=300)
     # plt.pause(10)
     # plt.close()
 
 
 
-def visualize_team_knowledge_constraints(team_knowledge, weights, step_cost_flag, particles_team_teacher = None, kc_id = None, fig=None, text=None, plot_min_constraints_flag = False, plot_text_flag = False, min_unit_constraints = [], plot_filename = 'team_knowledge_constraints', fig_title = None):
+def visualize_team_knowledge_constraints(team_knowledge, weights, step_cost_flag, particles_team_teacher = None, kc_id = None, fig=None, text=None, plot_min_constraints_flag = False, plot_text_flag = False, min_unit_constraints = [], plot_filename = 'team_knowledge_constraints', fig_title = None, vars_filename = 'sim_run'):
 
     ###########  functions ###################
     def label_axes(ax, mdp_class, weights=None):
@@ -1186,6 +1207,9 @@ def visualize_team_knowledge_constraints(team_knowledge, weights, step_cost_flag
         if mdp_class == 'augmented_taxi2':
             ax.set_xlabel('$\mathregular{w_0}$: Mud')
             ax.set_ylabel('$\mathregular{w_1}$: Recharge')
+
+        ax.view_init(elev=16, azim=-160)
+
 
 
     def plot_text(constraints, fig, i):
@@ -1375,6 +1399,11 @@ def visualize_team_knowledge_constraints(team_knowledge, weights, step_cost_flag
         plot_id += 1
 
 
+    label_axes(ax0, params.mdp_class, weights)
+    label_axes(ax1, params.mdp_class, weights)
+    label_axes(ax2, params.mdp_class, weights)
+    label_axes(ax3, params.mdp_class, weights)
+    label_axes(ax4, params.mdp_class, weights)
 
     fig.canvas.mpl_connect('motion_notify_event', on_move)
 
@@ -1447,7 +1476,7 @@ def visualize_BEC_area(BEC_constraints, fig, ax1):
 
 
 def obtain_summary_counterfactual_team(data_loc, particles_demo, member_id, variable_filter, nonzero_counter, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
-                       summary, summary_count, min_BEC_constraints_running, n_human_models_precomputed, visited_env_traj_idxs=[], n_train_demos=3, downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=1):
+                       summary, summary_count, min_BEC_constraints_running, n_human_models_precomputed, visited_env_traj_idxs=[], n_train_demos=3, downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=1, vars_filename = 'sim_run'):
 
     
     # unit = []
@@ -1654,8 +1683,8 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, member_id, vari
         min_model_idxs = np.argmin(distances, axis=1)
 
         # plot sampled human models and nearest particles
-        if params.plot_sampled_models_flag:                    
-            plot_sampled_models(particles_demo, min_BEC_constraints_running, sample_human_models, weights=weights, fig=None, text='Sampled human models based on ' + member_id)
+        if params.plot_sampled_counterfactual_models_flag:                    
+            plot_sampled_counterfactual_models(particles_demo, min_BEC_constraints_running, sample_human_models, weights=weights, fig=None, text='Sampled human models based on ' + member_id)
 
 
 
@@ -1878,7 +1907,7 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, member_id, vari
             
             # print('Updating particles with constraint: ', new_constraint)
             plot_title = 'Demo particles update after demonstration summary ' + str(summary_count)
-            particles_demo.update(new_constraint, plot_title = plot_title)
+            particles_demo.update(new_constraint, plot_title = plot_title, vars_filename=vars_filename)
 
             
             # added newly (12/1/23) to separate sampling space and demo info space
@@ -2356,7 +2385,7 @@ def majority_rules_non_intersecting_team_constraints(test_constraints_team, weig
 
 
 
-def plot_sampled_models(particles, constraints, human_models, weights=None, fig=None, text=None):
+def plot_sampled_countefactual_models(particles, constraints, human_models, weights=None, fig=None, text=None):
     
 
     def label_axes(ax):
@@ -2369,8 +2398,6 @@ def plot_sampled_models(particles, constraints, human_models, weights=None, fig=
         ax.set_ylabel(r'$\mathregular{w_1}$: Recharge', fontsize = fs)
         ax.set_zlabel('$\mathregular{w_2}$: Action', fontsize = fs)
         ax.view_init(elev=16, azim=-160)
-
-
 
     # print('human_models: ', human_models)
 
@@ -2584,7 +2611,7 @@ def obtain_diagnostic_tests(data_loc, previous_demos, visited_env_traj_idxs, min
 
 
 
-def simulate_team_learning(kc_id, particles_team_learner, new_constraints, params, loop_count, kc_reset_flag=True, viz_flag=False, learner_update_type = 'noise'):
+def simulate_team_learning(kc_id, particles_team_learner, new_constraints, params, loop_count, kc_reset_flag=True, viz_flag=False, learner_update_type = 'noise', vars_filename = 'sim_run'):
 
 
     print(colored('Simulating team learning for KC ' + str(kc_id) + 'in loop ' + str(loop_count) + '...', 'red'))
@@ -2593,13 +2620,16 @@ def simulate_team_learning(kc_id, particles_team_learner, new_constraints, param
     while p <= params.team_size:
         member_id = 'p' + str(p)
         # print('PF update of ', member_id)
-        plot_title = 'Learner belief update after demonstration for loop ' + str(loop_count+1) + ' for player ' + member_id
-        particles_team_learner[member_id].update(new_constraints, plot_title = plot_title, model_type = learner_update_type, viz_flag = viz_flag)
+        plot_title = 'Intearction No. ' + str(loop_count+1) + '. Learner belief update after demonstration for KC' + str(kc_id) + 'for player ' + member_id
+        particles_team_learner[member_id].update(new_constraints, plot_title = plot_title, model_type = learner_update_type, viz_flag = viz_flag, vars_filename = vars_filename)
         particles_team_learner[member_id].calc_particles_probability(new_constraints)
         ##########################
         
         if viz_flag:
-            visualize_transition(new_constraints[0], particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for set ' + str(loop_count+1) + ' for player ' + member_id, plot_filename ='ek_p' + str(p) + '_loop_' + str(loop_count+1))
+            plot_title = 'Intearction No. ' + str(loop_count+1) + '. Learner simulated knowledge change after demo for KC' + str(kc_id) + 'for player ' + member_id
+            visualize_transition(new_constraints, particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = plot_title, vars_filename=vars_filename)
+
+                
         p += 1
             
 

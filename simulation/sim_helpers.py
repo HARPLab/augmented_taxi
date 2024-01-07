@@ -17,6 +17,9 @@ import matplotlib.pyplot as plt
 import params_team as params
 import random
 
+import teams.utils_teams as utils_teams
+import sage.geometry.polyhedron.base as Polyhedron
+
 
 def sample_from_distribution(condition, points, probabilities, points_to_avoid = []):
     # Step 1: Normalize Probabilities
@@ -272,9 +275,7 @@ def get_human_response_each_test(condition, env_idx, particles_to_sample, opt_tr
         wt_vi_traj_env = pickle.load(f)
 
     mdp = wt_vi_traj_env[0][1].mdp
-    agent = FixedPolicyAgent(wt_vi_traj_env[0][1].policy)
     mdp.set_init_state(opt_traj[0][0])
-    # traj_opt = mdp_helpers.rollout_policy(mdp, agent)
     traj_opt = opt_traj
 
     skip_human_model = True
@@ -328,11 +329,14 @@ def get_human_response_each_test(condition, env_idx, particles_to_sample, opt_tr
                 
                 # print('Sampled point: ', human_model_weight, 'Sampled point probability: ', rew_weight_prob, 'rand_number: ', rand_number)
                 if len(points_to_avoid) > 0:
+                    point_already_sampled = False
                     for point_avd in points_to_avoid:
-                        if not (human_model_weight == point_avd).all():
-                            sampled_point_flag = True
-                            # print('Point sampled!')
-                            break
+                        if (human_model_weight == point_avd).all():
+                            point_already_sampled = True
+
+                    if not point_already_sampled:
+                        sampled_point_flag = True
+                        # print('Point sampled!')
                 else:
                     sampled_point_flag = True
                     # print('Point sampled!')
@@ -374,10 +378,9 @@ def get_human_response_each_test(condition, env_idx, particles_to_sample, opt_tr
 
         # for model_idx, human_model_weight in enumerate(cust_samps):
         # print('human_model_weight: ', human_model_weight, 'cluster_id: ', cluster_id)
-        # print('human_model_weight: ', human_model_weight)
+        print('Sampled model weight: ', human_model_weight)
         
         if len(human_model_weight) != 0:
-        # if (human_model_weight != [0, 0, 0]):
             points_to_avoid.append(human_model_weight)
 
             mdp.weights = human_model_weight
@@ -385,11 +388,12 @@ def get_human_response_each_test(condition, env_idx, particles_to_sample, opt_tr
             vi_human = ValueIteration(mdp, sample_rate=1, max_iterations=100)
             vi_human.run_vi()
 
+            print('Checking sampled human model for test with constraints: ', test_constraints)
             if not vi_human.stabilized:
-                # print(colored('Human model with weight, ' + str(human_model_weight) + ', did not converge and skipping for response generation', 'red'))
+                print(colored('Human model with weight, ' + str(human_model_weight) + ', did not converge and skipping for response generation', 'red'))
                 skip_human_model = True
             else:
-                # print(colored('Human model with weight, ' + str(human_model_weight) + ', converged', 'green'))
+                print(colored('Human model with weight, ' + str(human_model_weight) + ', converged', 'green'))
                 skip_human_model = False
             
             if not skip_human_model:
@@ -501,39 +505,36 @@ def get_human_response_all_tests(particles_to_sample, preliminary_tests, learnin
             learner_member_prob_test, particles_learner_prob_demo_history, particles_learner_prob_test_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, prob_reweight_history, prob_resample_history, resample_flag_history, \
                 update_type, update_sequence_history, noise_measures, resample_noise_history = args
 
-    test_mdp = {}
-    test_opt_traj = {}
-    test_agent = {}
+    # test_mdp = {}
+    # test_opt_traj = {}
 
-    for test_id, test in enumerate(preliminary_tests):
+    # for test_id, test in enumerate(preliminary_tests):
        
-        env_idx, traj_idx = test[2]
-        opt_traj = test[1]
+    #     env_idx, traj_idx = test[2]
+    #     opt_traj = test[1]
 
-        print('test ', test)
+    #     # print('test ', test)
 
-        filename = 'models/augmented_taxi2/gt_policies/wt_vi_traj_params_env' + str(env_idx).zfill(5) + '.pickle'
+    #     filename = 'models/augmented_taxi2/gt_policies/wt_vi_traj_params_env' + str(env_idx).zfill(5) + '.pickle'
 
-        # print('filename: ', filename)
+    #     # print('filename: ', filename)
     
-        with open(filename, 'rb') as f:
-            wt_vi_traj_env = pickle.load(f)
+    #     with open(filename, 'rb') as f:
+    #         wt_vi_traj_env = pickle.load(f)
 
-        # print('wt_vi_traj_env[0][1].mdp: ', wt_vi_traj_env[0][1].mdp)
+    #     # print('wt_vi_traj_env[0][1].mdp: ', wt_vi_traj_env[0][1].mdp)
 
-        # mdp = wt_vi_traj_env[0][1].mdp
-        # agent = FixedPolicyAgent(wt_vi_traj_env[0][1].policy)
-        # mdp.set_init_state(opt_traj[0][0])
+    #     # mdp = wt_vi_traj_env[0][1].mdp
+    #     # agent = FixedPolicyAgent(wt_vi_traj_env[0][1].policy)
+    #     # mdp.set_init_state(opt_traj[0][0])
 
-        test_mdp[test_id] = wt_vi_traj_env[0][1].mdp
-        test_agent[test_id] = FixedPolicyAgent(wt_vi_traj_env[0][1].policy)
-        test_mdp[test_id].set_init_state(opt_traj[0][0])
-        # test_opt_traj[test_id] = mdp_helpers.rollout_policy(test_mdp[test_id], test_agent[test_id])
-        test_opt_traj[test_id] = opt_traj
+    #     test_mdp[test_id] = wt_vi_traj_env[0][1].mdp
+    #     test_mdp[test_id].set_init_state(opt_traj[0][0])
+    #     test_opt_traj[test_id] = opt_traj
 
-        # print('test_mdp: ', test_mdp)
-        # print('test_agent: ', test_agent)
-        # print('test_opt_traj: ', test_opt_traj)
+    #     # print('test_mdp: ', test_mdp)
+    #     # print('test_agent: ', test_agent)
+    #     # print('test_opt_traj: ', test_opt_traj)
 
 
 
@@ -544,12 +545,16 @@ def get_human_response_all_tests(particles_to_sample, preliminary_tests, learnin
     differing_response_model_idx = []
     points_to_avoid = []
 
-    human_opt_trajs_all_tests = []
-    response_type_all_tests = []
-    human_model_weight_all_tests = []
+
 
     # sample human models
     while skip_human_model:
+        
+        # reset variables
+        if skip_human_model:
+            human_opt_trajs_all_tests = []
+            response_type_all_tests = []
+            human_model_weight_all_tests = []
 
         ## Method 2: Sampling from all particles
         sampled_point_flag = False
@@ -558,44 +563,62 @@ def get_human_response_all_tests(particles_to_sample, preliminary_tests, learnin
             
             # print('Sampled point: ', human_model_weight, 'Sampled point probability: ', rew_weight_prob, 'rand_number: ', rand_number)
             if len(points_to_avoid) > 0:
+                point_already_sampled = False
                 for point_avd in points_to_avoid:
-                    if not (human_model_weight == point_avd).all():
-                        sampled_point_flag = True
-                        # print('Point sampled!')
-                        break
+                    if (human_model_weight == point_avd).all():
+                        point_already_sampled = True
+
+                if not point_already_sampled:
+                    sampled_point_flag = True
+                    # print('Point sampled!')
             else:
                 sampled_point_flag = True
                 # print('Point sampled!')
 
+        print('Sampled human model: ', human_model_weight)
     ############################
         
         if len(human_model_weight) != 0:
             points_to_avoid.append(human_model_weight)
 
-            for test_id in range(len(preliminary_tests)):
-                test_constraints = preliminary_tests[test_id][3]
-                test_mdp[test_id].weights = human_model_weight
-                vi_human = ValueIteration(test_mdp[test_id], sample_rate=1, max_iterations=100)
+            # check for each test
+            test_id = 0
+            for test in preliminary_tests:
+
+                # check for each test
+                env_idx, traj_idx = test[2]
+                opt_traj = test[1]
+                
+                filename = 'models/augmented_taxi2/gt_policies/wt_vi_traj_params_env' + str(env_idx).zfill(5) + '.pickle'
+                with open(filename, 'rb') as f:
+                    wt_vi_traj_env = pickle.load(f)
+
+                # print('wt_vi_traj_env[0][1].mdp: ', wt_vi_traj_env[0][1].mdp)
+
+                mdp = wt_vi_traj_env[0][1].mdp
+                mdp.set_init_state(opt_traj[0][0])
+                mdp.weights = human_model_weight
+                vi_human = ValueIteration(mdp, sample_rate=1, max_iterations=100)
                 vi_human.run_vi()
 
+                test_constraints = test[3]
+                print('Checking sampled human model for test: ', test_id, ', for constraints: ', test_constraints)
+
                 if not vi_human.stabilized:
-                    # print(colored('Human model with weight, ' + str(human_model_weight) + ', did not converge and skipping for response generation', 'red'))
+                    print(colored('Human model with weight, ' + str(human_model_weight) + ', did not converge and skipping for response generation', 'red'))
                     skip_human_model = True
                 else:
-                    # print(colored('Human model with weight, ' + str(human_model_weight) + ', converged', 'green'))
+                    print(colored('Human model with weight, ' + str(human_model_weight) + ', converged', 'green'))
                     skip_human_model = False
                 
 
                 if not skip_human_model:
-                    cur_state = test_mdp[test_id].get_init_state()
+                    cur_state = mdp.get_init_state()
                     # print('Current state: ', cur_state)
                     human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
 
-                    # get trajectory from precomputed models
-
-                    
-                    human_traj_rewards = test_mdp[test_id].accumulate_reward_features(human_opt_trajs[0], discount=True)  # just use the first optimal trajectory
-                    mu_sa = test_mdp[test_id].accumulate_reward_features(test_opt_traj[test_id], discount=True)
+                    human_traj_rewards = mdp.accumulate_reward_features(human_opt_trajs[0], discount=True)  # just use the first optimal trajectory
+                    mu_sa = mdp.accumulate_reward_features(opt_traj, discount=True)
                     new_constraint = mu_sa - human_traj_rewards
 
                     # print('New constraint: ', new_constraint)
@@ -618,7 +641,7 @@ def get_human_response_all_tests(particles_to_sample, preliminary_tests, learnin
                 else:
                     response_type = 'NA'
                     # visualize skipped trajectories
-                    cur_state = test_mdp[test_id].get_init_state()
+                    cur_state = mdp.get_init_state()
                     human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
                     # mdp.visualize_trajectory(human_opt_trajs[0])
                     # plt.show()
@@ -635,6 +658,7 @@ def get_human_response_all_tests(particles_to_sample, preliminary_tests, learnin
                         if constraint.dot(human_model_weight.T) < 0:
                             constraint_flag = False
                 
+                # save to history variables for debugging
                 if len(args) != 0:
                     sampled_points_history.append(human_model_weight)
                     response_history.append(response_type)
@@ -654,16 +678,20 @@ def get_human_response_all_tests(particles_to_sample, preliminary_tests, learnin
                     resample_flag_history.append(resample_flag)
                     resample_noise_history.append(noise_measures)
                     update_sequence_history.append(update_type)
-                
 
-                loop_count += 1
+                # save sampled model if it provides a stable trajectory for all tests
+                if not skip_human_model:
+                    human_opt_trajs_all_tests.append(human_opt_trajs[0])
+                    response_type_all_tests.append(response_type)
+                    human_model_weight_all_tests.append(human_model_weight)
+                    
+                test_id += 1 # update test_id
 
-                human_opt_trajs_all_tests.append(human_opt_trajs[0])
-                response_type_all_tests.append(response_type)
-                human_model_weight_all_tests.append(human_model_weight)
 
+            loop_count += 1
             
         else:
+            print('No valid human model sampled. Skipping ...')
             human_opt_trajs_all_tests = [None]
             response_type_all_tests = 'NA'
             human_model_weight_all_tests = [None]
@@ -679,6 +707,94 @@ def get_human_response_all_tests(particles_to_sample, preliminary_tests, learnin
                 prob_reweight_history, prob_resample_history, resample_flag_history, update_sequence_history, resample_noise_history
     else:
         return human_opt_trajs_all_tests, response_type_all_tests
+####################################
+    
+def plot_sampled_models(particles, test_constraints, human_model_weight_all_tests, test_no, fig=None, plot_title = 'Sampled models', vars_filename = 'sim_run'):
+
+    '''
+    Visualize the sampled human model
+    '''
+    if fig == None:
+        fig = plt.figure()
+
+    def label_axes(ax, mdp_class, weights=None, view_params = None):
+        fs = 12
+        ax.set_facecolor('white')
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
+        if weights is not None:
+            ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100/2)
+        if mdp_class == 'augmented_taxi2':
+            ax.set_xlabel(r'$\mathregular{w_0}$: Mud', fontsize = fs)
+            ax.set_ylabel(r'$\mathregular{w_1}$: Recharge', fontsize = fs)
+        elif mdp_class == 'colored_tiles':
+            ax.set_xlabel('X: Tile A (brown)')
+            ax.set_ylabel('Y: Tile B (green)')
+        else:
+            ax.set_xlabel('X: Goal')
+            ax.set_ylabel('Y: Skateboard')
+        ax.set_zlabel('$\mathregular{w_2}$: Action', fontsize = fs)
+
+        # ax.view_init(elev=16, azim=-160)
+        if not view_params is None:
+            elev = view_params[0]
+            azim = view_params[1]
+        else:
+            elev=16
+            azim = -160
+        ax.view_init(elev=elev, azim=azim)
+
+
+    ax1 = fig.add_subplot(1, 3, 1, projection='3d')
+    ax2 = fig.add_subplot(1, 3, 2, projection='3d', sharex=ax1, sharey=ax1, sharez=ax1)
+    ax3 = fig.add_subplot(1, 3, 3, projection='3d', sharex=ax1, sharey=ax1, sharez=ax1)
+    ax1.title.set_text('Particles for P1')
+    ax2.title.set_text('Particles for P2')
+    ax3.title.set_text('Particles for P3')
+    fig.suptitle(plot_title, fontsize=16)
+
+    for p in range(len(particles)):
+        member_id = 'p' + str(p+1)
+
+        if p==0:
+            plot_ax = ax1
+        elif p ==1:
+            plot_ax = ax2
+        elif p ==2:
+            plot_ax = ax3
+        
+        particles[member_id].plot(fig=fig, ax=plot_ax, cluster_centers = [human_model_weight_all_tests[member_id][test_no-1]], cluster_weights = [0.5])
+        label_axes(plot_ax, params.mdp_class)
+        
+        utils_teams.visualize_planes_team(test_constraints, fig=fig, ax=plot_ax)
+        ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(test_constraints)
+        poly = Polyhedron.Polyhedron(ieqs=ieqs)
+        BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=plot_ax, plot_ref_sphere=False, alpha=0.75)
+
+    # https://stackoverflow.com/questions/41167196/using-matplotlib-3d-axes-how-to-drag-two-axes-at-once
+    # link the pan of the three axes together
+    def on_move(event):
+        if event.inaxes == ax1:
+            ax2.view_init(elev=ax1.elev, azim=ax1.azim)
+            ax3.view_init(elev=ax1.elev, azim=ax1.azim)
+        elif event.inaxes == ax2:
+            ax1.view_init(elev=ax2.elev, azim=ax2.azim)
+            ax3.view_init(elev=ax2.elev, azim=ax2.azim)
+        elif event.inaxes == ax3:
+            ax1.view_init(elev=ax3.elev, azim=ax3.azim)
+            ax2.view_init(elev=ax3.elev, azim=ax3.azim)
+            return
+        fig.canvas.draw_idle()
+
+    fig.canvas.mpl_connect('motion_notify_event', on_move)
+
+    if params.show_plots_flag:
+        plt.show()
+    if params.save_plots_flag:
+        plt.savefig('plots/' + vars_filename + '_' + plot_title + '.png', dpi=300)
+
+
 
 
 # def get_human_response_old(env_idx, env_cnst, opt_traj, likelihood_correct_response):

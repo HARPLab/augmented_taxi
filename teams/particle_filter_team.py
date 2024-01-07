@@ -891,16 +891,16 @@ class Particles_team():
         ########################################
 
         # noise suggested by "Novel approach to nonlinear/non-Gaussian Bayesian state estimation" by Gordon et al.
-        print(colored("max_ele_dist: " + str(max_ele_dist) + ". max_azi_dist: " + str(max_azi_dist), "red"))
+        # print(colored("max_ele_dist: " + str(max_ele_dist) + ". max_azi_dist: " + str(max_azi_dist), "red"))
 
         if model_type == 'noise':
             noise = np.array([np.random.normal(scale=max_ele_dist, size=len(positions_spherical)),
                             np.random.normal(scale=max_azi_dist, size=len(positions_spherical))]).T
-            print('Resampling with noise...')
+            # print('Resampling with noise...')
         else:
             noise = np.array([np.zeros(len(positions_spherical)),
                             np.zeros(len(positions_spherical))]).T
-            print('Resampling without noise...')
+            # print('Resampling without noise...')
         
         noise_before_transform = copy.deepcopy(noise)
 
@@ -1134,7 +1134,7 @@ class Particles_team():
         N_particles = len(self.positions)
         uniform_particles_id = []
 
-        print('N_particles: ', N_particles)
+        # print('N_particles: ', N_particles)
         # print('N_weights: ', len(self.weights))
 
         for particle_id in range(N_particles):
@@ -1176,7 +1176,7 @@ class Particles_team():
     ################################################################################################
 
 
-    def update(self, constraints, c=0.5, reset_threshold_prob=0.001, learning_factor = None, plot_title = None, model_type = 'noise', viz_flag = False):
+    def update(self, constraints, c=0.5, reset_threshold_prob=0.001, learning_factor = None, plot_title = None, model_type = 'noise', viz_flag = False, vars_filename = 'sim_run'):
         self.weights_prev = self.weights.copy()
         self.positions_prev = self.positions.copy()
         # print(colored('constraints: ' + str(constraints), 'red'))
@@ -1217,8 +1217,8 @@ class Particles_team():
 
         if viz_flag:
             fig = plt.figure()
-            fig2 = plt.figure()
-            ax2 = []
+            # fig2 = plt.figure()
+            # ax2 = []
             ax = []
             plt_id = 1
             N = len(constraints)
@@ -1237,10 +1237,10 @@ class Particles_team():
             self.calc_particles_probability([constraint])
             prob_initial.append(self.particles_prob_correct)
 
-            if viz_flag:
-                ax2.append(fig2.add_subplot(N, 3, plt_id))
-                ax2[cnst_id*3].hist(self.weights, bins=20)
-                ax2[cnst_id*3].title.set_text('Particle distribution before reweighting')
+            # if viz_flag:
+            #     ax2.append(fig2.add_subplot(N, 3, plt_id))
+            #     ax2[cnst_id*3].hist(self.weights, bins=20)
+            #     ax2[cnst_id*3].title.set_text('Particle distribution before reweighting')
             
 
             self.reweight(constraint, learning_factor)
@@ -1252,10 +1252,10 @@ class Particles_team():
                 ax.append(fig.add_subplot(N, 3, plt_id, projection='3d'))
                 plt_id += 1
                 ax.append(fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
-                ax2.append(fig2.add_subplot(N, 3, plt_id))
+                # ax2.append(fig2.add_subplot(N, 3, plt_id))
                 plt_id += 1
                 ax.append(fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
-                ax2.append(fig2.add_subplot(N, 3, plt_id))
+                # ax2.append(fig2.add_subplot(N, 3, plt_id))
                 plt_id += 1
                 ax[cnst_id*3].title.set_text('Particles before reweighting')
                 ax[cnst_id*3 + 1].title.set_text('Particles after reweighting')
@@ -1270,17 +1270,18 @@ class Particles_team():
                 ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraint)
                 poly = Polyhedron.Polyhedron(ieqs=ieqs)
                 BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax[cnst_id*3 + 1], plot_ref_sphere=False, alpha=0.75)
-                ## debug
-                vis_scale_factor = 10 * len(self.positions) * (1/sum(self.weights))
-                for particle_id in range(len(self.positions)):
-                    pos = self.positions[particle_id]
-                    weight = self.weights[particle_id]
-                    dot = constraint.dot(pos.T)
-                    if dot < 0:
-                        ax[cnst_id*3+1].scatter(pos[0][0], pos[0][1], pos[0][2], marker='o', c='r', s=weight*vis_scale_factor)
+                
+                # ## debug
+                # vis_scale_factor = 10 * len(self.positions) * (1/sum(self.weights))
+                # for particle_id in range(len(self.positions)):
+                #     pos = self.positions[particle_id]
+                #     weight = self.weights[particle_id]
+                #     dot = constraint.dot(pos.T)
+                #     if dot < 0:
+                #         ax[cnst_id*3+1].scatter(pos[0][0], pos[0][1], pos[0][2], marker='o', c='r', s=weight*vis_scale_factor)
 
-                ax2[cnst_id*3+1].hist(self.weights, bins=20)
-                ax2[cnst_id*3+1].title.set_text('Particle distribution after reweighting')
+                # ax2[cnst_id*3+1].hist(self.weights, bins=20)
+                # ax2[cnst_id*3+1].title.set_text('Particle distribution after reweighting')
 
                 # set view
                 if constraint[0][0] == 0:
@@ -1323,7 +1324,7 @@ class Particles_team():
                     
 
                 n_eff = self.calc_n_eff(self.weights)
-                # print('n_eff: {}'.format(n_eff))
+                print('N_particles: ', len(self.weights), 'n_eff: ', n_eff)
                 if n_eff < c * len(self.weights):
                     # a) use systematic resampling
                     # resample_indexes = p_utils.systematic_resample(self.weights)
@@ -1355,16 +1356,18 @@ class Particles_team():
                     if viz_flag:
                         self.plot(fig=fig, ax=ax[cnst_id*3 + 2], cluster_centers=self.cluster_centers, cluster_weights=self.cluster_weights)
                         BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3 + 2])
-                        vis_scale_factor = 10 * len(self.positions) * (1/sum(self.weights))
-                        for particle_id in range(len(self.positions)):
-                            pos = self.positions[particle_id]
-                            weight = self.weights[particle_id]
-                            dot = constraint.dot(pos.T)
-                            if dot < 0:
-                                ax[cnst_id*3+2].scatter(pos[0][0], pos[0][1], pos[0][2], marker='o', c='r', s=weight*vis_scale_factor)
                         
-                        ax2[cnst_id*3+2].hist(self.weights, bins=20)
-                        ax2[cnst_id*3+2].title.set_text('Particle distribution after resampling')
+                        # # debug
+                        # vis_scale_factor = 10 * len(self.positions) * (1/sum(self.weights))
+                        # for particle_id in range(len(self.positions)):
+                        #     pos = self.positions[particle_id]
+                        #     weight = self.weights[particle_id]
+                        #     dot = constraint.dot(pos.T)
+                        #     if dot < 0:
+                        #         ax[cnst_id*3+2].scatter(pos[0][0], pos[0][1], pos[0][2], marker='o', c='r', s=weight*vis_scale_factor)
+                        
+                        # ax2[cnst_id*3+2].hist(self.weights, bins=20)
+                        # ax2[cnst_id*3+2].title.set_text('Particle distribution after resampling')
                         
 
                 else:
@@ -1389,8 +1392,10 @@ class Particles_team():
             # fig.canvas.mpl_connect('motion_notify_event', on_move)
 
 
-        if viz_flag:
+        if viz_flag and params.show_plots_flag:
             plt.show()
+        if viz_flag and params.save_plots_flag:
+            plt.savefig('plots/' + vars_filename + '_' + plot_title +'.png', dpi=300)
 
         self.binned = False
 
@@ -1404,7 +1409,7 @@ class Particles_team():
         :param k: concentration parameter of VMF
         :return: probability of x under this composite distribution (uniform + VMF)
         '''
-        print(colored('Reweighting particles for learning factor: ' + str(learning_factor), 'red'))
+        # print(colored('Reweighting particles for learning factor: ' + str(learning_factor), 'red'))
         if learning_factor is None:
             u_pdf_scaled = self.u_pdf_scaled
             VMF_kappa = self.VMF_kappa

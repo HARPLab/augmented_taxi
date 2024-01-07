@@ -100,7 +100,7 @@ if __name__ == "__main__":
     
     
     N_runs = 1
-    run_start_id = 1
+    run_start_id = 2
     learner_update_type = 'noise'
 
     file_prefix = 'debug_trials_01_05_w_sample_all_tests'
@@ -140,7 +140,7 @@ if __name__ == "__main__":
         print(colored('Simulation run: ' + str(run_id) + '. Demo strategy: ' + str(dem_strategy_for_run) + '. Team composition:' + str(team_composition_for_run), 'red'))
         # run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', team_learning_factor = team_learning_factor, viz_flag=[False, False, False], run_no = run_id, vars_filename=file_prefix)
         run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', initial_team_learning_factor = ilcr, team_learning_rate = rlcr, \
-                            viz_flag=[True, True, True], run_no = run_id, vars_filename=file_prefix, response_sampling_condition=sampling_cond_for_run, team_composition=team_composition_for_run, learner_update_type = learner_update_type)
+                            viz_flag=[False, False, True], run_no = run_id, vars_filename=file_prefix, response_sampling_condition=sampling_cond_for_run, team_composition=team_composition_for_run, learner_update_type = learner_update_type)
 
 
         # file_name = [file_prefix + '_' + str(run_id) + '.csv']

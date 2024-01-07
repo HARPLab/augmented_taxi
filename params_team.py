@@ -346,7 +346,9 @@ test_env_traj_tracers = {
 debug_flag = False
 debug_kl_calc = False
 debug_hm_sampling = False
-plot_sampled_models_flag = False
+plot_sampled_counterfactual_models_flag = False
+save_plots_flag = True
+show_plots_flag = False
 
 team_size = 3
 
@@ -380,8 +382,8 @@ max_loops = 50
 learning_goal = 1.0
 loop_threshold_demo_simplification = 100
 default_learning_factor_teacher = 0.8
-max_learning_factor = 1.0
-response_generation_type = 'All_tests'
+max_learning_factor = 0.9
+response_generation_type = 'All_tests'  #'Individual_tests', 'All_tests'
 
 sens_low_learner_learning_factor_range = [0.55, 0.7]
 sens_high_learner_learning_factor_range = [0.75, 0.9]
