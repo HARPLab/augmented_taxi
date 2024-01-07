@@ -463,11 +463,10 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                         if params.response_generation_type == 'Individual_tests':
                             team_learning_factor[p-1] = min(team_learning_factor[p-1] + team_learning_rate[p-1, 0], max_learning_factor) # update learning parameter
                         
-
-                        if knowledge_viz_flag:
-                            plot_title = 'Interaction No.' + str(loop_count+1) +'Simulated knowledge change for player ' + member_id + ' after test ' + str(test_no) + ' of KC' + str(kc_id)
-                            team_helpers.visualize_transition(test_constraints, particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = plot_title, vars_filename = vars_filename)
-
+                        # if knowledge_viz_flag:
+                        #     plot_title = 'Interaction No.' + str(loop_count+1) +'Simulated knowledge change for player ' + member_id + ' after test ' + str(test_no) + ' of KC' + str(kc_id)
+                        #     team_helpers.visualize_transition(test_constraints, particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = plot_title, vars_filename = vars_filename)
+                            
                         # reset knowledge to mirror particle reset
                         prev_pf_reset_count = particles_team_teacher[member_id].pf_reset_count
                         if particles_team_teacher[member_id].pf_reset_count > prev_pf_reset_count:
@@ -478,9 +477,10 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                         
                         print(colored("You got the diagnostic test right!", 'green'))
                         response_category_team.append('correct')
-                        if knowledge_viz_flag:
-                            plot_title = 'Interaction No.' + str(loop_count +1) + '. After test ' + str(test_no) + ' of KC ' + str(kc_id) + ' for player ' + member_id
-                            team_helpers.visualize_transition(test_constraints, particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = plot_title, vars_filename = vars_filename)
+
+                        # if knowledge_viz_flag:
+                        #     plot_title = 'Interaction No.' + str(loop_count +1) + '. After test ' + str(test_no) + ' of KC ' + str(kc_id) + ' for player ' + member_id
+                        #     team_helpers.visualize_transition(test_constraints, particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = plot_title, vars_filename = vars_filename)
 
                     else:
                         
@@ -511,9 +511,9 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                         if params.response_generation_type == 'Individual_tests':
                             team_learning_factor[p-1] = min(team_learning_factor[p-1] + team_learning_rate[p-1, 1], max_learning_factor) # update learning parameter
                         
-                        if knowledge_viz_flag:
-                            plot_title = 'Interaction No.' + str(loop_count+1) +'Simulated knowledge change for player ' + member_id + ' after test ' + str(test_no) + ' of KC' + str(kc_id)
-                            team_helpers.visualize_transition([-failed_BEC_constraint], particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = plot_title, vars_filename = vars_filename)
+                        # if knowledge_viz_flag:
+                        #     plot_title = 'Interaction No.' + str(loop_count+1) +'Simulated knowledge change for player ' + member_id + ' after test ' + str(test_no) + ' of KC' + str(kc_id)
+                        #     team_helpers.visualize_transition([-failed_BEC_constraint], particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = plot_title, vars_filename = vars_filename)
 
                         
                         # reset knowledge to mirror particle reset
@@ -528,9 +528,10 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                         
                         print("You got the diagnostic test wrong. Failed BEC constraint: {}".format(failed_BEC_constraint))
                         response_category_team.append('incorrect')
-                        if knowledge_viz_flag:
-                            plot_title = 'Interaction No.' + str(loop_count+1) + '. After test ' + str(test_no) + ' of KC ' + str(kc_id) + ' for player ' + member_id
-                            team_helpers.visualize_transition([-failed_BEC_constraint], particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = plot_title, vars_filename = vars_filename)
+                        
+                        # if knowledge_viz_flag:
+                        #     plot_title = 'Interaction No.' + str(loop_count+1) + '. After test ' + str(test_no) + ' of KC ' + str(kc_id) + ' for player ' + member_id
+                        #     team_helpers.visualize_transition([-failed_BEC_constraint], particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = plot_title, vars_filename = vars_filename)
                         
                         # Correct trajectory
                         if demo_viz_flag:
@@ -652,7 +653,10 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                     prev_pf_reset_count = particles_team_teacher['joint_knowledge'].pf_reset_count
                     # print('PF update of joint knowledge with constraints: ', test_constraints_team)
                     particles_team_teacher['joint_knowledge'].update_jk(test_constraints_team)
-                    
+
+                    plot_title = 'Interaction No.' + str(loop_count +1) + '. Teacher belief for joint knowledge after tests of KC ' + str(kc_id)                    
+                    team_helpers.visualize_transition(test_constraints_team, particles_team_teacher['joint_knowledge'], params.mdp_class, params.weights['val'], text = plot_title, vars_filename = vars_filename)
+
             
             else:
                 ## update team knowledge based on the test responses of the team for intersecting constraints
