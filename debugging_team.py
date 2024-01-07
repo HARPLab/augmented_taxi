@@ -43,7 +43,7 @@ from teams import particle_filter_team as pf_team
 import policy_summarization.particle_filter as pf
 import teams.utils_teams as utils_teams
 from simulation import human_learner_model as hlm
-from simulation.sim_helpers import get_human_response
+from simulation.sim_helpers import get_human_response_all_tests, get_human_response_each_test
 
 
 
@@ -983,40 +983,53 @@ def check_resampling_gaussian_noise():
 
 def debug_knowledge_calculation():
 
-    min_KC_constraints =  [np.array([[1, 1, 0]]), np.array([[-2, -1, -6]]), np.array([[-1, -1, -4]]), np.array([[ 0, -1, -4]])]
+    # min_KC_constraints =  [np.array([[1, 1, 0]]), np.array([[-2, -1, -6]]), np.array([[-1, -1, -4]]), np.array([[ 0, -1, -4]])]
 
-    min_BEC_constraints = [np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
+    # min_BEC_constraints = [np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
  
 
-    team_knowledge = {'p1': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], \
-                             [np.array([[ 0, -1, -2]])], [np.array([[-1, -1, -4]]), np.array([[ 0, -1, -4]]), np.array([[-2, -1, -6]]), np.array([[ 0, -1, -2]])]], 
-                      'p2': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], \
-                             [np.array([[0, 1, 2]])], [np.array([[-1, -1, -4]]), np.array([[ 0, -1, -4]]), np.array([[-2, -1, -6]]), np.array([[1, 1, 0]])]], 
-                      'p3': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], \
-                             [np.array([[0, 1, 2]])], [np.array([[-1, -1, -4]]), np.array([[ 0, -1, -4]]), np.array([[-2, -1, -6]]), np.array([[1, 1, 0]])]], 
-                      'common_knowledge': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], \
-                                           [np.array([[0, 1, 2]])], [np.array([[-2, -1, -6]]), np.array([[1, 1, 0]]), np.array([[ 0, -1, -2]])]], 
-                       'joint_knowledge': [[[np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])]], \
-                                           [[np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])]], \
-                                            [[np.array([[ 0, -1, -2]])], [np.array([[0, 1, 2]])], [np.array([[0, 1, 2]])]], \
-                                                [[np.array([[-1, -1, -4]]), np.array([[ 0, -1, -4]]), np.array([[-2, -1, -6]]), np.array([[ 0, -1, -2]])], [np.array([[-1, -1, -4]]), np.array([[ 0, -1, -4]]), np.array([[-2, -1, -6]]), np.array([[1, 1, 0]])], [np.array([[-1, -1, -4]]), np.array([[ 0, -1, -4]]), np.array([[-2, -1, -6]]), np.array([[1, 1, 0]])]]]}
+    # team_knowledge = {'p1': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], \
+    #                          [np.array([[ 0, -1, -2]])], [np.array([[-1, -1, -4]]), np.array([[ 0, -1, -4]]), np.array([[-2, -1, -6]]), np.array([[ 0, -1, -2]])]], 
+    #                   'p2': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], \
+    #                          [np.array([[0, 1, 2]])], [np.array([[-1, -1, -4]]), np.array([[ 0, -1, -4]]), np.array([[-2, -1, -6]]), np.array([[1, 1, 0]])]], 
+    #                   'p3': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], \
+    #                          [np.array([[0, 1, 2]])], [np.array([[-1, -1, -4]]), np.array([[ 0, -1, -4]]), np.array([[-2, -1, -6]]), np.array([[1, 1, 0]])]], 
+    #                   'common_knowledge': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], \
+    #                                        [np.array([[0, 1, 2]])], [np.array([[-2, -1, -6]]), np.array([[1, 1, 0]]), np.array([[ 0, -1, -2]])]], 
+    #                    'joint_knowledge': [[[np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])]], \
+    #                                        [[np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])]], \
+    #                                         [[np.array([[ 0, -1, -2]])], [np.array([[0, 1, 2]])], [np.array([[0, 1, 2]])]], \
+    #                                             [[np.array([[-1, -1, -4]]), np.array([[ 0, -1, -4]]), np.array([[-2, -1, -6]]), np.array([[ 0, -1, -2]])], [np.array([[-1, -1, -4]]), np.array([[ 0, -1, -4]]), np.array([[-2, -1, -6]]), np.array([[1, 1, 0]])], [np.array([[-1, -1, -4]]), np.array([[ 0, -1, -4]]), np.array([[-2, -1, -6]]), np.array([[1, 1, 0]])]]]}
+    ###########
 
-    
+    min_KC_constraints = [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])]
+
+    min_BEC_constraints = [np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
+
+
+    team_knowledge =   {'p1': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  4]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])]], 
+                        'p2': [[np.array([[ 0,  0, -1]])], [np.array([[ 1,  0, -2]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])]], 
+                        'p3': [[np.array([[ 0,  0, -1]])], [np.array([[ 1,  0, -2]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])]], 
+                        'common_knowledge': [[np.array([[ 0,  0, -1]])], [np.array([[-1,  0,  4]]), np.array([[ 1,  0, -2]])], [np.array([[ 0, -1, -4]]), np.array([[0, 1, 2]])]], 
+                        'joint_knowledge': [[[np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])], [np.array([[ 0,  0, -1]])]], [[np.array([[-1,  0,  4]])], [np.array([[ 1,  0, -2]])], [np.array([[ 1,  0, -2]])]], 
+                                            [[np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])], [np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])]]]}
+                            
     # KC_constraints =  [np.array([[ 0,  0, -1]]), np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])]
     # min_KC_constraints = BEC_helpers.remove_redundant_constraints(KC_constraints, params.weights['val'], params.step_cost_flag)
 
-    all_unit_constraints = [np.array([[-2, -1,  0]]), np.array([[1, 1, 0]]), np.array([[-1,  0,  2]])]
+    # all_unit_constraints = [np.array([[-2, -1,  0]]), np.array([[1, 1, 0]]), np.array([[-1,  0,  2]])]
                                                    
-
+    kc_id = 2
+    
     print('min_KC_constraints: ', min_KC_constraints)
     
-    unit_knowledge = team_helpers.calc_knowledge_level(team_knowledge, min_KC_constraints, kc_id_list = [3])
+    unit_knowledge = team_helpers.calc_knowledge_level(team_knowledge, min_KC_constraints, kc_id_list = [kc_id])
     BEC_knowledge = team_helpers.calc_knowledge_level(team_knowledge, min_BEC_constraints)
 
     print('unit_knowledge: ', unit_knowledge)
     print('BEC knowledge: ', BEC_knowledge)
 
-    unit_learning_goal_reached = team_helpers.check_unit_learning_goal_reached(team_knowledge, min_KC_constraints, 3)
+    unit_learning_goal_reached = team_helpers.check_unit_learning_goal_reached(team_knowledge, min_KC_constraints,  kc_id)
 
     print('unit_learning_goal_reached: ', unit_learning_goal_reached)
 

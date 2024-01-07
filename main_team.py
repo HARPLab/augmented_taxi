@@ -244,8 +244,10 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
 
             ## if there are no new demos; reuse the old ones
             if len(BEC_summary) == prev_summary_len:
-                print(colored('No new demos generated. Reusing last set of demos..', 'red'))
-                BEC_summary.append(BEC_summary[-1])
+                # check if it's for the same KC as previous interaction
+                if (variable_filter != running_variable_filter_unit).any():
+                    print(colored('No new demos generated. Reusing last set of demos..', 'red'))
+                    BEC_summary.append(BEC_summary[-1])
 
 
 
