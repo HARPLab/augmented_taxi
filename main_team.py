@@ -73,28 +73,28 @@ def initialize_loop_vars():
                         'unit_knowledge_level_expected': None,
                         'BEC_knowledge_level_expected': None,
                         'opposing_constraints_count': 0,
-                        'final_remedial_constraints': None,
-                        'N_remedial_tests': None,
+                        # 'final_remedial_constraints': None,
+                        # 'N_remedial_tests': None,
                         'team_knowledge': None,
                         'particles_team_teacher': None,
                         'particles_team_learner': None,
                         'unit_knowledge_level': None,
                         'BEC_knowledge_level': None,
                         'unit_knowledge_area': None,
-                        'all_unit_constraints_area': None,
+                        # 'all_unit_constraints_area': None,
                         'BEC_knowledge_area': None,
                         'pf_reset_count': np.zeros(params.team_size+2, dtype=int),
                         
                         'team_response_models': None,
-                        'particles_prob_teacher_after_demo': None,
-                        'particles_prob_learner_after_demo': None,
+                        # 'particles_prob_teacher_after_demo': None,
+                        # 'particles_prob_learner_after_demo': None,
                         'particles_prob_teacher_before_test': None,
                         'particles_prob_learner_before_test': None,
-                        'particles_prob_teacher_after_test': None,
-                        'particles_prob_learner_after_test': None,
-                        'cluster_prob_learner_demo': None,
-                        'particles_prob_teacher_test': None,
-                        'particles_prob_learner_test': None,
+                        # 'particles_prob_teacher_after_test': None,
+                        # 'particles_prob_learner_after_test': None,
+                        # 'cluster_prob_learner_demo': None,
+                        # 'particles_prob_teacher_test': None,
+                        # 'particles_prob_learner_test': None,
 
                         'sim_status': None
                         }
@@ -713,18 +713,18 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
             loop_vars['BEC_knowledge_level'] = team_helpers.calc_knowledge_level(team_knowledge, min_BEC_constraints, particles_team_teacher = particles_team_teacher, plot_flag = False, fig_title = 'Actual BEC knowledge level expected after var filter: ' + str(variable_filter), vars_filename=vars_filename)
             loop_vars['unit_knowledge_area'] = BEC_helpers.calc_solid_angles([min_KC_constraints])
             # loop_vars['all_unit_constraints_area'] = BEC_helpers.calc_solid_angles([all_unit_constraints])
-            loop_vars['all_unit_constraints_area'] = []
+            # loop_vars['all_unit_constraints_area'] = []
             loop_vars['BEC_knowledge_area'] = BEC_helpers.calc_solid_angles([min_BEC_constraints])
             loop_vars['initial_team_learning_factor'] = copy.deepcopy(initial_team_learning_factor)
             loop_vars['team_learning_factor'] = copy.deepcopy(team_learning_factor)
             loop_vars['team_composition'] = team_composition
-            loop_vars['sampling_condition'] = response_sampling_condition
+            # loop_vars['sampling_condition'] = response_sampling_condition
             loop_vars['particles_prob_learner_before_test'] = copy.deepcopy(prob_learner_before_testing)
             loop_vars['particles_prob_teacher_before_test'] = copy.deepcopy(prob_teacher_before_testing)
-            loop_vars['particles_prob_learner_after_test'] = copy.deepcopy(prob_learner_after_testing)
-            loop_vars['particles_prob_teacher_after_test'] = copy.deepcopy(prob_teacher_after_testing)
-            loop_vars['particles_prob_learner_demos'] = copy.deepcopy(particles_learner_prob_after_demo)
-            loop_vars['particles_prob_teacher_demos'] = copy.deepcopy(particles_teacher_prob_after_demo)
+            # loop_vars['particles_prob_learner_after_test'] = copy.deepcopy(prob_learner_after_testing)
+            # loop_vars['particles_prob_teacher_after_test'] = copy.deepcopy(prob_teacher_after_testing)
+            # loop_vars['particles_prob_learner_demos'] = copy.deepcopy(particles_learner_prob_after_demo)
+            # loop_vars['particles_prob_teacher_demos'] = copy.deepcopy(particles_teacher_prob_after_demo)
             loop_vars['sim_status'] = 'Running'
             loop_vars['team_response_models'] = human_model_weight_team
 

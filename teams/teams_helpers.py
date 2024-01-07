@@ -1884,8 +1884,8 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, member_id, vari
             if len(unit) > 0:
                 summary.append(unit)
 
-            if params.plot_sampled_models_flag:
-                plot_sampled_models(particles_demo, unit[3], sample_human_models, weights=weights, fig=None, text='Sampled human models based on ' + member_id)
+            if params.plot_sampled_counterfactual_models_flag:
+                plot_sampled_counterfactual_models(particles_demo, unit[3], sample_human_models, weights=weights, fig=None, text='Sampled human models based on ' + member_id)
 
             return summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo
         
