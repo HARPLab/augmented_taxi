@@ -42,6 +42,8 @@ import pandas as pd
 from main_team import run_reward_teaching
 from analyze_sim_data import run_analysis_script
 
+from pyDOE import lhs
+
 
 def get_sim_conditions(team_composition_list, dem_strategy_list, sampling_condition_list, N_runs, run_start_id):
     sim_conditions = []
@@ -76,6 +78,18 @@ def get_sim_conditions(team_composition_list, dem_strategy_list, sampling_condit
 
 
     return sim_conditions
+
+
+def get_parameter_combination(params_to_study, num_samples):
+    
+    N = len(params_to_study)
+    lhs_sample = lhs(N, samples=num_samples, criterion = 'maximin')
+
+    
+
+
+
+
 
 
 

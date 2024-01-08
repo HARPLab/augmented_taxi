@@ -1409,6 +1409,7 @@ class Particles_team():
             plt.show()
         if viz_flag and params.save_plots_flag:
             plt.savefig('plots/' + vars_filename + '_' + plot_title +'.png', dpi=300)
+            plt.close()
 
         self.binned = False
 

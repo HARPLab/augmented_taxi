@@ -655,6 +655,7 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team_te
     
     if params.save_plots_flag:
         plt.savefig('plots/' + vars_filename + '_' + fig_title + '.png')
+        plt.close()
 
         # # print(colored('Calculated knowledge level for: ', 'blue'), knowledge_type)
         # # print('min_unit_constraints: ', min_unit_constraints)
@@ -1201,7 +1202,8 @@ def visualize_transition(constraints, particles, mdp_class, weights=None, fig=No
     if params.show_plots_flag:
         plt.show()
     if params.save_plots_flag:
-        fig.savefig('plots/' + vars_filename + '_' + text +'.png', dpi=300)
+        plt.savefig('plots/' + vars_filename + '_' + text +'.png', dpi=300)
+        plt.close()
     # fig.savefig('plots/' + plot_filename +'.png', dpi=300)
     # plt.pause(10)
     # plt.close()
@@ -2399,7 +2401,7 @@ def majority_rules_non_intersecting_team_constraints(test_constraints_team, weig
 
 
 
-def plot_sampled_countefactual_models(particles, constraints, human_models, weights=None, fig=None, text=None):
+def plot_sampled_counterfactual_models(particles, constraints, human_models, weights=None, fig=None, text=None):
     
 
     def label_axes(ax):
