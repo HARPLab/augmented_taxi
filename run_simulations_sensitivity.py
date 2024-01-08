@@ -117,11 +117,11 @@ if __name__ == "__main__":
     # dem_strategy_list = ['joint_knowledge']
 
     
-    N_runs_for_each_study_condition = 2
-    run_start_id = 1
+    N_runs_for_each_study_condition = 1
+    run_start_id = 5
     sensitivity_run_start_id = 1
     learner_update_type = 'noise'
-    N_combinations = 3
+    N_combinations = 2
 
     file_prefix = 'trials_01_07_w_updated_noise'
     

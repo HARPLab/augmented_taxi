@@ -104,7 +104,7 @@ if __name__ == "__main__":
     learner_update_type = 'noise'
     params.max_learning_factor = 0.9
 
-    file_prefix = 'debug_trials_01_07_w_sample_all_tests'
+    file_prefix = 'debug_trials_01_07_w_sample_all_tests_recheck_visited_envs'
     
     path = 'data/simulation/sim_experiments'
 

@@ -225,7 +225,10 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
 
 
                         # particles probability
-                        team_particles_probability_dict = str_to_dict(sim_vars['particles_prob_learner_demo'][i], var_type=float)
+                        if 'particles_prob_learner_demo' in sim_vars.columns:
+                            team_particles_probability_dict = str_to_dict(sim_vars['particles_prob_learner_demo'][i], var_type=float)
+                        elif 'particles_prob_learner_demos' in sim_vars.columns:
+                            team_particles_probability_dict = str_to_dict(sim_vars['particles_prob_learner_demos'][i], var_type=float)
                         lf = sim_vars['team_learning_factor'][i]
                         lf = lf.strip('[]')
                         lf = lf.split(' ')
@@ -302,7 +305,7 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
             run_id += 1
 
 
-    # process team knowledge data
+    #### process team knowledge data
     BEC_knowledge_level = []
     BEC_knowledge_level_expected = []
     knowledge_type = []
@@ -315,7 +318,7 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
     team_knowledge_level_min = team_knowledge_level_min.drop(['p1', 'p2', 'p3', 'common_knowledge', 'joint_knowledge'], axis=1)
 
 
-    # Long format data
+    #### Long format data of team knowledge level
     team_knowledge_level_long = pd.DataFrame()
     for know_id in ['p1', 'p2', 'p3', 'common_knowledge', 'joint_knowledge']:
         team_knowledge_level_long = pd.concat([team_knowledge_level_long, team_knowledge_level_min])
@@ -345,39 +348,39 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
     # team_knowledge_level_long = pd.read_csv('models/augmented_taxi2/team_knowledge_level_long.csv')
 
     
-    # ############## concept-wise interaction count
-    # concept_ids = team_BEC_knowledge_level['knowledge_comp_id'].unique()
-    # unique_ids = team_knowledge_level_long['run_no'].unique()
-    # interaction_count = pd.DataFrame()
+    ############## concept-wise interaction count
+    concept_ids = team_BEC_knowledge_level['knowledge_comp_id'].unique()
+    unique_ids = team_knowledge_level_long['run_no'].unique()
+    interaction_count = pd.DataFrame()
 
-    # print(team_BEC_knowledge_level)
+    print(team_BEC_knowledge_level)
 
-    # for id in unique_ids:
-    #     interaction_count_dict = {}
-    #     for c_id in range(len(concept_ids)):
-    #         interaction_count_dict['run_no'] = id
-    #         interaction_count_dict['demo_strategy'] = team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['demo_strategy'].iloc[0]
-    #         interaction_count_dict['team_composition'] = team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['team_composition'].iloc[0]
+    for id in unique_ids:
+        interaction_count_dict = {}
+        for c_id in range(len(concept_ids)):
+            interaction_count_dict['run_no'] = id
+            interaction_count_dict['demo_strategy'] = team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['demo_strategy'].iloc[0]
+            interaction_count_dict['team_composition'] = team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['team_composition'].iloc[0]
             
-    #         print('A: ', team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['loop_count'])
-    #         print('run_no: ', id, ' c_id: ', c_id, ' concept_ids[c_id+1]: ', concept_ids[c_id])
+            print('A: ', team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['loop_count'])
+            print('run_no: ', id, ' c_id: ', c_id, ' concept_ids[c_id+1]: ', concept_ids[c_id])
             
-    #         if concept_ids[c_id] <= team_BEC_knowledge_level['knowledge_comp_id'].iloc[-1]:
-    #             max_loop_id = team_BEC_knowledge_level[(team_BEC_knowledge_level['run_no'] == id) & (team_BEC_knowledge_level['knowledge_comp_id'] == concept_ids[c_id])]['loop_count'].iloc[-1]
-    #             max_loop_count = max_loop_id - team_BEC_knowledge_level[(team_BEC_knowledge_level['run_no'] == id) & (team_BEC_knowledge_level['knowledge_comp_id'] == concept_ids[c_id])]['loop_count'].iloc[0] + 1
+            if concept_ids[c_id] <= team_BEC_knowledge_level['knowledge_comp_id'].iloc[-1]:
+                max_loop_id = team_BEC_knowledge_level[(team_BEC_knowledge_level['run_no'] == id) & (team_BEC_knowledge_level['knowledge_comp_id'] == concept_ids[c_id])]['loop_count'].iloc[-1]
+                max_loop_count = max_loop_id - team_BEC_knowledge_level[(team_BEC_knowledge_level['run_no'] == id) & (team_BEC_knowledge_level['knowledge_comp_id'] == concept_ids[c_id])]['loop_count'].iloc[0] + 1
             
-    #         # else:
-    #         #     max_loop_id = []
-    #         #     max_loop_count = 0
+            # else:
+            #     max_loop_id = []
+            #     max_loop_count = 0
 
-    #         interaction_count_dict['Int_end_id_concept_'+str(concept_ids[c_id])] = max_loop_id
-    #         interaction_count_dict['N_int_concept_'+str(concept_ids[c_id])] = max_loop_count    
+            interaction_count_dict['Int_end_id_concept_'+str(concept_ids[c_id])] = max_loop_id
+            interaction_count_dict['N_int_concept_'+str(concept_ids[c_id])] = max_loop_count    
 
-    #     interaction_count = interaction_count.append(interaction_count_dict, ignore_index=True)
+        interaction_count = interaction_count.append(interaction_count_dict, ignore_index=True)
 
-    # print('interaction_count: ', interaction_count)
-    # interaction_count.to_csv('models/augmented_taxi2/interaction_count.csv')
-    # ######################################################################
+    print('interaction_count: ', interaction_count)
+    interaction_count.to_csv(path + '/interaction_count.csv')
+    ######################################################################
     
 
     ## run-wise data
@@ -393,7 +396,7 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
         
         run_data = run_data.append(run_data_dict, ignore_index=True)
 
-    # run_data.to_csv(path + '/run_data.csv')
+    run_data.to_csv(path + '/run_data.csv')
 
     print(colored('Number of runs processed: ' + str(len(run_data)), 'red'))
 
@@ -879,7 +882,10 @@ def analyze_individual_runs(path, file):
     study_data = pd.read_pickle(path + '/' + file)
 
     ### plot particle probability for learner
-    particles_prob_learner_demo = study_data['particles_prob_learner_demo']
+    if 'particles_prob_learner_demo' in study_data.columns:
+        particles_prob_learner_demo = study_data['particles_prob_learner_demo']
+    elif 'particles_prob_learner_demos' in study_data.columns:
+        particles_prob_learner_demo = study_data['particles_prob_learner_demos']
     particles_prob_learner_demo_df = pd.DataFrame()
 
     for i, row in particles_prob_learner_demo.iteritems():
@@ -888,7 +894,10 @@ def analyze_individual_runs(path, file):
     
 
     ### particle probability of teacher
-    particles_prob_teacher_demo = study_data['particles_prob_teacher_demo']
+    if 'particles_prob_teacher_demo' in study_data.columns:
+        particles_prob_teacher_demo = study_data['particles_prob_teacher_demo']
+    elif 'particles_prob_teacher_demos' in study_data.columns:
+        particles_prob_teacher_demo = study_data['particles_prob_teacher_demos']
     particles_prob_teacher_demo_df = pd.DataFrame()
 
     for i, row in particles_prob_teacher_demo.iteritems():
@@ -1021,32 +1030,33 @@ def analyze_individual_runs(path, file):
 
 if __name__ == "__main__":
 
-    # # process team knowledge data
-    # path = 'data/simulation/sim_experiments/new_data'
-    # files = os.listdir(path)
+    # process team knowledge data
+    path = 'data/simulation/sim_experiments/new_data'
+    files = os.listdir(path)
 
-    # # all_file_prefix_list = ['trials_12_17']
-    # # all_runs_to_exclude_list = [[3, 12, 24, 7], [1,4,6,8], [], [1,3, 11, 12, 16, 18], [17, 21, 35], [], [], [], \
-    # #                             [], [], [], [], [], [], []]
-    # # all_runs_to_exclude_list = []
+    # all_file_prefix_list = ['trials_12_17']
+    # all_runs_to_exclude_list = [[3, 12, 24, 7], [1,4,6,8], [], [1,3, 11, 12, 16, 18], [17, 21, 35], [], [], [], \
+    #                             [], [], [], [], [], [], []]
+    # all_runs_to_exclude_list = []
 
-    # # sets_to_consider = [14]
-    # # file_prefix_list = [all_file_prefix_list[i] for i in sets_to_consider]
-    # # runs_to_exclude_list = [all_runs_to_exclude_list[i] for i in sets_to_consider]
+    # sets_to_consider = [14]
+    # file_prefix_list = [all_file_prefix_list[i] for i in sets_to_consider]
+    # runs_to_exclude_list = [all_runs_to_exclude_list[i] for i in sets_to_consider]
 
-    # file_prefix_list = ['trials_12_29_w_updated', 'trials_12_30_w_updated', 'trials_12_31_w_updated', 'trials_01_01_w_updated', 'trials_01_02_w_updated']
-    # runs_to_exclude_list = ['unfinished', 'trials_01_01_w_updated_noise_57'] 
-    # # trials_01_01_w_updated_noise_57.csv - outlier, N = 48 trials
+    file_prefix_list = ['trials_12_29_w_updated', 'trials_12_30_w_updated', 'trials_12_31_w_updated', 'trials_01_01_w_updated', 
+                        'trials_01_02_w_updated', 'trials_01_03_w_updated', 'trials_01_04_w_updated']
+    runs_to_exclude_list = ['unfinished', 'trials_01_01_w_updated_noise_57'] 
+    # trials_01_01_w_updated_noise_57.csv - outlier, N = 48 trials
 
 
-    # print(file_prefix_list)
-    # print(runs_to_exclude_list)
+    print(file_prefix_list)
+    print(runs_to_exclude_list)
     
-    # runs_to_analyze_list = []
+    runs_to_analyze_list = []
 
-    # run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list = runs_to_exclude_list, runs_to_analyze_list = runs_to_analyze_list)
+    run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list = runs_to_exclude_list, runs_to_analyze_list = runs_to_analyze_list)
 
-    # # analyze_run_data(path, path + '/run_data.csv')
+    # analyze_run_data(path, path + '/run_data.csv')
 
 
 
@@ -1180,12 +1190,12 @@ if __name__ == "__main__":
 
     #### Analyze individual runs
 
-    path = 'data/simulation/sim_experiments/new_data'
-    file = ''
+    # path = 'data/simulation/sim_experiments/new_data'
+    # file = ''
 
-    analyze_individual_runs(path, 'trials_12_29_w_updated_noise_8.pickle')
+    # analyze_individual_runs(path, 'trials_12_29_w_updated_noise_8.pickle')
 
-
+    ##############################
 
 
 

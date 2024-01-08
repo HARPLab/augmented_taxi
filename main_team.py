@@ -249,9 +249,18 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
             ## if there are no new demos; reuse the old ones
             if len(BEC_summary) == prev_summary_len:
                 # check if it's for the same KC as previous interaction
-                if (variable_filter == running_variable_filter_unit).any():
-                    print(colored('No new demos generated. Reusing last set of demos..', 'red'))
-                    BEC_summary.append(BEC_summary[-1])
+                print(colored('running_variable_filter_unit: ' + str(running_variable_filter_unit) + '. variable_filter: ' + str(variable_filter), 'green'))
+                if (variable_filter == running_variable_filter_unit).all():
+                    
+                    # # Approach 1:
+                    # print(colored('No new demos generated. Reusing last set of demos..', 'red'))
+                    # BEC_summary.append(BEC_summary[-1])
+
+                    # Approach 2:
+                    print(colored('No new demos generated. Checking previously visited environments', 'red'))
+                    BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = team_helpers.obtain_team_summary(params.data_loc['BEC'], min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, params.weights['val'], params.step_cost_flag, 
+                                                                                                                pool, params.BEC['n_human_models'], consistent_state_count, params.BEC['n_train_demos'], particles_demo, knowledge_id, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, [], obj_func_proportion = obj_func_prop, vars_filename=vars_filename)        
+
 
 
 
@@ -268,7 +277,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
             print(colored('Unit constraints for this set of demonstrations: ' + str(unit_constraints), 'red'))
 
             # check if variable filter matches the running variable filter
-            if (variable_filter == running_variable_filter_unit).any():
+            if (variable_filter != running_variable_filter_unit).any():
                 # print('Knowledge component / Variable filter:', variable_filter)
                 RuntimeError('Running variable filter does not match:', running_variable_filter_unit)
 
