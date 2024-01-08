@@ -1391,6 +1391,19 @@ class Particles_team():
             
             # fig.canvas.mpl_connect('motion_notify_event', on_move)
 
+            # Add what constraints are being shown in the demo to the plot
+        if viz_flag:
+            if len(constraints) > 0:
+                x_loc = 0.5
+                y_loc = 0.1
+                fig.text(0.2, y_loc, 'Constraints in this demo: ', fontsize=20)
+                for cnst in constraints:
+                    fig.text(x_loc, y_loc, str(cnst), fontsize=20)
+                    y_loc -= 0.05
+                if learning_factor is not None:
+                    fig.text(0.2, y_loc, 'Learning factor: ' + str(learning_factor), fontsize=20)
+                else:
+                    fig.text(0.2, y_loc, 'Learning factor: ' + str(self.u_prob_mass_scaled), fontsize=20)
 
         if viz_flag and params.show_plots_flag:
             plt.show()
@@ -1472,7 +1485,8 @@ class Particles_team():
 
     def update_jk(self, joint_knowledge, c=0.5, reset_threshold_prob=0.001):
         
-        joint_constraints = joint_knowledge[0]
+        # joint_constraints = joint_knowledge[0]
+        joint_constraints = joint_knowledge
 
         print('Update JK with constraints: {}'.format(joint_constraints))
         

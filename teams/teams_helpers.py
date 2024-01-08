@@ -890,7 +890,12 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_learnin
         particles_team['joint_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), params.default_learning_factor_teacher)
         if team_prior is not None:
             team_prior['joint_knowledge'] = [calc_joint_knowledge(team_prior, team_size)]
-            particles_team['joint_knowledge'].update_jk(team_prior['joint_knowledge'])
+
+            print('team_prior[joint_knowledge]: ', team_prior['joint_knowledge'])
+            joint_constraints = []
+            for p in range(params.team_size):
+                joint_constraints.append(team_prior['joint_knowledge'][0][p])
+            particles_team['joint_knowledge'].update_jk(joint_constraints)
             particles_team['joint_knowledge'].knowledge_update(team_prior['joint_knowledge'])
     
 
@@ -1103,8 +1108,17 @@ def visualize_transition(constraints, particles, mdp_class, weights=None, fig=No
     if len(constraints) > 0:
         for ax_n in [ax1, ax2, ax3]:
             if knowledge_type == 'joint_knowledge':
-                for constraint in constraints:
+                joint_constraints = constraints
+                for constraint in joint_constraints:
                     BEC_viz.visualize_planes(constraint, fig=fig, ax=ax_n)
+                if constraint[0][0][0] == 0:
+                    view_params = [16, -160]
+                elif constraint[0][0][1] == 0:
+                    view_params = [2, -100]
+                elif constraint[0][0][2] == 0:
+                    view_params = [2, -60]
+                else:
+                    view_params = [16, -160]
             else:
                 if len(constraints) > 1:
                     BEC_viz.visualize_planes(constraints, fig=fig, ax=ax_n)
@@ -1157,7 +1171,7 @@ def visualize_transition(constraints, particles, mdp_class, weights=None, fig=No
     label_axes(ax2, mdp_class, weights, view_params = view_params)
     label_axes(ax3, mdp_class, weights, view_params = view_params)
 
-    # New: Add what constraints are being shown in the demo to the plot
+    # Add what constraints are being shown in the demo to the plot
     if len(constraints) > 0:
         x_loc = 0.5
         y_loc = 0.1

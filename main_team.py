@@ -245,7 +245,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
             ## if there are no new demos; reuse the old ones
             if len(BEC_summary) == prev_summary_len:
                 # check if it's for the same KC as previous interaction
-                if (variable_filter != running_variable_filter_unit).any():
+                if (variable_filter == running_variable_filter_unit).any():
                     print(colored('No new demos generated. Reusing last set of demos..', 'red'))
                     BEC_summary.append(BEC_summary[-1])
 
@@ -655,7 +655,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                     particles_team_teacher['joint_knowledge'].update_jk(test_constraints_team)
 
                     plot_title = 'Interaction No.' + str(loop_count +1) + '. Teacher belief for joint knowledge after tests of KC ' + str(kc_id)                    
-                    team_helpers.visualize_transition(test_constraints_team, particles_team_teacher['joint_knowledge'], params.mdp_class, params.weights['val'], text = plot_title, vars_filename = vars_filename)
+                    team_helpers.visualize_transition(test_constraints_team, particles_team_teacher['joint_knowledge'], params.mdp_class, params.weights['val'], knowledge_type = 'joint_knowledge', text = plot_title, vars_filename = vars_filename)
 
             
             else:
