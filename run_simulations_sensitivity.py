@@ -9,7 +9,7 @@ from multiprocessing import Process, Queue, Pool
 import sage.all
 import sage.geometry.polyhedron.base as Polyhedron
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import os
@@ -85,9 +85,16 @@ def get_parameter_combination(params_to_study, num_samples):
     N = len(params_to_study)
     lhs_sample = lhs(N, samples=num_samples, criterion = 'maximin')
 
-    
+    sample_combinations = []
+    for i in range(len(lhs_sample)):
+        sample_combinations.append([])
+        for j, param in enumerate(params_to_study):
+            sample_combinations[i].append(params_to_study[param][0] + lhs_sample[i][j]*(params_to_study[param][1] - params_to_study[param][0]))
 
+    with open('data/simulation/sim_experiments/sensitivity_analysis/param_combinations.pickle', 'wb') as f:
+        pickle.dump(sample_combinations, f)
 
+    return sample_combinations
 
 
 
@@ -103,80 +110,104 @@ if __name__ == "__main__":
     sampling_condition_list = ['particles']  # Conditions: ['particles', 'cluster_random', 'cluster_weight']sampling of human responses from learner PF models
     sim_params = {'min_correct_likelihood': 0}
 
+    team_composition_list = [[0,0,0]]
+    # team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
 
-    team_params_learning = {'low': [0.65, 0.05], 'med': [0.65, 0.05], 'high': [0.8, 0.05]}
-
-    # team_params_learning = {'low': 0.5, 'med': 0.65, 'high': 0.8}
-    team_composition_list = [[0,0,0], [0,0,2]]
+    dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
     # dem_strategy_list = ['joint_knowledge']
 
-    # team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
-    dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
     
-
-    
-    
-    N_runs = 9
+    N_runs_for_each_study_condition = 2
     run_start_id = 1
+    sensitivity_run_start_id = 1
     learner_update_type = 'noise'
+    N_combinations = 3
 
-    file_prefix = 'trials_01_04_w_updated_noise'
+    file_prefix = 'trials_01_07_w_updated_noise'
     
     path = 'data/simulation/sim_experiments/sensitivity_analysis/'
 
+    # params_to_study = {'learning_factor_low': [0.6, 0.7], 'learning_factor_high': [0.75, 0.85], 'learning_rate': [0.0, 0.1], 'max_learning_factor': [0.85, 1.0]}
+    params_to_study = {'learning_factor_low': [0.6, 0.7], 'learning_factor_high': [0.75, 0.85], 'learning_rate': [0.0, 0.1], 'max_learning_factor': [0.85, 1.0]}
+    ##########################
 
-    sim_conditions = get_sim_conditions(team_composition_list, dem_strategy_list, sampling_condition_list, N_runs, run_start_id)
+    ### generate or load parametr combinations
+    try:
+        with open('data/simulation/sim_experiments/sensitivity_analysis/param_combinations.pickle', 'rb') as f:
+            parameter_combinations = pickle.load(f)
+    
+        if len(parameter_combinations) != (sensitivity_run_start_id + N_combinations-1):
+            parameter_combinations = get_parameter_combination(params_to_study, N_combinations)
+            print('Parameter combinations generated: ', parameter_combinations)
+        else:
+            print('Parameter combinations loaded: ', parameter_combinations)
+    except:
+        parameter_combinations = get_parameter_combination(params_to_study, N_combinations)
+        print('Parameter combinations generated: ', parameter_combinations)
+        RuntimeError('Parameter combinations unavailable')
+
+    ######################
+    
+
+    for sensitivity_run_id in range(sensitivity_run_start_id, sensitivity_run_start_id + N_combinations):
+        team_params_learning = {'low': [parameter_combinations[sensitivity_run_id-1][0], parameter_combinations[sensitivity_run_id-1][2]], 
+                                'high': [parameter_combinations[sensitivity_run_id-1][1], parameter_combinations[sensitivity_run_id-1][2]]}
+        params.max_learning_factor = parameter_combinations[sensitivity_run_id-1][3]
+
+        print('Sensitivity run: ', sensitivity_run_id, '. Team params: ', team_params_learning, '. Max learning factor: ', params.max_learning_factor)
+
+        sim_conditions = get_sim_conditions(team_composition_list, dem_strategy_list, sampling_condition_list, N_runs_for_each_study_condition, run_start_id)
+
+        # for each study parameter combination, N_runs of simulations
+
+        for run_id in range(run_start_id, run_start_id+N_runs_for_each_study_condition):
+            print('sim_conditions run_id:', sim_conditions[run_id - run_start_id], '. sim_conditions: ', sim_conditions )
+            if run_id == sim_conditions[run_id - run_start_id][0]:
+                team_composition_for_run = sim_conditions[run_id - run_start_id][1]
+                dem_strategy_for_run = sim_conditions[run_id - run_start_id][2]
+                sampling_cond_for_run = sim_conditions[run_id - run_start_id][3]
+            else:
+                RuntimeError('Error in sim conditions')
+                break
+
+            ilcr = np.zeros(params.team_size)
+            rlcr = np.zeros([params.team_size, 2])
+
+            for j in range(params.team_size):
+                if team_composition_for_run[j] == 0: 
+                    ilcr[j] = team_params_learning['low'][0]
+                    rlcr[j,0] = team_params_learning['low'][1]
+                    rlcr[j,1] = 0     
+                elif team_composition_for_run[j] == 1:
+                    ilcr[j] = team_params_learning['med'][0]
+                    rlcr[j,0] = team_params_learning['med'][1]
+                    rlcr[j,1] = 0
+                elif team_composition_for_run[j] == 2:
+                    ilcr[j] = team_params_learning['high'][0]
+                    rlcr[j,0] = team_params_learning['high'][1]
+                    rlcr[j,1] = 0
+            
+            print(colored('Simulation run: ' + str(run_id) + '. Demo strategy: ' + str(dem_strategy_for_run) + '. Team composition:' + str(team_composition_for_run), 'red'))
+            # run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', team_learning_factor = team_learning_factor, viz_flag=[False, False, False], run_no = run_id, vars_filename=file_prefix)
+            run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', initial_team_learning_factor = ilcr, team_learning_rate = rlcr, \
+                                viz_flag=[False, False, True], run_no = run_id, vars_filename=file_prefix, response_sampling_condition=sampling_cond_for_run, team_composition=team_composition_for_run, learner_update_type = learner_update_type, study_id = sensitivity_run_id)
 
 
+            # file_name = [file_prefix + '_' + str(run_id) + '.csv']
+            # print('Running analysis script... Reading data from: ', file_name)
+            # run_analysis_script(path, file_name, file_prefix)
 
-
-    # for run_id in range(run_start_id, run_start_id+N_runs):
-    #     print('sim_conditions run_id:', sim_conditions[run_id - run_start_id], '. sim_conditions: ', sim_conditions )
-    #     if run_id == sim_conditions[run_id - run_start_id][0]:
-    #         team_composition_for_run = sim_conditions[run_id - run_start_id][1]
-    #         dem_strategy_for_run = sim_conditions[run_id - run_start_id][2]
-    #         sampling_cond_for_run = sim_conditions[run_id - run_start_id][3]
-    #     else:
-    #         RuntimeError('Error in sim conditions')
-    #         break
-
-    #     ilcr = np.zeros(params.team_size)
-    #     rlcr = np.zeros([params.team_size, 2])
-
-    #     for j in range(params.team_size):
-    #         if team_composition_for_run[j] == 0: 
-    #             ilcr[j] = team_params_learning['low'][0]
-    #             rlcr[j,0] = team_params_learning['low'][1]
-    #             rlcr[j,1] = 0     
-    #         elif team_composition_for_run[j] == 1:
-    #             ilcr[j] = team_params_learning['med'][0]
-    #             rlcr[j,0] = team_params_learning['med'][1]
-    #             rlcr[j,1] = 0
-    #         elif team_composition_for_run[j] == 2:
-    #             ilcr[j] = team_params_learning['high'][0]
-    #             rlcr[j,0] = team_params_learning['high'][1]
-    #             rlcr[j,1] = 0
         
-    #     print(colored('Simulation run: ' + str(run_id) + '. Demo strategy: ' + str(dem_strategy_for_run) + '. Team composition:' + str(team_composition_for_run), 'red'))
-    #     # run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', team_learning_factor = team_learning_factor, viz_flag=[False, False, False], run_no = run_id, vars_filename=file_prefix)
-    #     run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', initial_team_learning_factor = ilcr, team_learning_rate = rlcr, \
-    #                         viz_flag=[False, False, False], run_no = run_id, vars_filename=file_prefix, response_sampling_condition=sampling_cond_for_run, team_composition=team_composition_for_run, learner_update_type = learner_update_type)
-
-
-    #     # file_name = [file_prefix + '_' + str(run_id) + '.csv']
-    #     # print('Running analysis script... Reading data from: ', file_name)
-    #     # run_analysis_script(path, file_name, file_prefix)
-
-    
-    # # # save all the variables
-    # # vars_to_save.to_csv('models/augmented_taxi2/vars_to_save.csv', index=False)
-    # # with open('models/augmented_taxi2/vars_to_save.pickle', 'wb') as f:
-    # #     pickle.dump(vars_to_save, f)
-    
-    # print('All simulation runs completed..')
-    
-    # # pool.close()
-    # # pool.join()
+        # # save all the variables
+        # vars_to_save.to_csv('models/augmented_taxi2/vars_to_save.csv', index=False)
+        # with open('models/augmented_taxi2/vars_to_save.pickle', 'wb') as f:
+        #     pickle.dump(vars_to_save, f)
+        
+        print('All simulation runs completed for this study setting..')
+    print('All simulation runs completed..')
+        
+    # pool.close()
+    # pool.join()
 
 
     

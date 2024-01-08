@@ -8,7 +8,7 @@ from multiprocessing import Process, Queue, Pool
 import sage.all
 import sage.geometry.polyhedron.base as Polyhedron
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import os
@@ -48,10 +48,12 @@ from analyze_sim_data import run_analysis_script
 
 def initialize_loop_vars():
 
-    demo_vars_template = {'run_no': 1,
+    demo_vars_template = {'study_id': None,
+                        'run_no': None,
                         'demo_strategy': None,
                         'sampling_condition': None,
                         'team_composition': None,
+                        'max_learning_factor': None,
                         'initial_team_learning_factor': np.zeros(params.team_size, dtype=int),
 
                         'knowledge_id': None,
@@ -141,7 +143,7 @@ def get_optimal_policies(pool):
 
 def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowledge', experiment_type = 'simulated',  initial_team_learning_factor = 0.65*np.ones([params.team_size, 1]), 
                         team_learning_rate = np.hstack((0.05*np.ones([params.team_size, 1]), 0*np.ones([params.team_size, 1]))), obj_func_prop = 1.0, run_no = 1, viz_flag=[False, False, False], \
-                        vars_filename = 'var_to_save', response_sampling_condition = 'particles', team_composition = None, learner_update_type = 'no_noise'):
+                        vars_filename = 'var_to_save', response_sampling_condition = 'particles', team_composition = None, learner_update_type = 'no_noise', study_id = 1):
 
     ####### Initialize variables ########################
 
@@ -153,6 +155,8 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
     BEC_summary, visited_env_traj_idxs, min_BEC_constraints_running, prior_min_BEC_constraints_running = [], [], copy.deepcopy(params.prior), copy.deepcopy(params.prior)
     summary_count, prev_summary_len = 0, 0
     all_unit_constraints = []
+
+    full_vars_filename = 'models/' + params.data_loc['BEC'] + '/' + vars_filename + '_study_' + str(study_id) + '_run_' + str(run_no)
     
     
     ## Initialize teaching variables
@@ -165,7 +169,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
     # initialize/load variables to save
     loop_vars = initialize_loop_vars()
     try:
-        with open('models/augmented_taxi2/' + vars_filename + '_' + str(run_no) + '.pickle', 'rb') as f:
+        with open(full_vars_filename + '.pickle', 'rb') as f:
             vars_to_save = pickle.load(f)
     except:
         vars_to_save = pd.DataFrame(columns=loop_vars.keys())
@@ -264,7 +268,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
             print(colored('Unit constraints for this set of demonstrations: ' + str(unit_constraints), 'red'))
 
             # check if variable filter matches the running variable filter
-            if (variable_filter != running_variable_filter_unit).any():
+            if (variable_filter == running_variable_filter_unit).any():
                 # print('Knowledge component / Variable filter:', variable_filter)
                 RuntimeError('Running variable filter does not match:', running_variable_filter_unit)
 
@@ -690,8 +694,10 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
 
             # update variables
             loop_vars = initialize_loop_vars()
+            loop_vars['study_id'] = study_id
             loop_vars['run_no'] = run_no
             loop_vars['demo_strategy'] = demo_strategy
+            loop_vars['max_learning_factor'] = params.max_learning_factor
             loop_vars['knowledge_id'] = knowledge_id
             loop_vars['variable_filter'] = variable_filter
             loop_vars['knowledge_comp_id'] = kc_id
@@ -811,8 +817,8 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
 
         ########
         # save vars so far (end of session)
-        vars_to_save.to_csv('models/' + params.data_loc['BEC'] + '/' + vars_filename + '_' + str(run_no) + '.csv', index=False)
-        with open('models/augmented_taxi2/' + vars_filename + '_' + str(run_no) + '.pickle', 'wb') as f:
+        vars_to_save.to_csv(full_vars_filename + '.csv', index=False)
+        with open(full_vars_filename + '.pickle', 'wb') as f:
             pickle.dump(vars_to_save, f)
 
 

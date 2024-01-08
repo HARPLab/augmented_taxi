@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 import numpy as np
 import matplotlib.pyplot as plt
 import sage.all

@@ -9,7 +9,7 @@ from termcolor import colored
 import sage.all
 import sage.geometry.polyhedron.base as Polyhedron
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import os

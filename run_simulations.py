@@ -9,7 +9,7 @@ from multiprocessing import Process, Queue, Pool
 import sage.all
 import sage.geometry.polyhedron.base as Polyhedron
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import os
@@ -102,6 +102,7 @@ if __name__ == "__main__":
     N_runs = 1
     run_start_id = 1
     learner_update_type = 'noise'
+    params.max_learning_factor = 0.9
 
     file_prefix = 'debug_trials_01_07_w_sample_all_tests'
     

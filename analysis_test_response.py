@@ -6,7 +6,7 @@ import copy
 from termcolor import colored
 from pathos.multiprocessing import ProcessPool as Pool
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import sage.all
 import sage.geometry.polyhedron.base as Polyhedron

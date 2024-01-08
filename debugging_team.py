@@ -49,7 +49,7 @@ from simulation.sim_helpers import get_human_response_all_tests, get_human_respo
 
 from termcolor import colored
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib as mpl

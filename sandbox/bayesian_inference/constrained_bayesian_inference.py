@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 
 fs = 16
 
