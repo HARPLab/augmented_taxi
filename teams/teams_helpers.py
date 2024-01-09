@@ -832,7 +832,7 @@ def obtain_team_summary(data_loc, min_subset_constraints_record, min_BEC_constra
 
 
 
-def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_learning_factor=None, team_prior=None, pf_flag = 'teacher', vars_filename='sim_run'):
+def sample_team_pf(team_size, n_particles, weights, step_cost_flag, default_learning_factor_teacher, team_learning_factor=None, team_prior=None, pf_flag = 'teacher', vars_filename='sim_run'):
 
     particles_team = {}
     
@@ -840,17 +840,21 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_learnin
     for i in range(team_size):
         member_id = 'p' + str(i+1)
 
-        if team_learning_factor is not None:
+        
+        
+        if pf_flag == 'learner':
             learning_factor = team_learning_factor[i]
         else:
-            learning_factor = params.default_learning_factor_teacher
+            learning_factor = default_learning_factor_teacher
 
+        particles_team[member_id] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), learning_factor)
 
-        if pf_flag == 'learner':
-            particles_team[member_id] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), learning_factor)
-        elif pf_flag == 'teacher':
-            particles_team[member_id] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), params.default_learning_factor_teacher)
-        
+        #########
+        # if pf_flag == 'learner':
+        #     particles_team[member_id] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), learning_factor)
+        # elif pf_flag == 'teacher':
+        #     particles_team[member_id] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), params.default_learning_factor_teacher)
+        ##########
         
         #### debug - save particles!
         # pf_particles = pd.DataFrame({'Pos': str(particles_team[member_id].positions)})
@@ -878,7 +882,7 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_learnin
 
     if pf_flag == 'teacher':
         # particles for aggregated team knowledge - common knowledge
-        particles_team['common_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), params.default_learning_factor_teacher)
+        particles_team['common_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), default_learning_factor_teacher)
         if team_prior is not None:
             team_prior['common_knowledge'] = [calc_common_knowledge(team_prior, team_size, weights, step_cost_flag)]
             plot_title = 'Teacher belief for common knowledge for prior'
@@ -888,7 +892,7 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, team_learnin
 
         # particles for aggregated team knowledge - joint knowledge (both methods should produce similar particles; check and if they are similar method 1 is more streamlined)
         # method 1
-        particles_team['joint_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), params.default_learning_factor_teacher)
+        particles_team['joint_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), default_learning_factor_teacher)
         if team_prior is not None:
             team_prior['joint_knowledge'] = [calc_joint_knowledge(team_prior, team_size)]
 

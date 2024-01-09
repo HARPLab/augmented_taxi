@@ -9,6 +9,7 @@ import sage.all
 import sage.geometry.polyhedron.base as Polyhedron
 import matplotlib
 matplotlib.use('Agg')
+# matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import os
@@ -80,6 +81,8 @@ def initialize_loop_vars():
                         'team_knowledge': None,
                         'particles_team_teacher': None,
                         'particles_team_learner': None,
+                        'particles_team_teacher_after_demos': None,
+                        'particles_team_learner_after_demos': None,
                         'unit_knowledge_level': None,
                         'BEC_knowledge_level': None,
                         'unit_knowledge_area': None,
@@ -88,8 +91,8 @@ def initialize_loop_vars():
                         'pf_reset_count': np.zeros(params.team_size+2, dtype=int),
                         
                         'team_response_models': None,
-                        # 'particles_prob_teacher_after_demo': None,
-                        # 'particles_prob_learner_after_demo': None,
+                        'particles_prob_teacher_before_demo': None,
+                        'particles_prob_learner_before_demo': None,
                         'particles_prob_teacher_before_test': None,
                         'particles_prob_learner_before_test': None,
                         # 'particles_prob_teacher_after_test': None,
@@ -161,9 +164,9 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
     
     ## Initialize teaching variables
     # particle filter models for individual and team knowledge of teachers and individual knowledge of learners; initialize expected and actual team knowledge
-    team_prior, particles_team_teacher = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_prior = params.team_prior, vars_filename=vars_filename)
+    team_prior, particles_team_teacher = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, params.default_learning_factor_teacher, team_prior = params.team_prior, vars_filename=vars_filename)
     team_knowledge = copy.deepcopy(team_prior) # team_prior calculated from team_helpers.sample_team_pf also has the aggregated knowledge from individual priors
-    particles_team_learner = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_learning_factor = team_learning_factor, team_prior = params.team_prior, pf_flag='learner', vars_filename=vars_filename)
+    particles_team_learner = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, params.default_learning_factor_teacher, team_learning_factor = team_learning_factor, team_prior = params.team_prior, pf_flag='learner', vars_filename=vars_filename)
     team_knowledge_expected = copy.deepcopy(team_knowledge)
     
     # initialize/load variables to save
@@ -176,6 +179,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
 
     ## Initialize teaching loop variables
     loop_count, next_unit_loop_id, resp_no = 0, 0, 0
+    last_obj_func_reset_id = 0
     unit_learning_goal_reached, next_kc_flag = False, False   # learning flags
     kc_id = 1 # knowledge component id / variable filter id
     
@@ -285,11 +289,25 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
             # obtain the constraints conveyed by the unit's demonstrations
             min_KC_constraints = BEC_helpers.remove_redundant_constraints(unit_constraints, params.weights['val'], params.step_cost_flag)
 
+
+            # calculate probability of correct response before demo
+            for i in range(params.team_size):
+                member_id = 'p' + str(i+1)
+                particles_team_teacher[member_id].calc_particles_probability(min_KC_constraints)
+                particles_team_learner[member_id].calc_particles_probability(min_KC_constraints)
+                particles_prob_teacher_before_demo[member_id] = particles_team_teacher[member_id].particles_prob_correct
+                particles_prob_learner_before_demo[member_id] = particles_team_learner[member_id].particles_prob_correct
+
             # calculate expected learning
             team_knowledge_expected, particles_team_teacher, pf_update_args = team_helpers.calc_expected_learning(team_knowledge_expected, kc_id, particles_team_teacher, min_BEC_constraints, min_KC_constraints, params, loop_count, kc_reset_flag=True, viz_flag=knowledge_viz_flag, vars_filename=vars_filename)
             
             # Simulate learning by team members
             particles_team_learner = team_helpers.simulate_team_learning(kc_id, particles_team_learner, min_KC_constraints, params, loop_count, viz_flag=knowledge_viz_flag, learner_update_type = learner_update_type, vars_filename=vars_filename)
+
+
+            # copy particles for debugging after demos
+            particles_team_teacher_after_demos = copy.deepcopy(particles_team_teacher)
+            particles_team_learner_after_demos = copy.deepcopy(particles_team_learner)
 
             ############ debug - update probabilities after seeing demos (this is the distribution from which a response will be sampled for the learner)
             particles_teacher_prob_after_demo = {}
@@ -728,8 +746,10 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
             # loop_vars['final_remedial_constraints'] = copy.deepcopy(remedial_constraints_team_expanded)
             loop_vars['N_remedial_tests'] = N_remedial_tests
             loop_vars['team_knowledge'] = copy.deepcopy(team_knowledge)
-            loop_vars['particles_team_teacher'] = copy.deepcopy(particles_team_teacher)
-            loop_vars['particles_team_learner'] = copy.deepcopy(particles_team_learner)
+            loop_vars['particles_team_teacher_after_demos'] = copy.deepcopy(particles_team_teacher_after_demos)
+            loop_vars['particles_team_learner_after_demos'] = copy.deepcopy(particles_team_learner_after_demos)
+            loop_vars['particles_team_teacher_final'] = copy.deepcopy(particles_team_teacher)
+            loop_vars['particles_team_learner_final'] = copy.deepcopy(particles_team_learner)
             loop_vars['unit_knowledge_level'] = team_helpers.calc_knowledge_level(team_knowledge, min_KC_constraints, particles_team_teacher = particles_team_teacher, kc_id_list = [kc_id], plot_flag = False, fig_title = 'Actual Unit knowledge level for var filter: ' + str(variable_filter), vars_filename=vars_filename)
             loop_vars['BEC_knowledge_level'] = team_helpers.calc_knowledge_level(team_knowledge, min_BEC_constraints, particles_team_teacher = particles_team_teacher, plot_flag = False, fig_title = 'Actual BEC knowledge level expected after var filter: ' + str(variable_filter), vars_filename=vars_filename)
             loop_vars['unit_knowledge_area'] = BEC_helpers.calc_solid_angles([min_KC_constraints])
@@ -744,8 +764,8 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
             loop_vars['particles_prob_teacher_before_test'] = copy.deepcopy(prob_teacher_before_testing)
             # loop_vars['particles_prob_learner_after_test'] = copy.deepcopy(prob_learner_after_testing)
             # loop_vars['particles_prob_teacher_after_test'] = copy.deepcopy(prob_teacher_after_testing)
-            # loop_vars['particles_prob_learner_demos'] = copy.deepcopy(particles_learner_prob_after_demo)
-            # loop_vars['particles_prob_teacher_demos'] = copy.deepcopy(particles_teacher_prob_after_demo)
+            loop_vars['particles_prob_learner_before_demos'] = particles_prob_learner_before_demo
+            loop_vars['particles_prob_teacher_before_demos'] = particles_prob_teacher_before_demo
             loop_vars['sim_status'] = 'Running'
             loop_vars['team_response_models'] = human_model_weight_team
 
@@ -788,8 +808,10 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                 team_knowledge_expected = copy.deepcopy(team_knowledge)
 
                 # update obj_func_prop (is ths needed?)
-                if loop_count - next_unit_loop_id > params.loop_threshold_demo_simplification:
-                    obj_func_prop = 0.5     # reduce informativeness from demos if they have not learned
+                N_loops_since_last_useful_demo = min(loop_count - last_obj_func_reset_id, loop_count - next_unit_loop_id)
+                if N_loops_since_last_useful_demo > params.loop_threshold_demo_simplification:
+                    obj_func_prop = obj_func_prop*0.75     # reduce informativeness from demos if they have not learned
+                    last_obj_func_reset_id = loop_count
                     # print(colored('updated obj_func_prop: ' + str(obj_func_prop), 'red') )
                     RuntimeError('obj_func_prop needs to be reduced since the team is not learning!')
 

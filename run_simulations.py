@@ -89,7 +89,7 @@ if __name__ == "__main__":
     team_params_learning = {'low': [0.65, 0.05], 'med': [0.65, 0.05], 'high': [0.8, 0.05]}
 
     # team_params_learning = {'low': 0.5, 'med': 0.65, 'high': 0.8}
-    team_composition_list = [[0,0,0], [0,0,2]]
+    team_composition_list = [[0,0,0]]
     # dem_strategy_list = ['joint_knowledge']
 
     # team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
@@ -99,12 +99,13 @@ if __name__ == "__main__":
     sim_params = {'min_correct_likelihood': 0}
     
     
-    N_runs = 1
+    N_runs = 8
     run_start_id = 1
     learner_update_type = 'noise'
     params.max_learning_factor = 0.9
+    params.default_learning_factor_teacher = 0.8
 
-    file_prefix = 'debug_trials_01_07_w_sample_all_tests_recheck_visited_envs'
+    file_prefix = 'trials_01_09_regular'
     
     path = 'data/simulation/sim_experiments'
 
@@ -141,7 +142,7 @@ if __name__ == "__main__":
         print(colored('Simulation run: ' + str(run_id) + '. Demo strategy: ' + str(dem_strategy_for_run) + '. Team composition:' + str(team_composition_for_run), 'red'))
         # run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', team_learning_factor = team_learning_factor, viz_flag=[False, False, False], run_no = run_id, vars_filename=file_prefix)
         run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', initial_team_learning_factor = ilcr, team_learning_rate = rlcr, \
-                            viz_flag=[False, False, True], run_no = run_id, vars_filename=file_prefix, response_sampling_condition=sampling_cond_for_run, team_composition=team_composition_for_run, learner_update_type = learner_update_type)
+                            viz_flag=[False, False, False], run_no = run_id, vars_filename=file_prefix, response_sampling_condition=sampling_cond_for_run, team_composition=team_composition_for_run, learner_update_type = learner_update_type)
 
 
         # file_name = [file_prefix + '_' + str(run_id) + '.csv']

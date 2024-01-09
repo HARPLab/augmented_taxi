@@ -105,31 +105,46 @@ if __name__ == "__main__":
     os.makedirs('models/' + params.data_loc['base'], exist_ok=True)
     os.makedirs('models/' + params.data_loc['BEC'], exist_ok=True)
 
-    
-    # fixed parameters
-    sampling_condition_list = ['particles']  # Conditions: ['particles', 'cluster_random', 'cluster_weight']sampling of human responses from learner PF models
-    sim_params = {'min_correct_likelihood': 0}
 
-    team_composition_list = [[0,0,0]]
-    # team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
 
-    dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
-    # dem_strategy_list = ['joint_knowledge']
-
-    
-    N_runs_for_each_study_condition = 1
-    run_start_id = 5
+    ## varying parameters
+    N_runs_for_each_study_condition = 5
+    run_start_id = 1
     sensitivity_run_start_id = 1
-    learner_update_type = 'noise'
-    N_combinations = 2
+    N_combinations = 20
 
-    file_prefix = 'trials_01_07_w_updated_noise'
+    file_prefix = 'trials_01_08_sensitivity_teacher_lf'
     
     path = 'data/simulation/sim_experiments/sensitivity_analysis/'
 
+    ## Learner model sensitivity analysis
     # params_to_study = {'learning_factor_low': [0.6, 0.7], 'learning_factor_high': [0.75, 0.85], 'learning_rate': [0.0, 0.1], 'max_learning_factor': [0.85, 1.0]}
-    params_to_study = {'learning_factor_low': [0.6, 0.7], 'learning_factor_high': [0.75, 0.85], 'learning_rate': [0.0, 0.1], 'max_learning_factor': [0.85, 1.0]}
+    # params_to_study = {'learning_factor_low': [0.6, 0.7], 'learning_factor_high': [0.75, 0.85], 'learning_rate': [0.0, 0.1], 'max_learning_factor': [0.85, 1.0]}
+    
+    
+    # Sensitivity for teacher learning factor
+    params_to_study = {'default_learning_factor_teacher': [0.6, 0.9]}
+
+    
+    team_composition_list = [[0,0,0]]
+    # team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
+
+    # dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
+    dem_strategy_list = ['joint_knowledge']
+
+
+
     ##########################
+
+    # fixed parameters
+    learner_update_type = 'noise'
+    sampling_condition_list = ['particles']  # Conditions: ['particles', 'cluster_random', 'cluster_weight']sampling of human responses from learner PF models
+    sim_params = {'min_correct_likelihood': 0}
+    team_params_learning = {'low': [0.65, 0.05], 'med': [0.65, 0.05], 'high': [0.8, 0.05]}
+    params.max_learning_factor = 0.9
+    # params.default_learning_factor_teacher = 0.8
+
+    #################################
 
     ### generate or load parametr combinations
     try:
@@ -150,11 +165,18 @@ if __name__ == "__main__":
     
 
     for sensitivity_run_id in range(sensitivity_run_start_id, sensitivity_run_start_id + N_combinations):
-        team_params_learning = {'low': [parameter_combinations[sensitivity_run_id-1][0], parameter_combinations[sensitivity_run_id-1][2]], 
-                                'high': [parameter_combinations[sensitivity_run_id-1][1], parameter_combinations[sensitivity_run_id-1][2]]}
-        params.max_learning_factor = parameter_combinations[sensitivity_run_id-1][3]
+        
+        ## Learner model sensitivity analysis
+        # team_params_learning = {'low': [parameter_combinations[sensitivity_run_id-1][0], parameter_combinations[sensitivity_run_id-1][2]], 
+        #                         'high': [parameter_combinations[sensitivity_run_id-1][1], parameter_combinations[sensitivity_run_id-1][2]]}
+        # params.max_learning_factor = parameter_combinations[sensitivity_run_id-1][3]
+        # print('Sensitivity run: ', sensitivity_run_id, '. Team params: ', team_params_learning, '. Max learning factor: ', params.max_learning_factor)
 
-        print('Sensitivity run: ', sensitivity_run_id, '. Team params: ', team_params_learning, '. Max learning factor: ', params.max_learning_factor)
+        ## Teacher model sensitivity analysis
+        params.default_learning_factor_teacher = parameter_combinations[sensitivity_run_id-1][0]
+        print('Sensitivity run: ', sensitivity_run_id, '. Learning_factor_teacher:', params.default_learning_factor_teacher)
+
+        
 
         sim_conditions = get_sim_conditions(team_composition_list, dem_strategy_list, sampling_condition_list, N_runs_for_each_study_condition, run_start_id)
 

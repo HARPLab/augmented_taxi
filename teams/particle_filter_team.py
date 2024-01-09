@@ -274,7 +274,7 @@ class Particles_team():
         phi_lim = [0, np.pi]
         theta_lim = [np.pi/2, 3*np.pi/2]
 
-        # fix unscaled vmf_mass instead of making it variable
+        # fix unscaled vmf_mass instead of making it variable for when u_cdf_scaled <= 0.5
         vmf_mass = 0.25
         
         if u_cdf_scaled > 0.5:
@@ -1374,6 +1374,11 @@ class Particles_team():
                     resample_flag.append(False)
                     prob_resample.append(self.particles_prob_correct) # will give the same value as prob_reweight
 
+            # update prev positions
+            self.positions_prev = copy.deepcopy(self.positions)
+            self.weights_prev = copy.deepcopy(self.weights)
+            
+            
             # # https://stackoverflow.com/questions/41167196/using-matplotlib-3d-axes-how-to-drag-two-axes-at-once
             # # link the pan of the three axes together
             # def on_move(event):
@@ -1392,6 +1397,8 @@ class Particles_team():
             # fig.canvas.mpl_connect('motion_notify_event', on_move)
 
             # Add what constraints are being shown in the demo to the plot
+        
+
         if viz_flag:
             if len(constraints) > 0:
                 x_loc = 0.5
