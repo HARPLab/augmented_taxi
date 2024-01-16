@@ -10,6 +10,7 @@ import sage.all
 import sage.geometry.polyhedron.base as Polyhedron
 import matplotlib
 matplotlib.use('Agg')
+# matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import os
@@ -90,22 +91,22 @@ if __name__ == "__main__":
 
     # team_params_learning = {'low': 0.5, 'med': 0.65, 'high': 0.8}
     team_composition_list = [[0,0,0]]
-    # dem_strategy_list = ['joint_knowledge']
+    dem_strategy_list = ['individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
 
     # team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
-    dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
+    # dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
     
     sampling_condition_list = ['particles']  # Conditions: ['particles', 'cluster_random', 'cluster_weight']sampling of human responses from learner PF models
     sim_params = {'min_correct_likelihood': 0}
     
     
-    N_runs = 8
-    run_start_id = 1
-    learner_update_type = 'noise'
+    N_runs = 3
+    run_start_id = 4
+    learner_update_type = 'no_noise'
     params.max_learning_factor = 0.9
     params.default_learning_factor_teacher = 0.8
 
-    file_prefix = 'trials_01_09_regular'
+    file_prefix = 'debug_trials_01_15_no_noise'
     
     path = 'data/simulation/sim_experiments'
 
@@ -142,7 +143,7 @@ if __name__ == "__main__":
         print(colored('Simulation run: ' + str(run_id) + '. Demo strategy: ' + str(dem_strategy_for_run) + '. Team composition:' + str(team_composition_for_run), 'red'))
         # run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', team_learning_factor = team_learning_factor, viz_flag=[False, False, False], run_no = run_id, vars_filename=file_prefix)
         run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', initial_team_learning_factor = ilcr, team_learning_rate = rlcr, \
-                            viz_flag=[False, False, False], run_no = run_id, vars_filename=file_prefix, response_sampling_condition=sampling_cond_for_run, team_composition=team_composition_for_run, learner_update_type = learner_update_type)
+                            viz_flag=[False, False, True], run_no = run_id, vars_filename_prefix=file_prefix, response_sampling_condition=sampling_cond_for_run, team_composition=team_composition_for_run, learner_update_type = learner_update_type)
 
 
         # file_name = [file_prefix + '_' + str(run_id) + '.csv']

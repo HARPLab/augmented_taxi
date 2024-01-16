@@ -8,7 +8,7 @@ from multiprocessing import Process, Queue, Pool
 import sage.all
 import sage.geometry.polyhedron.base as Polyhedron
 import matplotlib
-matplotlib.use('Agg')
+# matplotlib.use('Agg')
 # matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -79,8 +79,8 @@ def initialize_loop_vars():
                         # 'final_remedial_constraints': None,
                         # 'N_remedial_tests': None,
                         'team_knowledge': None,
-                        'particles_team_teacher': None,
-                        'particles_team_learner': None,
+                        'particles_team_teacher_final': None,
+                        'particles_team_learner_final': None,
                         'particles_team_teacher_after_demos': None,
                         'particles_team_learner_after_demos': None,
                         'unit_knowledge_level': None,
@@ -93,13 +93,13 @@ def initialize_loop_vars():
                         'team_response_models': None,
                         'particles_prob_teacher_before_demo': None,
                         'particles_prob_learner_before_demo': None,
+                        'particles_prob_teacher_after_demo': None,
+                        'particles_prob_learner_after_demo': None,
                         'particles_prob_teacher_before_test': None,
                         'particles_prob_learner_before_test': None,
-                        # 'particles_prob_teacher_after_test': None,
-                        # 'particles_prob_learner_after_test': None,
-                        # 'cluster_prob_learner_demo': None,
-                        # 'particles_prob_teacher_test': None,
-                        # 'particles_prob_learner_test': None,
+                        'particles_prob_teacher_after_test': None,
+                        'particles_prob_learner_after_test': None,
+
 
                         'sim_status': None
                         }
@@ -143,10 +143,21 @@ def get_optimal_policies(pool):
 
 
 
+def debug_calc_prob_mass_correct_side(constraints, particles):
+
+    prob_mass_correct_side_constraints = {}
+    for i in range(params.team_size):
+        member_id = 'p' + str(i+1)
+        particles[member_id].calc_particles_probability(constraints)
+        prob_mass_correct_side_constraints[member_id] = particles[member_id].particles_prob_correct
+
+    return prob_mass_correct_side_constraints
+
+
 
 def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowledge', experiment_type = 'simulated',  initial_team_learning_factor = 0.65*np.ones([params.team_size, 1]), 
                         team_learning_rate = np.hstack((0.05*np.ones([params.team_size, 1]), 0*np.ones([params.team_size, 1]))), obj_func_prop = 1.0, run_no = 1, viz_flag=[False, False, False], \
-                        vars_filename = 'var_to_save', response_sampling_condition = 'particles', team_composition = None, learner_update_type = 'no_noise', study_id = 1):
+                        vars_filename_prefix = 'var_to_save', response_sampling_condition = 'particles', team_composition = None, learner_update_type = 'no_noise', study_id = 1):
 
     ####### Initialize variables ########################
 
@@ -159,20 +170,21 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
     summary_count, prev_summary_len = 0, 0
     all_unit_constraints = []
 
-    full_vars_filename = 'models/' + params.data_loc['BEC'] + '/' + vars_filename + '_study_' + str(study_id) + '_run_' + str(run_no)
+    vars_filename = vars_filename_prefix + '_study_' + str(study_id) + '_run_' + str(run_no)
+    full_path_filename = 'models/' + params.data_loc['BEC'] + '/' + vars_filename
     
     
     ## Initialize teaching variables
     # particle filter models for individual and team knowledge of teachers and individual knowledge of learners; initialize expected and actual team knowledge
-    team_prior, particles_team_teacher = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, params.default_learning_factor_teacher, team_prior = params.team_prior, vars_filename=vars_filename)
+    team_prior, particles_team_teacher = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, params.default_learning_factor_teacher, team_prior = params.team_prior, vars_filename=vars_filename, model_type = params.teacher_update_model_type)
     team_knowledge = copy.deepcopy(team_prior) # team_prior calculated from team_helpers.sample_team_pf also has the aggregated knowledge from individual priors
-    particles_team_learner = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, params.default_learning_factor_teacher, team_learning_factor = team_learning_factor, team_prior = params.team_prior, pf_flag='learner', vars_filename=vars_filename)
+    particles_team_learner = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, params.default_learning_factor_teacher, team_learning_factor = team_learning_factor, team_prior = params.team_prior, pf_flag='learner', vars_filename=vars_filename, model_type=learner_update_type)
     team_knowledge_expected = copy.deepcopy(team_knowledge)
     
     # initialize/load variables to save
     loop_vars = initialize_loop_vars()
     try:
-        with open(full_vars_filename + '.pickle', 'rb') as f:
+        with open(full_path_filename + '.pickle', 'rb') as f:
             vars_to_save = pickle.load(f)
     except:
         vars_to_save = pd.DataFrame(columns=loop_vars.keys())
@@ -187,7 +199,10 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
     ##### initialize debugging variables
     sampled_points_history, team_learning_factor_history, response_history, member, constraint_history, test_history, constraint_flag_history = [], [], [], [], [], [], []
     update_id_history, update_sequence_history, skip_model_history, cluster_id_history, point_probability, prob_initial_history, prob_reweight_history = [], [], [], [], [], [], []
-    prob_resample_history, resample_flag_history, particles_learner_prob_demo_history, particles_learner_prob_test_history, resample_noise_history = [], [], [], [], [] 
+    prob_resample_history, resample_flag_history, resample_noise_history = [], [], []
+    prob_teacher_before_demo_history, prob_learner_before_demo_history, prob_teacher_after_demo_history,  prob_learner_after_demo_history = [], [], [], []
+    prob_teacher_before_test_history, prob_learner_before_test_history, prob_teacher_after_test_history, prob_learner_after_test_history = [], [], [], []
+    prob_teacher_after_feedback_history, prob_learner_after_feedback_history = [], []
 
     ########################
 
@@ -286,38 +301,41 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                 RuntimeError('Running variable filter does not match:', running_variable_filter_unit)
 
             
-            # obtain the constraints conveyed by the unit's demonstrations
+            # obtain the minimum constraints conveyed by the unit's demonstrations
             min_KC_constraints = BEC_helpers.remove_redundant_constraints(unit_constraints, params.weights['val'], params.step_cost_flag)
 
+            # DEBUG: calculate probability mass pf correct side before demo
+            prob_teacher_pf_before_demo_dict = debug_calc_prob_mass_correct_side(min_KC_constraints, particles_team_teacher)
+            prob_learner_pf_before_demo_dict = debug_calc_prob_mass_correct_side(min_KC_constraints, particles_team_learner)
+            teacher_pf_before_demo = copy.deepcopy(particles_team_teacher)
+            learner_pf_before_demo = copy.deepcopy(particles_team_learner)
 
-            # calculate probability of correct response before demo
-            for i in range(params.team_size):
-                member_id = 'p' + str(i+1)
-                particles_team_teacher[member_id].calc_particles_probability(min_KC_constraints)
-                particles_team_learner[member_id].calc_particles_probability(min_KC_constraints)
-                particles_prob_teacher_before_demo[member_id] = particles_team_teacher[member_id].particles_prob_correct
-                particles_prob_learner_before_demo[member_id] = particles_team_learner[member_id].particles_prob_correct
+            prob_teacher_before_demo_history.append(prob_teacher_pf_before_demo_dict)
+            prob_learner_before_demo_history.append(prob_learner_pf_before_demo_dict)
+
+            #############################################
 
             # calculate expected learning
-            team_knowledge_expected, particles_team_teacher, pf_update_args = team_helpers.calc_expected_learning(team_knowledge_expected, kc_id, particles_team_teacher, min_BEC_constraints, min_KC_constraints, params, loop_count, kc_reset_flag=True, viz_flag=knowledge_viz_flag, vars_filename=vars_filename)
+            team_knowledge_expected, particles_team_teacher, pf_update_args = team_helpers.calc_expected_learning(team_knowledge_expected, kc_id, particles_team_teacher, min_BEC_constraints, unit_constraints, params, loop_count, kc_reset_flag=True, viz_flag=knowledge_viz_flag, vars_filename=vars_filename)
             
-            # Simulate learning by team members
-            particles_team_learner = team_helpers.simulate_team_learning(kc_id, particles_team_learner, min_KC_constraints, params, loop_count, viz_flag=knowledge_viz_flag, learner_update_type = learner_update_type, vars_filename=vars_filename)
+            # simulate learning by team members (use unit constraints to simulate learning, instead of the minimum KC constraints)
+            # particles_team_learner = team_helpers.simulate_team_learning(kc_id, particles_team_learner, min_KC_constraints, params, loop_count, viz_flag=knowledge_viz_flag, learner_update_type = learner_update_type, vars_filename=vars_filename)
+            particles_team_learner = team_helpers.simulate_team_learning(kc_id, particles_team_learner, unit_constraints, params, loop_count, viz_flag=knowledge_viz_flag, learner_update_type = learner_update_type, vars_filename=vars_filename)
+            ############################################
 
+            # DEBUG: calculate probability mass pf correct side after demo
+            prob_teacher_pf_after_demo_dict = debug_calc_prob_mass_correct_side(min_KC_constraints, particles_team_teacher)
+            prob_learner_pf_after_demo_dict = debug_calc_prob_mass_correct_side(min_KC_constraints, particles_team_learner)
+            teacher_pf_after_demo = copy.deepcopy(particles_team_teacher)
+            learner_pf_after_demo = copy.deepcopy(particles_team_learner)
+
+            prob_teacher_after_demo_history.append(prob_teacher_pf_after_demo_dict)
+            prob_learner_after_demo_history.append(prob_learner_pf_after_demo_dict)
+            ############################################################
 
             # copy particles for debugging after demos
             particles_team_teacher_after_demos = copy.deepcopy(particles_team_teacher)
             particles_team_learner_after_demos = copy.deepcopy(particles_team_learner)
-
-            ############ debug - update probabilities after seeing demos (this is the distribution from which a response will be sampled for the learner)
-            particles_teacher_prob_after_demo = {}
-            particles_learner_prob_after_demo = {}
-            for i in range(params.team_size):
-                member_id = 'p' + str(i+1)
-                particles_teacher_prob_after_demo[member_id] = particles_team_teacher[member_id].particles_prob_correct
-                particles_learner_prob_after_demo[member_id] = particles_team_learner[member_id].particles_prob_correct
-                # print(colored('particles_teacher_prob_demo for player ' + member_id + ': ' + str(particles_teacher_prob_demo[member_id]) + '. particles_learner_prob_demo for player ' + member_id + ': ' + str(particles_learner_prob_demo[member_id]), 'green'))
-            ############################################################
 
             ### Generate tests for the unit and sample responses
 
@@ -326,9 +344,9 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
             preliminary_tests, visited_env_traj_idxs = team_helpers.obtain_diagnostic_tests(params.data_loc['BEC'], BEC_summary[-1], visited_env_traj_idxs, min_KC_constraints, min_subset_constraints_record, traj_record, traj_features_record, running_variable_filter_unit, mdp_features_record)
 
             ### query the human's response to the diagnostic tests
-            test_no = 1
+            
             all_tests_constraints, test_constraints_team = [], []
-            prob_teacher_before_testing, prob_learner_before_testing, prob_teacher_after_testing, prob_learner_after_testing = [], [], [], []
+            # prob_teacher_before_testing, prob_learner_before_testing, prob_teacher_after_testing, prob_learner_after_testing = [], [], [], []
             kc_reset_flag = True  # flag to reset the KC constraints in the team knowledge
             human_opt_trajs_all_tests_team = {}
             response_type_all_tests_team = {}
@@ -342,30 +360,41 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                     member_id = 'p' + str(i+1)
 
                     prob_initial, prob_reweight, prob_resample, resample_flag, noise_measures = pf_update_args[i]
-
-                    args = loop_count, member_id, [], sampled_points_history, response_history, member, constraint_history, constraint_flag_history, update_id_history, skip_model_history, cluster_id_history, point_probability, \
-                            team_learning_factor_history, particles_learner_prob_after_demo[member_id], [], particles_learner_prob_demo_history, particles_learner_prob_test_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, \
+       
+                    args = loop_count, member_id, [], sampled_points_history, response_history, member, constraint_history, constraint_flag_history, update_id_history, skip_model_history, \
+                            cluster_id_history, point_probability, team_learning_factor_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, \
                             prob_reweight_history, prob_resample_history, resample_flag_history, [], update_sequence_history, noise_measures, resample_noise_history
+                     
 
-                    human_model_weight_all_tests, human_opt_trajs_all_tests, response_type_all_tests, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, update_id_history, skip_model_history, cluster_id_history, point_probability, team_learning_factor_history, particles_learner_prob_demo_history, \
-                           particles_learner_prob_test_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, prob_reweight_history, prob_resample_history, resample_flag_history, update_sequence_history, resample_noise_history = sim_helpers.get_human_response_all_tests(particles_team_learner[member_id], preliminary_tests, team_learning_factor[i], args)
+                    human_model_weight_all_tests, human_opt_trajs_all_tests, response_type_all_tests, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, update_id_history, skip_model_history, cluster_id_history, point_probability, team_learning_factor_history, \
+                           prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, prob_reweight_history, prob_resample_history, resample_flag_history, update_sequence_history, resample_noise_history = sim_helpers.get_human_response_all_tests(particles_team_learner[member_id], preliminary_tests, team_learning_factor[i], args)
                     
                     human_opt_trajs_all_tests_team[member_id] = human_opt_trajs_all_tests
                     response_type_all_tests_team[member_id] = response_type_all_tests
                     human_model_weight_team[member_id] = human_model_weight_all_tests
-            #####################
 
+                    #####################
+
+
+
+
+
+            #####################
+            prob_teacher_pf_before_test_list, prob_learner_pf_before_test_list, prob_teacher_pf_after_test_list, prob_learner_pf_after_test_list = [], [], [], []
+            N_tests = len(preliminary_tests)
+            all_test_constraints = []
+            test_no = 1
             ##### simulate response for each test
             for test in preliminary_tests:
         
-                response_category_team = []
+                response_category_team = {}
                 failed_BEC_constraints_tuple = []
                 test_mdp = test[0]
                 opt_traj = test[1]
                 test_mdp.set_init_state(opt_traj[0][0])
                 env_idx, traj_idx = test[2]
                 test_constraints = copy.deepcopy(test[3])
-                all_tests_constraints.append(test_constraints)
+                all_test_constraints.append(test_constraints)
                 # test_history = [test] # to ensure that remedial demonstrations and tests are visually simple/similar and complex/different, respectively
 
                 print('Interaction No: ', loop_count+1, ' Test no ', test_no, ' out of ', len(preliminary_tests), 'for KC ', kc_id, '. Test constraints: ', test_constraints)
@@ -384,25 +413,26 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                 if experiment_type == 'simulated':
                 
                     for i in range(params.team_size):
-                        print('Simulating response for player ', i+1, 'for constraint', test_constraints[0])
+                        print('Simulating response for player ', i+1, 'for constraint', test_constraints)
 
                         member_id = 'p' + str(i+1)
                         
                         ## for debugging
                         prob_initial, prob_reweight, prob_resample, resample_flag, noise_measures = pf_update_args[i]
 
-                        args = loop_count, member_id, test_constraints, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, update_id_history, skip_model_history, cluster_id_history, point_probability, \
-                            team_learning_factor_history, particles_learner_prob_after_demo[member_id], [], particles_learner_prob_demo_history, particles_learner_prob_test_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, \
+                        args = loop_count, member_id, test_constraints, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, update_id_history, skip_model_history, \
+                            cluster_id_history, point_probability, team_learning_factor_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, \
                             prob_reweight_history, prob_resample_history, resample_flag_history, [], update_sequence_history, noise_measures, resample_noise_history
+                        #########
 
-                        # Method 2: Sample human models for individual tests
+                        
                         if params.response_generation_type == 'Individual_tests':
 
                             # human_traj, response_type = sim_helpers.get_human_response(response_sampling_condition, env_idx, particles_team_learner[member_id], opt_traj, test_constraints, team_learning_factor[i])
 
                             ## for debugging
-                            human_model_weight, human_traj, response_type, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, update_id_history, skip_model_history, cluster_id_history, point_probability, team_learning_factor_history, particles_learner_prob_demo_history, \
-                            particles_learner_prob_test_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, prob_reweight_history, prob_resample_history, resample_flag_history, update_sequence_history, resample_noise_history = sim_helpers.get_human_response_each_test(response_sampling_condition, env_idx, particles_team_learner[member_id], opt_traj, test_constraints, team_learning_factor[i], args)
+                            human_model_weight, human_traj, response_type, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, update_id_history, skip_model_history, cluster_id_history, point_probability, team_learning_factor_history, \
+                            prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, prob_reweight_history, prob_resample_history, resample_flag_history, update_sequence_history, resample_noise_history = sim_helpers.get_human_response_each_test(response_sampling_condition, env_idx, particles_team_learner[member_id], opt_traj, test_constraints, team_learning_factor[i], args)
 
                             if test_no == 1:
                                 human_opt_trajs_all_tests_team[member_id] = []
@@ -430,177 +460,355 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                 ################################################
 
                 ### plot sampled human models
-                if knowledge_viz_flag:
-                    all_tests_constraints_expanded = [item for tc in all_tests_constraints for item in tc]
+                all_test_constraints_expanded = [item for tc in all_test_constraints for item in tc]
+                if knowledge_viz_flag:  
                     # print('all_tests_constraints: ', all_tests_constraints, 'all_tests_constraints_expanded: ', all_tests_constraints_expanded, 'human_model_weight_team: ', human_model_weight_team)
                     plot_title = 'Interaction No.' + str(loop_count +1) + '. Human models for test ' + str(test_no) + ' of KC ' + str(kc_id)
-                    sim_helpers.plot_sampled_models(particles_team_learner, all_tests_constraints_expanded, human_model_weight_team, test_no, plot_title = plot_title, vars_filename = vars_filename)
+                    sim_helpers.plot_sampled_models(particles_team_learner, all_test_constraints_expanded, human_model_weight_team, test_no, plot_title = plot_title, vars_filename = vars_filename)
                     # print('human_opt_trajs_all_tests: ', human_opt_trajs_all_tests)
 
-                ################################
+                # ################################
 
-                ## show demos and simulate responses for human team members
-                particles_prob_teacher_before_test, particles_prob_learner_before_test, particles_prob_teacher_after_test, particles_prob_learner_after_test = {}, {}, {}, {}
+                # ## show demos and simulate responses for human team members
+                # # particles_prob_teacher_before_test, particles_prob_learner_before_test, particles_prob_teacher_after_test, particles_prob_learner_after_test = {}, {}, {}, {}
+                # prob_teacher_pf_before_test_dict, prob_learner_pf_before_test_dict, prob_teacher_pf_after_test_dict, prob_learner_pf_after_test_dict = {}, {}, {}, {}
+
                 
-                p = 1
-                # Show the same test for each person and get test responses of each person in the team
-                while p <= params.team_size:
-                    member_id = 'p' + str(p)
-                    # print("Here is a diagnostic test for this unit for player ", p)
 
-                    # update probability of particles before test
-                    particles_team_teacher[member_id].calc_particles_probability(test_constraints)
-                    particles_team_learner[member_id].calc_particles_probability(test_constraints)
-                    particles_prob_teacher_before_test[member_id] = particles_team_teacher[member_id].particles_prob_correct
-                    particles_prob_learner_before_test[member_id] = particles_team_learner[member_id].particles_prob_correct
+                ###########  Update PF based on test responses
+            #     # Method 1: Update knowlegde for each test
+            #     # Show the same test for each person and get test responses of each person in the team
+                # p = 1
+            #     while p <= params.team_size:
+            #         member_id = 'p' + str(p)
+            #         # print("Here is a diagnostic test for this unit for player ", p)
 
-                    # get response trajectory
-                    if experiment_type != 'simulated':
-                        # print('Test for response type: ', experiment_type)
-                        human_traj, _ = test_mdp.visualize_interaction(keys_map=params.keys_map) # the latter is simply the gridworld locations of the agent
-                    else:
-                        # print('human_opt_trajs_all_tests_team: ', human_opt_trajs_all_tests_team)
-                        human_traj = human_opt_trajs_all_tests_team[member_id][test_no-1]
-                        if test_viz_flag:
-                            test_mdp.visualize_trajectory(human_traj)
+            #         # DEBUG: update probability of particles before test
+            #         particles_team_teacher[member_id].calc_particles_probability(test_constraints)
+            #         particles_team_learner[member_id].calc_particles_probability(test_constraints)
+            #         prob_teacher_pf_before_test_dict[member_id] = particles_team_teacher[member_id].particles_prob_correct
+            #         prob_learner_pf_before_test_dict[member_id] = particles_team_learner[member_id].particles_prob_correct
+
+            #         # get response trajectory
+            #         if experiment_type != 'simulated':
+            #             # print('Test for response type: ', experiment_type)
+            #             human_traj, _ = test_mdp.visualize_interaction(keys_map=params.keys_map) # the latter is simply the gridworld locations of the agent
+            #         else:
+            #             # print('human_opt_trajs_all_tests_team: ', human_opt_trajs_all_tests_team)
+            #             human_traj = human_opt_trajs_all_tests_team[member_id][test_no-1]
+            #             if test_viz_flag:
+            #                 test_mdp.visualize_trajectory(human_traj)
                     
-                    print('human_traj len: ', len(human_traj))
-                    human_feature_count = test_mdp.accumulate_reward_features(human_traj, discount=True)
-                    opt_feature_count = test_mdp.accumulate_reward_features(opt_traj, discount=True)
+            #         print('human_traj len: ', len(human_traj))
+            #         human_feature_count = test_mdp.accumulate_reward_features(human_traj, discount=True)
+            #         opt_feature_count = test_mdp.accumulate_reward_features(opt_traj, discount=True)
 
-                    # for correct response
-                    if (human_feature_count == opt_feature_count).all():
-                        if test_no == 1:
-                            test_constraints_team.append(copy.deepcopy(test_constraints))
-                        else:
-                            test_constraints_team[p-1].extend(copy.deepcopy(test_constraints))
-                        print('Test constraints: ', test_constraints, '. Test constraints team: ', test_constraints_team, 'for test no: ', test_no)
+                    
+            #         # for correct response
+            #         if (human_feature_count == opt_feature_count).all():
+            #             if test_no == 1:
+            #                 test_constraints_team.append(copy.deepcopy(test_constraints))
+            #             else:
+            #                 test_constraints_team[p-1].extend(copy.deepcopy(test_constraints))
+            #             print('Test constraints: ', test_constraints, '. Test constraints team: ', test_constraints_team, 'for test no: ', test_no)
                         
-                        # update team knowledge
-                        # print(colored('Current team knowledge for member id ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
-                        # print('test_constraints: ', test_constraints, 'kc_reset_flag: ', kc_reset_flag)
-                        team_knowledge = team_helpers.update_team_knowledge(team_knowledge, kc_id, kc_reset_flag, test_constraints, params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
-                        # print(colored('Updated team knowledge for member id  ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
+            #             # update team knowledge
+            #             # print(colored('Current team knowledge for member id ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
+            #             # print('test_constraints: ', test_constraints, 'kc_reset_flag: ', kc_reset_flag)
+            #             team_knowledge = team_helpers.update_team_knowledge(team_knowledge, kc_id, kc_reset_flag, test_constraints, params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
+            #             # print(colored('Updated team knowledge for member id  ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
 
-                        # update teacher model
-                        plot_title = 'Interaction No.' + str(loop_count +1) + '. Teacher belief for player ' + member_id + ' after test ' + str(test_no) + ' of Unit ' + str(kc_id)
-                        particles_team_teacher[member_id].update(test_constraints, plot_title = plot_title, viz_flag = knowledge_viz_flag, vars_filename = vars_filename) # update individual knowledge based on test response
+            #             # update teacher model
+            #             plot_title = 'Interaction No.' + str(loop_count +1) + '. Teacher belief for player ' + member_id + ' after test ' + str(test_no) + ' of Unit ' + str(kc_id)
+            #             print('Teacher update. Updating particles for ', member_id, ' for test ', test_no, ' for kc_id ', kc_id, ' in ', params.teacher_update_model_type, ' condition...')
+            #             particles_team_teacher[member_id].update(test_constraints, plot_title = plot_title, viz_flag = knowledge_viz_flag, vars_filename = vars_filename, model_type = params.teacher_update_model_type) # update individual knowledge based on test response
 
-                        # update learner model
-                        plot_title = 'Interaction No.' + str(loop_count +1) + '. Learner belief for player ' + member_id + ' after test ' + str(test_no) + ' of Unit ' + str(kc_id)
-                        particles_team_learner[member_id].update(test_constraints, learning_factor=team_learning_factor[p-1], plot_title = plot_title, model_type = learner_update_type, viz_flag = knowledge_viz_flag, vars_filename = vars_filename) # update individual knowledge based on test response
+            #             # update learner model
+            #             plot_title = 'Interaction No.' + str(loop_count +1) + '. Learner belief for player ' + member_id + ' after test ' + str(test_no) + ' of Unit ' + str(kc_id)
+            #             print('Learner update. Updating particles for ', member_id, ' for test ', test_no, ' for kc_id ', kc_id, ' in ', learner_update_type, ' condition...')
+            #             particles_team_learner[member_id].update(test_constraints, learning_factor=team_learning_factor[p-1], plot_title = plot_title, model_type = learner_update_type, viz_flag = knowledge_viz_flag, vars_filename = vars_filename, reset_threshold_prob = params.pf_reset_threshold) # update individual knowledge based on test response
                         
-                        # update learner factor - after demonstrating learning or its lack (only if updating after each individual test and sampling a new human model after each individual test)
-                        if params.response_generation_type == 'Individual_tests':
-                            team_learning_factor[p-1] = min(team_learning_factor[p-1] + team_learning_rate[p-1, 0], max_learning_factor) # update learning parameter
+            #             # update learner factor - after demonstrating learning or its lack (only if updating after each individual test and sampling a new human model after each individual test)
+            #             if params.response_generation_type == 'Individual_tests':
+            #                 team_learning_factor[p-1] = min(team_learning_factor[p-1] + team_learning_rate[p-1, 0], max_learning_factor) # update learning parameter
                         
-                        # if knowledge_viz_flag:
-                        #     plot_title = 'Interaction No.' + str(loop_count+1) +'Simulated knowledge change for player ' + member_id + ' after test ' + str(test_no) + ' of KC' + str(kc_id)
-                        #     team_helpers.visualize_transition(test_constraints, particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = plot_title, vars_filename = vars_filename)
+            #             # if knowledge_viz_flag:
+            #             #     plot_title = 'Interaction No.' + str(loop_count+1) +'Simulated knowledge change for player ' + member_id + ' after test ' + str(test_no) + ' of KC' + str(kc_id)
+            #             #     team_helpers.visualize_transition(test_constraints, particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = plot_title, vars_filename = vars_filename)
                             
-                        # reset knowledge to mirror particle reset
-                        prev_pf_reset_count = particles_team_teacher[member_id].pf_reset_count
-                        if particles_team_teacher[member_id].pf_reset_count > prev_pf_reset_count:
-                            reset_index = [i for i in range(len(team_knowledge[member_id][kc_id])) if (team_knowledge[member_id][kc_id][i] == particles_team_teacher[member_id].reset_constraint).all()]
-                            # print('Resetting constraints.. Previous constraints in KC: ', team_knowledge[member_id][kc_id], 'Reset index: ', reset_index)
-                            team_knowledge[member_id][kc_id] = team_knowledge[member_id][kc_id][reset_index[0]:]
-                            # print('New constraints: ', team_knowledge[member_id][kc_id])
+            #             # reset knowledge to mirror particle reset
+            #             prev_pf_reset_count = particles_team_teacher[member_id].pf_reset_count
+            #             if particles_team_teacher[member_id].pf_reset_count > prev_pf_reset_count:
+            #                 reset_index = [i for i in range(len(team_knowledge[member_id][kc_id])) if (team_knowledge[member_id][kc_id][i] == particles_team_teacher[member_id].reset_constraint).all()]
+            #                 # print('Resetting constraints.. Previous constraints in KC: ', team_knowledge[member_id][kc_id], 'Reset index: ', reset_index)
+            #                 team_knowledge[member_id][kc_id] = team_knowledge[member_id][kc_id][reset_index[0]:]
+            #                 # print('New constraints: ', team_knowledge[member_id][kc_id])
                         
-                        print(colored("You got the diagnostic test right!", 'green'))
-                        response_category_team.append('correct')
+            #             print(colored("You got the diagnostic test right!", 'green'))
+            #             response_category_team.append('correct')
 
-                        # if knowledge_viz_flag:
-                        #     plot_title = 'Interaction No.' + str(loop_count +1) + '. After test ' + str(test_no) + ' of KC ' + str(kc_id) + ' for player ' + member_id
-                        #     team_helpers.visualize_transition(test_constraints, particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = plot_title, vars_filename = vars_filename)
+            #             # if knowledge_viz_flag:
+            #             #     plot_title = 'Interaction No.' + str(loop_count +1) + '. After test ' + str(test_no) + ' of KC ' + str(kc_id) + ' for player ' + member_id
+            #             #     team_helpers.visualize_transition(test_constraints, particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = plot_title, vars_filename = vars_filename)
 
-                    else:
+            #         else:
                         
-                        failed_BEC_constraint = opt_feature_count - human_feature_count
-                        failed_BEC_constraints_tuple.append([member_id, failed_BEC_constraint])
-                        unit_learning_goal_reached = False
-                        if test_no == 1:
-                            test_constraints_team.append(copy.deepcopy([-failed_BEC_constraint]))
-                        else:
-                            test_constraints_team[p-1].extend(copy.deepcopy([-failed_BEC_constraint]))
-                        print('Test constraints: ', [-failed_BEC_constraint], 'Test constraints team: ', test_constraints_team, 'for test no: ', test_no)
+            #             failed_BEC_constraint = opt_feature_count - human_feature_count
+            #             failed_BEC_constraints_tuple.append([member_id, failed_BEC_constraint])
+            #             unit_learning_goal_reached = False
+            #             if test_no == 1:
+            #                 test_constraints_team.append(copy.deepcopy([-failed_BEC_constraint]))
+            #             else:
+            #                 test_constraints_team[p-1].extend(copy.deepcopy([-failed_BEC_constraint]))
+            #             print('Test constraints: ', [-failed_BEC_constraint], 'Test constraints team: ', test_constraints_team, 'for test no: ', test_no)
                         
                         
-                        # update team knowledge
-                        # print(colored('Current team knowledge for member id ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
-                        team_knowledge = team_helpers.update_team_knowledge(team_knowledge, kc_id, kc_reset_flag, [-failed_BEC_constraint], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
-                        # print(colored('Updated team knowledge for member id ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
+            #             # update team knowledge
+            #             # print(colored('Current team knowledge for member id ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
+            #             team_knowledge = team_helpers.update_team_knowledge(team_knowledge, kc_id, kc_reset_flag, [-failed_BEC_constraint], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
+            #             # print(colored('Updated team knowledge for member id ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
 
-                        # update teacher model
-                        plot_title =  'Interaction No.' + str(loop_count +1) + '. Teacher belief for player ' + member_id + ' after test ' + str(test_no) + ' of KC ' + str(kc_id)
-                        particles_team_teacher[member_id].update([-failed_BEC_constraint], plot_title = plot_title, viz_flag = knowledge_viz_flag, vars_filename = vars_filename)
+            #             # update teacher model
+            #             plot_title =  'Interaction No.' + str(loop_count +1) + '. Teacher belief for player ' + member_id + ' after test ' + str(test_no) + ' of KC ' + str(kc_id)
+            #             print('Teacher update. Updating particles for ', member_id, ' for test ', test_no, ' for kc_id ', kc_id, ' in ', params.teacher_update_model_type, ' condition...')                        
+            #             particles_team_teacher[member_id].update([-failed_BEC_constraint], plot_title = plot_title, viz_flag = knowledge_viz_flag, vars_filename = vars_filename, model_type = params.teacher_update_model_type)
 
-                        # updated learner model
-                        plot_title =  'Interaction No.' + str(loop_count +1) + '. Learner belief for player ' + member_id + ' after test ' + str(test_no) + ' of KC ' + str(kc_id)
-                        particles_team_learner[member_id].update([-failed_BEC_constraint], learning_factor=team_learning_factor[p-1], plot_title = plot_title, model_type = learner_update_type, viz_flag = knowledge_viz_flag, vars_filename = vars_filename)       
+            #             # updated learner model
+            #             plot_title =  'Interaction No.' + str(loop_count +1) + '. Learner belief for player ' + member_id + ' after test ' + str(test_no) + ' of KC ' + str(kc_id)
+            #             print('Learner update. Updating particles for ', member_id, ' for test ', test_no, ' for kc_id ', kc_id, ' in ', learner_update_type, ' condition...')
+            #             particles_team_learner[member_id].update([-failed_BEC_constraint], learning_factor=team_learning_factor[p-1], plot_title = plot_title, model_type = learner_update_type, viz_flag = knowledge_viz_flag, vars_filename = vars_filename, reset_threshold_prob = params.pf_reset_threshold)       
                         
-                        # update learner factor - after demonstrating learning or its lack (only if updating after each individual test and sampling a new human model after each individual test)
-                        if params.response_generation_type == 'Individual_tests':
-                            team_learning_factor[p-1] = min(team_learning_factor[p-1] + team_learning_rate[p-1, 1], max_learning_factor) # update learning parameter
+            #             # update learner factor - after demonstrating learning or its lack (only if updating after each individual test and sampling a new human model after each individual test)
+            #             if params.response_generation_type == 'Individual_tests':
+            #                 team_learning_factor[p-1] = min(team_learning_factor[p-1] + team_learning_rate[p-1, 1], max_learning_factor) # update learning parameter
                         
-                        # if knowledge_viz_flag:
-                        #     plot_title = 'Interaction No.' + str(loop_count+1) +'Simulated knowledge change for player ' + member_id + ' after test ' + str(test_no) + ' of KC' + str(kc_id)
-                        #     team_helpers.visualize_transition([-failed_BEC_constraint], particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = plot_title, vars_filename = vars_filename)
+            #             # if knowledge_viz_flag:
+            #             #     plot_title = 'Interaction No.' + str(loop_count+1) +'Simulated knowledge change for player ' + member_id + ' after test ' + str(test_no) + ' of KC' + str(kc_id)
+            #             #     team_helpers.visualize_transition([-failed_BEC_constraint], particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = plot_title, vars_filename = vars_filename)
 
                         
-                        # reset knowledge to mirror particle reset
-                        prev_pf_reset_count = particles_team_teacher[member_id].pf_reset_count
-                        if particles_team_teacher[member_id].pf_reset_count > prev_pf_reset_count:
-                            # print('Resetting constraints.. Previous constraints in KC: ', team_knowledge[member_id][kc_id])
-                            # print('Constraint that reset particle filter: ', particles_team_teacher[member_id].reset_constraint)
-                            reset_index = [i for i in range(len(team_knowledge[member_id][kc_id])) if (team_knowledge[member_id][kc_id][i] == particles_team_teacher[member_id].reset_constraint).all()]
-                            # print('Reset index: ', reset_index)
-                            team_knowledge[member_id][kc_id] = team_knowledge[member_id][kc_id][reset_index[0]:]
-                            # print('New constraints: ', team_knowledge[member_id])
+            #             # reset knowledge to mirror particle reset
+            #             prev_pf_reset_count = particles_team_teacher[member_id].pf_reset_count
+            #             if particles_team_teacher[member_id].pf_reset_count > prev_pf_reset_count:
+            #                 # print('Resetting constraints.. Previous constraints in KC: ', team_knowledge[member_id][kc_id])
+            #                 # print('Constraint that reset particle filter: ', particles_team_teacher[member_id].reset_constraint)
+            #                 reset_index = [i for i in range(len(team_knowledge[member_id][kc_id])) if (team_knowledge[member_id][kc_id][i] == particles_team_teacher[member_id].reset_constraint).all()]
+            #                 # print('Reset index: ', reset_index)
+            #                 team_knowledge[member_id][kc_id] = team_knowledge[member_id][kc_id][reset_index[0]:]
+            #                 # print('New constraints: ', team_knowledge[member_id])
                         
-                        print("You got the diagnostic test wrong. Failed BEC constraint: {}".format(failed_BEC_constraint))
-                        response_category_team.append('incorrect')
+            #             print("You got the diagnostic test wrong. Failed BEC constraint: {}".format(failed_BEC_constraint))
+            #             response_category_team.append('incorrect')
                         
-                        # if knowledge_viz_flag:
-                        #     plot_title = 'Interaction No.' + str(loop_count+1) + '. After test ' + str(test_no) + ' of KC ' + str(kc_id) + ' for player ' + member_id
-                        #     team_helpers.visualize_transition([-failed_BEC_constraint], particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = plot_title, vars_filename = vars_filename)
+            #             # if knowledge_viz_flag:
+            #             #     plot_title = 'Interaction No.' + str(loop_count+1) + '. After test ' + str(test_no) + ' of KC ' + str(kc_id) + ' for player ' + member_id
+            #             #     team_helpers.visualize_transition([-failed_BEC_constraint], particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = plot_title, vars_filename = vars_filename)
                         
-                        # Correct trajectory
-                        if demo_viz_flag:
-                            print('Here is the correct trajectory...')
-                            test_mdp.visualize_trajectory_comparison(opt_traj, human_traj)
+            #             # Correct trajectory
+            #             if demo_viz_flag:
+            #                 print('Here is the correct trajectory...')
+            #                 test_mdp.visualize_trajectory_comparison(opt_traj, human_traj)
                         
 
-                    ####################################
+            #         ####################################
                     
-                    # update team knowlegde in PF model
-                    # print(colored('team_knowledge for member ' + str(member_id) + ': ' + str(team_knowledge[member_id]), 'green'))
-                    particles_team_teacher[member_id].knowledge_update(team_knowledge[member_id])
+            #         # update team knowlegde in PF model
+            #         # print(colored('team_knowledge for member ' + str(member_id) + ': ' + str(team_knowledge[member_id]), 'green'))
+            #         particles_team_teacher[member_id].knowledge_update(team_knowledge[member_id])
 
 
-                    ########## debugging - calculate proportion of particles that are within the BEC for teacher and learner
-                    particles_team_teacher[member_id].calc_particles_probability(test_constraints)
-                    particles_team_learner[member_id].calc_particles_probability(test_constraints)
-                    particles_prob_teacher_after_test[member_id] = particles_team_teacher[member_id].particles_prob_correct
-                    particles_prob_learner_after_test[member_id] = particles_team_learner[member_id].particles_prob_correct
+            #         ########## debugging - calculate proportion of particles that are within the BEC for teacher and learner
+            #         particles_team_teacher[member_id].calc_particles_probability(test_constraints)
+            #         particles_team_learner[member_id].calc_particles_probability(test_constraints)
+            #         prob_teacher_pf_after_test_dict[member_id] = particles_team_teacher[member_id].particles_prob_correct
+            #         prob_learner_pf_after_test_dict[member_id] = particles_team_learner[member_id].particles_prob_correct
 
-                    # print(colored('particles_prob_teacher_test for player : ' + member_id +   str(particles_prob_teacher_test[member_id]) + '. particles_prob_learner_test for player : ' + member_id + str(particles_prob_learner_test[member_id]), 'green'))
-                    ##########################
+            #         # print(colored('particles_prob_teacher_test for player : ' + member_id +   str(particles_prob_teacher_test[member_id]) + '. particles_prob_learner_test for player : ' + member_id + str(particles_prob_learner_test[member_id]), 'green'))
+            #         ##########################
 
-                    # update team player id
-                    p += 1
+            #         # update team player id
+            #         p += 1
                 
-                # update probability for current test
-                prob_teacher_before_testing.append(particles_prob_teacher_before_test)
-                prob_learner_before_testing.append(particles_prob_learner_before_test)
-                prob_teacher_after_testing.append(particles_prob_teacher_after_test)
-                prob_learner_after_testing.append(particles_prob_learner_after_test)
+            #     # update probability for current test
+            #     prob_teacher_pf_before_test_list.append(prob_teacher_pf_before_test_dict)
+            #     prob_learner_pf_before_test_list.append(prob_learner_pf_before_test_dict)
+            #     prob_teacher_pf_after_test_list.append(prob_teacher_pf_after_test_dict)
+            #     prob_learner_pf_after_test_list.append(prob_learner_pf_after_test_dict)
 
 
                 # Update test number
                 test_no += 1
-                kc_reset_flag = False
+                # kc_reset_flag = False
+
+            print('all_test_constraints: ', all_test_constraints)
+            # ##############################
+
+            ## Method 2: Update PF after all tests
+            test_responses_team = []
+            response_type_team = []
+            prob_teacher_pf_before_test_dict, prob_learner_pf_before_test_dict, prob_teacher_pf_after_test_dict, prob_learner_pf_after_test_dict = {}, {}, {}, {}
+            prob_teacher_pf_after_feedback_dict, prob_learner_pf_after_feedback_dict = {}, {}
+
+            kc_reset_flag = True  # always true when knowledge is update together after all tests
+            p = 1
+            while p <= params.team_size:
+                member_id = 'p' + str(p)
+
+                # DEBUG: update probability of particles before test
+                particles_team_teacher[member_id].calc_particles_probability(all_test_constraints_expanded)
+                particles_team_learner[member_id].calc_particles_probability(all_test_constraints_expanded)
+                prob_teacher_pf_before_test_dict[member_id] = particles_team_teacher[member_id].particles_prob_correct
+                prob_learner_pf_before_test_dict[member_id] = particles_team_learner[member_id].particles_prob_correct
+
+                # for each tests
+                for test_no in range(len(preliminary_tests)):
+                    test_mdp = preliminary_tests[test_no][0]
+                    opt_traj = preliminary_tests[test_no][1]
+                    test_mdp.set_init_state(opt_traj[0][0])
+
+                    test_constraints = all_test_constraints[test_no]
+                    print('Test constraints: ', test_constraints)
+                    human_traj = human_opt_trajs_all_tests_team[member_id][test_no]  # simulated human response
+                    
+                    if test_viz_flag:
+                        test_mdp.visualize_trajectory(human_traj)
+                    
+                    human_feature_count = test_mdp.accumulate_reward_features(human_traj, discount=True)
+                    opt_feature_count = test_mdp.accumulate_reward_features(opt_traj, discount=True)
+
+                    if (human_feature_count == opt_feature_count).all():
+                        if test_no == 0:
+                            test_responses_team.append(copy.deepcopy(test_constraints))
+                            response_type_team.append(['correct'])
+                        else:
+                            test_responses_team[p-1].extend(copy.deepcopy(test_constraints))
+                            response_type_team[p-1].extend(['correct'])
+
+                    else:
+                        failed_BEC_constraint = opt_feature_count - human_feature_count
+                        failed_BEC_constraints_tuple.append([member_id, failed_BEC_constraint])
+                        unit_learning_goal_reached = False
+                        if test_no == 0:
+                            test_responses_team.append(copy.deepcopy([-failed_BEC_constraint]))
+                            response_type_team.append(['incorrect'])
+                        else:
+                            test_responses_team[p-1].extend(copy.deepcopy([-failed_BEC_constraint]))
+                            response_type_team[p-1].extend(['incorrect'])
+                            
+                print('Test responses team: ', test_responses_team, '. Response type team: ', response_type_team)
+                
+                # update team knowledge
+                print(colored('Current team knowledge for member id ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
+                team_knowledge = team_helpers.update_team_knowledge(team_knowledge, kc_id, kc_reset_flag, test_responses_team[p-1], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
+                print(colored('Updated team knowledge for member id ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
+
+                # update teacher model
+                plot_title =  'Interaction No.' + str(loop_count +1) + '. Teacher belief for player ' + member_id + ' after all tests of KC ' + str(kc_id)
+                particles_team_teacher[member_id].update(test_responses_team[p-1], plot_title = plot_title, viz_flag = knowledge_viz_flag, vars_filename = vars_filename, model_type = params.teacher_update_model_type)
+
+                # updated learner model
+                plot_title =  'Interaction No.' + str(loop_count +1) + '. Learner belief for player ' + member_id + ' after all tests of KC ' + str(kc_id)
+                particles_team_learner[member_id].update(test_responses_team[p-1], learning_factor=team_learning_factor[p-1], plot_title = plot_title, model_type = learner_update_type, viz_flag = knowledge_viz_flag, vars_filename = vars_filename, reset_threshold_prob = params.pf_reset_threshold)
+
+
+                particles_team_teacher[member_id].calc_particles_probability(all_test_constraints_expanded)
+                particles_team_learner[member_id].calc_particles_probability(all_test_constraints_expanded)
+                prob_teacher_pf_after_test_dict[member_id] = particles_team_teacher[member_id].particles_prob_correct
+                prob_learner_pf_after_test_dict[member_id] = particles_team_learner[member_id].particles_prob_correct
+
+
+                # learning from corrective feedback
+                if params.learning_from_correction_flag:
+                    for test_id in range(len(preliminary_tests)):
+                        response_type = response_type_team[p-1][test_id]
+                        if response_type == 'incorrect':
+                            teacher_lf = 0.8*params.default_learning_factor_teacher
+                            plot_title = 'Interaction No.' + str(loop_count +1) + '. Teacher belief for player ' + member_id + ' correctve feedback after all tests of KC ' + str(kc_id)
+                            particles_team_teacher[member_id].update(all_test_constraints[test_id], learning_factor = teacher_lf, plot_title = plot_title, viz_flag = knowledge_viz_flag, vars_filename = vars_filename, model_type = params.teacher_update_model_type)
+
+                            learner_lf = 0.8*team_learning_factor[p-1]
+                            plot_title = 'Interaction No.' + str(loop_count +1) + '. Teacher belief for player ' + member_id + ' correctve feedback after all tests of KC ' + str(kc_id)
+                            particles_team_learner[member_id].update(all_test_constraints[test_id], learning_factor = learner_lf, plot_title = plot_title, viz_flag = knowledge_viz_flag, vars_filename = vars_filename, model_type = params.teacher_update_model_type)
+
+                    
+
+
+
+                # update learning factor
+                response_flag = True
+                print('response_type_team: ', response_type_team)
+                for response_type in response_type_team[p-1]:
+                    if response_type == 'incorrect':
+                        response_type = False
+                if response_flag:
+                    team_learning_factor[p-1] = min(team_learning_factor[p-1] + team_learning_rate[p-1, 0], max_learning_factor)
+                else:
+                    team_learning_factor[p-1] = min(team_learning_factor[p-1] + team_learning_rate[p-1, 1], max_learning_factor)
+
+                if knowledge_viz_flag:
+                    plot_title = 'Interaction No.' + str(loop_count+1) +'Simulated knowledge change for player ' + member_id + ' after test of KC' + str(kc_id)
+                    team_helpers.visualize_transition(test_responses_team[p-1], particles_team_learner[member_id], params.mdp_class, params.weights['val'], text = plot_title, vars_filename = vars_filename)
+
+                    plot_title = 'Interaction No.' + str(loop_count+1) + '. After test of KC ' + str(kc_id) + ' for player ' + member_id
+                    team_helpers.visualize_transition(test_responses_team[p-1], particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = plot_title, vars_filename = vars_filename)
+                        
+
+                # reset knowledge to mirror particle reset
+                prev_pf_reset_count = particles_team_teacher[member_id].pf_reset_count
+                if particles_team_teacher[member_id].pf_reset_count > prev_pf_reset_count:
+                    # print('Resetting constraints.. Previous constraints in KC: ', team_knowledge[member_id][kc_id])
+                    # print('Constraint that reset particle filter: ', particles_team_teacher[member_id].reset_constraint)
+                    reset_index = [i for i in range(len(team_knowledge[member_id][kc_id])) if (team_knowledge[member_id][kc_id][i] == particles_team_teacher[member_id].reset_constraint).all()]
+                    # print('Reset index: ', reset_index)
+                    team_knowledge[member_id][kc_id] = team_knowledge[member_id][kc_id][reset_index[0]:]
+                    print('New constraints: ', team_knowledge[member_id])
+
+
+                # display correct trajectory
+                if demo_viz_flag:
+                    for test_no in range(len(preliminary_tests)):
+                        test_mdp = preliminary_tests[test_no][0]
+                        opt_traj = preliminary_tests[test_no][1]
+                        test_mdp.set_init_state(opt_traj[0][0])
+                        human_traj = human_opt_trajs_all_tests_team[member_id][test_no]  # simulated human response
+
+                        if response_type_team[member_id][test_no] == 'incorrect':
+                            print('Here is the correct trajectory...')
+                            test_mdp.visualize_trajectory_comparison(opt_traj, human_traj)
+
+                
+                # update team knowlegde in PF model
+                # print(colored('team_knowledge for member ' + str(member_id) + ': ' + str(team_knowledge[member_id]), 'green'))
+                particles_team_teacher[member_id].knowledge_update(team_knowledge[member_id])
+
+
+                ########## debugging - calculate proportion of particles that are within the BEC for teacher and learner
+                particles_team_teacher[member_id].calc_particles_probability(all_test_constraints_expanded)
+                particles_team_learner[member_id].calc_particles_probability(all_test_constraints_expanded)
+                prob_teacher_pf_after_feedback_dict[member_id] = particles_team_teacher[member_id].particles_prob_correct
+                prob_learner_pf_after_feedback_dict[member_id] = particles_team_learner[member_id].particles_prob_correct
+
+                # update player id
+                p += 1
+                        
+
             ##############################  Completed simulating team response
             
+            # # update prob
+            # prob_teacher_before_test_history.append(prob_teacher_pf_before_test_list)
+            # prob_learner_before_test_history.append(prob_learner_pf_before_test_list)
+            # prob_teacher_after_test_history.append(prob_teacher_pf_after_test_list)
+            # prob_learner_after_test_history.append(prob_learner_pf_after_test_list)
+                
+            
+            prob_teacher_before_test_history.append(prob_teacher_pf_before_test_dict)
+            prob_learner_before_test_history.append(prob_learner_pf_before_test_dict)
+            prob_teacher_after_test_history.append(prob_teacher_pf_after_test_dict)
+            prob_learner_after_test_history.append(prob_learner_pf_after_test_dict)
+            prob_teacher_after_feedback_history.append(prob_teacher_pf_after_feedback_dict)
+            prob_learner_after_feedback_history.append(prob_learner_pf_after_feedback_dict)
+
+
             ######  update learning factor based on all test responses for the next set of interaction
             if params.response_generation_type == 'All_tests':    
                 for test_id in range(len(preliminary_tests)):
@@ -619,36 +827,36 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                 
                 ## Check if there are non-intersecting constraints and go to fall-back teaching behavior
                 # print('test_constraints_team for recent test: ', test_constraints_team)
-                test_constraints_team_expanded = []
-                for ind_test_constraints in test_constraints_team:
-                    test_constraints_team_expanded.extend(ind_test_constraints)
+                test_response_team_expanded = []
+                for ind_test_constraints in test_responses_team:
+                    test_response_team_expanded.extend(ind_test_constraints)
                 # print('test_constraints_team_expanded: ', test_constraints_team_expanded)
-                non_intersecting_constraints_flag, non_intersecting_constraints_count = team_helpers.check_for_non_intersecting_constraints(test_constraints_team_expanded, params.weights['val'], params.step_cost_flag, non_intersecting_constraints_count)
+                non_intersecting_constraints_flag, non_intersecting_constraints_count = team_helpers.check_for_non_intersecting_constraints(test_response_team_expanded, params.weights['val'], params.step_cost_flag, non_intersecting_constraints_count)
                 # print('Non-intersecting constraints normal loop? ', non_intersecting_constraints_flag)
                 
                 ## Assign majority rules and update common knowledge and joint knowledge accordingly
                 if non_intersecting_constraints_flag:
-                    test_constraints_team_expanded, intersecting_constraints = team_helpers.majority_rules_non_intersecting_team_constraints(test_constraints_team, params.weights['val'], params.step_cost_flag, test_flag = True)
+                    test_response_team_expanded, intersecting_constraints = team_helpers.majority_rules_non_intersecting_team_constraints(test_responses_team, params.weights['val'], params.step_cost_flag, test_flag = True)
                     # print('Majority rules for non intersecting contraints... Team constraints team expanded after processing: ', test_constraints_team_expanded)
                 
                 # if there are no constraints after majority rules non intersecting constraints! just an additional check so that simulation does not stop
-                if len(test_constraints_team_expanded) == 0:
+                if len(test_response_team_expanded) == 0:
                     RuntimeError('No constraints after majority rules non intersecting constraints!')
 
                 # double check again
-                non_intersecting_constraints_flag, non_intersecting_constraints_count = team_helpers.check_for_non_intersecting_constraints(test_constraints_team_expanded, params.weights['val'], params.step_cost_flag, non_intersecting_constraints_count)
+                non_intersecting_constraints_flag, non_intersecting_constraints_count = team_helpers.check_for_non_intersecting_constraints(test_response_team_expanded, params.weights['val'], params.step_cost_flag, non_intersecting_constraints_count)
 
                 ## update team knowledge based on the test responses of the team
                 if not non_intersecting_constraints_flag:
                 
                     ## update common knowledge manually since it could have been updated by the majority rules function
                     test_cnst_team_updated = []
-                    for cnst in test_constraints_team_expanded:
+                    for cnst in test_response_team_expanded:
                         test_cnst_team_updated.append(cnst)
 
-                    min_new_common_knowledge = BEC_helpers.remove_redundant_constraints(test_constraints_team_expanded, params.weights['val'], params.step_cost_flag)
+                    min_new_common_knowledge = BEC_helpers.remove_redundant_constraints(test_response_team_expanded, params.weights['val'], params.step_cost_flag)
                     
-                    # print('Updating common knowledge...')
+                    print('Updating common knowledge...')
                     if kc_id == len(team_knowledge['common_knowledge']):
                         # # print('Appendin common knowledge...')
                         team_knowledge['common_knowledge'].append(min_new_common_knowledge)
@@ -669,24 +877,24 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
                     
                     # print('PF update of commong knowledge with constraints: ', min_new_common_knowledge)
                     plot_title = 'Interaction No.' + str(loop_count +1) + '. Teacher belief for common knowledge after tests of KC ' + str(kc_id)
-                    particles_team_teacher['common_knowledge'].update(min_new_common_knowledge, plot_title = plot_title, viz_flag = knowledge_viz_flag, vars_filename = vars_filename)
+                    particles_team_teacher['common_knowledge'].update(min_new_common_knowledge, plot_title = plot_title, viz_flag = knowledge_viz_flag, vars_filename = vars_filename, model_type = params.teacher_update_model_type)
 
                     # reset knowledge to mirror particle reset
                     prev_pf_reset_count = particles_team_teacher['common_knowledge'].pf_reset_count
                     if particles_team_teacher['common_knowledge'].pf_reset_count > prev_pf_reset_count:
-                        # print('Resetting constraints.. Previous constraints common knowledge: ', team_knowledge['common_knowledge'])
+                        print('Resetting constraints.. Previous constraints common knowledge: ', team_knowledge['common_knowledge'])
                         # reset_index = [i for i in range(len(team_knowledge['common_knowledge'])) if (team_knowledge['common_knowledge'][i] == particles_team_teacher['common_knowledge'].reset_constraint).all()]
                         reset_index = [i for i in range(len(team_knowledge['common_knowledge'][kc_id])) if (team_knowledge['common_knowledge'][kc_id][i] == particles_team_teacher['common_knowledge'].reset_constraint).all()]
-                        # print('Reset index: ', reset_index, 'previous reset count: ', prev_pf_reset_count, 'current reset count: ', particles_team_teacher['common_knowledge'].pf_reset_count, 'reset constraint: ', particles_team_teacher['common_knowledge'].reset_constraint)
+                        print('Reset index: ', reset_index, 'previous reset count: ', prev_pf_reset_count, 'current reset count: ', particles_team_teacher['common_knowledge'].pf_reset_count, 'reset constraint: ', particles_team_teacher['common_knowledge'].reset_constraint)
                         team_knowledge['common_knowledge'][kc_id] = team_knowledge['common_knowledge'][kc_id][reset_index[0]:]
                         # print('New constraints: ', team_knowledge['common_knowledge'])
                     
                     prev_pf_reset_count = particles_team_teacher['joint_knowledge'].pf_reset_count
                     # print('PF update of joint knowledge with constraints: ', test_constraints_team)
-                    particles_team_teacher['joint_knowledge'].update_jk(test_constraints_team)
+                    particles_team_teacher['joint_knowledge'].update_jk(test_responses_team)
 
                     plot_title = 'Interaction No.' + str(loop_count +1) + '. Teacher belief for joint knowledge after tests of KC ' + str(kc_id)                    
-                    team_helpers.visualize_transition(test_constraints_team, particles_team_teacher['joint_knowledge'], params.mdp_class, params.weights['val'], knowledge_type = 'joint_knowledge', text = plot_title, vars_filename = vars_filename)
+                    team_helpers.visualize_transition(test_responses_team, particles_team_teacher['joint_knowledge'], params.mdp_class, params.weights['val'], knowledge_type = 'joint_knowledge', text = plot_title, vars_filename = vars_filename)
 
             
             else:
@@ -736,8 +944,8 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
             loop_vars['all_unit_constraints'] = copy.deepcopy(all_unit_constraints)
             loop_vars['demo_ids'] = copy.deepcopy(demo_ids)
             loop_vars['team_knowledge_expected'] = copy.deepcopy(team_knowledge_expected)
-            loop_vars['unit_knowledge_level_expected'] = team_helpers.calc_knowledge_level(team_knowledge_expected, min_KC_constraints, kc_id_list = [kc_id], plot_flag = False, fig_title = 'Expected Unit knowledge level for var filter: ' + str(variable_filter), vars_filename=vars_filename )
-            loop_vars['BEC_knowledge_level_expected'] = team_helpers.calc_knowledge_level(team_knowledge_expected, min_BEC_constraints, plot_flag = False, fig_title = 'Expected BEC knowledge level after var filter: ' + str(variable_filter), vars_filename=vars_filename)
+            loop_vars['unit_knowledge_level_expected'] = team_helpers.calc_knowledge_level(team_knowledge_expected, min_KC_constraints, kc_id_list = [kc_id], plot_flag = knowledge_viz_flag, fig_title = 'Expected Unit knowledge level for var filter: ' + str(variable_filter), vars_filename=vars_filename )
+            loop_vars['BEC_knowledge_level_expected'] = team_helpers.calc_knowledge_level(team_knowledge_expected, min_BEC_constraints, plot_flag = knowledge_viz_flag, fig_title = 'Expected BEC knowledge level after var filter: ' + str(variable_filter), vars_filename=vars_filename)
             # loop_vars['response_type'] = response_type
             # loop_vars['response_distribution'] = response_distribution_list[resp_no-1]
             loop_vars['test_constraints'] = copy.deepcopy(all_tests_constraints)
@@ -750,8 +958,8 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
             loop_vars['particles_team_learner_after_demos'] = copy.deepcopy(particles_team_learner_after_demos)
             loop_vars['particles_team_teacher_final'] = copy.deepcopy(particles_team_teacher)
             loop_vars['particles_team_learner_final'] = copy.deepcopy(particles_team_learner)
-            loop_vars['unit_knowledge_level'] = team_helpers.calc_knowledge_level(team_knowledge, min_KC_constraints, particles_team_teacher = particles_team_teacher, kc_id_list = [kc_id], plot_flag = False, fig_title = 'Actual Unit knowledge level for var filter: ' + str(variable_filter), vars_filename=vars_filename)
-            loop_vars['BEC_knowledge_level'] = team_helpers.calc_knowledge_level(team_knowledge, min_BEC_constraints, particles_team_teacher = particles_team_teacher, plot_flag = False, fig_title = 'Actual BEC knowledge level expected after var filter: ' + str(variable_filter), vars_filename=vars_filename)
+            loop_vars['unit_knowledge_level'] = team_helpers.calc_knowledge_level(team_knowledge, min_KC_constraints, particles_team_teacher = particles_team_teacher, kc_id_list = [kc_id], plot_flag = knowledge_viz_flag, fig_title = 'Actual Unit knowledge level for var filter: ' + str(variable_filter), vars_filename=vars_filename)
+            loop_vars['BEC_knowledge_level'] = team_helpers.calc_knowledge_level(team_knowledge, min_BEC_constraints, particles_team_teacher = particles_team_teacher, plot_flag = knowledge_viz_flag, fig_title = 'Actual BEC knowledge level expected after var filter: ' + str(variable_filter), vars_filename=vars_filename)
             loop_vars['unit_knowledge_area'] = BEC_helpers.calc_solid_angles([min_KC_constraints])
             # loop_vars['all_unit_constraints_area'] = BEC_helpers.calc_solid_angles([all_unit_constraints])
             # loop_vars['all_unit_constraints_area'] = []
@@ -760,12 +968,24 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
             loop_vars['team_learning_factor'] = copy.deepcopy(team_learning_factor)
             loop_vars['team_composition'] = team_composition
             # loop_vars['sampling_condition'] = response_sampling_condition
-            loop_vars['particles_prob_learner_before_test'] = copy.deepcopy(prob_learner_before_testing)
-            loop_vars['particles_prob_teacher_before_test'] = copy.deepcopy(prob_teacher_before_testing)
-            # loop_vars['particles_prob_learner_after_test'] = copy.deepcopy(prob_learner_after_testing)
-            # loop_vars['particles_prob_teacher_after_test'] = copy.deepcopy(prob_teacher_after_testing)
-            loop_vars['particles_prob_learner_before_demos'] = particles_prob_learner_before_demo
-            loop_vars['particles_prob_teacher_before_demos'] = particles_prob_teacher_before_demo
+
+            loop_vars['particles_prob_teacher_before_demo'] = copy.deepcopy(prob_teacher_pf_before_demo_dict)
+            loop_vars['particles_prob_learner_before_demo'] = copy.deepcopy(prob_learner_pf_before_demo_dict)
+            loop_vars['particles_prob_teacher_after_demo'] = copy.deepcopy(prob_teacher_pf_after_demo_dict)
+            loop_vars['particles_prob_learner_after_demo'] = copy.deepcopy(prob_learner_pf_after_demo_dict)
+            # loop_vars['particles_prob_teacher_before_test'] = copy.deepcopy(prob_teacher_pf_before_test_list)
+            # loop_vars['particles_prob_learner_before_test'] = copy.deepcopy(prob_learner_pf_before_test_list)
+            # loop_vars['particles_prob_teacher_after_test'] = copy.deepcopy(prob_teacher_pf_after_test_list)
+            # loop_vars['particles_prob_learner_after_test'] = copy.deepcopy(prob_learner_pf_after_test_list)
+            loop_vars['particles_prob_teacher_before_test'] = copy.deepcopy(prob_teacher_pf_before_test_dict)
+            loop_vars['particles_prob_learner_before_test'] = copy.deepcopy(prob_learner_pf_before_test_dict)
+            loop_vars['particles_prob_teacher_after_test'] = copy.deepcopy(prob_teacher_pf_after_test_dict)
+            loop_vars['particles_prob_learner_after_test'] = copy.deepcopy(prob_learner_pf_after_test_dict)
+
+            loop_vars['particles_prob_teacher_after_feedback'] = copy.deepcopy(prob_teacher_pf_after_feedback_dict)
+            loop_vars['particles_prob_learner_after_feedback'] = copy.deepcopy(prob_learner_pf_after_feedback_dict)
+            
+
             loop_vars['sim_status'] = 'Running'
             loop_vars['team_response_models'] = human_model_weight_team
 
@@ -785,7 +1005,7 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
             if knowledge_viz_flag:
             # print('Visualizing team knowledge constraints for this teaching loop...')
                 plot_title =  'Interaction No.' + str(loop_count +1) + '. Team_knowledge_constraints'
-                fig = team_helpers.visualize_team_knowledge_constraints(team_knowledge, params.weights['val'], params.step_cost_flag, particles_team_teacher = particles_team_teacher, min_unit_constraints = min_BEC_constraints, plot_filename = 'team_knowledge_constraints', fig_title = plot_title)
+                team_helpers.visualize_team_knowledge_constraints(team_knowledge, params.weights['val'], params.step_cost_flag, particles_team_teacher = particles_team_teacher, min_unit_constraints = min_BEC_constraints, plot_filename = 'team_knowledge_constraints', fig_title = plot_title)
         
 
             # Update variable filter for next loop
@@ -848,21 +1068,25 @@ def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowle
 
         ########
         # save vars so far (end of session)
-        vars_to_save.to_csv(full_vars_filename + '.csv', index=False)
-        with open(full_vars_filename + '.pickle', 'wb') as f:
+        vars_to_save.to_csv(full_path_filename + '.csv', index=False)
+        with open(full_path_filename + '.pickle', 'wb') as f:
             pickle.dump(vars_to_save, f)
 
 
         ## debugging - save data
         data_dict = {'update_id': update_id_history, 'member_id': member, 'learning_factor': team_learning_factor_history, 'model': sampled_points_history, 'point_probability': point_probability, 'skip_model': skip_model_history, \
-                 'constraints': constraint_history, 'constraint_flag': constraint_flag_history, 'response': response_history, 'cluster_id': cluster_id_history, 'particles_learner_prob_demo_history': particles_learner_prob_demo_history, \
-                'particles_learner_prob_test_history': particles_learner_prob_demo_history, 'prob_initial_history': prob_initial_history, 'prob_reweight_history': prob_reweight_history, 'prob_resample_history': prob_resample_history, \
+                    'constraints': constraint_history, 'constraint_flag': constraint_flag_history, 'response': response_history, 'cluster_id': cluster_id_history, \
+                    'prob_initial_history': prob_initial_history, 'prob_reweight_history': prob_reweight_history, 'prob_resample_history': prob_resample_history, \
                     'resample_flag_history': resample_flag_history, 'update_type': update_sequence_history, 'resample_noise': resample_noise_history}
     
         debug_data_response = pd.DataFrame(data=data_dict)
 
         debug_data_response.to_csv('models/' + params.data_loc['BEC'] + '/' + 'debug_data_' + vars_filename + '_' + str(run_no) + '.csv', index=False)
 
+        prob_data_dict = {'prob_teacher_before_demo_history': prob_teacher_before_demo_history, 'prob_learner_before_demo_history': prob_learner_before_demo_history, 'prob_teacher_after_demo_history': prob_teacher_after_demo_history, 'prob_learner_after_demo_history': prob_learner_after_demo_history, \
+                          'prob_teacher_before_test_history': prob_teacher_before_test_history, 'prob_learner_before_test_history': prob_learner_before_test_history, 'prob_teacher_after_test_history': prob_teacher_after_test_history, 'prob_learner_after_test_history': prob_learner_after_test_history}
+        debug_prob_data = pd.DataFrame(data=prob_data_dict)
+        debug_prob_data.to_csv('models/' + params.data_loc['BEC'] + '/' + 'debug_prob_data_' + vars_filename + '_' + str(run_no) + '.csv', index=False)
 ####################################################################################
 
 

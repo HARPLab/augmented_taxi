@@ -8,7 +8,7 @@ from mpl_toolkits.mplot3d import proj3d
 
 from policy_summarization import probability_utils as p_utils
 import matplotlib
-matplotlib.use('Agg')
+
 
 fs = 16
 

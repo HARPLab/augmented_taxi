@@ -1036,6 +1036,36 @@ def debug_knowledge_calculation():
 ##############################################
 
 
+def split_pickle_file(path, file):
+
+    trial_data = pd.read_pickle(path + '/' + file)
+
+    # check for duplicate runs
+    duplicate_run_start_id = []
+    for i in range(len(trial_data)-1):
+        if trial_data['knowledge_comp_id'][i+1] < trial_data['knowledge_comp_id'][i]:
+            duplicate_run_start_id.append(i+1)
+    
+
+    if len(duplicate_run_start_id) > 0:
+        if len(duplicate_run_start_id) == 1:
+            duplicate_trial_data = trial_data[duplicate_run_start_id[0]:]
+            trial_data = trial_data[:duplicate_run_start_id[0]-1]
+        else:
+            RuntimeError('More than two trial data!')
+
+        with open(path + '/duplicate_' + file, 'wb') as f:
+            pickle.dump(duplicate_trial_data, f)
+
+        with open(path + '/' + file, 'wb') as f:
+            pickle.dump(trial_data, f)
+
+    x = 1
+
+######################################
+
+
+
 
 if __name__ == "__main__":
 

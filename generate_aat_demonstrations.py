@@ -9,7 +9,7 @@ import sage.all
 import sage.geometry.polyhedron.base as Polyhedron
 
 import matplotlib
-matplotlib.use('Agg')
+# matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import policy_summarization.BEC_visualization as BEC_viz
 import matplotlib as mpl

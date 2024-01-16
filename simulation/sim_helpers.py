@@ -264,8 +264,8 @@ def sample_from_cluster(particles_to_sample, cluster_id, mdp):
 def get_human_response_each_test(condition, env_idx, particles_to_sample, opt_traj, test_constraints, learning_factor, args = []):
 
     if len(args) != 0:
-        set_id, member_id, test_constraints, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, set_id_history, skip_model_history, cluster_id_history, point_probability, team_learning_factor_history, demo_prob, \
-            learner_member_prob_test, particles_learner_prob_demo_history, particles_learner_prob_test_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, prob_reweight_history, prob_resample_history, resample_flag_history, \
+        set_id, member_id, test_constraints, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, set_id_history, skip_model_history, cluster_id_history, point_probability, team_learning_factor_history, \
+            prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, prob_reweight_history, prob_resample_history, resample_flag_history, \
                 update_type, update_sequence_history, noise_measures, resample_noise_history = args
 
 
@@ -455,8 +455,6 @@ def get_human_response_each_test(condition, env_idx, particles_to_sample, opt_tr
                 skip_model_history.append(skip_human_model)
                 point_probability.append(rew_weight_prob)
                 team_learning_factor_history.append(learning_factor)
-                particles_learner_prob_demo_history.append(demo_prob)
-                particles_learner_prob_test_history.append(learner_member_prob_test)
                 prob_initial_history.append(prob_initial) 
                 prob_reweight_history.append(prob_reweight) 
                 prob_resample_history.append(prob_resample) 
@@ -490,7 +488,7 @@ def get_human_response_each_test(condition, env_idx, particles_to_sample, opt_tr
 
     if len(args) != 0:
         return human_model_weight, human_opt_trajs[0], response_type, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, set_id_history, skip_model_history, cluster_id_history, \
-            point_probability, team_learning_factor_history, particles_learner_prob_demo_history, particles_learner_prob_test_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, \
+            point_probability, team_learning_factor_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, \
                 prob_reweight_history, prob_resample_history, resample_flag_history, update_sequence_history, resample_noise_history
     else:
         return human_opt_trajs[0], response_type
@@ -501,8 +499,8 @@ def get_human_response_each_test(condition, env_idx, particles_to_sample, opt_tr
 def get_human_response_all_tests(particles_to_sample, preliminary_tests, learning_factor, args = []):
 
     if len(args) != 0:
-        set_id, member_id, test_constraints, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, set_id_history, skip_model_history, cluster_id_history, point_probability, team_learning_factor_history, demo_prob, \
-            learner_member_prob_test, particles_learner_prob_demo_history, particles_learner_prob_test_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, prob_reweight_history, prob_resample_history, resample_flag_history, \
+        set_id, member_id, test_constraints, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, set_id_history, skip_model_history, cluster_id_history, point_probability, team_learning_factor_history, \
+            prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, prob_reweight_history, prob_resample_history, resample_flag_history, \
                 update_type, update_sequence_history, noise_measures, resample_noise_history = args
 
     # test_mdp = {}
@@ -670,8 +668,6 @@ def get_human_response_all_tests(particles_to_sample, preliminary_tests, learnin
                     skip_model_history.append(skip_human_model)
                     point_probability.append(rew_weight_prob)
                     team_learning_factor_history.append(learning_factor)
-                    particles_learner_prob_demo_history.append(demo_prob)
-                    particles_learner_prob_test_history.append(learner_member_prob_test)
                     prob_initial_history.append(prob_initial) 
                     prob_reweight_history.append(prob_reweight) 
                     prob_resample_history.append(prob_resample) 
@@ -703,7 +699,7 @@ def get_human_response_all_tests(particles_to_sample, preliminary_tests, learnin
 
     if len(args) != 0:
         return human_model_weight_all_tests, human_opt_trajs_all_tests, response_type_all_tests, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, set_id_history, skip_model_history, cluster_id_history, \
-            point_probability, team_learning_factor_history, particles_learner_prob_demo_history, particles_learner_prob_test_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, \
+            point_probability, team_learning_factor_history, prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, \
                 prob_reweight_history, prob_resample_history, resample_flag_history, update_sequence_history, resample_noise_history
     else:
         return human_opt_trajs_all_tests, response_type_all_tests
@@ -754,6 +750,8 @@ def plot_sampled_models(particles, test_constraints, human_model_weight_all_test
     ax3.title.set_text('Particles for P3')
     fig.suptitle(plot_title, fontsize=16)
 
+    print('particles: ', particles)
+
     for p in range(len(particles)):
         member_id = 'p' + str(p+1)
 
@@ -764,6 +762,8 @@ def plot_sampled_models(particles, test_constraints, human_model_weight_all_test
         elif p ==2:
             plot_ax = ax3
         
+        # print('human_model_weight_all_tests: ', human_model_weight_all_tests)
+
         particles[member_id].plot(fig=fig, ax=plot_ax, cluster_centers = [human_model_weight_all_tests[member_id][test_no-1]], cluster_weights = [0.5])
         label_axes(plot_ax, params.mdp_class)
         

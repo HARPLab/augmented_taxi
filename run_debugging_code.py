@@ -34,4 +34,7 @@ if __name__ == "__main__":
     #################################
 
     ## debug knowledge calculation
-    dt.debug_knowledge_calculation()
+    # dt.debug_knowledge_calculation()
+
+    # split pickle files fo multiple runs
+    dt.split_pickle_file('data/simulation/sim_experiments/new_data', 'debug_trials_01_09_no_noise_study_1_run_5.pickle')

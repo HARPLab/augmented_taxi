@@ -501,7 +501,7 @@ def run_remedial_loop(failed_BEC_constraints_tuple, particles_team_teacher, team
     #     # print('Current team likelihood correct response: ', team_likelihood_correct_response)
     #     team_likelihood_correct_response[i] = max(min(1, team_likelihood_correct_response[i] + team_learning_rate[i, 0]), sim_params['min_correct_likelihood']) # have a minimum likelihood so that people can still learn
     #     # print('Updating LCR (correct) for player ', i+1, 'to ', team_likelihood_correct_response[i], 'using learning rate ', team_learning_rate[i, 0])
-    #     print("tkinter  a correct response!")
+    #     print("Sampled  a correct response!")
     # else:
     #     # print('Current team likelihood correct response: ', team_likelihood_correct_response)
     #     team_likelihood_correct_response[i] = max(min(1, team_likelihood_correct_response[i] + team_learning_rate[i, 1]), sim_params['min_correct_likelihood']) # have a minimum likelihood so that people can still learn

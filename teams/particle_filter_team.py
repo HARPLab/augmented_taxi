@@ -1,5 +1,4 @@
 import matplotlib
-matplotlib.use('Agg')
 import numpy as np
 import matplotlib.pyplot as plt
 import sage.all
@@ -1066,6 +1065,7 @@ class Particles_team():
             else:
                 # get another set of candidate indexes using systematic resampling
                 candidate_indexes = p_utils.systematic_resample(self.weights)
+                # print('Candidate indexes: ', candidate_indexes, '. len: ', len(candidate_indexes))
                 np.random.shuffle(candidate_indexes)
                 candidate_indexes = list(candidate_indexes)
                 index = candidate_indexes.pop()
@@ -1631,6 +1631,7 @@ class Particles_team():
         BEC_viz.visualize_planes(constraints, fig=fig, ax=ax2)
 
         plt.show()
+
 
 
     @staticmethod
