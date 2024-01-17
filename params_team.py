@@ -347,7 +347,7 @@ debug_flag = False
 debug_kl_calc = False
 debug_hm_sampling = False
 plot_sampled_counterfactual_models_flag = False
-save_plots_flag = False
+save_plots_flag = True
 show_plots_flag = False
 
 team_size = 3
@@ -388,4 +388,4 @@ sens_low_learner_learning_factor_range = [0.55, 0.7]
 sens_high_learner_learning_factor_range = [0.75, 0.9]
 sens_learning_rate_range = [0, 0.1]
 teacher_update_model_type = 'no_noise'  # 'no_noise', 'noise'
-learning_from_correction_flag = False
+learning_from_correction_flag = True

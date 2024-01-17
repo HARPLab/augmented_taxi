@@ -9,8 +9,8 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib
-# matplotlib.use('TkAgg')
-matplotlib.use('Agg')
+matplotlib.use('TkAgg')
+# matplotlib.use('Agg')
 import math
 import os
 from termcolor import colored
@@ -1419,32 +1419,32 @@ def sensitivity_analysis(path, files, file_prefix_list, runs_to_exclude_list=[],
     print(sensitivity_data)
 
 
-def debug_calc_prob_mass_correct_side(constraints, particles):
+def debug_calc_prob_mass_correct_side(constraints, particles, team_learning_factor):
 
     prob_mass_correct_side_constraints = {}
     for i in range(params.team_size):
         member_id = 'p' + str(i+1)
+        lf_var = member_id + '_lf'
         particles[member_id].calc_particles_probability(constraints)
+        prob_mass_correct_side_constraints[lf_var] = team_learning_factor[i]
         prob_mass_correct_side_constraints[member_id] = particles[member_id].particles_prob_correct
 
     return prob_mass_correct_side_constraints
 
 
-def simulate_individual_runs(path, file):
+def simulate_individual_runs(params, path, file, run_id, vars_filename_prefix = ''):
     ### read trial data and simulate particle filter updates ####
 
     # debug params
     interesting_interactions = []
     viz_flag = True
-    learner_update_type = 'noise'
+    learner_update_type = 'no_noise'
 
     # load trial data
     trial_data = pd.read_pickle(path + '/' + file)
 
-    print('trial_data: ', trial_data)
-
     # simulated 
-    vars_filename_prefix = 'm1_learn_noise_simulated_min_demo_t3_' + file.split('.')[0]
+    vars_filename_prefix = vars_filename_prefix + '_' + file.split('.')[0] + '_' + str(run_id) 
 
     # trial conditions
     demo_strategy = trial_data['demo_strategy'].iloc[0]
@@ -1453,8 +1453,8 @@ def simulate_individual_runs(path, file):
     # trial params
     max_learning_factor = trial_data['max_learning_factor'].iloc[0]
     initial_team_learning_factor = trial_data['initial_team_learning_factor'].iloc[0]
-    print('initial_team_learning_factor: ', initial_team_learning_factor)
     team_learning_factor = copy.deepcopy(initial_team_learning_factor)
+    print('initial_team_learning_factor: ', initial_team_learning_factor)
 
 
     # fixed params (start saving these too to the trial data)
@@ -1469,6 +1469,7 @@ def simulate_individual_runs(path, file):
     test_responses_team = trial_data['test_constraints_team']
     loop_count = trial_data['loop_count']
     team_response_models = trial_data['team_response_models']
+    # team_learning_factor = trial_data['team_learning_factor']
 
     # actual particles and probabilities (for comparison)
     teacher_pf_actual_after_demo = trial_data['particles_team_teacher_after_demos']
@@ -1484,33 +1485,9 @@ def simulate_individual_runs(path, file):
     team_prior, teacher_pf = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, default_learning_factor_teacher, team_prior = params.team_prior, vars_filename=vars_filename_prefix, model_type = params.teacher_update_model_type)
     learner_pf = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, default_learning_factor_teacher, team_learning_factor = team_learning_factor, team_prior = params.team_prior, pf_flag='learner', vars_filename=vars_filename_prefix, model_type = learner_update_type)
 
-    # duplicates
-    duplicate_teacher_pf = copy.deepcopy(teacher_pf)
-    duplicate_learner_pf = copy.deepcopy(learner_pf)
-
-
     # initialize dataframes to save probability data
-    prob_pf_teacher_before_demo = pd.DataFrame()
-    prob_pf_learner_before_demo = pd.DataFrame()
-    prob_pf_teacher_before_test = pd.DataFrame()
-    prob_pf_learner_before_test = pd.DataFrame()
-    prob_pf_teacher_after_demo = pd.DataFrame()
-    prob_pf_learner_after_demo = pd.DataFrame()
-    prob_pf_teacher_after_test = pd.DataFrame()
-    prob_pf_learner_after_test = pd.DataFrame()
-    prob_pf_actual_learner_before_test = pd.DataFrame()
+    prob_pf = pd.DataFrame()
 
-    # duplicates
-    duplicate_prob_pf_teacher_before_demo = pd.DataFrame()
-    duplicate_prob_pf_learner_before_demo = pd.DataFrame()
-    duplicate_prob_pf_teacher_before_test = pd.DataFrame()
-    duplicate_prob_pf_learner_before_test = pd.DataFrame()
-    duplicate_prob_pf_teacher_after_demo = pd.DataFrame()
-    duplicate_prob_pf_learner_after_demo = pd.DataFrame()
-    duplicate_prob_pf_teacher_after_test = pd.DataFrame()
-    duplicate_prob_pf_learner_after_test = pd.DataFrame()
-
-    print('demo_constraints: ', demo_constraints)
 
     # simulate teaching-learning interaction process
     for loop_id in range(len(loop_count)):
@@ -1529,50 +1506,28 @@ def simulate_individual_runs(path, file):
         team_models_loop = team_response_models.iloc[loop_id]
         prob_pf_actual_learner_before_test_loop = prob_pf_actual_learner_before_test_read_data.iloc[loop_id]
         learner_pf_actual_after_demo_loop = learner_pf_actual_after_demo.iloc[loop_id]
+        # team_learning_factor_loop = team_learning_factor.iloc[loop_id]
 
         # initialize dicts to save probability data
-        prob_pf_teacher_before_demo_dict = debug_calc_prob_mass_correct_side(min_demo_loop, teacher_pf)
-        
-        # # to check if returns same probability in case of redundant constraints
-        # prob_pf_teacher_before_demo_dict_2 = debug_calc_prob_mass_correct_side(demo_loop, teacher_pf)
-        # print('prob_pf_teacher_before_demo_dict_2: ', prob_pf_teacher_before_demo_dict_2, 'prob_pf_teacher_before_demo_dict: ', prob_pf_teacher_before_demo_dict)
-        # break
-
+        prob_pf_teacher_before_demo_dict = debug_calc_prob_mass_correct_side(min_demo_loop, teacher_pf, [params.default_learning_factor_teacher]*params.team_size)
+        prob_pf_teacher_before_demo_dict['prob_type'] = 'teacher_before_demo'
         prob_pf_teacher_before_demo_dict['loop_id'] = loop_id+1
-        prob_pf_teacher_before_demo_dict['demo_constraints'] = min_demo_loop
+        prob_pf_teacher_before_demo_dict['constraints'] = min_demo_loop
 
-        prob_pf_learner_before_demo_dict = debug_calc_prob_mass_correct_side(min_demo_loop, learner_pf)
+        prob_pf_learner_before_demo_dict = debug_calc_prob_mass_correct_side(min_demo_loop, learner_pf, team_learning_factor)
+        prob_pf_learner_before_demo_dict['prob_type'] = 'learner_before_demo'
         prob_pf_learner_before_demo_dict['loop_id'] = loop_id+1
-        prob_pf_learner_before_demo_dict['demo_constraints'] = min_demo_loop
-
-        # duplicates
-        duplicate_prob_pf_teacher_before_demo_dict = debug_calc_prob_mass_correct_side(min_demo_loop, duplicate_teacher_pf)
-        duplicate_prob_pf_teacher_before_demo_dict['loop_id'] = loop_id+1
-        duplicate_prob_pf_teacher_before_demo_dict['demo_constraints'] = min_demo_loop
-
-        duplicate_prob_pf_learner_before_demo_dict = debug_calc_prob_mass_correct_side(min_demo_loop, duplicate_learner_pf)
-        duplicate_prob_pf_learner_before_demo_dict['loop_id'] = loop_id+1
-        duplicate_prob_pf_learner_before_demo_dict['demo_constraints'] = min_demo_loop
+        prob_pf_learner_before_demo_dict['constraints'] = min_demo_loop
 
         # update demo dataframes
-        prob_pf_teacher_before_demo = prob_pf_teacher_before_demo.append(prob_pf_teacher_before_demo_dict, ignore_index=True)
-        prob_pf_learner_before_demo = prob_pf_learner_before_demo.append(prob_pf_learner_before_demo_dict, ignore_index=True)
-
-        # duplicates
-        duplicate_prob_pf_teacher_before_demo = duplicate_prob_pf_teacher_before_demo.append(duplicate_prob_pf_teacher_before_demo_dict, ignore_index=True)
-        duplicate_prob_pf_learner_before_demo = duplicate_prob_pf_learner_before_demo.append(duplicate_prob_pf_learner_before_demo_dict, ignore_index=True)
+        prob_pf = prob_pf.append(prob_pf_teacher_before_demo_dict, ignore_index=True)
+        prob_pf = prob_pf.append(prob_pf_learner_before_demo_dict, ignore_index=True)
 
         # test dict
-        prob_pf_teacher_before_test_dict = {'loop_id': loop_id+1}
-        prob_pf_learner_before_test_dict = {'loop_id': loop_id+1}
-        prob_pf_teacher_after_test_dict = {'loop_id': loop_id+1}
-        prob_pf_learner_after_test_dict = {'loop_id': loop_id+1}
-
-        # duplicates
-        duplicate_prob_pf_teacher_before_test_dict = {'loop_id': loop_id+1}
-        duplicate_prob_pf_learner_before_test_dict = {'loop_id': loop_id+1}
-        duplicate_prob_pf_teacher_after_test_dict = {'loop_id': loop_id+1}
-        duplicate_prob_pf_learner_after_test_dict = {'loop_id': loop_id+1}
+        prob_pf_teacher_before_test_dict = {'loop_id': loop_id+1,  'prob_type': 'teacher_before_test'}
+        prob_pf_learner_before_test_dict = {'loop_id': loop_id+1,  'prob_type': 'learner_before_test'}
+        prob_pf_teacher_after_test_dict = {'loop_id': loop_id+1,  'prob_type': 'teacher_after_test'}
+        prob_pf_learner_after_test_dict = {'loop_id': loop_id+1,  'prob_type': 'learner_after_test'}
 
         # test constraints
         test_loop_extended = []
@@ -1596,38 +1551,21 @@ def simulate_individual_runs(path, file):
             # learner_pf[member_id].calc_particles_probability(demo_loop)
             # prob_pf_learner_after_demo_dict[member_id] = learner_pf[member_id].particles_prob_correct
 
-            # duplicates
-            print('Duplicate teacher update after demo for member: ', member_id)
-            duplicate_teacher_pf[member_id].update(demo_loop, plot_title = 'Duplicate Simulated interaction No.' + str(loop_id +1) + '. Teacher belief after demo for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix, model_type = params.teacher_update_model_type)
-            print('Duplicate Leacher update after demo for member: ', member_id)
-            duplicate_learner_pf[member_id].update(demo_loop, learning_factor = team_learning_factor[p_id], plot_title = 'Duplicate Simulated interaction No.' + str(loop_id +1) + '. Learner belief after demo for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix, model_type = learner_update_type)
-
-
         # update prob after demos
-        prob_pf_teacher_after_demo_dict = debug_calc_prob_mass_correct_side(min_demo_loop, teacher_pf)
+        prob_pf_teacher_after_demo_dict = debug_calc_prob_mass_correct_side(min_demo_loop, teacher_pf, [params.default_learning_factor_teacher]*params.team_size)
         prob_pf_teacher_after_demo_dict['loop_id'] = loop_id+1
-        prob_pf_teacher_after_demo_dict['demo_constraints'] = min_demo_loop
+        prob_pf_teacher_after_demo_dict['constraints'] = min_demo_loop
+        prob_pf_teacher_after_demo_dict['prob_type'] = 'teacher_after_demo'
+        
 
-        prob_pf_learner_after_demo_dict = debug_calc_prob_mass_correct_side(min_demo_loop, learner_pf)
+        prob_pf_learner_after_demo_dict = debug_calc_prob_mass_correct_side(min_demo_loop, learner_pf, team_learning_factor)
         prob_pf_learner_after_demo_dict['loop_id'] = loop_id+1
-        prob_pf_learner_after_demo_dict['demo_constraints'] = min_demo_loop
-
-        # duplicates
-        duplicate_prob_pf_teacher_after_demo_dict = debug_calc_prob_mass_correct_side(min_demo_loop, duplicate_teacher_pf)
-        duplicate_prob_pf_teacher_after_demo_dict['loop_id'] = loop_id+1
-        duplicate_prob_pf_teacher_after_demo_dict['demo_constraints'] = min_demo_loop
-
-        duplicate_prob_pf_learner_after_demo_dict = debug_calc_prob_mass_correct_side(min_demo_loop, duplicate_learner_pf)
-        duplicate_prob_pf_learner_after_demo_dict['loop_id'] = loop_id+1
-        duplicate_prob_pf_learner_after_demo_dict['demo_constraints'] = min_demo_loop
+        prob_pf_learner_after_demo_dict['constraints'] = min_demo_loop
+        prob_pf_learner_after_demo_dict['prob_type'] = 'learner_after_demo'
 
         # update demo dataframes
-        prob_pf_teacher_after_demo = prob_pf_teacher_after_demo.append(prob_pf_teacher_after_demo_dict, ignore_index=True)
-        prob_pf_learner_after_demo = prob_pf_learner_after_demo.append(prob_pf_learner_after_demo_dict, ignore_index=True)
-
-        # duplicates
-        duplicate_prob_pf_teacher_after_demo = duplicate_prob_pf_teacher_after_demo.append(duplicate_prob_pf_teacher_after_demo_dict, ignore_index=True)
-        duplicate_prob_pf_learner_after_demo = duplicate_prob_pf_learner_after_demo.append(duplicate_prob_pf_learner_after_demo_dict, ignore_index=True)
+        prob_pf = prob_pf.append(prob_pf_teacher_after_demo_dict, ignore_index=True)
+        prob_pf = prob_pf.append(prob_pf_learner_after_demo_dict, ignore_index=True)
 
         # plot sampled models
         print('team_models_loop: ', team_models_loop)
@@ -1637,291 +1575,195 @@ def simulate_individual_runs(path, file):
             plot_title = 'Actual interaction No.' + str(loop_id +1) + '. Human models sampled for test'
             sim_helpers.plot_sampled_models(learner_pf_actual_after_demo_loop, test_loop_extended, team_models_loop, 1, plot_title = plot_title, vars_filename=vars_filename_prefix)
             
-            for p_id in range(params.team_size):
-                member_id = 'p' + str(p_id+1)
-                print('Member id:', member_id, 'Learner_pf entropy: ', learner_pf[member_id].calc_entropy(), 'learner_pf_actual_after_demo_loop entropy: ', learner_pf_actual_after_demo_loop[member_id].calc_entropy())
-            print('learner_pf_prob_test: ', debug_calc_prob_mass_correct_side(test_loop_extended, learner_pf))
-            print('learner_pf_actual_after_demo_loop_prob_test: ', debug_calc_prob_mass_correct_side(test_loop_extended, learner_pf_actual_after_demo_loop))
-
-            # duplicates
-            plot_title = 'Duplicate Simulated interaction No.' + str(loop_id +1) + '. Human models sampled for test'
-            sim_helpers.plot_sampled_models(duplicate_learner_pf, test_loop_extended, team_models_loop, 1, plot_title = plot_title, vars_filename=vars_filename_prefix)
-            plot_title = 'Duplicate Actual interaction No.' + str(loop_id +1) + '. Human models sampled for test'
-            sim_helpers.plot_sampled_models(learner_pf_actual_after_demo_loop, test_loop_extended, team_models_loop, 1, plot_title = plot_title, vars_filename=vars_filename_prefix)
-
-            for p_id in range(params.team_size):
-                member_id = 'p' + str(p_id+1)
-                print('Duplicate Member id:', member_id, 'Learner_pf entropy: ', duplicate_learner_pf[member_id].calc_entropy(), 'learner_pf_actual_after_demo_loop entropy: ', learner_pf_actual_after_demo_loop[member_id].calc_entropy())
-            print('Duplicate learner_pf_prob_test: ', debug_calc_prob_mass_correct_side(test_loop_extended, duplicate_learner_pf))
-            print('Duplicate learner_pf_actual_after_demo_loop_prob_test: ', debug_calc_prob_mass_correct_side(test_loop_extended, learner_pf_actual_after_demo_loop))
-
+            # for p_id in range(params.team_size):
+            #     member_id = 'p' + str(p_id+1)
+            #     print('Member id:', member_id, 'Learner_pf entropy: ', learner_pf[member_id].calc_entropy(), 'learner_pf_actual_after_demo_loop entropy: ', learner_pf_actual_after_demo_loop[member_id].calc_entropy())
+            
             # if loop_id == 3:
             #     break
         print('test_responses_loop: ', test_responses_loop)
 
 
-        # 
 
+        # ### update teacher and learner particle filters for tests
 
-
-
-
-        ### update teacher and learner particle filters for tests
-
-        # Method 1: update particle filter (after each test response)
-        N_tests = len(test_loop)
-        for test_id in range(N_tests):
+        # # Method 1: update particle filter (after each test response)
+        # N_tests = len(test_loop)
+        # for test_id in range(N_tests):
             
-            for p_id in range(params.team_size):
-                member_id = 'p' + str(p_id+1)
+        #     for p_id in range(params.team_size):
+        #         member_id = 'p' + str(p_id+1)
+        #         lf_var = member_id + '_lf'
                 
-                if N_tests == 1:
-                    test_response_ind = test_responses_loop[p_id]
-                else:
-                    test_response_ind = [test_responses_loop[p_id][test_id]]
-                print('test_response_ind: ', test_response_ind)
+        #         if N_tests == 1:
+        #             test_response_ind = test_responses_loop[p_id]
+        #         else:
+        #             test_response_ind = [test_responses_loop[p_id][test_id]]
+        #         print('test_response_ind: ', test_response_ind)
 
-                # probabilities before test
-                teacher_pf[member_id].calc_particles_probability(test_loop[test_id])
-                prob_pf_teacher_before_test_dict[member_id] = teacher_pf[member_id].particles_prob_correct
-                prob_pf_teacher_before_test_dict['test_id'] = test_id+1
-                prob_pf_teacher_before_test_dict['test_constraints'] = test_loop[test_id]
+        #         # probabilities before test
+        #         teacher_pf[member_id].calc_particles_probability(test_loop[test_id])
+        #         prob_pf_teacher_before_test_dict[member_id] = teacher_pf[member_id].particles_prob_correct
+        #         prob_pf_teacher_before_test_dict['test_id'] = test_id+1
+        #         prob_pf_teacher_before_test_dict['constraints'] = test_loop[test_id]
+        #         prob_pf_teacher_before_test_dict[lf_var] = params.default_learning_factor_teacher
 
-                learner_pf[member_id].calc_particles_probability(test_loop[test_id])
-                prob_pf_learner_before_test_dict[member_id] = learner_pf[member_id].particles_prob_correct
-                prob_pf_learner_before_test_dict['test_id'] = test_id+1
-                prob_pf_learner_before_test_dict['test_constraints'] = test_loop[test_id]
-
-                # duplicates
-                duplicate_teacher_pf[member_id].calc_particles_probability(test_loop[test_id])
-                duplicate_prob_pf_teacher_before_test_dict[member_id] = duplicate_teacher_pf[member_id].particles_prob_correct
-                duplicate_prob_pf_teacher_before_test_dict['test_id'] = test_id+1
-                duplicate_prob_pf_teacher_before_test_dict['test_constraints'] = test_loop[test_id]
-
-                duplicate_learner_pf[member_id].calc_particles_probability(test_loop[test_id])
-                duplicate_prob_pf_learner_before_test_dict[member_id] = duplicate_learner_pf[member_id].particles_prob_correct
-                duplicate_prob_pf_learner_before_test_dict['test_id'] = test_id+1
-                duplicate_prob_pf_learner_before_test_dict['test_constraints'] = test_loop[test_id]
+        #         learner_pf[member_id].calc_particles_probability(test_loop[test_id])
+        #         prob_pf_learner_before_test_dict[member_id] = learner_pf[member_id].particles_prob_correct
+        #         prob_pf_learner_before_test_dict['test_id'] = test_id+1
+        #         prob_pf_learner_before_test_dict['constraints'] = test_loop[test_id]
+        #         prob_pf_learner_before_test_dict[lf_var] = team_learning_factor[p_id]
 
 
-                # update particle filter for test response
-                print('Teacher update after test ', test_id, ' for member: ', member_id)
-                teacher_pf[member_id].update(test_response_ind, model_type = params.teacher_update_model_type,  plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Teacher belief after test for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
-                # teacher_pf[member_id].calc_particles_probability(test_response_ind)
-                # prob_pf_teacher_after_test_dict[member_id] = teacher_pf[member_id].particles_prob_correct
-                
-                print('Learner update after test ', test_id, ' for member: ', member_id)
-                learner_pf[member_id].update(test_response_ind, learning_factor = team_learning_factor[p_id], model_type = learner_update_type, plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Learner belief after test for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
-                # learner_pf[member_id].calc_particles_probability(test_response_ind)
-                # prob_pf_learner_after_test_dict[member_id] = learner_pf[member_id].particles_prob_correct
-
-                # duplicates
-                print('Duplicate teacher update after test ', test_id, ' for member: ', member_id)
-                duplicate_teacher_pf[member_id].update(test_response_ind, model_type = params.teacher_update_model_type,  plot_title = 'Duplicate Simulated interaction No.' + str(loop_id +1) + '. Teacher belief after test for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
-                print('Duplicate Learner update after test ', test_id, ' for member: ', member_id)
-                duplicate_learner_pf[member_id].update(test_response_ind, learning_factor = team_learning_factor[p_id], model_type = learner_update_type, plot_title = 'Duplicate Simulated interaction No.' + str(loop_id +1) + '. Learner belief after test for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
-
-                # probabibilites after test
-                teacher_pf[member_id].calc_particles_probability(test_loop[test_id])
-                prob_pf_teacher_after_test_dict[member_id] = teacher_pf[member_id].particles_prob_correct
-                prob_pf_teacher_after_test_dict['test_id'] = test_id+1
-                prob_pf_teacher_after_test_dict['test_constraints'] = test_loop[test_id]
-
-                learner_pf[member_id].calc_particles_probability(test_loop[test_id])
-                prob_pf_learner_after_test_dict[member_id] = learner_pf[member_id].particles_prob_correct
-                prob_pf_learner_after_test_dict['test_id'] = test_id+1
-                prob_pf_learner_after_test_dict['test_constraints'] = test_loop[test_id]
-
-                # duplicates
-                duplicate_teacher_pf[member_id].calc_particles_probability(test_loop[test_id])
-                duplicate_prob_pf_teacher_after_test_dict[member_id] = duplicate_teacher_pf[member_id].particles_prob_correct
-                duplicate_prob_pf_teacher_after_test_dict['test_id'] = test_id+1
-                duplicate_prob_pf_teacher_after_test_dict['test_constraints'] = test_loop[test_id]
-
-                duplicate_learner_pf[member_id].calc_particles_probability(test_loop[test_id])
-                duplicate_prob_pf_learner_after_test_dict[member_id] = duplicate_learner_pf[member_id].particles_prob_correct
-                duplicate_prob_pf_learner_after_test_dict['test_id'] = test_id+1
-                duplicate_prob_pf_learner_after_test_dict['test_constraints'] = test_loop[test_id]
+        #         # update particle filter for test response
+        #         print('Teacher update after test ', test_id, ' for member: ', member_id)
+        #         teacher_pf[member_id].update(test_response_ind, model_type = params.teacher_update_model_type,  plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Teacher belief after test for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
+            
+        #         print('Learner update after test ', test_id, ' for member: ', member_id)
+        #         learner_pf[member_id].update(test_response_ind, learning_factor = team_learning_factor[p_id], model_type = learner_update_type, plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Learner belief after test for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
 
 
-                # response type
-                response_type = []
-                if (test_response_ind == test_loop_extended[test_id]).all():
+        #         # probabibilites after test
+        #         teacher_pf[member_id].calc_particles_probability(test_loop[test_id])
+        #         prob_pf_teacher_after_test_dict[member_id] = teacher_pf[member_id].particles_prob_correct
+        #         prob_pf_teacher_after_test_dict['test_id'] = test_id+1
+        #         prob_pf_teacher_after_test_dict['constraints'] = test_loop[test_id]
+        #         prob_pf_teacher_after_test_dict[lf_var] = params.default_learning_factor_teacher
+
+        #         learner_pf[member_id].calc_particles_probability(test_loop[test_id])
+        #         prob_pf_learner_after_test_dict[member_id] = learner_pf[member_id].particles_prob_correct
+        #         prob_pf_learner_after_test_dict['test_id'] = test_id+1
+        #         prob_pf_learner_after_test_dict['constraints'] = test_loop[test_id]
+        #         prob_pf_learner_after_test_dict[lf_var] = team_learning_factor[p_id]
+
+
+        #         # response type
+        #         response_type = []
+        #         if (test_response_ind == test_loop_extended[test_id]).all():
+        #             team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 0], max_learning_factor)
+        #             var_name = 'response_type_' + member_id
+        #             prob_pf_learner_before_test_dict[var_name] = 'correct'
+        #             prob_pf_learner_after_test_dict[var_name] = 'correct'
+        #             prob_pf_teacher_before_test_dict[var_name] = 'correct'
+        #             prob_pf_teacher_after_test_dict[var_name] = 'correct'
+        #             
+        #         else:
+        #             team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 1], max_learning_factor)
+        #             var_name = 'response_type_' + member_id
+        #             prob_pf_learner_before_test_dict[var_name] = 'incorrect'
+        #             prob_pf_learner_after_test_dict[var_name] = 'incorrect'
+        #             prob_pf_teacher_before_test_dict[var_name] = 'incorrect'
+        #             prob_pf_teacher_after_test_dict[var_name] = 'incorrect'
+        #             
+
+
+        #     # update test dataframes
+        #     prob_pf = prob_pf.append(prob_pf_teacher_before_test_dict, ignore_index=True)
+        #     prob_pf = prob_pf.append(prob_pf_learner_before_test_dict, ignore_index=True)
+        #     prob_pf = prob_pf.append(prob_pf_teacher_after_test_dict, ignore_index=True)
+        #     prob_pf = prob_pf.append(prob_pf_learner_after_test_dict, ignore_index=True)
+            
+
+        ############
+            
+        # # Method 2: update particle filter (after all test responses)
+        N_tests = len(test_loop)
+        
+        for p_id in range(params.team_size):
+            member_id = 'p' + str(p_id+1)
+            lf_var = member_id + '_lf'
+            
+            if N_tests == 1:
+                all_test_responses = test_responses_loop[p_id]
+            else:
+                all_test_responses = []
+                for test_id in range(N_tests):
+                    all_test_responses.append(test_responses_loop[p_id][test_id])
+            print('all_test_responses: ', all_test_responses)
+
+
+            # probabilities before test
+            teacher_pf[member_id].calc_particles_probability(test_loop_extended)
+            prob_pf_teacher_before_test_dict[member_id] = teacher_pf[member_id].particles_prob_correct
+            prob_pf_teacher_before_test_dict['constraints'] = test_loop_extended
+            prob_pf_teacher_before_test_dict[lf_var] = params.default_learning_factor_teacher
+
+            learner_pf[member_id].calc_particles_probability(test_loop_extended)
+            prob_pf_learner_before_test_dict[member_id] = learner_pf[member_id].particles_prob_correct
+            prob_pf_learner_before_test_dict['constraints'] = test_loop_extended
+            prob_pf_learner_before_test_dict[lf_var] = team_learning_factor[p_id]
+
+
+            # update particle filter for test response
+            print('Teacher update after tests for member: ', member_id)
+            teacher_pf[member_id].update(all_test_responses, model_type = params.teacher_update_model_type,  plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Teacher belief after test for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
+            
+            print('Learner update after test for member: ', member_id)
+            learner_pf[member_id].update(all_test_responses, learning_factor = team_learning_factor[p_id], model_type = learner_update_type, plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Learner belief after test for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
+
+
+            # probabibilites after test
+            teacher_pf[member_id].calc_particles_probability(test_loop_extended)
+            prob_pf_teacher_after_test_dict[member_id] = teacher_pf[member_id].particles_prob_correct
+            prob_pf_teacher_after_test_dict['constraints'] = test_loop_extended
+            prob_pf_teacher_after_test_dict['test_response'] = all_test_responses
+            prob_pf_teacher_after_test_dict[lf_var] = params.default_learning_factor_teacher
+
+            learner_pf[member_id].calc_particles_probability(test_loop_extended)
+            prob_pf_learner_after_test_dict[member_id] = learner_pf[member_id].particles_prob_correct
+            prob_pf_learner_after_test_dict['constraints'] = test_loop_extended
+            prob_pf_learner_after_test_dict['test_response'] = all_test_responses
+            prob_pf_learner_after_test_dict[lf_var] = team_learning_factor[p_id]
+
+
+            # response type
+            response_type = []
+            for test_id in range(N_tests):
+                if (all_test_responsesp[test_id] == test_loop_extended[test_id]).all():
                     team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 0], max_learning_factor)
                     var_name = 'response_type_' + member_id
                     prob_pf_learner_before_test_dict[var_name] = 'correct'
-                    duplicate_prob_pf_learner_before_test_dict[var_name] = 'correct'
+                    prob_pf_learner_after_test_dict[var_name] = 'correct'
+                    prob_pf_teacher_before_test_dict[var_name] = 'correct'
+                    prob_pf_teacher_after_test_dict[var_name] = 'correct'
                 else:
                     team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 1], max_learning_factor)
                     var_name = 'response_type_' + member_id
                     prob_pf_learner_before_test_dict[var_name] = 'incorrect'
-                    duplicate_prob_pf_learner_before_test_dict[var_name] = 'incorrect'
+                    prob_pf_learner_after_test_dict[var_name] = 'incorrect'
+                    prob_pf_teacher_before_test_dict[var_name] = 'incorrect'
+                    prob_pf_teacher_after_test_dict[var_name] = 'incorrect'
 
-                # # actual learner prob dict
-                # prob_pf_actual_learner_before_test_dict = copy.deepcopy(prob_pf_actual_learner_before_test_loop[test_id])
-                # print('prob_pf_learner_actual_before_test_dict: ', prob_pf_actual_learner_before_test_dict)
-                # prob_pf_actual_learner_before_test_dict['test_id'] = test_id+1
-
-
-            # update test dataframes
-            prob_pf_teacher_before_test = prob_pf_teacher_before_test.append(prob_pf_teacher_before_test_dict, ignore_index=True)
-            prob_pf_learner_before_test = prob_pf_learner_before_test.append(prob_pf_learner_before_test_dict, ignore_index=True)
-            prob_pf_teacher_after_test = prob_pf_teacher_after_test.append(prob_pf_teacher_after_test_dict, ignore_index=True)
-            prob_pf_learner_after_test = prob_pf_learner_after_test.append(prob_pf_learner_after_test_dict, ignore_index=True)
-            # prob_pf_actual_learner_before_test = prob_pf_actual_learner_before_test.append(prob_pf_actual_learner_before_test_dict, ignore_index=True)
-            
-            # duplicates
-            duplicate_prob_pf_teacher_before_test = duplicate_prob_pf_teacher_before_test.append(duplicate_prob_pf_teacher_before_test_dict, ignore_index=True)
-            duplicate_prob_pf_learner_before_test = duplicate_prob_pf_learner_before_test.append(duplicate_prob_pf_learner_before_test_dict, ignore_index=True)
-            duplicate_prob_pf_teacher_after_test = duplicate_prob_pf_teacher_after_test.append(duplicate_prob_pf_teacher_after_test_dict, ignore_index=True)
-            duplicate_prob_pf_learner_after_test = duplicate_prob_pf_learner_after_test.append(duplicate_prob_pf_learner_after_test_dict, ignore_index=True)
-
-
-        #############
-            
-        # # # Method 2: update particle filter (after all test responses)
-        # N_tests = len(test_loop)
+        # update test dataframes
+        prob_pf = prob_pf.append(prob_pf_teacher_before_test_dict, ignore_index=True)
+        prob_pf = prob_pf.append(prob_pf_learner_before_test_dict, ignore_index=True)
+        prob_pf = prob_pf.append(prob_pf_teacher_after_test_dict, ignore_index=True)
+        prob_pf = prob_pf.append(prob_pf_learner_after_test_dict, ignore_index=True)
         
-        # for p_id in range(params.team_size):
-        #     member_id = 'p' + str(p_id+1)
-            
-        #     if N_tests == 1:
-        #         all_test_responses = test_responses_loop[p_id]
-        #     else:
-        #         all_test_responses = []
-        #         for test_id in range(N_tests):
-        #             all_test_responses.append(test_responses_loop[p_id][test_id])
-        #     print('all_test_responses: ', all_test_responses)
+        ##############
+        # # save data
+        # if loop_id % 10 == 0:
+        #     # save dataframes
 
+        #     prob_pf_teacher_before_demo.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_teacher_before_demo.csv')
+        #     prob_pf_learner_before_demo.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_learner_before_demo.csv')
+        #     prob_pf_teacher_after_demo.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_teacher_after_demo.csv')
+        #     prob_pf_learner_after_demo.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_learner_after_demo.csv')
+        #     prob_pf_teacher_before_test.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_teacher_before_test.csv')
+        #     prob_pf_learner_before_test.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_learner_before_test.csv')
+        #     prob_pf_teacher_after_test.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_teacher_after_test.csv')
+        #     prob_pf_learner_after_test.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_learner_after_test.csv')
+        #     # prob_pf_actual_learner_before_test.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_actual_learner_before_test.csv')
 
-        #     # probabilities before test
-        #     teacher_pf[member_id].calc_particles_probability(test_loop_extended)
-        #     prob_pf_teacher_before_test_dict[member_id] = teacher_pf[member_id].particles_prob_correct
-        #     prob_pf_teacher_before_test_dict['test_constraints'] = test_loop_extended
-
-        #     learner_pf[member_id].calc_particles_probability(test_loop_extended)
-        #     prob_pf_learner_before_test_dict[member_id] = learner_pf[member_id].particles_prob_correct
-        #     prob_pf_learner_before_test_dict['test_constraints'] = test_loop_extended
-
-        #     # duplicates
-        #     duplicate_teacher_pf[member_id].calc_particles_probability(test_loop_extended)
-        #     duplicate_prob_pf_teacher_before_test_dict[member_id] = duplicate_teacher_pf[member_id].particles_prob_correct
-        #     duplicate_prob_pf_teacher_before_test_dict['test_constraints'] = test_loop_extended
-
-        #     duplicate_learner_pf[member_id].calc_particles_probability(test_loop_extended)
-        #     duplicate_prob_pf_learner_before_test_dict[member_id] = duplicate_learner_pf[member_id].particles_prob_correct
-        #     duplicate_prob_pf_learner_before_test_dict['test_constraints'] = test_loop_extended
-
-
-        #     # update particle filter for test response
-        #     print('Teacher update after tests for member: ', member_id)
-        #     teacher_pf[member_id].update(all_test_responses, model_type = params.teacher_update_model_type,  plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Teacher belief after test for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
-        #     # teacher_pf[member_id].calc_particles_probability(test_response_ind)
-        #     # prob_pf_teacher_after_test_dict[member_id] = teacher_pf[member_id].particles_prob_correct
-            
-        #     print('Learner update after test for member: ', member_id)
-        #     learner_pf[member_id].update(all_test_responses, learning_factor = team_learning_factor[p_id], model_type = learner_update_type, plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Learner belief after test for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
-        #     # learner_pf[member_id].calc_particles_probability(test_response_ind)
-        #     # prob_pf_learner_after_test_dict[member_id] = learner_pf[member_id].particles_prob_correct
-
-        #     # duplicates
-        #     print('Duplicate teacher update after test for member: ', member_id)
-        #     duplicate_teacher_pf[member_id].update(all_test_responses, model_type = params.teacher_update_model_type,  plot_title = 'Duplicate Simulated interaction No.' + str(loop_id +1) + '. Teacher belief after test for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
-        #     print('Duplicate Learner update after test for member: ', member_id)
-        #     duplicate_learner_pf[member_id].update(all_test_responses, learning_factor = team_learning_factor[p_id], model_type = learner_update_type, plot_title = 'Duplicate Simulated interaction No.' + str(loop_id +1) + '. Learner belief after test for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
-
-        #     # probabibilites after test
-        #     teacher_pf[member_id].calc_particles_probability(test_loop_extended)
-        #     prob_pf_teacher_after_test_dict[member_id] = teacher_pf[member_id].particles_prob_correct
-        #     prob_pf_teacher_after_test_dict['test_constraints'] = test_loop_extended
-        #     prob_pf_teacher_after_test_dict['test_response'] = all_test_responses
-
-        #     learner_pf[member_id].calc_particles_probability(test_loop_extended)
-        #     prob_pf_learner_after_test_dict[member_id] = learner_pf[member_id].particles_prob_correct
-        #     prob_pf_learner_after_test_dict['test_constraints'] = test_loop_extended
-        #     prob_pf_learner_after_test_dict['test_response'] = all_test_responses
-
-        #     # duplicates
-        #     duplicate_teacher_pf[member_id].calc_particles_probability(test_loop_extended)
-        #     duplicate_prob_pf_teacher_after_test_dict[member_id] = duplicate_teacher_pf[member_id].particles_prob_correct
-        #     duplicate_prob_pf_teacher_after_test_dict['test_constraints'] = test_loop_extended
-        #     duplicate_prob_pf_teacher_after_test_dict['test_response'] = all_test_responses
-
-        #     duplicate_learner_pf[member_id].calc_particles_probability(test_loop_extended)
-        #     duplicate_prob_pf_learner_after_test_dict[member_id] = duplicate_learner_pf[member_id].particles_prob_correct
-        #     duplicate_prob_pf_learner_after_test_dict['test_constraints'] = test_loop_extended
-        #     duplicate_prob_pf_learner_after_test_dict['test_response'] = all_test_responses
-
-        #     # # actual learner prob dict
-        #     # prob_pf_actual_learner_before_test_dict = copy.deepcopy(prob_pf_actual_learner_before_test_loop[test_id])
-        #     # print('prob_pf_learner_actual_before_test_dict: ', prob_pf_actual_learner_before_test_dict)
-        #     # prob_pf_actual_learner_before_test_dict['test_id'] = test_id+1
-
-
-        # # update test dataframes
-        # prob_pf_teacher_before_test = prob_pf_teacher_before_test.append(prob_pf_teacher_before_test_dict, ignore_index=True)
-        # prob_pf_learner_before_test = prob_pf_learner_before_test.append(prob_pf_learner_before_test_dict, ignore_index=True)
-        # prob_pf_teacher_after_test = prob_pf_teacher_after_test.append(prob_pf_teacher_after_test_dict, ignore_index=True)
-        # prob_pf_learner_after_test = prob_pf_learner_after_test.append(prob_pf_learner_after_test_dict, ignore_index=True)
-        # prob_pf_actual_learner_before_test = prob_pf_actual_learner_before_test.append(prob_pf_actual_learner_before_test_dict, ignore_index=True)
+    #################
+    # save dataframes final
         
-        # # duplicates
-        # duplicate_prob_pf_teacher_before_test = duplicate_prob_pf_teacher_before_test.append(duplicate_prob_pf_teacher_before_test_dict, ignore_index=True)
-        # duplicate_prob_pf_learner_before_test = duplicate_prob_pf_learner_before_test.append(duplicate_prob_pf_learner_before_test_dict, ignore_index=True)
-        # duplicate_prob_pf_teacher_after_test = duplicate_prob_pf_teacher_after_test.append(duplicate_prob_pf_teacher_after_test_dict, ignore_index=True)
-        # duplicate_prob_pf_learner_after_test = duplicate_prob_pf_learner_after_test.append(duplicate_prob_pf_learner_after_test_dict, ignore_index=True)
-
-        if loop_count % 10 == 0:
-            # save dataframes
-
-            prob_pf_teacher_before_demo.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_teacher_before_demo.csv')
-            prob_pf_learner_before_demo.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_learner_before_demo.csv')
-            prob_pf_teacher_after_demo.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_teacher_after_demo.csv')
-            prob_pf_learner_after_demo.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_learner_after_demo.csv')
-            prob_pf_teacher_before_test.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_teacher_before_test.csv')
-            prob_pf_learner_before_test.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_learner_before_test.csv')
-            prob_pf_teacher_after_test.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_teacher_after_test.csv')
-            prob_pf_learner_after_test.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_learner_after_test.csv')
-            # prob_pf_actual_learner_before_test.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_actual_learner_before_test.csv')
-
-            # duplicates
-            duplicate_prob_pf_teacher_before_demo.to_csv(path + '/' + vars_filename_prefix + '_duplicate_prob_pf_teacher_before_demo.csv')
-            duplicate_prob_pf_learner_before_demo.to_csv(path + '/' + vars_filename_prefix + '_duplicate_prob_pf_learner_before_demo.csv')
-            duplicate_prob_pf_teacher_after_demo.to_csv(path + '/' + vars_filename_prefix + '_duplicate_prob_pf_teacher_after_demo.csv')
-            duplicate_prob_pf_learner_after_demo.to_csv(path + '/' + vars_filename_prefix + '_duplicate_prob_pf_learner_after_demo.csv')
-            duplicate_prob_pf_teacher_before_test.to_csv(path + '/' + vars_filename_prefix + '_duplicate_prob_pf_teacher_before_test.csv')
-            duplicate_prob_pf_learner_before_test.to_csv(path + '/' + vars_filename_prefix + '_duplicate_prob_pf_learner_before_test.csv')
-            duplicate_prob_pf_teacher_after_test.to_csv(path + '/' + vars_filename_prefix + '_duplicate_prob_pf_teacher_after_test.csv')
-            duplicate_prob_pf_learner_after_test.to_csv(path + '/' + vars_filename_prefix + '_duplicate_prob_pf_learner_after_test.csv')
-
-
-    # save dataframes finall
-
-    prob_pf_teacher_before_demo.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_teacher_before_demo.csv')
-    prob_pf_learner_before_demo.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_learner_before_demo.csv')
-    prob_pf_teacher_after_demo.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_teacher_after_demo.csv')
-    prob_pf_learner_after_demo.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_learner_after_demo.csv')
-    prob_pf_teacher_before_test.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_teacher_before_test.csv')
-    prob_pf_learner_before_test.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_learner_before_test.csv')
-    prob_pf_teacher_after_test.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_teacher_after_test.csv')
-    prob_pf_learner_after_test.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_learner_after_test.csv')
-    # prob_pf_actual_learner_before_test.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_actual_learner_before_test.csv')
-
-    # duplicates
-    duplicate_prob_pf_teacher_before_demo.to_csv(path + '/' + vars_filename_prefix + '_duplicate_prob_pf_teacher_before_demo.csv')
-    duplicate_prob_pf_learner_before_demo.to_csv(path + '/' + vars_filename_prefix + '_duplicate_prob_pf_learner_before_demo.csv')
-    duplicate_prob_pf_teacher_after_demo.to_csv(path + '/' + vars_filename_prefix + '_duplicate_prob_pf_teacher_after_demo.csv')
-    duplicate_prob_pf_learner_after_demo.to_csv(path + '/' + vars_filename_prefix + '_duplicate_prob_pf_learner_after_demo.csv')
-    duplicate_prob_pf_teacher_before_test.to_csv(path + '/' + vars_filename_prefix + '_duplicate_prob_pf_teacher_before_test.csv')
-    duplicate_prob_pf_learner_before_test.to_csv(path + '/' + vars_filename_prefix + '_duplicate_prob_pf_learner_before_test.csv')
-    duplicate_prob_pf_teacher_after_test.to_csv(path + '/' + vars_filename_prefix + '_duplicate_prob_pf_teacher_after_test.csv')
-    duplicate_prob_pf_learner_after_test.to_csv(path + '/' + vars_filename_prefix + '_duplicate_prob_pf_learner_after_test.csv')
-
-
+    prob_pf.to_csv(path + '/' + vars_filename_prefix + '_prob_pf.csv')
+    ####################
 
     # plot simulated probability data
-    f, ax = plt.subplots(ncols=3, sharex=True, sharey=True, figsize=(15,10))
-    plt.subplots_adjust(wspace=0.1, hspace=0.1)
+    # f, ax = plt.subplots(ncols=3, sharex=True, sharey=True, figsize=(15,10))
+    # plt.subplots_adjust(wspace=0.1, hspace=0.1)
 
     # # Method 1
     # for col_id in range(3):  
@@ -1973,10 +1815,10 @@ def read_prob_data(path, file):
             else:
                 prob_data['noise_cond'] = ['no_noise']*len(prob_data)
             
-            if 'm1' in filename:
-                prob_data['test_update'] = ['individual_tests']*len(prob_data)
-            else:
+            if 'm2' in filename:
                 prob_data['test_update'] = ['all_tests']*len(prob_data)
+            else:
+                prob_data['test_update'] = ['individual_tests']*len(prob_data)
 
 
             run_id += 1
@@ -1984,8 +1826,40 @@ def read_prob_data(path, file):
             all_prob_data_learner_before_test = pd.concat([all_prob_data_learner_before_test, prob_data], ignore_index=True)
 
     
+    # Plot knowledge level for without noise
+    row_id = 0
+    f, ax = plt.subplots(nrows=3, sharex=True, sharey=True, figsize=(15,10))
+    plt.subplots_adjust(wspace=0.1, hspace=0.1)
+    for p in range(params.team_size):
+        member_id = 'p' + str(p+1)
+        plot_data = all_prob_data_learner_before_test[(all_prob_data_learner_before_test['noise_cond']=='no_noise') & (all_prob_data_learner_before_test['test_update']=='all_tests')]
+        
+        # plot_data[member_id] = plot_data[member_id] + np.random.normal(0.02, 0.04, len(plot_data))
 
+        sns.lineplot(plot_data, x = 'loop_id', y = member_id, ax=ax[row_id], errorbar=('se', 1), err_style="band").set(title=member_id)
+
+        # sns.lineplot(plot_data, x = 'loop_id', y = member_id, hue = 'test_id', ax=ax[row_id], errorbar=('se', 1), err_style="band").set(title=member_id)
+
+        row_id += 1 
+    f.suptitle('Prob. correct response for all tests, no noise, no corrective feedback')
+
+    
     print(all_prob_data_learner_before_test)
+    all_prob_data_learner_before_test.to_csv(path + '/' + file + '_prob_data_learner_before_test.csv')
+
+
+    prob_filename = '_prob_vars_no_noise_all_tests'
+
+    # For all tests
+    plot_data.groupby(['loop_id']).agg({'p1': 'std', 'p2': 'std', 'p3': 'std'}).to_csv(path + '/' + file + prob_filename + '.csv')
+
+    # For individual tests
+    # plot_data.groupby(['loop_id', 'test_id']).agg({'p1': 'std', 'p2': 'std', 'p3': 'std'}).to_csv(path + '/' + file + prob_filename + '.csv')
+    
+    # plot_data.groupby(['loop_id', 'test_id']).agg({'p1': 'std', 'p2': 'std', 'p3': 'std'}).plot()
+    plt.show()
+
+    
 
 
 
@@ -2165,24 +2039,24 @@ if __name__ == "__main__":
 
     ##############################
 
-    # ### Analyze individual runs
+    ## Analyze individual runs
 
-    # # path = 'data/simulation/sim_experiments/new_data'
-    # path = 'models/augmented_taxi2'
-    # file = ''
-
-    # # analyze_individual_runs(path, 'trials_01_09_regular_study_1_run_100.pickle')
-
-    # # plot_prob_ind_run(path, 'trials_01_09_regular_study_1_run_100.pickle')
-
-    # simulate_individual_runs(path, 'debug_trials_01_09_no_noise_study_1_run_8.pickle')
-
-    # ##############################
-    # Analyze particle filter update process
+    # path = 'data/simulation/sim_experiments/new_data'
     path = 'models/augmented_taxi2'
-    file_prefix = 'trials_01_09_no_noise_study_1_run_8'
+    file = ''
 
-    read_prob_data(path, file_prefix)
+    # analyze_individual_runs(path, 'trials_01_09_regular_study_1_run_100.pickle')
+
+    # plot_prob_ind_run(path, 'trials_01_09_regular_study_1_run_100.pickle')
+
+    simulate_individual_runs(path, 'debug_trials_01_09_no_noise_study_1_run_8.pickle')
+
+    # ###########################
+    # ## Analyze particle filter update process
+    # path = 'models/augmented_taxi2'
+    # file_prefix = 'trials_01_09_no_noise_study_1_run_8'
+
+    # read_prob_data(path, file_prefix)
 
 
 

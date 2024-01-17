@@ -19,6 +19,7 @@ import random
 
 import teams.utils_teams as utils_teams
 import sage.geometry.polyhedron.base as Polyhedron
+from teams import particle_filter_team as pf_team
 
 
 def sample_from_distribution(condition, points, probabilities, points_to_avoid = []):
@@ -794,6 +795,19 @@ def plot_sampled_models(particles, test_constraints, human_model_weight_all_test
     if params.save_plots_flag:
         plt.savefig('plots/' + vars_filename + '_' + plot_title + '.png', dpi=300)
         plt.close()
+
+
+
+def save_pf_models(n_particles):
+    path = 'simulation/pf_models/'
+    learning_factor_list = [0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]
+
+    for learning_factor in learning_factor_list:
+        initial_pf = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), learning_factor)
+
+        with open(path + 'initial_pf_' + str(learning_factor) + '_n_particles_' + str(n_particles) + '.pickle', 'wb') as f:
+            pickle.dump(initial_pf, f)
+
 
 
 

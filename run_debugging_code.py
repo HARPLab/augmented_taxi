@@ -1,7 +1,9 @@
 import cProfile
 
 import debugging_team as dt
-
+import analyze_sim_data as asd
+import params_team as params
+import simulation.sim_helpers as sim_helpers
 
 if __name__ == "__main__":
     
@@ -36,5 +38,18 @@ if __name__ == "__main__":
     ## debug knowledge calculation
     # dt.debug_knowledge_calculation()
 
-    # split pickle files fo multiple runs
-    dt.split_pickle_file('data/simulation/sim_experiments/new_data', 'debug_trials_01_09_no_noise_study_1_run_5.pickle')
+    # # split pickle files fo multiple runs
+    # dt.split_pickle_file('data/simulation/sim_experiments/new_data', 'debug_trials_01_09_no_noise_study_1_run_5.pickle')
+    ################################
+
+    # # save initial pf for various learning factors
+    # sim_helpers.save_pf_models(500)
+
+    ## run individual simulations to check PF udpate process
+    path = 'models/augmented_taxi2'
+    file = 'debug_trials_01_09_no_noise_study_1_run_8.pickle'
+    params.default_learning_factor_teacher = 0.8
+    N_runs = 2
+    for run_id in range(0, N_runs):
+        print('run_id: ', run_id)
+        asd.simulate_individual_runs(params, path, file, run_id, vars_filename_prefix = 'm2_simulated_no_noise')

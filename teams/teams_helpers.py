@@ -831,19 +831,23 @@ def obtain_team_summary(data_loc, min_subset_constraints_record, min_BEC_constra
 def sample_team_pf(team_size, n_particles, weights, step_cost_flag, default_learning_factor_teacher, team_learning_factor=None, team_prior=None, pf_flag = 'teacher', vars_filename='sim_run', model_type = 'noise'):
 
     particles_team = {}
-    
+    path = 'simulation/pf_models/'
     # particles for individual team members
     for i in range(team_size):
         member_id = 'p' + str(i+1)
 
-        
-        
         if pf_flag == 'learner':
             learning_factor = team_learning_factor[i]
         else:
             learning_factor = default_learning_factor_teacher
 
-        particles_team[member_id] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), learning_factor)
+        try:
+            filename = 'initial_pf_' + str(learning_factor) + '_n_particles_' + str(n_particles) + '.pickle'
+            with open(path + filename, 'rb') as f:
+                particles_team[member_id] = pickle.load(f)
+        except:
+            print('Initializing particle filter..')
+            particles_team[member_id] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), learning_factor)
         
         # debug prob
         fixed_cnsts = [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])]
