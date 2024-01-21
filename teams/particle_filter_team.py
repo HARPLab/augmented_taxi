@@ -1231,6 +1231,7 @@ class Particles_team():
         resample_flag = []
 
 
+
         for cnst_id in range(len(constraints)):
             # print('constraint: {}'.format(constraint))
             constraint = constraints[cnst_id]
@@ -1242,8 +1243,17 @@ class Particles_team():
             #     ax2[cnst_id*3].hist(self.weights, bins=20)
             #     ax2[cnst_id*3].title.set_text('Particle distribution before reweighting')
             
+            # to accomodate different learning factors from corrective feedback based on correctness of constraints
 
-            self.reweight(constraint, learning_factor)
+            if type(learning_factor) == list:
+                if len(learning_factor) > 1:
+                    cnst_lf = learning_factor[cnst_id]
+                else:
+                    cnst_lf = learning_factor[0]
+            else:
+                cnst_lf = learning_factor
+
+            self.reweight(constraint, cnst_lf)
             
 
 
@@ -1430,7 +1440,7 @@ class Particles_team():
         :param k: concentration parameter of VMF
         :return: probability of x under this composite distribution (uniform + VMF)
         '''
-        # print(colored('Reweighting particles for learning factor: ' + str(learning_factor), 'red'))
+        print(colored('Reweighting particles for learning factor: ' + str(learning_factor), 'red'))
         if learning_factor is None:
             u_pdf_scaled = self.u_pdf_scaled
             VMF_kappa = self.VMF_kappa

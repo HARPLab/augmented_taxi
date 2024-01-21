@@ -347,7 +347,7 @@ debug_flag = False
 debug_kl_calc = False
 debug_hm_sampling = False
 plot_sampled_counterfactual_models_flag = False
-save_plots_flag = True
+save_plots_flag = False
 show_plots_flag = False
 
 team_size = 3

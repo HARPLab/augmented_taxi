@@ -48,8 +48,12 @@ if __name__ == "__main__":
     ## run individual simulations to check PF udpate process
     path = 'models/augmented_taxi2'
     file = 'debug_trials_01_09_no_noise_study_1_run_8.pickle'
+    
     params.default_learning_factor_teacher = 0.8
-    N_runs = 2
-    for run_id in range(0, N_runs):
+    N_runs = 9
+    run_start_id = 2
+    viz_flag = False
+
+    for run_id in range(run_start_id, run_start_id+ N_runs):
         print('run_id: ', run_id)
-        asd.simulate_individual_runs(params, path, file, run_id, vars_filename_prefix = 'm2_simulated_no_noise')
+        asd.simulate_individual_runs_w_feedback(params, path, file, run_id, viz_flag = viz_flag, vars_filename_prefix = 'm2_simulated_no_noise_w_feedback')
