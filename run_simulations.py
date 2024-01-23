@@ -8,14 +8,15 @@ from termcolor import colored
 from multiprocessing import Process, Queue, Pool
 import sage.all
 import sage.geometry.polyhedron.base as Polyhedron
-import matplotlib
-matplotlib.use('Agg')
-# matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
+
+
 from tqdm import tqdm
 import os
 import itertools
 from itertools import permutations, combinations
+import random
+import pandas as pd
+
 
 # Other imports.
 sys.path.append("simple_rl")
@@ -31,17 +32,23 @@ from simple_rl.utils import mdp_helpers
 import policy_summarization.BEC_helpers as BEC_helpers
 import policy_summarization.BEC_visualization as BEC_viz
 from teams import particle_filter_team as pf_team
-import matplotlib as mpl
 import teams.teams_helpers as team_helpers
+from main_team import run_reward_teaching
+from analyze_sim_data import run_analysis_script
+
+# Imports for plotting
+# import matplotlib
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 mpl.rcParams['figure.facecolor'] = '1.0'
 mpl.rcParams['axes.labelsize'] = 'x-large'
 mpl.rcParams['xtick.labelsize'] = 'large'
 
-import random
-import pandas as pd
+# matplotlib.use('TkAgg')
+mpl.use('Agg')
 
-from main_team import run_reward_teaching
-from analyze_sim_data import run_analysis_script
+
+
 
 
 def get_sim_conditions(team_composition_list, dem_strategy_list, sampling_condition_list, N_runs, run_start_id):
@@ -87,7 +94,7 @@ if __name__ == "__main__":
 
     
 
-    team_params_learning = {'low': [0.65, 0.05], 'med': [0.65, 0.05], 'high': [0.8, 0.05]}
+    team_params_learning = {'low': [0.65, 0.05],'high': [0.8, 0.05]}
 
     # team_params_learning = {'low': 0.5, 'med': 0.65, 'high': 0.8}
     team_composition_list = [[0,0,0]]
@@ -100,13 +107,13 @@ if __name__ == "__main__":
     sim_params = {'min_correct_likelihood': 0}
     
     
-    N_runs = 1
-    run_start_id = 30
+    N_runs = 4
+    run_start_id = 1
     learner_update_type = 'no_noise'
     params.max_learning_factor = 0.9
     params.default_learning_factor_teacher = 0.8
 
-    file_prefix = 'debug_trials_01_15_no_noise'
+    file_prefix = 'debug_trials_01_22_no_noise_w_feedback'
     
     path = 'data/simulation/sim_experiments'
 

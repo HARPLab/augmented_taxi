@@ -802,7 +802,7 @@ def sample_valid_region_jk(joint_constraints, min_azi, max_azi, min_ele, max_ele
 
 
 
-def obtain_team_summary(data_loc, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
+def obtain_team_summary(data_loc, run_env_loc, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
                         n_train_demos, particles_demo, knowledge_id, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, obj_func_proportion=1, vars_filename='sim_run'):
 
 
@@ -818,7 +818,7 @@ def obtain_team_summary(data_loc, min_subset_constraints_record, min_BEC_constra
     #     summary_count = len(BEC_summary)
 
     if summary_variant == 'counterfactual':
-        BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = obtain_summary_counterfactual_team(data_loc, particles_demo, knowledge_id, variable_filter, nonzero_counter, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
+        BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, knowledge_id, variable_filter, nonzero_counter, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
                        BEC_summary, summary_count, min_BEC_constraints_running, params.BEC['n_human_models_precomputed'], visited_env_traj_idxs = visited_env_traj_idxs, n_train_demos=np.inf, downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=obj_func_proportion, vars_filename = vars_filename)
 
         
@@ -1522,7 +1522,7 @@ def visualize_BEC_area(BEC_constraints, fig, ax1):
 
 
 
-def obtain_summary_counterfactual_team(data_loc, particles_demo, member_id, variable_filter, nonzero_counter, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
+def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, member_id, variable_filter, nonzero_counter, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
                        summary, summary_count, min_BEC_constraints_running, n_human_models_precomputed, visited_env_traj_idxs=[], n_train_demos=3, downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=1, vars_filename = 'sim_run'):
 
     
@@ -1689,7 +1689,7 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, member_id, vari
     # print('variable filter: {}'.format(variable_filter))
 
     # clear the demonstration generation log
-    open('models/' + data_loc + '/demo_gen_log.txt', 'w').close()
+    open('models/' + data_loc + '/' + run_env_loc + '/demo_gen_log.txt', 'w').close()
 
     sample_human_models_ref = BEC_helpers.sample_human_models_uniform([], n_human_models_precomputed)
     
@@ -1718,7 +1718,7 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, member_id, vari
             return summary, summary_count, visited_env_traj_idxs, min_BEC_constraints_running, particles_demo
         
         # print("Length of summary: {}".format(summary_count))
-        with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
+        with open('models/' + data_loc + '/' + run_env_loc + '/demo_gen_log.txt', 'a') as myfile:
             myfile.write('Length of summary: {}\n'.format(summary_count))
 
         # print(colored('sample_human_models: ', 'red'), sample_human_models)
@@ -1773,7 +1773,7 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, member_id, vari
         ####################################################################################################
 
 
-        with open('models/' + data_loc + '/info_gains_joint' + str(summary_count) + '.pickle', 'wb') as f:
+        with open('models/' + data_loc + '/' + run_env_loc + '/info_gains_joint' + str(summary_count) + '.pickle', 'wb') as f:
             pickle.dump(info_gains_record, f)
 
         differing_constraint_count = 1          # number of constraints in the running human model that would differ after showing a particular demonstration
@@ -1938,7 +1938,7 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, member_id, vari
         
         
         if best_env_idx is not None:
-            with open('models/' + data_loc + '/best_env_idxs' + str(summary_count) + '.pickle', 'wb') as f:
+            with open('models/' + data_loc +  '/' + run_env_loc + '/best_env_idxs' + str(summary_count) + '.pickle', 'wb') as f:
                 pickle.dump((best_env_idx, best_traj_idx, best_env_idxs, best_traj_idxs), f)
 
             best_traj = traj_record[best_env_idx][best_traj_idx]
@@ -1972,12 +1972,12 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, member_id, vari
         
 
         # # print(colored('Max infogain: {}'.format(max_info_gain), 'blue'))
-        with open('models/' + data_loc + '/demo_gen_log.txt', 'a') as myfile:
+        with open('models/' + data_loc + '/' + run_env_loc + '/demo_gen_log.txt', 'a') as myfile:
             myfile.write('Max infogain: {}\n'.format(max_info_gain))
             myfile.write('\n')
 
         # save the summary along the way (for each completed unit)
-        with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
+        with open('models/' + data_loc + '/' + run_env_loc + '/BEC_summary.pickle', 'wb') as f:
             pickle.dump((summary, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo), f)
 
     # add any remaining demonstrations
@@ -1985,7 +1985,7 @@ def obtain_summary_counterfactual_team(data_loc, particles_demo, member_id, vari
         summary.append(unit)
 
     # this method doesn't always finish, so save the summary along the way (for each completed unit)
-    with open('models/' + data_loc + '/BEC_summary.pickle', 'wb') as f:
+    with open('models/' + data_loc + '/' + run_env_loc + '/BEC_summary.pickle', 'wb') as f:
         pickle.dump((summary, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo), f)
 
     return summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo
@@ -2027,7 +2027,7 @@ def check_unit_learning_goal_reached(team_knowledge, min_unit_constraints, kc_id
 
 
 def compute_counterfactuals_team(args):
-    data_loc, model_idx, env_idx, w_human_normalized, env_filename, trajs_opt, particles, min_BEC_constraints_running, step_cost_flag, summary_len, variable_filter, mdp_features, consider_human_models_jointly = args
+    data_loc, run_env_loc, model_idx, env_idx, w_human_normalized, env_filename, trajs_opt, particles, min_BEC_constraints_running, step_cost_flag, summary_len, variable_filter, mdp_features, consider_human_models_jointly = args
 
     skip_env = False
 
@@ -2141,7 +2141,7 @@ def compute_counterfactuals_team(args):
         # human_rewards_env = [np.array([[0]]) for i in range(len(trajs_opt))]
 
     if summary_len is not None:
-        with open('models/' + data_loc + '/counterfactual_data_' + str(summary_len) + '/model' + str(model_idx) +
+        with open('models/' + data_loc + '/' + run_env_loc + '/counterfactual_data_' + str(summary_len) + '/model' + str(model_idx) +
                   '/cf_data_env' + str(env_idx).zfill(5) + '.pickle', 'wb') as f:
             pickle.dump(constraints_env, f)
         # # print('Info gain for Summary length ' + str(summary_len) + ' of model ' + str(model_idx) + 'of env' + str(env_idx) + 'is' + str(info_gain_env) + '...')

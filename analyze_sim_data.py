@@ -9,8 +9,6 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib
-matplotlib.use('TkAgg')
-# matplotlib.use('Agg')
 import math
 import os
 from termcolor import colored
@@ -316,7 +314,7 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
                         elif (kc_variables == [[0, 0, 0]]).all():
                             kc_id = 3
                         else:
-                            print(colored('Unregognized variable filter: ' + kc_variables, 'red'))
+                            print(colored('Unrecognized variable filter: ' + kc_variables, 'red'))
 
                         # kc_variables = sim_vars['variable_filter'][i]
                         # print('kc_variables: ', type(kc_variables))
@@ -350,54 +348,58 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
 
                         
 
-                        #### particles probability
-                        if 'particles_prob_learner_demo' in sim_vars.columns:
-                            # team_particles_probability_dict = str_to_dict(sim_vars['particles_prob_learner_demo'][i], var_type=float)
-                            var_name = 'particles_prob_learner_demo'
-                        elif 'particles_prob_learner_demos' in sim_vars.columns:
-                            # team_particles_probability_dict = str_to_dict(sim_vars['particles_prob_learner_demos'][i], var_type=float)
-                            var_name = 'particles_prob_learner_demos'
-                        elif 'particles_prob_learner_before_test' in sim_vars.columns:
-                            # team_particles_probability_dict = str_to_dict(sim_vars['particles_prob_learner_before_test'][i], var_type=float)
-                            var_name = 'particles_prob_learner_before_test'
+                        # #### particles probability
+                        # if 'particles_prob_learner_demo' in sim_vars.columns:
+                        #     # team_particles_probability_dict = str_to_dict(sim_vars['particles_prob_learner_demo'][i], var_type=float)
+                        #     var_name = 'particles_prob_learner_demo'
+                        # elif 'particles_prob_learner_demos' in sim_vars.columns:
+                        #     # team_particles_probability_dict = str_to_dict(sim_vars['particles_prob_learner_demos'][i], var_type=float)
+                        #     var_name = 'particles_prob_learner_demos'
+                        # elif 'particles_prob_learner_before_test' in sim_vars.columns:
+                        #     # team_particles_probability_dict = str_to_dict(sim_vars['particles_prob_learner_before_test'][i], var_type=float)
+                        #     var_name = 'particles_prob_learner_before_test'
+
+                        for var_name in ['particles_prob_teacher_before_demo', 'particles_prob_learner_before_demo', 'particles_prob_teacher_after_demo', 'particles_prob_learner_after_demo', \
+                                         'particles_prob_teacher_before_test', 'particles_prob_learner_before_test', 'particles_prob_teacher_after_test', 'particles_prob_teacher_after_feedback', 'particles_prob_learner_after_feedback']:
 
                         
-                        test_id = 1
-                        print('sim_vars[var_name][i]:', sim_vars[var_name][i])
+                            test_id = 1
+                            print('sim_vars[var_name][i]:', sim_vars[var_name][i])
 
-                        # ## for newer trials; each test has probability separately
-                        for prob_dict in sim_vars[var_name][i]:
-                            team_particles_probability_dict = {}
-                            for key, val in prob_dict.items():
-                                print('key: ', key, ' val: ', val)
-                                team_particles_probability_dict[key] = float(val)
+                            # ## for newer trials; each test has probability separately
+                            for prob_dict in sim_vars[var_name][i]:
+                                team_particles_probability_dict = {}
+                                for key, val in prob_dict.items():
+                                    print('key: ', key, ' val: ', val)
+                                    team_particles_probability_dict[key] = float(val)
 
-                        
-                        # for older trials; only one probability
-                        # if True:
-                        #     team_particles_probability_dict = str_to_dict(sim_vars[var_name][i], var_type=float)
-                        ###########
+                            
+                            # for older trials; only one probability
+                            # if True:
+                            #     team_particles_probability_dict = str_to_dict(sim_vars[var_name][i], var_type=float)
+                            ###########
 
-                            print('team_particles_probability_dict: ', team_particles_probability_dict)
+                                print('team_particles_probability_dict: ', team_particles_probability_dict)
 
-                            for p_id, player in enumerate(team_particles_probability_dict):
-                                particles_probability_dict = {}
-                                particles_probability_dict['run_no'] = run_id
-                                particles_probability_dict['demo_strategy'] = sim_vars['demo_strategy'][i]
-                                particles_probability_dict['team_composition'] = team_composition
-                                particles_probability_dict['loop_count'] = int(sim_vars['loop_count'][i])
-                                particles_probability_dict['test_id'] = test_id
-                                particles_probability_dict['test_constraints'] = test_constraints[test_id-1]
-                                particles_probability_dict['update_id'] = update_id
-                                particles_probability_dict['kc_id'] = kc_variables
-                                particles_probability_dict['player_id'] = player
-                                particles_probability_dict['learning_factor'] = lf_array[p_id]
-                                particles_probability_dict['particles_prob'] = float(team_particles_probability_dict[player])
-                                particles_probability_dict['file_name'] = file
+                                for p_id, player in enumerate(team_particles_probability_dict):
+                                    particles_probability_dict = {}
+                                    particles_probability_dict['run_no'] = run_id
+                                    particles_probability_dict['demo_strategy'] = sim_vars['demo_strategy'][i]
+                                    particles_probability_dict['team_composition'] = team_composition
+                                    particles_probability_dict['loop_count'] = int(sim_vars['loop_count'][i])
+                                    particles_probability_dict['test_id'] = test_id
+                                    particles_probability_dict['test_constraints'] = test_constraints[test_id-1]
+                                    particles_probability_dict['update_id'] = update_id
+                                    particles_probability_dict['update_type'] = var_name
+                                    particles_probability_dict['kc_id'] = kc_variables
+                                    particles_probability_dict['player_id'] = player
+                                    particles_probability_dict['learning_factor'] = lf_array[p_id]
+                                    particles_probability_dict['particles_prob'] = float(team_particles_probability_dict[player])
+                                    particles_probability_dict['file_name'] = file
 
-                                particles_prob = particles_prob.append(particles_probability_dict, ignore_index=True)
+                                    particles_prob = particles_prob.append(particles_probability_dict, ignore_index=True)
 
-                            test_id += 1
+                                test_id += 1
                         ################   
                         
                         update_id += 1
@@ -1723,10 +1725,12 @@ def simulate_individual_runs(params, path, file, run_id, viz_flag = False, vars_
             prob_pf_teacher_before_test_dict['N_tests'] = N_tests
             prob_pf_teacher_after_test_dict['N_tests'] = N_tests
             
+
+            tests_correct_flag = True
             for test_id in range(N_tests):
                 
                 if (all_test_responses[test_id] == test_loop_extended[test_id]).all():
-                    team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 0], max_learning_factor)
+                    # team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 0], max_learning_factor)
                     var_name = 'response_type_' + member_id
                     if test_id == 0:
                         prob_pf_learner_before_test_dict[var_name] = ['correct']
@@ -1739,8 +1743,9 @@ def simulate_individual_runs(params, path, file, run_id, viz_flag = False, vars_
                         prob_pf_teacher_before_test_dict[var_name].append('correct')
                         prob_pf_teacher_after_test_dict[var_name].append('correct')
                 else:
-                    team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 1], max_learning_factor)
+                    # team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 1], max_learning_factor)
                     var_name = 'response_type_' + member_id
+                    tests_correct_flag = False
                     if test_id == 0:
                         prob_pf_learner_before_test_dict[var_name] = ['incorrect']
                         prob_pf_learner_after_test_dict[var_name] = ['incorrect']
@@ -1751,6 +1756,13 @@ def simulate_individual_runs(params, path, file, run_id, viz_flag = False, vars_
                         prob_pf_learner_after_test_dict[var_name].append('incorrect')
                         prob_pf_teacher_before_test_dict[var_name].append('incorrect')
                         prob_pf_teacher_after_test_dict[var_name].append('incorrect')
+
+            # update learning factor when all tests are correct
+            if tests_correct_flag:
+                team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 0], max_learning_factor)
+            else:
+                team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 1], max_learning_factor)
+
 
         # update test dataframes
         prob_pf = prob_pf.append(prob_pf_teacher_before_test_dict, ignore_index=True)
@@ -2023,10 +2035,10 @@ def simulate_individual_runs_w_feedback(params, path, file, run_id, viz_flag = F
 
 
             print('Teacher update after feedback for member: ', member_id)
-            teacher_pf[member_id].update(test_loop_extended, learning_factor = teacher_feedback_lf, model_type = params.teacher_update_model_type,  plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Teacher belief after test for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
+            teacher_pf[member_id].update(test_loop_extended, learning_factor = teacher_feedback_lf, model_type = params.teacher_update_model_type,  plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Teacher belief after corrective feedback for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
 
             print('Learner update after feedback for member: ', member_id)
-            learner_pf[member_id].update(test_loop_extended, learning_factor = learner_feedback_lf, model_type = learner_update_type, plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Learner belief after test for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
+            learner_pf[member_id].update(test_loop_extended, learning_factor = learner_feedback_lf, model_type = learner_update_type, plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Learner belief after corrective feedback for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
 
 
             # probabilities after feedback
@@ -2049,10 +2061,11 @@ def simulate_individual_runs_w_feedback(params, path, file, run_id, viz_flag = F
             prob_pf_teacher_before_test_dict['N_tests'] = N_tests
             prob_pf_teacher_after_test_dict['N_tests'] = N_tests
             
+            tests_correct_flag = True
             for test_id in range(N_tests):
                 
                 if (all_test_responses[test_id] == test_loop_extended[test_id]).all():
-                    team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 0], max_learning_factor)
+                    # team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 0], max_learning_factor)
                     var_name = 'response_type_' + member_id
                     if test_id == 0:
                         prob_pf_learner_before_test_dict[var_name] = ['correct']
@@ -2067,7 +2080,8 @@ def simulate_individual_runs_w_feedback(params, path, file, run_id, viz_flag = F
                         prob_pf_teacher_after_feedback_dict[var_name].append('correct')
                         prob_pf_learner_after_feedback_dict[var_name].append('correct')
                 else:
-                    team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 1], max_learning_factor)
+                    # team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 1], max_learning_factor)
+                    tests_correct_flag = False
                     var_name = 'response_type_' + member_id
                     if test_id == 0:
                         prob_pf_learner_before_test_dict[var_name] = ['incorrect']
@@ -2081,6 +2095,12 @@ def simulate_individual_runs_w_feedback(params, path, file, run_id, viz_flag = F
                         prob_pf_teacher_after_test_dict[var_name].append('incorrect')
                         prob_pf_teacher_after_feedback_dict[var_name].append('incorrect')
                         prob_pf_learner_after_feedback_dict[var_name].append('incorrect')
+
+            # update learning factor when all tests are correct
+            if tests_correct_flag:
+                team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 0], max_learning_factor)
+            else:
+                team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 1], max_learning_factor)
 
         # update test dataframes
         prob_pf = prob_pf.append(prob_pf_teacher_before_test_dict, ignore_index=True)
@@ -2129,6 +2149,107 @@ def simulate_individual_runs_w_feedback(params, path, file, run_id, viz_flag = F
 
     # plt.show()
     
+
+
+def plot_pf_updates(path, file_prefix):
+
+    filelist = os.listdir(path)
+    save_filename = path + '/' + file_prefix + '_full_compiled_data.csv'
+
+    try:
+        
+        prob_data = pd.read_csv(save_filename)
+    except:
+
+        prob_data = pd.DataFrame()
+        run_id = 1
+        for filename in filelist:
+            # if file_prefix in filename and '.csv' in filename:
+            if file_prefix in filename and '.csv' in filename and 'lf_update' in filename:
+                filename_wo_prefix = filename.split(file_prefix)[0]
+                print('filename_wo_prefix: ', filename_wo_prefix)
+                print('Reading file: ', filename)
+                trial_data = pd.read_csv(path + '/' + filename)
+
+                trial_data['run_id'] = run_id*np.ones(len(trial_data))
+                
+                if 'no_noise' in filename_wo_prefix:
+                    trial_data['noise_cond'] = ['no_noise']*len(trial_data)
+                else:
+                    trial_data['noise_cond'] = ['noise']*len(trial_data)
+
+                if 'w_feedback' in filename_wo_prefix:
+                    trial_data['feedback_cond'] = ['w_feedback']*len(trial_data)
+                else:
+                    trial_data['feedback_cond'] = ['no_feedback']*len(trial_data)
+
+                prob_data = prob_data.append(trial_data, ignore_index=True)
+
+                run_id += 1
+
+        prob_data.to_csv(save_filename)
+
+    print(prob_data)
+
+    # plot data
+
+    plot_data_no_feedback = prob_data[(prob_data['prob_type']=='learner_before_test') & (prob_data['noise_cond']=='noise') & (prob_data['feedback_cond']=='no_feedback')]
+    plot_data_feedback = prob_data[(prob_data['prob_type']=='learner_before_test') & (prob_data['noise_cond']=='noise') & (prob_data['feedback_cond']=='w_feedback')]
+
+    plot_data_no_feedback.to_csv(path + '/' + file_prefix + '_plot_data_w_noise_no_feedback.csv')
+    plot_data_feedback.to_csv(path + '/' + file_prefix + '_plot_data_w_noise_feedback.csv')
+
+
+
+    # plot probabilities vs loop id
+    f1, ax1= plt.subplots(nrows=3, sharex=True, sharey=True, figsize=(15,10))
+    ax3 = np.array(ax1).reshape(-1)
+    plt.subplots_adjust(wspace=0.1, hspace=0.1)
+
+    for col_id in range(3):  
+        member_id = 'p' + str(col_id+1)
+        sns.lineplot(plot_data_no_feedback, x='loop_id', y = member_id, ax=ax1[col_id], errorbar=('se', 1), err_style="band").set(title='Member'+ member_id)
+        ax3[col_id] = ax1[col_id].twinx()
+        sns.lineplot(plot_data_no_feedback, x='loop_id', y = member_id+'_lf', ax=ax3[col_id], errorbar=('se', 1), err_style="band", color = 'r').set(title='Member'+ member_id)
+        ax3[col_id].set_ylim(ax3[col_id].get_ylim()[::-1])
+
+    f1.suptitle('Prob. correct test response, with noise, no feedback')
+    
+
+
+    f2, ax2 = plt.subplots(nrows=3, sharex=True, sharey=True, figsize=(15,10))
+    ax4 = np.array(ax2).reshape(-1)
+    plt.subplots_adjust(wspace=0.1, hspace=0.1)
+
+    for col_id in range(3):  
+        member_id = 'p' + str(col_id+1)
+        sns.lineplot(plot_data_feedback, x='loop_id', y = member_id, ax=ax2[col_id], errorbar=('se', 1), err_style="band").set(title='Member'+ member_id)
+        ax4[col_id] = ax2[col_id].twinx()
+        sns.lineplot(plot_data_feedback, x='loop_id', y = member_id+'_lf', ax=ax4[col_id], errorbar=('se', 1), err_style="band", color='r').set(title='Member'+ member_id)
+        ax4[col_id].set_ylim(ax4[col_id].get_ylim()[::-1])
+
+    f2.suptitle('Prob. correct test response, with noise, with feedback')
+
+    plt.show()
+
+
+
+    # # plot learning factor vs probability
+    # f5, ax5 = plt.subplots(nrows=3, sharex=True, sharey=True, figsize=(15,10))
+    # plt.subplots_adjust(wspace=0.1, hspace=0.1)
+
+    # for col_id in range(3):  
+    #     member_id = 'p' + str(col_id+1)
+    #     lf_member = member_id + '_lf'
+    #     sns.lineplot(plot_data_no_feedback, x=lf_member, y = member_id, ax=ax5[col_id], errorbar=('se', 1), err_style="band").set(title='Member'+ member_id)
+
+
+    # f5.suptitle('Learning factor vs. Prob. correct test response, no noise, no feedback')
+
+    # plt.show()
+
+
+
 
 
 ####################################
@@ -2203,13 +2324,13 @@ def read_prob_data(path, file):
 if __name__ == "__main__":
 
     # process team knowledge data
-    path = 'data/simulation/sim_experiments/new_data'
+    path = 'models/augmented_taxi2'
     files = os.listdir(path)
 
-    # all_file_prefix_list = ['trials_12_17']
+    # all_file_prefix_list = ['debug_data_debug_trials_01_22_no_noise_w_feedback_study_1']
     # all_runs_to_exclude_list = [[3, 12, 24, 7], [1,4,6,8], [], [1,3, 11, 12, 16, 18], [17, 21, 35], [], [], [], \
     #                             [], [], [], [], [], [], []]
-    # all_runs_to_exclude_list = []
+    all_runs_to_exclude_list = []
 
     # sets_to_consider = [14]
     # file_prefix_list = [all_file_prefix_list[i] for i in sets_to_consider]
@@ -2218,22 +2339,21 @@ if __name__ == "__main__":
     # file_prefix_list = ['trials_12_29_w_updated', 'trials_12_30_w_updated', 'trials_12_31_w_updated', 'trials_01_01_w_updated', 
     #                     'trials_01_02_w_updated', 'trials_01_03_w_updated', 'trials_01_04_w_updated']
     
-    # file_prefix_list = ['trials_01_08_regular']
+    file_prefix_list = ['debug_data_debug_trials_01_22_no_noise_w_feedback_study_1']
     
-    # # runs_to_exclude_list = ['unfinished', 'trials_01_01_w_updated_noise_57'] 
-    # runs_to_exclude_list = ['unfinished']
-    # # trials_01_01_w_updated_noise_57.csv - outlier, N = 48 trials
+    # runs_to_exclude_list = ['unfinished', 'trials_01_01_w_updated_noise_57'] 
+    runs_to_exclude_list = ['unfinished']
+    # trials_01_01_w_updated_noise_57.csv - outlier, N = 48 trials
 
-    # vars_filename_prefix = 'analysis_after_fixes'
+    vars_filename_prefix = 'analysis'
 
-    # print(file_prefix_list)
-    # print(runs_to_exclude_list)
+    print(file_prefix_list)
+    print(runs_to_exclude_list)
     
-    # runs_to_analyze_list = []
 
-    # run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list = runs_to_exclude_list, runs_to_analyze_list = runs_to_analyze_list, vars_filename_prefix = vars_filename_prefix)
+    run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list = runs_to_exclude_list, vars_filename_prefix = vars_filename_prefix)
 
-    # # analyze_run_data(path, path + '/run_data.csv')
+    # analyze_run_data(path, path + '/run_data.csv')
 
     ###########################################
 
@@ -2374,24 +2494,25 @@ if __name__ == "__main__":
 
     ##############################
 
-    ## Analyze individual runs
+    # ## Analyze individual runs
 
-    # path = 'data/simulation/sim_experiments/new_data'
-    path = 'models/augmented_taxi2'
-    file = ''
+    # # path = 'data/simulation/sim_experiments/new_data'
+    # path = 'models/augmented_taxi2'
+    # file = ''
 
-    # analyze_individual_runs(path, 'trials_01_09_regular_study_1_run_100.pickle')
+    # # analyze_individual_runs(path, 'trials_01_09_regular_study_1_run_100.pickle')
 
-    # plot_prob_ind_run(path, 'trials_01_09_regular_study_1_run_100.pickle')
+    # # plot_prob_ind_run(path, 'trials_01_09_regular_study_1_run_100.pickle')
 
-    simulate_individual_runs(path, 'debug_trials_01_09_no_noise_study_1_run_8.pickle')
+    # simulate_individual_runs(path, 'debug_trials_01_09_no_noise_study_1_run_8.pickle')
 
     # ###########################
-    # ## Analyze particle filter update process
+    # # ## Analyze particle filter update process
     # path = 'models/augmented_taxi2'
     # file_prefix = 'trials_01_09_no_noise_study_1_run_8'
 
-    # read_prob_data(path, file_prefix)
+    # plot_pf_updates(path, file_prefix)
+
 
 
 

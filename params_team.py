@@ -349,6 +349,8 @@ debug_hm_sampling = False
 plot_sampled_counterfactual_models_flag = False
 save_plots_flag = False
 show_plots_flag = False
+correct_response_factor = 1.1
+incorrect_response_factor = 1.05
 
 team_size = 3
 

@@ -1047,15 +1047,22 @@ def split_pickle_file(path, file):
             duplicate_run_start_id.append(i+1)
     
 
-    if len(duplicate_run_start_id) > 0:
-        if len(duplicate_run_start_id) == 1:
-            duplicate_trial_data = trial_data[duplicate_run_start_id[0]:]
-            trial_data = trial_data[:duplicate_run_start_id[0]-1]
-        else:
-            RuntimeError('More than two trial data!')
+    # if len(duplicate_run_start_id) > 0:
+    #     if len(duplicate_run_start_id) == 1:
+    #         duplicate_trial_data = trial_data[duplicate_run_start_id[0]:]
+    #         trial_data = trial_data[:duplicate_run_start_id[0]-1]
+    #     else:
+    #         RuntimeError('More than two trial data!')
 
-        with open(path + '/duplicate_' + file, 'wb') as f:
-            pickle.dump(duplicate_trial_data, f)
+    #     with open(path + '/duplicate_' + file, 'wb') as f:
+    #         pickle.dump(duplicate_trial_data, f)
+
+    #     with open(path + '/' + file, 'wb') as f:
+    #         pickle.dump(trial_data, f)
+            
+    # save only the last trial data
+    if len(duplicate_run_start_id) > 0:
+        trial_data = trial_data[duplicate_run_start_id[-1]:]
 
         with open(path + '/' + file, 'wb') as f:
             pickle.dump(trial_data, f)
