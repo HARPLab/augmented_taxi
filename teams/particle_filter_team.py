@@ -1033,9 +1033,9 @@ class Particles_team():
 
         return entropy
 
-    def calc_info_gain(self, new_constraints):
+    def calc_info_gain(self, new_constraints, learning_factor):
         new_particles = copy.deepcopy(self)
-        new_particles.update(new_constraints)
+        new_particles.update(new_constraints, learning_factor=learning_factor)
 
         return self.calc_entropy() - new_particles.calc_entropy()
 
@@ -1176,7 +1176,7 @@ class Particles_team():
     ################################################################################################
 
 
-    def update(self, constraints, c=0.5, reset_threshold_prob=0.001, learning_factor = None, plot_title = None, model_type = 'noise', viz_flag = False, vars_filename = 'sim_run'):
+    def update(self, constraints, learning_factor, c=0.5, reset_threshold_prob=0.001, plot_title = None, model_type = 'noise', viz_flag = False, vars_filename = 'sim_run'):
         self.weights_prev = self.weights.copy()
         self.positions_prev = self.positions.copy()
         # print(colored('constraints: ' + str(constraints), 'red'))
@@ -1417,10 +1417,13 @@ class Particles_team():
                 for cnst in constraints:
                     fig.text(x_loc, y_loc, str(cnst), fontsize=20)
                     y_loc -= 0.05
-                if learning_factor is not None:
-                    fig.text(0.2, y_loc, 'Learning factor: ' + str(learning_factor), fontsize=20)
-                else:
-                    fig.text(0.2, y_loc, 'Learning factor: ' + str(self.u_prob_mass_scaled), fontsize=20)
+                
+                # if learning_factor is not None:
+                #     fig.text(0.2, y_loc, 'Learning factor: ' + str(learning_factor), fontsize=20)
+                # else:
+                #     fig.text(0.2, y_loc, 'Learning factor: ' + str(self.u_prob_mass_scaled), fontsize=20)
+
+                fig.text(0.2, y_loc, 'Learning factor: ' + str(learning_factor), fontsize=20)
 
         if viz_flag and params.show_plots_flag:
             plt.show()
@@ -1434,25 +1437,33 @@ class Particles_team():
 
 
 
-    def reweight(self, constraint, learning_factor = None):
+    def reweight(self, constraint, learning_factor):
         '''
         :param constraints: normal of constraints / mean direction of VMF
         :param k: concentration parameter of VMF
         :return: probability of x under this composite distribution (uniform + VMF)
         '''
         print(colored('Reweighting particles for learning factor: ' + str(learning_factor), 'red'))
-        if learning_factor is None:
-            u_pdf_scaled = self.u_pdf_scaled
-            VMF_kappa = self.VMF_kappa
-            x1 = self.x1
-            x2 = self.x2
+        # if learning_factor is None:
+        #     u_pdf_scaled = self.u_pdf_scaled
+        #     VMF_kappa = self.VMF_kappa
+        #     x1 = self.x1
+        #     x2 = self.x2
+        # else:
+        #     u_pdf_scaled = learning_factor/(2*np.pi)
+        #     VMF_kappa, x1 = self.solve_for_distribution_params(learning_factor)
+        #     if self.sampling_flag == 'continuous':
+        #         x2 = learning_factor/0.5
+        #     else:
+        #         x2 = 1 
+
+        # lf is always provided
+        u_pdf_scaled = learning_factor/(2*np.pi)
+        VMF_kappa, x1 = self.solve_for_distribution_params(learning_factor)
+        if self.sampling_flag == 'continuous':
+            x2 = learning_factor/0.5
         else:
-            u_pdf_scaled = learning_factor/(2*np.pi)
-            VMF_kappa, x1 = self.solve_for_distribution_params(learning_factor)
-            if self.sampling_flag == 'continuous':
-                x2 = learning_factor/0.5
-            else:
-                x2 = 1 
+            x2 = 1 
 
         for j, x in enumerate(self.positions):
             obs_prob = self.observation_probability(u_pdf_scaled, VMF_kappa, x, constraint, x1, x2)

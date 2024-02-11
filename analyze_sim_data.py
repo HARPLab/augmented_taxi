@@ -104,16 +104,16 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
 
     ### load previously saved data
     try:
-        with open (path + '/' + vars_filename_prefix + '_' + 'team_knowledge_level_long.pickle', 'rb') as f:
+        with open (path + '/' + vars_filename_prefix + '_' + 'team_knowledge_level_long2.pickle', 'rb') as f:
             team_knowledge_level_long = pickle.load(f)
 
-        with open (path + '/' + vars_filename_prefix + '_' + 'interaction_count.pickle', 'rb') as f:
+        with open (path + '/' + vars_filename_prefix + '_' + 'interaction_count2.pickle', 'rb') as f:
             interaction_count = pickle.load(f)
 
-        with open (path + '/' + vars_filename_prefix + '_' + 'run_data.pickle', 'rb') as f:
+        with open (path + '/' + vars_filename_prefix + '_' + 'run_data2.pickle', 'rb') as f:
             run_data = pickle.load(f)
 
-        with open (path + '/' + vars_filename_prefix + '_' + 'particles_prob.pickle', 'rb') as f:
+        with open (path + '/' + vars_filename_prefix + '_' + 'particles_prob2.pickle', 'rb') as f:
             particles_prob = pickle.load(f)
         
         
@@ -205,6 +205,7 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
                         test_constraints = sim_vars['test_constraints'][i]
                         team_composition = str(sim_vars['team_composition'][i])
                         print('team_composition: ', type(team_composition))
+                        print('test_constraints: ', test_constraints)
 
 
                         ### Unit knowledge level
@@ -363,15 +364,16 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
                                          'particles_prob_teacher_before_test', 'particles_prob_learner_before_test', 'particles_prob_teacher_after_test', 'particles_prob_teacher_after_feedback', 'particles_prob_learner_after_feedback']:
 
                         
-                            test_id = 1
+                            # test_id = 1
                             print('sim_vars[var_name][i]:', sim_vars[var_name][i])
 
-                            # ## for newer trials; each test has probability separately
-                            for prob_dict in sim_vars[var_name][i]:
-                                team_particles_probability_dict = {}
-                                for key, val in prob_dict.items():
-                                    print('key: ', key, ' val: ', val)
-                                    team_particles_probability_dict[key] = float(val)
+                            # ##  each test has probability separately
+                            # for prob_dict in sim_vars[var_name][i]:
+                            ## joint test has probability separately
+                            team_particles_probability_dict = {}
+                            for key, val in sim_vars[var_name][i].items():
+                                print('key: ', key, ' val: ', val)
+                                team_particles_probability_dict[key] = float(val)
 
                             
                             # for older trials; only one probability
@@ -387,8 +389,8 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
                                     particles_probability_dict['demo_strategy'] = sim_vars['demo_strategy'][i]
                                     particles_probability_dict['team_composition'] = team_composition
                                     particles_probability_dict['loop_count'] = int(sim_vars['loop_count'][i])
-                                    particles_probability_dict['test_id'] = test_id
-                                    particles_probability_dict['test_constraints'] = test_constraints[test_id-1]
+                                    # particles_probability_dict['test_id'] = test_id
+                                    particles_probability_dict['test_constraints'] = test_constraints
                                     particles_probability_dict['update_id'] = update_id
                                     particles_probability_dict['update_type'] = var_name
                                     particles_probability_dict['kc_id'] = kc_variables
@@ -399,7 +401,7 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
 
                                     particles_prob = particles_prob.append(particles_probability_dict, ignore_index=True)
 
-                                test_id += 1
+                                # test_id += 1
                         ################   
                         
                         update_id += 1
@@ -492,37 +494,36 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
         unique_ids = team_knowledge_level_long['run_no'].unique()
         interaction_count = pd.DataFrame()
 
+        team_BEC_knowledge_level.to_csv(path + '/' + vars_filename_prefix + '_' + 'team_BEC_knowledge_level.csv')
         print(team_BEC_knowledge_level)
 
         # for id in unique_ids:
         for id in range(len(run_history)):
             interaction_count_dict = {}
+            print('Run: ', run_history[id])
             for c_id in range(len(concept_ids)):
                 interaction_count_dict['run_no'] = run_history[id]
                 interaction_count_dict['learning_complete_flag'] = learning_complete_history[id]
-                interaction_count_dict['demo_strategy'] = ''.join(str(element) for element in team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == run_history[id]]['demo_strategy'].iloc[0])
-                interaction_count_dict['team_composition'] = ''.join(str(element) for element in team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == run_history[id]]['team_composition'].iloc[0])
-                
-                print('A: ', team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == run_history[id]]['loop_count'])
-                print('run_no: ', run_history[id], ' c_id: ', c_id, ' concept_ids[c_id+1]: ', concept_ids[c_id])
+                if learning_complete_history[id]:
+                    interaction_count_dict['demo_strategy'] = ''.join(str(element) for element in team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == run_history[id]]['demo_strategy'].iloc[0])
+                    interaction_count_dict['team_composition'] = ''.join(str(element) for element in team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == run_history[id]]['team_composition'].iloc[0])
 
-                run_team_knowledge_data = team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == run_history[id]]
-                
-                if concept_ids[c_id] <= run_team_knowledge_data['knowledge_comp_id'].iloc[-1]:
-                    loop_id_list = []
-                    for idx, row in team_BEC_knowledge_level.iterrows():
-                        print('row[run_no]: ', row['run_no'], ' run_history[id]: ', run_history[id], ' row[knowledge_comp_id]: ', row['knowledge_comp_id'], ' concept_ids[c_id]: ', concept_ids[c_id])
-                        if row['run_no'] == run_history[id] and row['knowledge_comp_id'] == concept_ids[c_id]:
-                            loop_id_list.append(row['loop_count'])
+                    run_team_knowledge_data = team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == run_history[id]]
                     
-                    max_loop_count = max(loop_id_list)-min(loop_id_list)+1
+                    if concept_ids[c_id] <= run_team_knowledge_data['knowledge_comp_id'].iloc[-1]:
+                        loop_id_list = []
+                        for idx, row in team_BEC_knowledge_level.iterrows():
+                            # print('row[run_no]: ', row['run_no'], ' run_history[id]: ', run_history[id], ' row[knowledge_comp_id]: ', row['knowledge_comp_id'], ' concept_ids[c_id]: ', concept_ids[c_id])
+                            if row['run_no'] == run_history[id] and row['knowledge_comp_id'] == concept_ids[c_id]:
+                                loop_id_list.append(row['loop_count'])
+                        
+                        max_loop_count = max(loop_id_list)-min(loop_id_list)+1
                     
-                    # max_loop_id = team_BEC_knowledge_level[(team_BEC_knowledge_level['run_no'] == run_history[id]) & (team_BEC_knowledge_level['knowledge_comp_id'] == concept_ids[c_id])]['loop_count'].iloc[-1]
-                    # max_loop_count = max_loop_id - team_BEC_knowledge_level[(team_BEC_knowledge_level['run_no'] == run_history[id]) & (team_BEC_knowledge_level['knowledge_comp_id'] == concept_ids[c_id])]['loop_count'].iloc[0] + 1
-                
-                # else:
-                #     max_loop_id = []
-                #     max_loop_count = 0
+                else:
+                    interaction_count_dict['demo_strategy'] = ''
+                    interaction_count_dict['team_composition'] = ''
+                    max_loop_count = 0
+
 
                 interaction_count_dict['Int_end_id_concept_'+str(concept_ids[c_id])] = max(loop_id_list)
                 interaction_count_dict['N_int_concept_'+str(concept_ids[c_id])] = max_loop_count    
@@ -545,11 +546,17 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
             run_data_dict = {}
             run_data_dict['run_no'] = run_history[id]
             run_data_dict['learning_complete_flag'] = learning_complete_history[id]
-            run_data_dict['demo_strategy'] = ''.join(str(element) for element in team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['demo_strategy'].iloc[0])
-            run_data_dict['max_loop_count'] = int(team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['loop_count'].iloc[-1])
-            run_data_dict['team_composition'] = ''.join(str(element) for element in team_knowledge_level_long[team_knowledge_level_long['run_no'] == id]['team_composition'].iloc[0])
-            run_data_dict['file_name'] = ''.join(str(element) for element in team_knowledge_level_long[team_knowledge_level_long['run_no'] == id]['file_name'].iloc[0])
-            
+            if learning_complete_history[id]:
+                run_data_dict['demo_strategy'] = ''.join(str(element) for element in team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['demo_strategy'].iloc[0])
+                run_data_dict['max_loop_count'] = int(team_BEC_knowledge_level[team_BEC_knowledge_level['run_no'] == id]['loop_count'].iloc[-1])
+                run_data_dict['team_composition'] = ''.join(str(element) for element in team_knowledge_level_long[team_knowledge_level_long['run_no'] == id]['team_composition'].iloc[0])
+                run_data_dict['file_name'] = ''.join(str(element) for element in team_knowledge_level_long[team_knowledge_level_long['run_no'] == id]['file_name'].iloc[0])
+            else:
+                run_data_dict['demo_strategy'] = ''
+                run_data_dict['max_loop_count'] = 0
+                run_data_dict['team_composition'] = ''
+                run_data_dict['file_name'] = ''
+
             run_data = run_data.append(run_data_dict, ignore_index=True)
 
         run_data.to_csv(path + '/' + vars_filename_prefix + '_' + 'run_data.csv')
@@ -1434,424 +1441,44 @@ def debug_calc_prob_mass_correct_side(constraints, particles, team_learning_fact
     return prob_mass_correct_side_constraints
 
 
-def simulate_individual_runs(params, path, file, run_id, viz_flag = False, vars_filename_prefix = ''):
-    ### read trial data and simulate particle filter updates ####
-
-    # debug params
-    interesting_interactions = []
-    learner_update_type = 'no_noise'
-
-    # load trial data
-    trial_data = pd.read_pickle(path + '/' + file)
-
-    # simulated 
-    vars_filename_prefix = vars_filename_prefix + '_' + file.split('.')[0] + '_' + str(run_id) 
-
-    # trial conditions
-    demo_strategy = trial_data['demo_strategy'].iloc[0]
-    team_composition = trial_data['team_composition'].iloc[0]
-
-    # trial params
-    max_learning_factor = trial_data['max_learning_factor'].iloc[0]
-    initial_team_learning_factor = trial_data['initial_team_learning_factor'].iloc[0]
-    team_learning_factor = copy.deepcopy(initial_team_learning_factor)
-    print('initial_team_learning_factor: ', initial_team_learning_factor)
-
-
-    # fixed params (start saving these too to the trial data)
-    team_learning_rate =  np.hstack((0.05*np.ones([params.team_size, 1]), 0*np.ones([params.team_size, 1])))
-    default_learning_factor_teacher = 0.8
-
-
-    # trial variables
-    demo_constraints = trial_data['unit_constraints']
-    min_demo_constraints = trial_data['min_KC_constraints']
-    test_constraints = trial_data['test_constraints']
-    test_responses_team = trial_data['test_constraints_team']
-    loop_count = trial_data['loop_count']
-    team_response_models = trial_data['team_response_models']
-    # team_learning_factor = trial_data['team_learning_factor']
-
-    # actual particles and probabilities (for comparison)
-    # teacher_pf_actual_after_demo = trial_data['particles_team_teacher_after_demos']
-    learner_pf_actual_after_demo = trial_data['particles_team_learner_after_demos']
-    # teacher_pf_actual_after_test = trial_data['particles_team_teacher_final']
-    # learner_pf_actual_after_test = trial_data['particles_team_learner_final']
-    # prob_pf_actual_teacher_before_demo = trial_data['particles_prob_teacher_before_demo']
-    # prob_pf_actual_learner_before_demo = trial_data['particles_prob_learner_before_demo']
-    # prob_pf_actual_teacher_before_test = trial_data['particles_prob_teacher_before_test']
-    prob_pf_actual_learner_before_test_read_data = trial_data['particles_prob_learner_before_test']
-
-    # initialize (simulated) teacher and learner particle filters
-    team_prior, teacher_pf = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, default_learning_factor_teacher, team_prior = params.team_prior, vars_filename=vars_filename_prefix, model_type = params.teacher_update_model_type)
-    learner_pf = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, default_learning_factor_teacher, team_learning_factor = team_learning_factor, team_prior = params.team_prior, pf_flag='learner', vars_filename=vars_filename_prefix, model_type = learner_update_type)
-
-    # initialize dataframes to save probability data
-    prob_pf = pd.DataFrame()
-
-
-    # simulate teaching-learning interaction process
-    for loop_id in range(len(loop_count)):
-        print(colored('loop_id: ' + str(loop_id), 'red'))
-        if len(interesting_interactions) > 0:
-            if loop_id+1 in interesting_interactions:
-                viz_flag = True
-            else:
-                viz_flag = False
-
-        # loop data
-        demo_loop = demo_constraints.iloc[loop_id]
-        min_demo_loop = min_demo_constraints.iloc[loop_id]
-        test_loop = test_constraints.iloc[loop_id]
-        test_responses_loop = test_responses_team.iloc[loop_id]
-        team_models_loop = team_response_models.iloc[loop_id]
-        prob_pf_actual_learner_before_test_loop = prob_pf_actual_learner_before_test_read_data.iloc[loop_id]
-        learner_pf_actual_after_demo_loop = learner_pf_actual_after_demo.iloc[loop_id]
-        # team_learning_factor_loop = team_learning_factor.iloc[loop_id]
-
-        # initialize dicts to save probability data
-        prob_pf_teacher_before_demo_dict = debug_calc_prob_mass_correct_side(min_demo_loop, teacher_pf, [params.default_learning_factor_teacher]*params.team_size)
-        prob_pf_teacher_before_demo_dict['prob_type'] = 'teacher_before_demo'
-        prob_pf_teacher_before_demo_dict['loop_id'] = loop_id+1
-        prob_pf_teacher_before_demo_dict['constraints'] = min_demo_loop
-
-        prob_pf_learner_before_demo_dict = debug_calc_prob_mass_correct_side(min_demo_loop, learner_pf, team_learning_factor)
-        prob_pf_learner_before_demo_dict['prob_type'] = 'learner_before_demo'
-        prob_pf_learner_before_demo_dict['loop_id'] = loop_id+1
-        prob_pf_learner_before_demo_dict['constraints'] = min_demo_loop
-
-        # update demo dataframes
-        prob_pf = prob_pf.append(prob_pf_teacher_before_demo_dict, ignore_index=True)
-        prob_pf = prob_pf.append(prob_pf_learner_before_demo_dict, ignore_index=True)
-
-        # test dict
-        prob_pf_teacher_before_test_dict = {'loop_id': loop_id+1,  'prob_type': 'teacher_before_test'}
-        prob_pf_learner_before_test_dict = {'loop_id': loop_id+1,  'prob_type': 'learner_before_test'}
-        prob_pf_teacher_after_test_dict = {'loop_id': loop_id+1,  'prob_type': 'teacher_after_test'}
-        prob_pf_learner_after_test_dict = {'loop_id': loop_id+1,  'prob_type': 'learner_after_test'}
-
-        # test constraints
-        test_loop_extended = []
-        for test_id in range(len(test_loop)):
-            test_loop_extended.extend(test_loop[test_id])
-        print('test_loop_extended: ', test_loop_extended)
-
-
-        # update teacher and learner particle filters for demonstrations
-        for p_id in range(params.team_size):
-            member_id = 'p' + str(p_id+1)
-
-            ### update teacher and learner particle filters for demonstrations
-            print('Teacher update after demo for member: ', member_id)
-            teacher_pf[member_id].update(demo_loop, plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Teacher belief after demo for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix, model_type = params.teacher_update_model_type)
-            # teacher_pf[member_id].calc_particles_probability(demo_loop)
-            # prob_pf_teacher_after_demo_dict[member_id] = teacher_pf[member_id].particles_prob_correct
-
-            print('Learner update after demo for member: ', member_id)
-            learner_pf[member_id].update(demo_loop, learning_factor = team_learning_factor[p_id], plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Learner belief after demo for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix, model_type = learner_update_type)
-            # learner_pf[member_id].calc_particles_probability(demo_loop)
-            # prob_pf_learner_after_demo_dict[member_id] = learner_pf[member_id].particles_prob_correct
-
-        # update prob after demos
-        prob_pf_teacher_after_demo_dict = debug_calc_prob_mass_correct_side(min_demo_loop, teacher_pf, [params.default_learning_factor_teacher]*params.team_size)
-        prob_pf_teacher_after_demo_dict['loop_id'] = loop_id+1
-        prob_pf_teacher_after_demo_dict['constraints'] = min_demo_loop
-        prob_pf_teacher_after_demo_dict['prob_type'] = 'teacher_after_demo'
-        
-
-        prob_pf_learner_after_demo_dict = debug_calc_prob_mass_correct_side(min_demo_loop, learner_pf, team_learning_factor)
-        prob_pf_learner_after_demo_dict['loop_id'] = loop_id+1
-        prob_pf_learner_after_demo_dict['constraints'] = min_demo_loop
-        prob_pf_learner_after_demo_dict['prob_type'] = 'learner_after_demo'
-
-        # update demo dataframes
-        prob_pf = prob_pf.append(prob_pf_teacher_after_demo_dict, ignore_index=True)
-        prob_pf = prob_pf.append(prob_pf_learner_after_demo_dict, ignore_index=True)
-
-        # plot sampled models
-        print('team_models_loop: ', team_models_loop)
-        if viz_flag:
-            plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Human models sampled for test'
-            sim_helpers.plot_sampled_models(learner_pf, test_loop_extended, team_models_loop, 1, plot_title = plot_title, vars_filename=vars_filename_prefix)
-            plot_title = 'Actual interaction No.' + str(loop_id +1) + '. Human models sampled for test'
-            sim_helpers.plot_sampled_models(learner_pf_actual_after_demo_loop, test_loop_extended, team_models_loop, 1, plot_title = plot_title, vars_filename=vars_filename_prefix)
-            
-            # for p_id in range(params.team_size):
-            #     member_id = 'p' + str(p_id+1)
-            #     print('Member id:', member_id, 'Learner_pf entropy: ', learner_pf[member_id].calc_entropy(), 'learner_pf_actual_after_demo_loop entropy: ', learner_pf_actual_after_demo_loop[member_id].calc_entropy())
-            
-            # if loop_id == 3:
-            #     break
-        print('test_responses_loop: ', test_responses_loop)
-
-
-
-        # ### update teacher and learner particle filters for tests
-
-        # # Method 1: update particle filter (after each test response)
-        # N_tests = len(test_loop)
-        # for test_id in range(N_tests):
-            
-        #     for p_id in range(params.team_size):
-        #         member_id = 'p' + str(p_id+1)
-        #         lf_var = member_id + '_lf'
-                
-        #         if N_tests == 1:
-        #             test_response_ind = test_responses_loop[p_id]
-        #         else:
-        #             test_response_ind = [test_responses_loop[p_id][test_id]]
-        #         print('test_response_ind: ', test_response_ind)
-
-        #         # probabilities before test
-        #         teacher_pf[member_id].calc_particles_probability(test_loop[test_id])
-        #         prob_pf_teacher_before_test_dict[member_id] = teacher_pf[member_id].particles_prob_correct
-        #         prob_pf_teacher_before_test_dict['test_id'] = test_id+1
-        #         prob_pf_teacher_before_test_dict['constraints'] = test_loop[test_id]
-        #         prob_pf_teacher_before_test_dict[lf_var] = params.default_learning_factor_teacher
-
-        #         learner_pf[member_id].calc_particles_probability(test_loop[test_id])
-        #         prob_pf_learner_before_test_dict[member_id] = learner_pf[member_id].particles_prob_correct
-        #         prob_pf_learner_before_test_dict['test_id'] = test_id+1
-        #         prob_pf_learner_before_test_dict['constraints'] = test_loop[test_id]
-        #         prob_pf_learner_before_test_dict[lf_var] = team_learning_factor[p_id]
-
-
-        #         # update particle filter for test response
-        #         print('Teacher update after test ', test_id, ' for member: ', member_id)
-        #         teacher_pf[member_id].update(test_response_ind, model_type = params.teacher_update_model_type,  plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Teacher belief after test for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
-            
-        #         print('Learner update after test ', test_id, ' for member: ', member_id)
-        #         learner_pf[member_id].update(test_response_ind, learning_factor = team_learning_factor[p_id], model_type = learner_update_type, plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Learner belief after test for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
-
-
-        #         # probabibilites after test
-        #         teacher_pf[member_id].calc_particles_probability(test_loop[test_id])
-        #         prob_pf_teacher_after_test_dict[member_id] = teacher_pf[member_id].particles_prob_correct
-        #         prob_pf_teacher_after_test_dict['test_id'] = test_id+1
-        #         prob_pf_teacher_after_test_dict['constraints'] = test_loop[test_id]
-        #         prob_pf_teacher_after_test_dict[lf_var] = params.default_learning_factor_teacher
-
-        #         learner_pf[member_id].calc_particles_probability(test_loop[test_id])
-        #         prob_pf_learner_after_test_dict[member_id] = learner_pf[member_id].particles_prob_correct
-        #         prob_pf_learner_after_test_dict['test_id'] = test_id+1
-        #         prob_pf_learner_after_test_dict['constraints'] = test_loop[test_id]
-        #         prob_pf_learner_after_test_dict[lf_var] = team_learning_factor[p_id]
-
-
-        #         # response type
-        #         response_type = []
-        #         if (test_response_ind == test_loop_extended[test_id]).all():
-        #             team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 0], max_learning_factor)
-        #             var_name = 'response_type_' + member_id
-        #             prob_pf_learner_before_test_dict[var_name] = 'correct'
-        #             prob_pf_learner_after_test_dict[var_name] = 'correct'
-        #             prob_pf_teacher_before_test_dict[var_name] = 'correct'
-        #             prob_pf_teacher_after_test_dict[var_name] = 'correct'
-        #             
-        #         else:
-        #             team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 1], max_learning_factor)
-        #             var_name = 'response_type_' + member_id
-        #             prob_pf_learner_before_test_dict[var_name] = 'incorrect'
-        #             prob_pf_learner_after_test_dict[var_name] = 'incorrect'
-        #             prob_pf_teacher_before_test_dict[var_name] = 'incorrect'
-        #             prob_pf_teacher_after_test_dict[var_name] = 'incorrect'
-        #             
-
-
-        #     # update test dataframes
-        #     prob_pf = prob_pf.append(prob_pf_teacher_before_test_dict, ignore_index=True)
-        #     prob_pf = prob_pf.append(prob_pf_learner_before_test_dict, ignore_index=True)
-        #     prob_pf = prob_pf.append(prob_pf_teacher_after_test_dict, ignore_index=True)
-        #     prob_pf = prob_pf.append(prob_pf_learner_after_test_dict, ignore_index=True)
-            
-
-        ############
-            
-        # # Method 2: update particle filter (after all test responses)
-        N_tests = len(test_loop)
-        
-        
-        for p_id in range(params.team_size):
-            member_id = 'p' + str(p_id+1)
-            lf_var = member_id + '_lf'
-            
-            if N_tests == 1:
-                all_test_responses = test_responses_loop[p_id]
-            else:
-                all_test_responses = []
-                for test_id in range(N_tests):
-                    all_test_responses.append(test_responses_loop[p_id][test_id])
-            print('all_test_responses: ', all_test_responses)
-
-
-            # probabilities before test
-            teacher_pf[member_id].calc_particles_probability(test_loop_extended)
-            prob_pf_teacher_before_test_dict[member_id] = teacher_pf[member_id].particles_prob_correct
-            prob_pf_teacher_before_test_dict['constraints'] = test_loop_extended
-            prob_pf_teacher_before_test_dict[lf_var] = params.default_learning_factor_teacher
-
-            learner_pf[member_id].calc_particles_probability(test_loop_extended)
-            prob_pf_learner_before_test_dict[member_id] = learner_pf[member_id].particles_prob_correct
-            prob_pf_learner_before_test_dict['constraints'] = test_loop_extended
-            prob_pf_learner_before_test_dict[lf_var] = team_learning_factor[p_id]
-
-
-            # update particle filter for test response
-            print('Teacher update after tests for member: ', member_id)
-            teacher_pf[member_id].update(all_test_responses, model_type = params.teacher_update_model_type,  plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Teacher belief after test for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
-            
-            print('Learner update after test for member: ', member_id)
-            learner_pf[member_id].update(all_test_responses, learning_factor = team_learning_factor[p_id], model_type = learner_update_type, plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Learner belief after test for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
-
-
-            # probabibilites after test
-            teacher_pf[member_id].calc_particles_probability(test_loop_extended)
-            prob_pf_teacher_after_test_dict[member_id] = teacher_pf[member_id].particles_prob_correct
-            prob_pf_teacher_after_test_dict['constraints'] = test_loop_extended
-            prob_pf_teacher_after_test_dict['test_response'] = all_test_responses
-            prob_pf_teacher_after_test_dict[lf_var] = params.default_learning_factor_teacher
-
-            learner_pf[member_id].calc_particles_probability(test_loop_extended)
-            prob_pf_learner_after_test_dict[member_id] = learner_pf[member_id].particles_prob_correct
-            prob_pf_learner_after_test_dict['constraints'] = test_loop_extended
-            prob_pf_learner_after_test_dict['test_response'] = all_test_responses
-            prob_pf_learner_after_test_dict[lf_var] = team_learning_factor[p_id]
-        #########
-
-            # response type and update team learning factor
-            print('all_test_responses: ', all_test_responses, 'test_loop_extended: ', test_loop_extended)
-            prob_pf_learner_before_test_dict['N_tests'] = N_tests
-            prob_pf_learner_after_test_dict['N_tests'] = N_tests
-            prob_pf_teacher_before_test_dict['N_tests'] = N_tests
-            prob_pf_teacher_after_test_dict['N_tests'] = N_tests
-            
-
-            tests_correct_flag = True
-            for test_id in range(N_tests):
-                
-                if (all_test_responses[test_id] == test_loop_extended[test_id]).all():
-                    # team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 0], max_learning_factor)
-                    var_name = 'response_type_' + member_id
-                    if test_id == 0:
-                        prob_pf_learner_before_test_dict[var_name] = ['correct']
-                        prob_pf_learner_after_test_dict[var_name] = ['correct']
-                        prob_pf_teacher_before_test_dict[var_name] = ['correct']
-                        prob_pf_teacher_after_test_dict[var_name] = ['correct']
-                    else:
-                        prob_pf_learner_before_test_dict[var_name].append('correct')
-                        prob_pf_learner_after_test_dict[var_name].append('correct')
-                        prob_pf_teacher_before_test_dict[var_name].append('correct')
-                        prob_pf_teacher_after_test_dict[var_name].append('correct')
-                else:
-                    # team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 1], max_learning_factor)
-                    var_name = 'response_type_' + member_id
-                    tests_correct_flag = False
-                    if test_id == 0:
-                        prob_pf_learner_before_test_dict[var_name] = ['incorrect']
-                        prob_pf_learner_after_test_dict[var_name] = ['incorrect']
-                        prob_pf_teacher_before_test_dict[var_name] = ['incorrect']
-                        prob_pf_teacher_after_test_dict[var_name] = ['incorrect']
-                    else:
-                        prob_pf_learner_before_test_dict[var_name].append('incorrect')
-                        prob_pf_learner_after_test_dict[var_name].append('incorrect')
-                        prob_pf_teacher_before_test_dict[var_name].append('incorrect')
-                        prob_pf_teacher_after_test_dict[var_name].append('incorrect')
-
-            # update learning factor when all tests are correct
-            if tests_correct_flag:
-                team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 0], max_learning_factor)
-            else:
-                team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 1], max_learning_factor)
-
-
-        # update test dataframes
-        prob_pf = prob_pf.append(prob_pf_teacher_before_test_dict, ignore_index=True)
-        prob_pf = prob_pf.append(prob_pf_learner_before_test_dict, ignore_index=True)
-        prob_pf = prob_pf.append(prob_pf_teacher_after_test_dict, ignore_index=True)
-        prob_pf = prob_pf.append(prob_pf_learner_after_test_dict, ignore_index=True)
-        
-        ##############
-        # # save data
-        # if loop_id % 10 == 0:
-        #     # save dataframes
-
-        #     prob_pf_teacher_before_demo.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_teacher_before_demo.csv')
-        #     prob_pf_learner_before_demo.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_learner_before_demo.csv')
-        #     prob_pf_teacher_after_demo.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_teacher_after_demo.csv')
-        #     prob_pf_learner_after_demo.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_learner_after_demo.csv')
-        #     prob_pf_teacher_before_test.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_teacher_before_test.csv')
-        #     prob_pf_learner_before_test.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_learner_before_test.csv')
-        #     prob_pf_teacher_after_test.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_teacher_after_test.csv')
-        #     prob_pf_learner_after_test.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_learner_after_test.csv')
-        #     # prob_pf_actual_learner_before_test.to_csv(path + '/' + vars_filename_prefix + '_prob_pf_actual_learner_before_test.csv')
-
-    #################
-    # save dataframes final
-        
-    prob_pf.to_csv(path + '/' + vars_filename_prefix + '_prob_pf.csv')
-    ####################
-
-    # plot simulated probability data
-    # f, ax = plt.subplots(ncols=3, sharex=True, sharey=True, figsize=(15,10))
-    # plt.subplots_adjust(wspace=0.1, hspace=0.1)
-
-    # # Method 1
-    # for col_id in range(3):  
-    #     member_id = 'p' + str(col_id+1)
-    #     sns.lineplot(prob_pf_learner_before_test, x=prob_pf_learner_before_test.index, y = member_id, hue = 'test_id', ax=ax[col_id], errorbar=('se', 1), err_style="band").set(title='Simulated Prob. correct test response member'+ member_id)
-
-    # # Method 2
-    # for col_id in range(3):  
-    #     member_id = 'p' + str(col_id+1)
-    #     sns.lineplot(prob_pf_learner_before_test, x=prob_pf_learner_before_test.index, y = member_id, ax=ax[col_id], errorbar=('se', 1), err_style="band").set(title='Simulated Prob. correct test response member'+ member_id)
-    # if params.save_plots_flag:
-    #     plt.savefig(path + '/' + vars_filename_prefix + '_simulated_probability.png')
-
-    # # plot actual probability data
-    # f2, ax2 = plt.subplots(ncols=3, sharex=True, sharey=True, figsize=(15,10))
-    # plt.subplots_adjust(wspace=0.1, hspace=0.1)
-
-    # # for col_id in range(3):  
-    # #     member_id = 'p' + str(col_id+1)
-    # #     sns.lineplot(prob_pf_actual_learner_before_test, x=prob_pf_actual_learner_before_test.index, y = member_id, hue = 'test_id', ax=ax2[col_id], errorbar=('se', 1), err_style="band").set(title='Actual Prob. correct test response member'+ member_id)
-
-    # for col_id in range(3):  
-    #     member_id = 'p' + str(col_id+1)
-    #     sns.lineplot(prob_pf_actual_learner_before_test, x=prob_pf_actual_learner_before_test.index, y = member_id, ax=ax2[col_id], errorbar=('se', 1), err_style="band").set(title='Actual Prob. correct test response member'+ member_id)
-
-    # if params.save_plots_flag:
-    #     plt.savefig(path + '/' + vars_filename_prefix + '_actual_probability.png')
-
-    # plt.show()
     
 
-def simulate_individual_runs_w_feedback(params, path, file, run_id, viz_flag = False, vars_filename_prefix = ''):
+def simulate_individual_runs_w_feedback(params, path, file, run_id, feedback_flag = True, review_flag = True, viz_flag = False, vars_filename_prefix = '', args=None):
     ### read trial data and simulate particle filter updates ####
 
     # debug params
     interesting_interactions = []
+
+    # sim params
     learner_update_type = 'no_noise'
 
     # load trial data
     trial_data = pd.read_pickle(path + '/' + file)
-
-    # simulated 
-    vars_filename_prefix = vars_filename_prefix + '_' + file.split('.')[0] + '_' + str(run_id) 
-
+    
     # trial conditions
     demo_strategy = trial_data['demo_strategy'].iloc[0]
-    team_composition = trial_data['team_composition'].iloc[0]
 
-    # trial params
-    max_learning_factor = trial_data['max_learning_factor'].iloc[0]
-    initial_team_learning_factor = trial_data['initial_team_learning_factor'].iloc[0]
+    if args is None:
+        team_composition = trial_data['team_composition'].iloc[0]
+
+        # trial params
+        max_learning_factor = trial_data['max_learning_factor'].iloc[0]
+        initial_team_learning_factor = trial_data['initial_team_learning_factor'].iloc[0]
+        team_learning_factor_delta = np.hstack((0.05*np.ones([params.team_size, 1]), 0*np.ones([params.team_size, 1])))
+        print('initial_team_learning_factor: ', initial_team_learning_factor)
+
+    else:
+        team_composition, initial_team_learning_factor, team_learning_factor_delta = args
+        max_learning_factor = params.max_learning_factor
+
+    teacher_learning_factor = np.ones([params.team_size, 1])*params.default_learning_factor_teacher
+
+
     team_learning_factor = copy.deepcopy(initial_team_learning_factor)
-    print('initial_team_learning_factor: ', initial_team_learning_factor)
-
-
-    # fixed params (start saving these too to the trial data)
-    team_learning_rate =  np.hstack((0.05*np.ones([params.team_size, 1]), 0*np.ones([params.team_size, 1])))
-    default_learning_factor_teacher = 0.8
+    
+    
+    # simulated filename
+    vars_filename_prefix = vars_filename_prefix + '_' + file.split('.')[0] + '_' + str(run_id) 
 
 
     # trial variables
@@ -1861,6 +1488,7 @@ def simulate_individual_runs_w_feedback(params, path, file, run_id, viz_flag = F
     test_responses_team = trial_data['test_constraints_team']
     loop_count = trial_data['loop_count']
     team_response_models = trial_data['team_response_models']
+    kc_id_list = trial_data['knowledge_comp_id']
     # team_learning_factor = trial_data['team_learning_factor']
 
     # actual particles and probabilities (for comparison)
@@ -1874,21 +1502,23 @@ def simulate_individual_runs_w_feedback(params, path, file, run_id, viz_flag = F
     # prob_pf_actual_learner_before_test_read_data = trial_data['particles_prob_learner_before_test']
 
     # initialize (simulated) teacher and learner particle filters
-    team_prior, teacher_pf = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, default_learning_factor_teacher, team_prior = params.team_prior, vars_filename=vars_filename_prefix, model_type = params.teacher_update_model_type)
-    learner_pf = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, default_learning_factor_teacher, team_learning_factor = team_learning_factor, team_prior = params.team_prior, pf_flag='learner', vars_filename=vars_filename_prefix, model_type = learner_update_type)
+    team_prior, teacher_pf = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, teacher_learning_factor=teacher_learning_factor, team_prior = params.team_prior, vars_filename=vars_filename_prefix, model_type = params.teacher_update_model_type)
+    learner_pf = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_learning_factor = team_learning_factor, team_prior = params.team_prior, pf_flag='learner', vars_filename=vars_filename_prefix, model_type = learner_update_type)
 
     # initialize dataframes to save probability data
     prob_pf = pd.DataFrame()
 
-
+    prev_kc_id = 1
     # simulate teaching-learning interaction process
     for loop_id in range(len(loop_count)):
         print(colored('loop_id: ' + str(loop_id), 'red'))
-        if len(interesting_interactions) > 0:
-            if loop_id+1 in interesting_interactions:
-                viz_flag = True
-            else:
-                viz_flag = False
+
+        
+        # if len(interesting_interactions) > 0:
+        #     if loop_id+1 in interesting_interactions:
+        #         viz_flag = True
+        #     else:
+        #         viz_flag = False
 
         # loop data
         demo_loop = demo_constraints.iloc[loop_id]
@@ -1896,6 +1526,13 @@ def simulate_individual_runs_w_feedback(params, path, file, run_id, viz_flag = F
         test_loop = test_constraints.iloc[loop_id]
         test_responses_loop = test_responses_team.iloc[loop_id]
         team_models_loop = team_response_models.iloc[loop_id]
+        current_kc_id = kc_id_list.iloc[loop_id]
+
+        # check and reset team learning factor
+        if loop_id > 0 and current_kc_id > prev_kc_id:
+            team_learning_factor = copy.deepcopy(initial_team_learning_factor)
+            print('team_learning_factor reset to initial_team_learning_factor for new KC: ', current_kc_id, '. TLF: ', team_learning_factor)
+
         # learner_pf_actual_after_demo_loop = learner_pf_actual_after_demo.iloc[loop_id]
         # prob_pf_actual_learner_before_test_loop = prob_pf_actual_learner_before_test_read_data.iloc[loop_id]
         # team_learning_factor_loop = team_learning_factor.iloc[loop_id]
@@ -1906,11 +1543,15 @@ def simulate_individual_runs_w_feedback(params, path, file, run_id, viz_flag = F
         prob_pf_teacher_before_demo_dict['prob_type'] = 'teacher_before_demo'
         prob_pf_teacher_before_demo_dict['loop_id'] = loop_id+1
         prob_pf_teacher_before_demo_dict['constraints'] = min_demo_loop
+        prob_pf_teacher_before_demo_dict['demo_strategy'] = demo_strategy
+        prob_pf_teacher_before_demo_dict['team_composition'] = team_composition
 
         prob_pf_learner_before_demo_dict = debug_calc_prob_mass_correct_side(min_demo_loop, learner_pf, team_learning_factor)
         prob_pf_learner_before_demo_dict['prob_type'] = 'learner_before_demo'
         prob_pf_learner_before_demo_dict['loop_id'] = loop_id+1
         prob_pf_learner_before_demo_dict['constraints'] = min_demo_loop
+        prob_pf_learner_before_demo_dict['demo_strategy'] = demo_strategy
+        prob_pf_learner_before_demo_dict['team_composition'] = team_composition
 
         ## learner PF without 
 
@@ -1919,11 +1560,11 @@ def simulate_individual_runs_w_feedback(params, path, file, run_id, viz_flag = F
         prob_pf = prob_pf.append(prob_pf_learner_before_demo_dict, ignore_index=True)
 
         # test dict
-        prob_pf_teacher_before_test_dict = {'loop_id': loop_id+1,  'prob_type': 'teacher_before_test'}
-        prob_pf_learner_before_test_dict = {'loop_id': loop_id+1,  'prob_type': 'learner_before_test'}
-        prob_pf_teacher_after_test_dict = {'loop_id': loop_id+1,  'prob_type': 'teacher_after_test'}
-        prob_pf_teacher_after_feedback_dict = {'loop_id': loop_id+1,  'prob_type': 'teacher_after_feedback'}
-        prob_pf_learner_after_feedback_dict = {'loop_id': loop_id+1,  'prob_type': 'learner_after_feedback'}
+        prob_pf_teacher_before_test_dict = {'loop_id': loop_id+1,  'prob_type': 'teacher_before_test', 'demo_strategy': demo_strategy, 'team_composition': team_composition}
+        prob_pf_learner_before_test_dict = {'loop_id': loop_id+1,  'prob_type': 'learner_before_test', 'demo_strategy': demo_strategy, 'team_composition': team_composition}
+        prob_pf_teacher_after_test_dict = {'loop_id': loop_id+1,  'prob_type': 'teacher_after_test', 'demo_strategy': demo_strategy, 'team_composition': team_composition}
+        prob_pf_teacher_after_feedback_dict = {'loop_id': loop_id+1,  'prob_type': 'teacher_after_feedback', 'demo_strategy': demo_strategy, 'team_composition': team_composition}
+        prob_pf_learner_after_feedback_dict = {'loop_id': loop_id+1,  'prob_type': 'learner_after_feedback', 'demo_strategy': demo_strategy, 'team_composition': team_composition}
 
         # test constraints
         test_loop_extended = []
@@ -1938,12 +1579,12 @@ def simulate_individual_runs_w_feedback(params, path, file, run_id, viz_flag = F
 
             ### update teacher and learner particle filters for demonstrations
             print('Teacher update after demo for member: ', member_id)
-            teacher_pf[member_id].update(demo_loop, plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Teacher belief after demo for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix, model_type = params.teacher_update_model_type)
+            teacher_pf[member_id].update(demo_loop, teacher_learning_factor[p_id], plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Teacher belief after demo for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix, model_type = params.teacher_update_model_type)
             # teacher_pf[member_id].calc_particles_probability(demo_loop)
             # prob_pf_teacher_after_demo_dict[member_id] = teacher_pf[member_id].particles_prob_correct
 
             print('Learner update after demo for member: ', member_id)
-            learner_pf[member_id].update(demo_loop, learning_factor = team_learning_factor[p_id], plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Learner belief after demo for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix, model_type = learner_update_type)
+            learner_pf[member_id].update(demo_loop, team_learning_factor[p_id], plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Learner belief after demo for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix, model_type = learner_update_type)
             # learner_pf[member_id].calc_particles_probability(demo_loop)
             # prob_pf_learner_after_demo_dict[member_id] = learner_pf[member_id].particles_prob_correct
 
@@ -1952,12 +1593,16 @@ def simulate_individual_runs_w_feedback(params, path, file, run_id, viz_flag = F
         prob_pf_teacher_after_demo_dict['loop_id'] = loop_id+1
         prob_pf_teacher_after_demo_dict['constraints'] = min_demo_loop
         prob_pf_teacher_after_demo_dict['prob_type'] = 'teacher_after_demo'
+        prob_pf_teacher_after_demo_dict['demo_strategy'] = demo_strategy
+        prob_pf_teacher_after_demo_dict['team_composition'] = team_composition
         
 
         prob_pf_learner_after_demo_dict = debug_calc_prob_mass_correct_side(min_demo_loop, learner_pf, team_learning_factor)
         prob_pf_learner_after_demo_dict['loop_id'] = loop_id+1
         prob_pf_learner_after_demo_dict['constraints'] = min_demo_loop
         prob_pf_learner_after_demo_dict['prob_type'] = 'learner_after_demo'
+        prob_pf_learner_after_demo_dict['demo_strategy'] = demo_strategy
+        prob_pf_learner_after_demo_dict['team_composition'] = team_composition
 
         # update demo dataframes
         prob_pf = prob_pf.append(prob_pf_teacher_after_demo_dict, ignore_index=True)
@@ -2010,7 +1655,7 @@ def simulate_individual_runs_w_feedback(params, path, file, run_id, viz_flag = F
 
             # update particle filter for test response (only for teacher)
             print('Teacher update after tests for member: ', member_id)
-            teacher_pf[member_id].update(all_test_responses, model_type = params.teacher_update_model_type,  plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Teacher belief after test for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
+            teacher_pf[member_id].update(all_test_responses, teacher_learning_factor[p_id], model_type = params.teacher_update_model_type,  plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Teacher belief after test for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
 
             # probabibilites after test
             teacher_pf[member_id].calc_particles_probability(test_loop_extended)
@@ -2025,21 +1670,39 @@ def simulate_individual_runs_w_feedback(params, path, file, run_id, viz_flag = F
             learner_feedback_lf = []
 
             # 
+            # for test_id in range(N_tests):
+                # if (all_test_responses[test_id] == test_loop_extended[test_id]).all():
+                #     teacher_feedback_lf.append(min(1.1*params.default_learning_factor_teacher, max_learning_factor))
+                #     learner_feedback_lf.append(min(1.05*team_learning_factor[p_id], max_learning_factor))
+                # else:
+                #     teacher_feedback_lf.append(min(1.05*params.default_learning_factor_teacher, max_learning_factor))
+                #     learner_feedback_lf.append(min(1.05*team_learning_factor[p_id], max_learning_factor))
+            
+            all_tests_correct_flag = True
             for test_id in range(N_tests):
-                if (all_test_responses[test_id] == test_loop_extended[test_id]).all():
-                    teacher_feedback_lf.append(min(1.1*params.default_learning_factor_teacher, max_learning_factor))
-                    learner_feedback_lf.append(min(1.1*team_learning_factor[p_id], max_learning_factor))
+                if not (all_test_responses[test_id] == test_loop_extended[test_id]).all():
+                    all_tests_correct_flag = False
+                    break
+            
+            # update learning factor before feedback
+            if feedback_flag:
+                if all_tests_correct_flag:
+                    team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_factor_delta[p_id, 0], max_learning_factor)
                 else:
-                    teacher_feedback_lf.append(min(1.05*params.default_learning_factor_teacher, max_learning_factor))
-                    learner_feedback_lf.append(min(1.05*team_learning_factor[p_id], max_learning_factor))
+                    team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_factor_delta[p_id, 1], max_learning_factor)
 
+            if review_flag:
+                print('Teacher update after feedback for member: ', member_id)
+                teacher_pf[member_id].update(test_loop_extended, teacher_learning_factor[p_id], model_type = params.teacher_update_model_type,  plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Teacher belief after corrective feedback for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
 
-            print('Teacher update after feedback for member: ', member_id)
-            teacher_pf[member_id].update(test_loop_extended, learning_factor = teacher_feedback_lf, model_type = params.teacher_update_model_type,  plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Teacher belief after corrective feedback for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
+                print('Learner update after feedback for member: ', member_id)
+                learner_pf[member_id].update(test_loop_extended, team_learning_factor[p_id], model_type = learner_update_type, plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Learner belief after corrective feedback for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
 
-            print('Learner update after feedback for member: ', member_id)
-            learner_pf[member_id].update(test_loop_extended, learning_factor = learner_feedback_lf, model_type = learner_update_type, plot_title = 'Simulated interaction No.' + str(loop_id +1) + '. Learner belief after corrective feedback for member ' + member_id, viz_flag = viz_flag, vars_filename=vars_filename_prefix)
-
+            # # update learning factor after feedback
+            # if all_tests_correct_flag:
+            #     team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 0], max_learning_factor)
+            # else:
+            #     team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 1], max_learning_factor)
 
             # probabilities after feedback
             teacher_pf[member_id].calc_particles_probability(test_loop_extended)
@@ -2096,11 +1759,11 @@ def simulate_individual_runs_w_feedback(params, path, file, run_id, viz_flag = F
                         prob_pf_teacher_after_feedback_dict[var_name].append('incorrect')
                         prob_pf_learner_after_feedback_dict[var_name].append('incorrect')
 
-            # update learning factor when all tests are correct
-            if tests_correct_flag:
-                team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 0], max_learning_factor)
-            else:
-                team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 1], max_learning_factor)
+            # # update learning factor when all tests are correct
+            # if tests_correct_flag:
+            #     team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 0], max_learning_factor)
+            # else:
+            #     team_learning_factor[p_id] = min(team_learning_factor[p_id] + team_learning_rate[p_id, 1], max_learning_factor)
 
         # update test dataframes
         prob_pf = prob_pf.append(prob_pf_teacher_before_test_dict, ignore_index=True)
@@ -2109,11 +1772,16 @@ def simulate_individual_runs_w_feedback(params, path, file, run_id, viz_flag = F
         prob_pf = prob_pf.append(prob_pf_teacher_after_feedback_dict, ignore_index=True)
         prob_pf = prob_pf.append(prob_pf_learner_after_feedback_dict, ignore_index=True)
         
+        # update KC
+        prev_kc_id = current_kc_id
+        
 
     #################
     # save dataframes final
         
     prob_pf.to_csv(path + '/' + vars_filename_prefix + '_prob_pf.csv')
+    with open(path + '/' + vars_filename_prefix + '_prob_pf.pickle', 'wb') as f:
+        pickle.dump(prob_pf, f)
     ####################
 
     # plot simulated probability data
@@ -2154,99 +1822,283 @@ def simulate_individual_runs_w_feedback(params, path, file, run_id, viz_flag = F
 def plot_pf_updates(path, file_prefix):
 
     filelist = os.listdir(path)
-    save_filename = path + '/' + file_prefix + '_full_compiled_data.csv'
+    save_filename = path + '/' + file_prefix + '_full_compiled_data_uf_test.csv'
+    noise_cond_to_check = 'no_noise'
+    
 
-    try:
-        
-        prob_data = pd.read_csv(save_filename)
-    except:
+    prob_data = pd.DataFrame()
+    run_id = 1
+    for filename in filelist:
+        # if file_prefix in filename and '.csv' in filename:
+        # if file_prefix in filename and '.pickle' in filename and 'uf_test' in filename:
+        if file_prefix in filename and '.pickle' in filename:
+            if file_prefix + '.pickle' != filename:
+                
+                # only plot sample conditions
+                # if not '51' in filename:
+                #     continue
 
-        prob_data = pd.DataFrame()
-        run_id = 1
-        for filename in filelist:
-            # if file_prefix in filename and '.csv' in filename:
-            if file_prefix in filename and '.csv' in filename and 'lf_update' in filename:
+
                 filename_wo_prefix = filename.split(file_prefix)[0]
+                
+
+                if 'uf_test' in filename_wo_prefix:
+                    continue
+
                 print('filename_wo_prefix: ', filename_wo_prefix)
                 print('Reading file: ', filename)
-                trial_data = pd.read_csv(path + '/' + filename)
+                # trial_data = pd.read_csv(path + '/' + filename)
+                with open(path + '/' + filename, 'rb') as f:
+                    trial_data = pickle.load(f)
 
                 trial_data['run_id'] = run_id*np.ones(len(trial_data))
                 
-                if 'no_noise' in filename_wo_prefix:
-                    trial_data['noise_cond'] = ['no_noise']*len(trial_data)
+                if 'learner_no_noise' in filename_wo_prefix:
+                    trial_data['learner_noise_cond'] = ['no_noise']*len(trial_data)
                 else:
-                    trial_data['noise_cond'] = ['noise']*len(trial_data)
+                    trial_data['learner_noise_cond'] = ['noise']*len(trial_data)
 
                 if 'w_feedback' in filename_wo_prefix:
-                    trial_data['feedback_cond'] = ['w_feedback']*len(trial_data)
+                    if 'reverse' in filename_wo_prefix:
+                        trial_data['feedback_cond'] = ['w_feedback_incorrect_understands_better']*len(trial_data)
+                    elif 'normal' in filename_wo_prefix:
+                        trial_data['feedback_cond'] = ['w_feeback_correct_understands_better']*len(trial_data)
+                    else:
+                        # skip
+                        print('Skipping trial data: ', filename)
+                        continue
+                    # trial_data['feedback_cond'] = ['w_feedback']*len(trial_data)
+                elif 'no_review' in filename_wo_prefix:
+                    trial_data['feedback_cond'] = ['no_feedback_no_review']*len(trial_data)
                 else:
-                    trial_data['feedback_cond'] = ['no_feedback']*len(trial_data)
+                    trial_data['feedback_cond'] = ['no_feedback_w_review']*len(trial_data)
+
+                    
+
+               
+
+                if 'team_composition' not in trial_data.columns:
+                    trial_data['team_composition'] = ['[0, 0, 0]']*len(trial_data)
+                else:
+                    trial_data['team_composition'] = trial_data['team_composition'].astype(str)
 
                 prob_data = prob_data.append(trial_data, ignore_index=True)
 
+
                 run_id += 1
 
-        prob_data.to_csv(save_filename)
+    prob_data.to_csv(save_filename)
 
     print(prob_data)
 
     # plot data
 
-    plot_data_no_feedback = prob_data[(prob_data['prob_type']=='learner_before_test') & (prob_data['noise_cond']=='noise') & (prob_data['feedback_cond']=='no_feedback')]
-    plot_data_feedback = prob_data[(prob_data['prob_type']=='learner_before_test') & (prob_data['noise_cond']=='noise') & (prob_data['feedback_cond']=='w_feedback')]
+    # plot_data_no_feedback = prob_data[(prob_data['prob_type']=='learner_before_test') & (prob_data['noise_cond']=='noise') & (prob_data['feedback_cond']=='no_feedback')]
+    # plot_data_feedback = prob_data[(prob_data['prob_type']=='learner_before_test') & (prob_data['noise_cond']=='noise') & (prob_data['feedback_cond']=='w_feedback')]
 
-    plot_data_no_feedback.to_csv(path + '/' + file_prefix + '_plot_data_w_noise_no_feedback.csv')
-    plot_data_feedback.to_csv(path + '/' + file_prefix + '_plot_data_w_noise_feedback.csv')
+    # plot_data_no_feedback = prob_data[(prob_data['learner_noise_cond']==noise_cond_to_check) & (prob_data['feedback_cond']=='no_feedback')]
+    # plot_data_feedback = prob_data[ (prob_data['learner_noise_cond']==noise_cond_to_check) & (prob_data['feedback_cond']=='w_feedback')]
+
+    # plot_data_no_feedback = prob_data[(prob_data['learner_noise_cond']==noise_cond_to_check) & (prob_data['feedback_cond']=='no_feedback') & (prob_data['feedback_type']=='incorrect_understands_better')]
+    # plot_data_feedback = prob_data[ (prob_data['learner_noise_cond']==noise_cond_to_check) & (prob_data['feedback_cond']=='w_feedback') & (prob_data['feedback_type']=='incorrect_understands_better')]
+
+    plot_data = prob_data[(prob_data['learner_noise_cond']==noise_cond_to_check)]
+
+
+    # prob_type_list = ['learner_before_demo', 'learner_after_demo', 'learner_before_test', 'learner_after_test', 'learner_after_feedback']
+    # prob_type_list = ['teacher_before_demo', 'teacher_after_demo', 'teacher_before_test', 'teacher_after_test', 'teacher_after_feedback']
+    
+    prob_type_list = ['learner_before_test']
+    # prob_type_list = ['teacher_after_feedback', 'learner_after_feedback']
+
+    # prob_type_list = ['learner_before_test']
+
+    plot_data_no_feedback_prob_type = pd.DataFrame()
+    plot_data_feedback_prob_type = pd.DataFrame()
+    plot_data_prob_type = pd.DataFrame()
+    for prob_type in prob_type_list:
+        # plot_data_no_feedback_prob_type = plot_data_no_feedback_prob_type.append(plot_data_no_feedback[plot_data_no_feedback['prob_type']==prob_type], ignore_index=True)
+        # plot_data_feedback_prob_type = plot_data_feedback_prob_type.append(plot_data_feedback[plot_data_feedback['prob_type']==prob_type], ignore_index=True)
+        plot_data_prob_type = plot_data_prob_type.append(plot_data[plot_data['prob_type']==prob_type], ignore_index=True)
+
+
+    # for plot_id in range(len(plot_data_no_feedback_prob_type)):
+    #     for p_id in range(params.team_size):
+    #         member_id = 'p' + str(p_id+1)
+    #         lf_var = member_id + '_lf'
+    #         if type(plot_data_no_feedback_prob_type[lf_var].iloc[plot_id]) == list:
+    #             plot_data_no_feedback_prob_type[lf_var].iloc[plot_id] = plot_data_no_feedback_prob_type[lf_var].iloc[plot_id][0]
+
+    # for plot_id in range(len(plot_data_feedback_prob_type)):
+    #     for p_id in range(params.team_size):
+    #         member_id = 'p' + str(p_id+1)
+    #         lf_var = member_id + '_lf'
+    #         if type(plot_data_feedback_prob_type[lf_var].iloc[plot_id]) == list:
+    #             plot_data_feedback_prob_type[lf_var].iloc[plot_id] = plot_data_feedback_prob_type[lf_var].iloc[plot_id][0]
 
 
 
-    # plot probabilities vs loop id
-    f1, ax1= plt.subplots(nrows=3, sharex=True, sharey=True, figsize=(15,10))
-    ax3 = np.array(ax1).reshape(-1)
+    # save files
+    plot_data_feedback_prob_type.to_csv(path + '/' + file_prefix + '_plot_data_w_feedback_prob_type_' + noise_cond_to_check + '.csv')
+    plot_data_no_feedback_prob_type.to_csv(path + '/' + file_prefix + '_plot_data_no_feedback_prob_type_' + noise_cond_to_check + '.csv')
+
+    plot_data_prob_type.to_csv(path + '/' + file_prefix + '_plot_data.csv')
+
+
+    # prob_type_order = ['teacher_before_demo', 'learner_before_demo', 'teacher_after_demo', 'learner_after_demo', 'teacher_before_test', 'learner_before_test', 'teacher_after_test', 'teacher_after_feedback', 'learner_after_feedback']
+    feedback_cond_order = ['no_feedback_no_review', 'no_feedback_w_review', 'w_feedback_incorrect_understands_better', 'w_feeback_correct_understands_better']
+
+    ## plot teacher vs learner probabilities
+    # teacher plots
+    # ft, axt = plt.subplots(nrows=3, sharex=True, sharey=True, figsize=(15,10))
+    # plt.subplots_adjust(wspace=0.1, hspace=0.1)
+    # for col_id in range(3):
+    #     member_id = 'p' + str(col_id+1)
+    #     sns.lineplot(plot_data_prob_type, x='loop_id', y = member_id, hue = 'team_composition', ax=axt[col_id], errorbar=('se', 1), err_style="band").set(title='Prob. correct test response before test - team composition')
+    #     axt[col_id].axvline(x=4, color='k', linestyle='--')
+    #     axt[col_id].axvline(x=7, color='k', linestyle='--')
+    #     axt[col_id].set_ylim([0, 1])
+    #     axt[col_id].set_xlim([0, 10])
+
+    
+    # fl, axl = plt.subplots(nrows=3, sharex=True, sharey=True, figsize=(15,10))
+    # plt.subplots_adjust(wspace=0.1, hspace=0.1)
+    # for col_id in range(3):
+    #     member_id = 'p' + str(col_id+1)
+    #     sns.lineplot(plot_data_prob_type, x='loop_id', y = member_id, hue = 'feedback_type', ax=axl[col_id], errorbar=('se', 1), err_style="band").set(title='Prob. correct test response before test - Feedback type')
+    #     axl[col_id].axvline(x=4, color='k', linestyle='--')
+    #     axl[col_id].axvline(x=7, color='k', linestyle='--')
+    #     axl[col_id].set_ylim([0, 1])
+    #     axl[col_id].set_xlim([0, 10])
+
+    fl2, axl2 = plt.subplots(nrows=3, ncols=2, sharex=True, sharey=False, figsize=(15,10))
     plt.subplots_adjust(wspace=0.1, hspace=0.1)
+    # axl3 = np.array(axl2).reshape(-1)
+    for row_id in range(3):
+        member_id = 'p' + str(row_id+1)
+        sns.lineplot(plot_data_prob_type, x='loop_id', y = member_id, hue = 'feedback_cond', hue_order=feedback_cond_order, ax=axl2[row_id, 0], errorbar=('se', 1), err_style="band", legend=False).set(title='Prob. correct test response before test - Feedback condition Member '+ member_id)
+        axl2[row_id, 0].axvline(x=4, color='k', linestyle='--')
+        axl2[row_id, 0].axvline(x=7, color='k', linestyle='--')
+        axl2[row_id, 0].set_ylim([0, 1])
+        axl2[row_id, 0].set_xlim([0, 10])
 
-    for col_id in range(3):  
-        member_id = 'p' + str(col_id+1)
-        sns.lineplot(plot_data_no_feedback, x='loop_id', y = member_id, ax=ax1[col_id], errorbar=('se', 1), err_style="band").set(title='Member'+ member_id)
-        ax3[col_id] = ax1[col_id].twinx()
-        sns.lineplot(plot_data_no_feedback, x='loop_id', y = member_id+'_lf', ax=ax3[col_id], errorbar=('se', 1), err_style="band", color = 'r').set(title='Member'+ member_id)
-        ax3[col_id].set_ylim(ax3[col_id].get_ylim()[::-1])
+        # # plot uf in same plot
+        # axl3[col_id] = axl2[col_id].twinx()
+        # axl3[col_id].set_ylim([0.5, 1])
+        # sns.lineplot(plot_data_prob_type, x='loop_id', y = member_id+'_lf', ax=axl3[col_id], errorbar=('se', 1), err_style="band", linestyle = '--', color = 'r').set(title='Member '+ member_id)
 
-    f1.suptitle('Prob. correct test response, with noise, no feedback')
+        # plot uf in adjacent plot
+        sns.lineplot(plot_data_prob_type, x='loop_id', y = member_id+'_lf', hue = 'feedback_cond', hue_order=feedback_cond_order, ax=axl2[row_id,1], errorbar=('se', 1), err_style="band", linestyle = '--', color = 'r', legend=False).set(title='Understanding factor. Member '+ member_id)
+        axl2[row_id, 1].axvline(x=4, color='k', linestyle='--')
+        axl2[row_id, 1].axvline(x=7, color='k', linestyle='--')
+        axl2[row_id, 1].set_ylim([0.5, 1])
+
+    
+    
+    ## understanding factor vs probability
+
+    # fl2, axl2 = plt.subplots(nrows=1, sharex=True, sharey=False, figsize=(15,10))
+    # plt.subplots_adjust(wspace=0.1, hspace=0.1)
+    # # axl3 = np.array(axl2).reshape(-1)
+    # for row_id in range(1):
+    #     member_id = 'p' + str(row_id+1)
+    #     sns.lineplot(plot_data_prob_type, x=member_id+'_lf', y = member_id, hue = 'loop_id',  ax=axl2, errorbar=('se', 1), err_style="band", legend=False).set(title='UF vs. Prob. correct test response before test - Feedback condition Member '+ member_id)
+    #     axl2.axvline(x=4, color='k', linestyle='--')
+    #     axl2.axvline(x=7, color='k', linestyle='--')
+    #     axl2.set_ylim([0, 1])
+    #     axl2.set_xlim([0, 1])
+
+        # # plot uf in adjacent plot
+        # sns.lineplot(plot_data_prob_type, x='loop_id', y = member_id+'_lf', hue = 'feedback_cond', hue_order=feedback_cond_order, ax=axl2[row_id,1], errorbar=('se', 1), err_style="band", linestyle = '--', color = 'r', legend=False).set(title='Understanding factor. Member '+ member_id)
+        # axl2[row_id, 1].axvline(x=4, color='k', linestyle='--')
+        # axl2[row_id, 1].axvline(x=7, color='k', linestyle='--')
+        # axl2[row_id, 1].set_ylim([0.5, 1])
+
+
+    # fl2.suptitle('Prob. correct test response before test - Feedback condition')
+
+    # # plot probabilities vs loop id
+    # f1, ax1= plt.subplots(nrows=3, sharex=True, sharey=True, figsize=(15,10))
+    # ax3 = np.array(ax1).reshape(-1)
+    # plt.subplots_adjust(wspace=0.1, hspace=0.1)
+
+    # for col_id in range(3):  
+    #     member_id = 'p' + str(col_id+1)
+    #     sns.lineplot(plot_data_no_feedback_prob_type, x='loop_id', y = member_id, ax=ax1[col_id], errorbar=('se', 1), err_style="band").set(title='Member'+ member_id)
+    #     # sns.lineplot(plot_data_no_feedback_prob_type, x='loop_id', y = member_id, hue = 'prob_type', ax=ax1[col_id], errorbar=('se', 1), err_style="band").set(title='Member'+ member_id)
+    #     ax1[col_id].axvline(x=4, color='k', linestyle='--')
+    #     ax1[col_id].axvline(x=7, color='k', linestyle='--')
+        
+    #     ax3[col_id] = ax1[col_id].twinx()
+    #     sns.lineplot(plot_data_no_feedback_prob_type, x='loop_id', y = member_id+'_lf', ax=ax3[col_id], errorbar=('se', 1), err_style="band", color = 'r').set(title='Member'+ member_id)
+    #     # ax3[col_id].set_ylim(ax3[col_id].get_ylim()[::-1])
+
+    # f1.suptitle('Prob. correct test response, no noise, no feedback')
     
 
 
-    f2, ax2 = plt.subplots(nrows=3, sharex=True, sharey=True, figsize=(15,10))
-    ax4 = np.array(ax2).reshape(-1)
-    plt.subplots_adjust(wspace=0.1, hspace=0.1)
+    # f2, ax2 = plt.subplots(nrows=3, sharex=True, sharey=True, figsize=(15,10))
+    # ax4 = np.array(ax2).reshape(-1)
+    # plt.subplots_adjust(wspace=0.1, hspace=0.1)
 
-    for col_id in range(3):  
-        member_id = 'p' + str(col_id+1)
-        sns.lineplot(plot_data_feedback, x='loop_id', y = member_id, ax=ax2[col_id], errorbar=('se', 1), err_style="band").set(title='Member'+ member_id)
-        ax4[col_id] = ax2[col_id].twinx()
-        sns.lineplot(plot_data_feedback, x='loop_id', y = member_id+'_lf', ax=ax4[col_id], errorbar=('se', 1), err_style="band", color='r').set(title='Member'+ member_id)
-        ax4[col_id].set_ylim(ax4[col_id].get_ylim()[::-1])
+    # for col_id in range(3):  
+    #     member_id = 'p' + str(col_id+1)
+    #     sns.lineplot(plot_data_feedback_prob_type, x='loop_id', y = member_id, ax=ax2[col_id], errorbar=('se', 1), err_style="band").set(title='Member'+ member_id)
+    #     # sns.lineplot(plot_data_feedback_prob_type, x='loop_id', y = member_id, hue = 'prob_type', ax=ax2[col_id], errorbar=('se', 1), err_style="band").set(title='Member'+ member_id)
+    #     ax2[col_id].axvline(x=4, color='k', linestyle='--')
+    #     ax2[col_id].axvline(x=7, color='k', linestyle='--')
 
-    f2.suptitle('Prob. correct test response, with noise, with feedback')
+    #     ax4[col_id] = ax2[col_id].twinx()
+    #     sns.lineplot(plot_data_feedback_prob_type, x='loop_id', y = member_id+'_lf', ax=ax4[col_id], errorbar=('se', 1), err_style="band", color='r').set(title='Member'+ member_id)
+    #     # ax4[col_id].set_ylim(ax4[col_id].get_ylim()[::-1])
 
-    plt.show()
+    # f2.suptitle('Prob. correct test response, no noise, with feedback')
+
+    # plt.show()
 
 
 
     # # plot learning factor vs probability
+    # plot_data_no_feedback_prob_type_loops = plot_data_no_feedback_prob_type[plot_data_no_feedback_prob_type['loop_id']<=5]
+    # plot_data_feedback_prob_type_loops = plot_data_feedback_prob_type[plot_data_feedback_prob_type['loop_id']<=5]
+
+    # print(plot_data_no_feedback_prob_type_loops)
+    # print(plot_data_feedback_prob_type_loops)
+
     # f5, ax5 = plt.subplots(nrows=3, sharex=True, sharey=True, figsize=(15,10))
     # plt.subplots_adjust(wspace=0.1, hspace=0.1)
 
     # for col_id in range(3):  
     #     member_id = 'p' + str(col_id+1)
     #     lf_member = member_id + '_lf'
-    #     sns.lineplot(plot_data_no_feedback, x=lf_member, y = member_id, ax=ax5[col_id], errorbar=('se', 1), err_style="band").set(title='Member'+ member_id)
+    #     plot_data = plot_data_feedback_prob_type_loops[plot_data_feedback_prob_type_loops['prob_type']=='learner_before_test']
+    #     sns.lineplot(plot_data, x=lf_member, y = member_id, ax=ax5[col_id], errorbar=('se', 1), err_style="band").set(title='Member'+ member_id)
+    #     sns.lineplot(plot_data, x=lf_member, y = member_id, ax=ax5[col_id], errorbar=('se', 1), err_style="band", color='r').set(title='Member'+ member_id)
+
+    #     # sns.lineplot(plot_data_no_feedback_prob_type_loops, x=lf_member, y = member_id, ax=ax5[col_id], errorbar=('se', 1), err_style="band").set(title='Member'+ member_id)
+    #     # for loop_id in [1, 2, 3]:
+    #     #     plot_data_loop = plot_data_no_feedback_prob_type_loops[plot_data_no_feedback_prob_type_loops['loop_id']==loop_id]
+    #     #     print(plot_data_loop)
+    #     #     sns.lineplot(plot_data_loop, x=lf_member, y = member_id, ax=ax5[col_id], errorbar=('se', 1), err_style="band").set(title='Member'+ member_id)
+        
+    # f5.suptitle('Learning factor vs. Prob. correct test response before test')
 
 
-    # f5.suptitle('Learning factor vs. Prob. correct test response, no noise, no feedback')
+    # f6, ax6 = plt.subplots(nrows=3, sharex=True, sharey=True, figsize=(15,10))
+    # plt.subplots_adjust(wspace=0.1, hspace=0.1)
 
-    # plt.show()
+    # for col_id in range(3):  
+    #     member_id = 'p' + str(col_id+1)
+    #     lf_member = member_id + '_lf'
+    #     for loop_id in [1, 2, 3]:
+    #         plot_data_loop = plot_data_feedback_prob_type_loops[plot_data_feedback_prob_type_loops['loop_id']==loop_id]
+    #         print(plot_data_loop)
+    #         sns.lineplot(plot_data_loop, x=lf_member, y = member_id, ax=ax6[col_id], errorbar=('se', 1), err_style="band").set(title='Member'+ member_id)
+
+    # f6.suptitle('Learning factor vs. Prob. correct test response, no noise, no feedback')
+
+
+    plt.show()
 
 
 
@@ -2325,6 +2177,7 @@ if __name__ == "__main__":
 
     # process team knowledge data
     path = 'models/augmented_taxi2'
+    # path = 'data/simulation/sim_experiments/w_feedback'
     files = os.listdir(path)
 
     # all_file_prefix_list = ['debug_data_debug_trials_01_22_no_noise_w_feedback_study_1']
@@ -2339,10 +2192,10 @@ if __name__ == "__main__":
     # file_prefix_list = ['trials_12_29_w_updated', 'trials_12_30_w_updated', 'trials_12_31_w_updated', 'trials_01_01_w_updated', 
     #                     'trials_01_02_w_updated', 'trials_01_03_w_updated', 'trials_01_04_w_updated']
     
-    file_prefix_list = ['debug_data_debug_trials_01_22_no_noise_w_feedback_study_1']
+    file_prefix_list = ['debug_trials_02_05']
     
     # runs_to_exclude_list = ['unfinished', 'trials_01_01_w_updated_noise_57'] 
-    runs_to_exclude_list = ['unfinished']
+    runs_to_exclude_list = ['no_review']
     # trials_01_01_w_updated_noise_57.csv - outlier, N = 48 trials
 
     vars_filename_prefix = 'analysis'
@@ -2509,7 +2362,8 @@ if __name__ == "__main__":
     # ###########################
     # # ## Analyze particle filter update process
     # path = 'models/augmented_taxi2'
-    # file_prefix = 'trials_01_09_no_noise_study_1_run_8'
+    # file_prefix = 'debug_trials_01_23_no_noise_w_feedback_study_1_run_70'
+    # # file_prefix = 'debug_trials_01_09_no_noise_study_1_run_8'
 
     # plot_pf_updates(path, file_prefix)
 

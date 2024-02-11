@@ -1072,6 +1072,200 @@ def split_pickle_file(path, file):
 ######################################
 
 
+def check_ig_uf_relation(path):
+
+
+    # def calc_N_cnsts(kc_id, constraints_dict):
+    #     N_cnsts = 0
+    #     if kc_id == 0:
+    #         return 0
+    #     else:
+    #         for kc_index in range(kc_id):
+    #             N_cnsts += len(constraints_dict[kc_index])
+    #     return N_cnsts
+
+    params.default_learning_factor_teacher = 0.8
+
+    filename = 'particles_ig_demos_individual_KC_3'
+
+    try:
+        particles_ig = pd.read_csv(path + '/' + filename + '.csv')
+
+    except:
+
+        N_members = 11
+        
+        learning_factor = np.linspace(0.5, 1, num=11)
+
+        _, particles_initial = team_helpers.sample_team_pf(1, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, teacher_learning_factor=[params.default_learning_factor_teacher], team_prior = params.team_prior)
+        # no prior
+        # _, particles_initial = team_helpers.sample_team_pf(1, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, 0.8)
+        print(particles_initial)
+
+        # constraints_list = [[np.array([[-1, 0, 0]]), np.array([[1,  0,  -4]])], [np.array([[-1, 0, 0]]), np.array([[-1,  0,  2]])]]
+        
+        constraints_dict = {1: [[np.array([[-1, 0, 0]]), np.array([[1,  0,  -4]])], [np.array([[-1, 0, 0]]), np.array([[-1,  0,  2]])]], 
+                            2: [[np.array([[0, 1, 2]]), np.array([[0, 1, 0]])], [np.array([[  0,  -1, -10]]), np.array([[ 0, -1, -4]])]],
+                            3: [[np.array([[1, 1, 0]])]]
+                            }
+        
+        N_kcs = 3
+        N_updates = [1, 1, 1]
+        # constraints_list = [np.array([[-1, 0, 0]]), np.array([[1,  0,  -4]]), np.array([[-1, 0, 0]]), np.array([[-1,  0,  2]]), np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])] 
+       
+        # constraints_list = [np.array([[-1, 0, 0]]), np.array([[1,  0,  -4]]), np.array([[-1, 0, 0]]), np.array([[-1,  0,  2]])]
+
+        min_BEC_constraints_running = [np.array([[0, 0 ,-1]])]
+
+        # ig_const = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, constraint, params.weights['val'], params.step_cost_flag)
+
+        particles_ig = pd.DataFrame()
+        max_info_gain = {}
+        for i in range(N_members):
+            member_id = 'p' + str(i+1)
+            lf = learning_factor[i]
+            
+            
+            # if i == 3:
+            #     viz_flag = True
+            # else:
+            #     viz_flag = False
+            viz_flag = True
+
+            # particles_member = copy.deepcopy(particles_initial['p1'])  # for updating constraints sequentially one after the other
+            prev_constraints_list = []
+            for kc_id in range(N_kcs):
+                N_updates_kc = N_updates[kc_id]
+                constraints_list = constraints_dict[kc_id+1]
+
+                particles_member = copy.deepcopy(particles_initial['p1'])  # for updating only one constraint at a time individually; but from each "ideal" KC state
+                for p_cnst in prev_constraints_list:
+                    particles_member.update(p_cnst, 1, model_type = 'no_noise')
+
+
+                for update_id in range(N_updates_kc):
+                
+                    for cnst_index in range(len(constraints_list)):
+                        constraint = constraints_list[cnst_index]
+
+                        N_previous_cnst = [len(constraints_dict[kc+1]) for kc in list(range(kc_id)) if kc_id > 0 ] or [0]
+                        cnst_id = sum(N_previous_cnst) + cnst_index + 1
+
+                        # N_previous_cnst = calc_N_cnsts(kc_id, constraints_dict)
+                        # cnst_id = N_previous_cnst + cnst_index + 1
+                        print('N_previous_cnst: ', N_previous_cnst, '. cnst_index: ', cnst_index, '. cnst_id: ', cnst_id)
+
+                        # constraint = [constraint]
+                        # particles_member = copy.deepcopy(particles_initial['p1'])  # only for one update; for updating only one constraint at a time individually; 
+                        ig_const = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, constraint, params.weights['val'], params.step_cost_flag)
+                        print('Constraint: ', constraint, '. Info gain const: ', ig_const)
+
+                        # max_info_gain_cnst = max(max_info_gain_cnst, ig_const)
+                        
+                        particles_ig_dict = {'member_id': member_id, 'lf': lf, 'kc_id': kc_id+1, 'update_id': update_id+1, 'info_gain_pf': particles_member.calc_info_gain(constraint, lf), \
+                                            'ig_const': ig_const, 'cnst_id': cnst_id, 'cnst': constraint}  # calculate before update
+                        plot_title = 'Update no. ' + str(update_id+1) + ' for constraint ' + str(constraint) + ' and lf ' + str(lf)
+                        particles_member.update(constraint, lf, viz_flag = viz_flag, plot_title = plot_title, model_type = 'no_noise', vars_filename = filename)
+                        
+                        particles_ig = particles_ig.append(particles_ig_dict, ignore_index=True)
+
+                if len(prev_constraints_list) == 0:
+                    prev_constraints_list = copy.deepcopy(constraints_list)
+                else:
+                    prev_constraints_list.append(constraints_list)
+
+
+                # update min_BEC_constraints_running after each KC
+                for cnst_index in range(len(constraints_list)):
+                    constraint = constraints_list[cnst_index]
+                    min_BEC_constraints_running.extend(constraint)
+                
+                min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, params.weights['val'], params.step_cost_flag)
+
+
+
+        # find info gain proportion
+        
+        cnst_id_list = particles_ig['cnst_id'].unique()
+
+        print('cnst_id_list: ', cnst_id_list)
+        info_gain_proportion = []
+        for cnst_id in cnst_id_list:
+            max_info_gain = max(particles_ig[particles_ig['cnst_id']==cnst_id]['info_gain_pf'])
+            print('cnst_id: ', cnst_id, '. Max info gain: ', max_info_gain)
+
+            if len(info_gain_proportion)==0:
+                info_gain_proportion = particles_ig[particles_ig['cnst_id']==cnst_id]['info_gain_pf']/max_info_gain
+            else:
+                info_gain_proportion = info_gain_proportion.append(particles_ig[particles_ig['cnst_id']==cnst_id]['info_gain_pf']/max_info_gain)
+
+        print('particles_ig: ', particles_ig)
+        print('info_gain_proportion: ', info_gain_proportion)
+
+        particles_ig['info_gain_proportion'] = info_gain_proportion
+
+        particles_ig.to_csv(path + '/' + filename + '.csv')
+        print(particles_ig)
+
+    # plot
+    # info gain vs. UF - each constraint
+    palette = sns.color_palette("bright")
+
+    #
+    plot_data = particles_ig[(particles_ig['lf']>0.5) & (particles_ig['update_id']==1)]
+    fig, ax = plt.subplots(ncols=1,  sharex=True, sharey=True, figsize=(10,6))
+    plt.subplots_adjust(wspace=0.1, hspace=0.1)
+    # sns.lineplot(plot_data, x = 'lf', y = 'info_gain', hue = 'update_id', ax=ax, errorbar=('se', 1), err_style="band").set(title='Understanding factor vs. Info gain')
+    sns.lineplot(plot_data, x = 'lf', y = 'info_gain_proportion', hue = 'cnst_id', ax=ax, errorbar=('se', 1), err_style="band", palette = palette).set(title='Understanding factor vs. Info gain proportion')
+
+    
+    fig2, ax2 = plt.subplots(ncols=1,  sharex=True, sharey=True, figsize=(10,6))
+    plt.subplots_adjust(wspace=0.1, hspace=0.1)
+    # sns.lineplot(plot_data, x = 'lf', y = 'info_gain', hue = 'update_id', ax=ax, errorbar=('se', 1), err_style="band").set(title='Understanding factor vs. Info gain')
+    sns.lineplot(plot_data, x = 'lf', y = 'info_gain_proportion', ax=ax2, errorbar=('se', 1), err_style="band", palette = palette).set(title='Understanding factor vs. Info gain proportion')
+
+    
+    #
+    N_kcs = 3
+    constraints_dict = {1: [[np.array([[-1, 0, 0]]), np.array([[1,  0,  -4]])], [np.array([[-1, 0, 0]]), np.array([[-1,  0,  2]])]], 
+                            2: [[np.array([[0, 1, 2]]), np.array([[0, 1, 0]])], [np.array([[  0,  -1, -10]]), np.array([[ 0, -1, -4]])]],
+                            3: [[np.array([[1, 1, 0]])]]
+                            }
+    min_BEC_constraints_running = [np.array([[0, 0 ,-1]])]
+    ig_consts_dict = {}
+    
+    for kc_id in range(N_kcs):
+        constraint_list = constraints_dict[kc_id+1]
+        for cnst_index in range(len(constraint_list)):
+            constraint = constraint_list[cnst_index]
+            
+            N_previous_cnst = [len(constraints_dict[kc+1]) for kc in list(range(kc_id)) if kc_id > 0 ] or [0]
+            cnst_id = sum(N_previous_cnst) + cnst_index + 1
+
+            ig_consts_dict[cnst_id] = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, constraint, params.weights['val'], params.step_cost_flag)
+            print('Constraint: ', constraint, 'min_BEC_constraints_running: ', min_BEC_constraints_running, '. Info gain const: ', ig_consts_dict[cnst_id])
+            min_BEC_constraints_running.extend(constraint)
+        
+        # update min
+        min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, params.weights['val'], params.step_cost_flag)
+        print('Updated min_BEC_constraints_running: ', min_BEC_constraints_running, 'kc_id: ', kc_id)
+
+    print('ig_consts_dict: ', ig_consts_dict)
+
+    # for i in range(len(plot_data)):
+    #     cnst_id = plot_data['cnst_id'].iloc[i]
+    #     plot_data['ig_const'].iloc[i] = ig_consts_dict[cnst_id]
+
+    
+
+
+    plt.show()
+
+
+
+
+
+######################################
 
 
 if __name__ == "__main__":
@@ -3186,5 +3380,20 @@ if __name__ == "__main__":
 
 
     # print(team_helpers.calc_knowledge_level(team_knowledge, min_unit_constraints))
+    ######################################
+
+    path = 'models/augmented_taxi2'
+
+    filename = 'wt_vi_traj_params_env00000.pickle'
+
+    with open(path + '/' + filename, 'rb') as f:
+        best_env_idxs = pickle.load(f)
+
+    mdp = best_env_idxs[0][1].mdp
+
+    print(mdp)
+
+
+
 
     x = 1

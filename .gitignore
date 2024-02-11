@@ -30,3 +30,5 @@ demo_gen_log.txt
 aat_data/*
 plots/*
 data/*
+plots_old/*
+models_user_study/*

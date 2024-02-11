@@ -398,7 +398,7 @@ def check_for_non_intersecting_constraints(constraints, weights, step_cost_flag,
 
 
 
-def calc_expected_learning(team_knowledge_expected, kc_id, particles_team_teacher, min_BEC_constraints, demo_constraints, params, loop_count, kc_reset_flag = False, viz_flag = False, vars_filename='sim_run'):
+def calc_expected_learning(team_knowledge_expected, teacher_learning_factor, kc_id, particles_team_teacher, min_BEC_constraints, demo_constraints, params, loop_count, kc_reset_flag = False, viz_flag = False, vars_filename='sim_run'):
 
     # print(colored('Calculating expected learning for KC ' + str(kc_id) + 'in loop ' + str(loop_count) + '...', 'blue'))
     # # print('Current expected team knowledge: ', team_knowledge_expected)
@@ -414,7 +414,7 @@ def calc_expected_learning(team_knowledge_expected, kc_id, particles_team_teache
         # print('PF update of ', member_id)
         print('Teacher update. Updating particles for ', member_id, ' for kc_id ', kc_id, ' in ', params.teacher_update_model_type, ' condition...')
         plot_title = 'Interaction No. ' + str(loop_count+1) + '. Teacher belief (Expected knowledge change) for KC ' + str(kc_id) + ' for player ' + member_id
-        pf_update_args.append(particles_team_teacher[member_id].update(demo_constraints, plot_title = plot_title, viz_flag = viz_flag, vars_filename = vars_filename, model_type = params.teacher_update_model_type))
+        pf_update_args.append(particles_team_teacher[member_id].update(demo_constraints, teacher_learning_factor[p-1], plot_title = plot_title, viz_flag = viz_flag, vars_filename = vars_filename, model_type = params.teacher_update_model_type))
         
         ##########################
         
@@ -426,7 +426,7 @@ def calc_expected_learning(team_knowledge_expected, kc_id, particles_team_teache
     # Update common knowledge model
     plot_title = 'Interaction No. ' + str(loop_count+1) + '. Teacher belief (Expected knowledge change) for loop ' + str(loop_count+1) + ' for common knowledge'
     # print('Teacher update. Updating particles for common knowledge for kc_id ', kc_id, ' in ', model_type, ' condition...')
-    particles_team_teacher['common_knowledge'].update(demo_constraints, plot_title = plot_title, viz_flag = viz_flag, vars_filename=vars_filename, model_type = params.teacher_update_model_type)  # PF update of common_knowledge
+    particles_team_teacher['common_knowledge'].update(demo_constraints, params.default_learning_factor_teacher, plot_title = plot_title, viz_flag = viz_flag, vars_filename=vars_filename, model_type = params.teacher_update_model_type)  # PF update of common_knowledge
     if viz_flag:
         visualize_transition(demo_constraints, particles_team_teacher['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set' + str(loop_count+1) + ' for common knowledge', plot_filename ='ek_ck_loop_' + str(loop_count+1))
     
@@ -803,7 +803,7 @@ def sample_valid_region_jk(joint_constraints, min_azi, max_azi, min_ele, max_ele
 
 
 def obtain_team_summary(data_loc, run_env_loc, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
-                        n_train_demos, particles_demo, knowledge_id, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, obj_func_proportion=1, vars_filename='sim_run'):
+                        n_train_demos, particles_demo, teacher_uf_demo, knowledge_id, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, obj_func_proportion=1, vars_filename='sim_run'):
 
 
     summary_variant = 'counterfactual' # uses min_BEC_constraints_running to sample human models and could sample models from 
@@ -818,7 +818,7 @@ def obtain_team_summary(data_loc, run_env_loc, min_subset_constraints_record, mi
     #     summary_count = len(BEC_summary)
 
     if summary_variant == 'counterfactual':
-        BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, knowledge_id, variable_filter, nonzero_counter, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
+        BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, teacher_uf_demo, knowledge_id, variable_filter, nonzero_counter, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
                        BEC_summary, summary_count, min_BEC_constraints_running, params.BEC['n_human_models_precomputed'], visited_env_traj_idxs = visited_env_traj_idxs, n_train_demos=np.inf, downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=obj_func_proportion, vars_filename = vars_filename)
 
         
@@ -828,7 +828,7 @@ def obtain_team_summary(data_loc, run_env_loc, min_subset_constraints_record, mi
 
 
 
-def sample_team_pf(team_size, n_particles, weights, step_cost_flag, default_learning_factor_teacher, team_learning_factor=None, team_prior=None, pf_flag = 'teacher', vars_filename='sim_run', model_type = 'noise'):
+def sample_team_pf(team_size, n_particles, weights, step_cost_flag, teacher_learning_factor=None, team_learning_factor=None, team_prior=None, pf_flag = 'teacher', vars_filename='sim_run', model_type = 'noise', prior_lf = 1):
 
     particles_team = {}
     path = 'simulation/pf_models/'
@@ -839,7 +839,7 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, default_lear
         if pf_flag == 'learner':
             learning_factor = team_learning_factor[i]
         else:
-            learning_factor = default_learning_factor_teacher
+            learning_factor = teacher_learning_factor[i]
 
         try:
             filename = 'initial_pf_' + str(learning_factor) + '_n_particles_' + str(n_particles) + '.pickle'
@@ -849,12 +849,6 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, default_lear
             print('Initializing particle filter..')
             particles_team[member_id] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), learning_factor)
         
-        # debug prob
-        fixed_cnsts = [np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])]
-
-        particles_team[member_id].calc_particles_probability(fixed_cnsts)
-        print('Prob ', member_id, ': ', particles_team[member_id].particles_prob_correct)
-        print('Entropy: ', particles_team[member_id].calc_entropy())
 
         #########
         # if pf_flag == 'learner':
@@ -879,9 +873,10 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, default_lear
         if team_prior is not None:
             # for cnst in team_prior[member_id]:
             # print('team_prior[member_id]: ', team_prior[member_id]) 
-            plot_title = 'Teacher belief for player ' + str(member_id) + 'for prior'
+            plot_title = 'Belief for player ' + str(member_id) + 'for prior'
             print('Updating particles for ', member_id, 'with prior knowledge in ', model_type, ' condition...')
-            particles_team[member_id].update(team_prior[member_id][0], learning_factor = 1 , plot_title = plot_title, viz_flag = False, vars_filename=vars_filename, model_type = model_type) # team prior is in team knowledge format. Hence use kc_id = 0 to get prior
+            # prior is the same for all irrespective of their understanding/learning factor. So, prior learning factor is '1'
+            particles_team[member_id].update(team_prior[member_id][0], prior_lf, plot_title = plot_title, viz_flag = False, vars_filename=vars_filename, model_type = model_type) # team prior is in team knowledge format. Hence use kc_id = 0 to get prior
 
                 # visualize_transition(cnst, particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for ' + str(member_id) )
             
@@ -890,23 +885,23 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, default_lear
 
     if pf_flag == 'teacher':
         # particles for aggregated team knowledge - common knowledge
-        particles_team['common_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), default_learning_factor_teacher)
+        particles_team['common_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), learning_factor)
         if team_prior is not None:
             team_prior['common_knowledge'] = [calc_common_knowledge(team_prior, team_size, weights, step_cost_flag)]
             plot_title = 'Teacher belief for common knowledge for prior'
-            particles_team['common_knowledge'].update(team_prior['common_knowledge'][0], learning_factor = 1, plot_title=plot_title, viz_flag = False, vars_filename=vars_filename, model_type=model_type)  # team prior is in team knowledge format. Hence use kc_id = 0 to get prior
+            particles_team['common_knowledge'].update(team_prior['common_knowledge'][0], 1, plot_title=plot_title, viz_flag = False, vars_filename=vars_filename, model_type=model_type)  # team prior is in team knowledge format. Hence use kc_id = 0 to get prior
             particles_team['common_knowledge'].knowledge_update(team_prior['common_knowledge'])
         
 
         # particles for aggregated team knowledge - joint knowledge (both methods should produce similar particles; check and if they are similar method 1 is more streamlined)
         # method 1
-        particles_team['joint_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), default_learning_factor_teacher)
+        particles_team['joint_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), learning_factor)
         if team_prior is not None:
             team_prior['joint_knowledge'] = [calc_joint_knowledge(team_prior, team_size)]
 
             print('team_prior[joint_knowledge]: ', team_prior['joint_knowledge'])
             joint_constraints = []
-            for p in range(params.team_size):
+            for p in range(team_size):
                 joint_constraints.append(team_prior['joint_knowledge'][0][p])
             particles_team['joint_knowledge'].update_jk(joint_constraints)
             particles_team['joint_knowledge'].knowledge_update(team_prior['joint_knowledge'])
@@ -1522,7 +1517,7 @@ def visualize_BEC_area(BEC_constraints, fig, ax1):
 
 
 
-def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, member_id, variable_filter, nonzero_counter, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
+def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, teacher_uf_demo, member_id, variable_filter, nonzero_counter, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
                        summary, summary_count, min_BEC_constraints_running, n_human_models_precomputed, visited_env_traj_idxs=[], n_train_demos=3, downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=1, vars_filename = 'sim_run'):
 
     
@@ -1954,7 +1949,7 @@ def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, me
             
             # print('Updating particles with constraint: ', new_constraint)
             plot_title = 'Demo particles update after demonstration summary ' + str(summary_count)
-            particles_demo.update(new_constraint, plot_title = plot_title, vars_filename=vars_filename, model_type = params.teacher_update_model_type)
+            particles_demo.update(new_constraint, teacher_uf_demo, plot_title = plot_title, vars_filename=vars_filename, model_type = params.teacher_update_model_type)
 
             
             # added newly (12/1/23) to separate sampling space and demo info space
@@ -2658,7 +2653,7 @@ def obtain_diagnostic_tests(data_loc, previous_demos, visited_env_traj_idxs, min
 
 
 
-def simulate_team_learning(kc_id, particles_team_learner, new_constraints, params, loop_count, kc_reset_flag=True, viz_flag=False, learner_update_type = 'noise', vars_filename = 'sim_run'):
+def simulate_team_learning(kc_id, particles_team_learner, team_learning_factor, new_constraints, params, loop_count, kc_reset_flag=True, viz_flag=False, learner_update_type = 'noise', vars_filename = 'sim_run'):
 
 
     print(colored('Simulating team learning for KC ' + str(kc_id) + 'in loop ' + str(loop_count) + '...', 'red'))
@@ -2668,7 +2663,7 @@ def simulate_team_learning(kc_id, particles_team_learner, new_constraints, param
         member_id = 'p' + str(p)
         # print('PF update of ', member_id)
         plot_title = 'Intearction No. ' + str(loop_count+1) + '. Learner belief update after demonstration for KC' + str(kc_id) + 'for player ' + member_id
-        particles_team_learner[member_id].update(new_constraints, plot_title = plot_title, model_type = learner_update_type, viz_flag = viz_flag, vars_filename = vars_filename, reset_threshold_prob = params.pf_reset_threshold)
+        particles_team_learner[member_id].update(new_constraints, team_learning_factor[p-1], plot_title = plot_title, model_type = learner_update_type, viz_flag = viz_flag, vars_filename = vars_filename, reset_threshold_prob = params.pf_reset_threshold)
         # particles_team_learner[member_id].calc_particles_probability(new_constraints)
         ##########################
         
