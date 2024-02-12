@@ -15,7 +15,6 @@ import itertools
 
 # Other imports.
 # sys.path.append("simple_rl")
-import params_team as params
 from simple_rl.agents import FixedPolicyAgent
 from simple_rl.planning import ValueIteration
 from simple_rl.utils import make_mdp
@@ -44,7 +43,7 @@ from numpy.linalg import norm
 
 ############################################
 
-def initialize_loop_vars():
+def initialize_loop_vars(params):
 
     demo_vars_template = {'study_id': None,
                         'run_no': None,
@@ -99,12 +98,7 @@ def initialize_loop_vars():
 
 
 
-# def run_reward_teaching(params, pool, demo_strategy = 'common', experiment_type = 'simulated', response_distribution_list = ['correct']*10, run_no = 1, vars_to_save = None):
-# def run_reward_teaching(params, pool, sim_params, demo_strategy = 'common_knowledge', experiment_type = 'simulated',  team_likelihood_correct_response = 0.5*np.ones(params.team_size) ,  team_learning_rate = np.hstack((0.2*np.ones([params.team_size, 1]), -0.1*np.ones([params.team_size, 1]))), obj_func_prop = 1.0, run_no = 1, viz_flag=[False, False, False], vars_filename = 'var_to_save'):
-
-
-
-def get_optimal_policies(pool):
+def get_optimal_policies(params, pool):
 
     ps_helpers.obtain_env_policies(params.mdp_class, params.data_loc['BEC'], np.expand_dims(params.weights['val'], axis=0), params.mdp_parameters, pool)
 
@@ -134,10 +128,10 @@ def get_optimal_policies(pool):
 
 
 
-def debug_calc_prob_mass_correct_side(constraints, particles):
+def debug_calc_prob_mass_correct_side(team_size, constraints, particles):
 
     prob_mass_correct_side_constraints = {}
-    for i in range(params.team_size):
+    for i in range(team_size):
         member_id = 'p' + str(i+1)
         particles[member_id].calc_particles_probability(constraints)
         prob_mass_correct_side_constraints[member_id] = particles[member_id].particles_prob_correct
@@ -146,8 +140,8 @@ def debug_calc_prob_mass_correct_side(constraints, particles):
 
 
 
-def run_reward_teaching(params, pool, sim_params, initial_teacher_learning_factor, demo_strategy = 'common_knowledge', experiment_type = 'simulated', initial_team_learning_factor = 0.65*np.ones([params.team_size, 1]), 
-                        team_learning_rate = np.hstack((0.05*np.ones([params.team_size, 1]), 0*np.ones([params.team_size, 1]))), obj_func_prop = 1.0, run_no = 1, viz_flag=[False, False, False], \
+def run_reward_teaching(params, pool, initial_teacher_learning_factor, demo_strategy = 'common_knowledge', experiment_type = 'simulated', initial_team_learning_factor = [], 
+                        team_learning_rate = [], obj_func_prop = 1.0, run_no = 1, viz_flag=[False, False, False], \
                         vars_filename_prefix = 'var_to_save', response_sampling_condition = 'particles', team_composition = None, learner_update_type = 'no_noise', study_id = 1, \
                         feedback_flag = True, review_flag = True):
 
@@ -169,7 +163,6 @@ def run_reward_teaching(params, pool, sim_params, initial_teacher_learning_facto
     if not os.path.exists(full_path_filename):
         os.makedirs(full_path_filename)
     
-    
     ## Initialize teaching variables
     # particle filter models for individual and team knowledge of teachers and individual knowledge of learners; initialize expected and actual team knowledge
     team_prior, particles_team_teacher = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, teacher_learning_factor=teacher_learning_factor, team_prior = params.team_prior, vars_filename=vars_filename, model_type = params.teacher_update_model_type)
@@ -178,7 +171,7 @@ def run_reward_teaching(params, pool, sim_params, initial_teacher_learning_facto
     team_knowledge_expected = copy.deepcopy(team_knowledge)
     
     # initialize/load variables to save
-    loop_vars = initialize_loop_vars()
+    loop_vars = initialize_loop_vars(params)
     try:
         with open(full_path_filename + '.pickle', 'rb') as f:
             vars_to_save = pickle.load(f)
@@ -203,7 +196,7 @@ def run_reward_teaching(params, pool, sim_params, initial_teacher_learning_facto
     ########################
 
     ### Get/calculate optimal policies
-    policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count, min_BEC_constraints, BEC_lengths_record = get_optimal_policies(pool)
+    policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count, min_BEC_constraints, BEC_lengths_record = get_optimal_policies(params, pool)
     
     # unit (knowledge component/concept) initialization
     variable_filter, nonzero_counter, teaching_complete_flag = team_helpers.check_and_update_variable_filter(min_subset_constraints_record, initialize_filter_flag=True)
@@ -310,8 +303,8 @@ def run_reward_teaching(params, pool, sim_params, initial_teacher_learning_facto
             min_KC_constraints = BEC_helpers.remove_redundant_constraints(unit_constraints, params.weights['val'], params.step_cost_flag)
 
             # DEBUG: calculate probability mass pf correct side before demo
-            prob_teacher_pf_before_demo_dict = debug_calc_prob_mass_correct_side(min_KC_constraints, particles_team_teacher)
-            prob_learner_pf_before_demo_dict = debug_calc_prob_mass_correct_side(min_KC_constraints, particles_team_learner)
+            prob_teacher_pf_before_demo_dict = debug_calc_prob_mass_correct_side(params.team_size, min_KC_constraints, particles_team_teacher)
+            prob_learner_pf_before_demo_dict = debug_calc_prob_mass_correct_side(params.team_size, min_KC_constraints, particles_team_learner)
             teacher_pf_before_demo = copy.deepcopy(particles_team_teacher)
             learner_pf_before_demo = copy.deepcopy(particles_team_learner)
 
@@ -329,8 +322,8 @@ def run_reward_teaching(params, pool, sim_params, initial_teacher_learning_facto
             ############################################
 
             # DEBUG: calculate probability mass pf correct side after demo
-            prob_teacher_pf_after_demo_dict = debug_calc_prob_mass_correct_side(min_KC_constraints, particles_team_teacher)
-            prob_learner_pf_after_demo_dict = debug_calc_prob_mass_correct_side(min_KC_constraints, particles_team_learner)
+            prob_teacher_pf_after_demo_dict = debug_calc_prob_mass_correct_side(params.team_size, min_KC_constraints, particles_team_teacher)
+            prob_learner_pf_after_demo_dict = debug_calc_prob_mass_correct_side(params.team_size, min_KC_constraints, particles_team_learner)
             teacher_pf_after_demo = copy.deepcopy(particles_team_teacher)
             learner_pf_after_demo = copy.deepcopy(particles_team_learner)
 
@@ -778,7 +771,7 @@ def run_reward_teaching(params, pool, sim_params, initial_teacher_learning_facto
 
 
             # update variables
-            loop_vars = initialize_loop_vars()
+            loop_vars = initialize_loop_vars(params)
             loop_vars['study_id'] = study_id
             loop_vars['run_no'] = run_no
             loop_vars['demo_strategy'] = demo_strategy
@@ -929,31 +922,32 @@ def run_reward_teaching(params, pool, sim_params, initial_teacher_learning_facto
 
 
 if __name__ == "__main__":
-    pool = Pool(min(params.n_cpu, 60))
-    os.makedirs('models/' + params.data_loc['base'], exist_ok=True)
-    os.makedirs('models/' + params.data_loc['BEC'], exist_ok=True)
 
-
-    ## run_reward_teaching
-    # run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', experiment_type = 'simulated', response_distribution_list = ['mixed', 'correct', 'mixed', 'incorrect', 'correct', 'correct', 'correct', 'correct'], run_no = 1, viz_flag=True, vars_filename = 'workshop_data')
-    # vars_to_save = run_reward_teaching(params, pool)
+    x = 1
     
-    # viz_flag = [demo_viz, test_viz, pf_knowledge_viz]
-    sim_params = {'min_correct_likelihood': 0.5}
-    initial_team_learning_factor = [0.5, 0.6, 0.7]
-    run_reward_teaching(params, pool, sim_params, demo_strategy = 'individual_knowledge_low', experiment_type = 'simulated', run_no = 1, viz_flag=[False, False, True], vars_filename = '12_15_sim_debug', \
-                        response_sampling_condition = 'particles', team_composition = None, initial_team_learning_factor = initial_team_learning_factor)
+    # pool = Pool(min(params.n_cpu, 60))
+    # os.makedirs('models/' + params.data_loc['base'], exist_ok=True)
+    # os.makedirs('models/' + params.data_loc['BEC'], exist_ok=True)
+
+
+    # ## run_reward_teaching
+    # # run_reward_teaching(params, pool, demo_strategy = 'common_knowledge', experiment_type = 'simulated', response_distribution_list = ['mixed', 'correct', 'mixed', 'incorrect', 'correct', 'correct', 'correct', 'correct'], run_no = 1, viz_flag=True, vars_filename = 'workshop_data')
+    # # vars_to_save = run_reward_teaching(params, pool)
+    
+    # # viz_flag = [demo_viz, test_viz, pf_knowledge_viz]
+    # sim_params = {'min_correct_likelihood': 0.5}
+    # initial_team_learning_factor = [0.5, 0.6, 0.7]
+    # run_reward_teaching(params, pool, sim_params, demo_strategy = 'individual_knowledge_low', experiment_type = 'simulated', run_no = 1, viz_flag=[False, False, True], vars_filename = '12_15_sim_debug', \
+    #                     response_sampling_condition = 'particles', team_composition = None, initial_team_learning_factor = initial_team_learning_factor)
 
     
-    pool.close()
-    pool.join()
+    # pool.close()
+    # pool.join()
 
-
-
-# save files
-    # if len(BEC_summary) > 0:
-    #     with open('models/' + data_loc + '/teams_BEC_summary.pickle', 'wb') as f:
-    #         pickle.dump((BEC_summary, visited_env_traj_idxs, particles_team_teacher), f)
+    # save files
+        # if len(BEC_summary) > 0:
+        #     with open('models/' + data_loc + '/teams_BEC_summary.pickle', 'wb') as f:
+        #         pickle.dump((BEC_summary, visited_env_traj_idxs, particles_team_teacher), f)
 
 
 

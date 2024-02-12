@@ -110,13 +110,13 @@ if __name__ == "__main__":
     sim_params = {'min_correct_likelihood': 0}
     
     
-    N_runs = 4
+    N_runs = 16
     run_start_id = 100
     learner_update_type = 'no_noise'
     params.max_learning_factor = 0.9
     params.default_learning_factor_teacher = 0.8
 
-    file_prefix = 'debug_trials_02_05_no_noise_w_feedback_incorrect'
+    file_prefix = 'debug_trials_02_11_no_noise_w_feedback_incorrect_w_plots'
     
     path = 'data/simulation/sim_experiments'
 

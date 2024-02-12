@@ -111,39 +111,28 @@ if __name__ == "__main__":
     N_runs_for_each_study_condition = 5
     run_start_id = 1
     sensitivity_run_start_id = 1
-    N_combinations = 20
+    N_combinations = 30
 
-    file_prefix = 'trials_01_08_sensitivity_teacher_lf'
+    file_prefix = 'trials_02_11_sensitivity_w_feedback'
     
     path = 'data/simulation/sim_experiments/sensitivity_analysis/'
 
-    ## Learner model sensitivity analysis
+    ## Learner model params sensitivity analysis
     # params_to_study = {'learning_factor_low': [0.6, 0.7], 'learning_factor_high': [0.75, 0.85], 'learning_rate': [0.0, 0.1], 'max_learning_factor': [0.85, 1.0]}
-    # params_to_study = {'learning_factor_low': [0.6, 0.7], 'learning_factor_high': [0.75, 0.85], 'learning_rate': [0.0, 0.1], 'max_learning_factor': [0.85, 1.0]}
     
+    ## Learner and teacher model params sensitivity analysis
+    params_to_study = {'learning_factor_low': [0.6, 0.7], 'learning_factor_high': [0.75, 0.85], 'learning_rate': [0.0, 0.1], 'max_learning_factor': [0.85, 1.0], 'default_learning_factor_teacher': [0.6, 0.9]}
     
-    # Sensitivity for teacher learning factor
-    params_to_study = {'default_learning_factor_teacher': [0.6, 0.9]}
 
-    
-    team_composition_list = [[0,0,0]]
-    # team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
-
-    # dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
-    dem_strategy_list = ['joint_knowledge']
-
-
+    # Experiemnt conditions to test - keep this fixed for a set of sensitivity runs
+    team_composition_list = [[0,0,0]]   # [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
+    dem_strategy_list = ['joint_knowledge'] # ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
 
     ##########################
 
     # fixed parameters
-    learner_update_type = 'noise'
+    learner_update_type = 'no_noise'
     sampling_condition_list = ['particles']  # Conditions: ['particles', 'cluster_random', 'cluster_weight']sampling of human responses from learner PF models
-    sim_params = {'min_correct_likelihood': 0}
-    team_params_learning = {'low': [0.65, 0.05], 'med': [0.65, 0.05], 'high': [0.8, 0.05]}
-    params.max_learning_factor = 0.9
-    # params.default_learning_factor_teacher = 0.8
-
     #################################
 
     ### generate or load parametr combinations
@@ -166,18 +155,14 @@ if __name__ == "__main__":
 
     for sensitivity_run_id in range(sensitivity_run_start_id, sensitivity_run_start_id + N_combinations):
         
-        ## Learner model sensitivity analysis
-        # team_params_learning = {'low': [parameter_combinations[sensitivity_run_id-1][0], parameter_combinations[sensitivity_run_id-1][2]], 
-        #                         'high': [parameter_combinations[sensitivity_run_id-1][1], parameter_combinations[sensitivity_run_id-1][2]]}
-        # params.max_learning_factor = parameter_combinations[sensitivity_run_id-1][3]
-        # print('Sensitivity run: ', sensitivity_run_id, '. Team params: ', team_params_learning, '. Max learning factor: ', params.max_learning_factor)
-
-        ## Teacher model sensitivity analysis
-        params.default_learning_factor_teacher = parameter_combinations[sensitivity_run_id-1][0]
-        print('Sensitivity run: ', sensitivity_run_id, '. Learning_factor_teacher:', params.default_learning_factor_teacher)
+        # Learner and teacher model params sensitivity analysis
+        team_params_learning = {'low': [parameter_combinations[sensitivity_run_id-1][0], parameter_combinations[sensitivity_run_id-1][2]/2, parameter_combinations[sensitivity_run_id-1][2]], 
+                                'high': [parameter_combinations[sensitivity_run_id-1][1], parameter_combinations[sensitivity_run_id-1][2]/2, parameter_combinations[sensitivity_run_id-1][2]]}
+        params.max_learning_factor = parameter_combinations[sensitivity_run_id-1][3]
+        params.default_learning_factor_teacher = parameter_combinations[sensitivity_run_id-1][4]
+        print('Sensitivity run: ', sensitivity_run_id, '. Team params: ', team_params_learning, '. Max learning factor: ', params.max_learning_factor, '. Learning_factor_teacher:', params.default_learning_factor_teacher)
 
         
-
         sim_conditions = get_sim_conditions(team_composition_list, dem_strategy_list, sampling_condition_list, N_runs_for_each_study_condition, run_start_id)
 
         # for each study parameter combination, N_runs of simulations
@@ -199,20 +184,20 @@ if __name__ == "__main__":
                 if team_composition_for_run[j] == 0: 
                     ilcr[j] = team_params_learning['low'][0]
                     rlcr[j,0] = team_params_learning['low'][1]
-                    rlcr[j,1] = 0     
+                    rlcr[j,1] = team_params_learning['low'][2]     
                 elif team_composition_for_run[j] == 1:
                     ilcr[j] = team_params_learning['med'][0]
                     rlcr[j,0] = team_params_learning['med'][1]
-                    rlcr[j,1] = 0
+                    rlcr[j,1] = team_params_learning['med'][2]
                 elif team_composition_for_run[j] == 2:
                     ilcr[j] = team_params_learning['high'][0]
                     rlcr[j,0] = team_params_learning['high'][1]
-                    rlcr[j,1] = 0
+                    rlcr[j,1] = team_params_learning['high'][2]
             
             print(colored('Simulation run: ' + str(run_id) + '. Demo strategy: ' + str(dem_strategy_for_run) + '. Team composition:' + str(team_composition_for_run), 'red'))
             # run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', team_learning_factor = team_learning_factor, viz_flag=[False, False, False], run_no = run_id, vars_filename=file_prefix)
-            run_reward_teaching(params, pool, sim_params, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', initial_team_learning_factor = ilcr, team_learning_rate = rlcr, \
-                                viz_flag=[False, False, True], run_no = run_id, vars_filename=file_prefix, response_sampling_condition=sampling_cond_for_run, team_composition=team_composition_for_run, learner_update_type = learner_update_type, study_id = sensitivity_run_id)
+            run_reward_teaching(params, pool, [params.default_learning_factor_teacher]*params.team_size, demo_strategy = dem_strategy_for_run, experiment_type = 'simulated', initial_team_learning_factor = ilcr, team_learning_rate = rlcr, \
+                                viz_flag=[False, False, False], run_no = run_id, vars_filename_prefix=file_prefix, response_sampling_condition=sampling_cond_for_run, team_composition=team_composition_for_run, learner_update_type = learner_update_type, study_id = sensitivity_run_id)
 
 
             # file_name = [file_prefix + '_' + str(run_id) + '.csv']
