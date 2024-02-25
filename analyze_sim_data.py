@@ -381,25 +381,25 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
                             #     team_particles_probability_dict = str_to_dict(sim_vars[var_name][i], var_type=float)
                             ###########
 
-                                print('team_particles_probability_dict: ', team_particles_probability_dict)
+                            print('team_particles_probability_dict: ', team_particles_probability_dict)
 
-                                for p_id, player in enumerate(team_particles_probability_dict):
-                                    particles_probability_dict = {}
-                                    particles_probability_dict['run_no'] = run_id
-                                    particles_probability_dict['demo_strategy'] = sim_vars['demo_strategy'][i]
-                                    particles_probability_dict['team_composition'] = team_composition
-                                    particles_probability_dict['loop_count'] = int(sim_vars['loop_count'][i])
-                                    # particles_probability_dict['test_id'] = test_id
-                                    particles_probability_dict['test_constraints'] = test_constraints
-                                    particles_probability_dict['update_id'] = update_id
-                                    particles_probability_dict['update_type'] = var_name
-                                    particles_probability_dict['kc_id'] = kc_variables
-                                    particles_probability_dict['player_id'] = player
-                                    particles_probability_dict['learning_factor'] = lf_array[p_id]
-                                    particles_probability_dict['particles_prob'] = float(team_particles_probability_dict[player])
-                                    particles_probability_dict['file_name'] = file
+                            for p_id, player in enumerate(team_particles_probability_dict):
+                                particles_probability_dict = {}
+                                particles_probability_dict['run_no'] = run_id
+                                particles_probability_dict['demo_strategy'] = sim_vars['demo_strategy'][i]
+                                particles_probability_dict['team_composition'] = team_composition
+                                particles_probability_dict['loop_count'] = int(sim_vars['loop_count'][i])
+                                # particles_probability_dict['test_id'] = test_id
+                                particles_probability_dict['test_constraints'] = test_constraints
+                                particles_probability_dict['update_id'] = update_id
+                                particles_probability_dict['update_type'] = var_name
+                                particles_probability_dict['kc_id'] = kc_variables
+                                particles_probability_dict['player_id'] = player
+                                particles_probability_dict['learning_factor'] = lf_array[p_id]
+                                particles_probability_dict['particles_prob'] = float(team_particles_probability_dict[player])
+                                particles_probability_dict['file_name'] = file
 
-                                    particles_prob = particles_prob.append(particles_probability_dict, ignore_index=True)
+                                particles_prob = particles_prob.append(particles_probability_dict, ignore_index=True)
 
                                 # test_id += 1
                         ################   
@@ -2099,6 +2099,37 @@ def plot_pf_updates(path, file_prefix):
 
 
     plt.show()
+######################################
+    
+
+def plot_prob_data(path, file):
+
+    with open(path + '/' + file, 'rb') as f:
+        prob_data = pickle.load(f)
+
+    print(prob_data)
+
+
+    # reformat probability data
+    prob_data_reformatted = pd.DataFrame()
+    unique_runs = prob_data['run_id'].unique()
+
+    for run_id in unique_runs:
+        run_data = prob_data[prob_data['run_id'] == run_id]
+        run_data['loop_id'] = np.arange(1, len(run_data)+1)
+        prob_data_reformatted = prob_data_reformatted.append(run_data, ignore_index=True)
+
+
+    # plot teacher and learner probability of correct response for every interaction
+    f, ax = plt.subplots(nrows=2, ncols=3, sharex=True, sharey=True, figsize=(15,10))
+    plt.subplots_adjust(wspace=0.1, hspace=0.1)
+
+
+
+    for p in range(params.team_size):
+        member_id = 'p' + str(p+1)
+        # plot_data = 
+        sns.lineplot(prob_data, x = 'loop_id', y = member_id, hue = 'prob_type', ax=ax[0, p], errorbar=('se', 1), err_style="band").set(title=member_id)
 
 
 

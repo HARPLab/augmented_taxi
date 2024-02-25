@@ -58,6 +58,7 @@ mpl.rcParams['axes.labelsize'] = 'x-large'
 mpl.rcParams['xtick.labelsize'] = 'large'
 
 
+
 # # what does base_constraints.pickel contain?
 
 # with open('models/augmented_taxi2/base_constraints.pickle', 'rb') as f:
@@ -1070,7 +1071,35 @@ def split_pickle_file(path, file):
     x = 1
 
 ######################################
+def squarest_rectangle(area):
+        # Initialize variables to store the dimensions of the squarest rectangle
+        length = 1
+        width = area
+        
+        # Initialize the minimum difference between length and width
+        min_difference = abs(length - width)
 
+        while min_difference > 2:
+
+            area += 1
+        
+            # Iterate over all possible lengths up to the square root of the area
+            for l in range(1, int(area**0.5) + 1):
+                # Check if the length divides the area evenly
+                if area % l == 0:
+                    w = area // l  # Calculate the corresponding width
+                    
+                    # Calculate the difference between length and width
+                    difference = abs(l - w)
+                    
+                    # Update dimensions if the current rectangle is "squarer"
+                    if difference < min_difference:
+                        length = l
+                        width = w
+                        min_difference = difference
+
+        return length, width
+########################
 
 def check_ig_uf_relation(path):
 
@@ -1086,21 +1115,35 @@ def check_ig_uf_relation(path):
 
     params.default_learning_factor_teacher = 0.8
 
-    filename = 'particles_ig_demos_individual_KC_3'
+    filename = 'particles_ig_demos_individual_KC_4'
+
+
 
     try:
-        particles_ig = pd.read_csv(path + '/' + filename + '.csv')
+        particles_ig = pd.read_csv(path + '/' + filename + 'wrong_intentional'+ '.csv')
 
     except:
 
-        N_members = 11
-        
-        learning_factor = np.linspace(0.5, 1, num=11)
+        N_members = 10
 
-        _, particles_initial = team_helpers.sample_team_pf(1, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, teacher_learning_factor=[params.default_learning_factor_teacher], team_prior = params.team_prior)
+        # plot particle distribution
+        fig = plt.figure(figsize=(18, 14))    
+        fig2 = plt.figure(figsize=(4, 3))
+        row_len, col_len = squarest_rectangle(N_members)
+        print('row_len: ', row_len, '. col_len: ', col_len)
+        ax = np.array([fig.add_subplot(row_len, col_len, i+1, projection='3d') for i in range(N_members)])   
+        fig.tight_layout(pad=3)
+        ax2 = fig2.add_subplot(1,1,1, projection='3d')
+        fig.suptitle('Learning dynamics for various understanding factors.')
+        
+        learning_factor = np.round(np.linspace(0.55, 1, num=10),2)
+
+        _, particles_initial = team_helpers.sample_team_pf(1, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, teacher_learning_factor=[params.default_learning_factor_teacher], team_prior = params.team_prior, prior_lf=1)
         # no prior
         # _, particles_initial = team_helpers.sample_team_pf(1, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, 0.8)
         print(particles_initial)
+        particles_initial['p1'].plot(fig=fig2, ax=ax2)
+        fig2.suptitle('Prior knowledge of learner.')
 
         # constraints_list = [[np.array([[-1, 0, 0]]), np.array([[1,  0,  -4]])], [np.array([[-1, 0, 0]]), np.array([[-1,  0,  2]])]]
         
@@ -1109,7 +1152,7 @@ def check_ig_uf_relation(path):
                             3: [[np.array([[1, 1, 0]])]]
                             }
         
-        N_kcs = 3
+        N_kcs = 1
         N_updates = [1, 1, 1]
         # constraints_list = [np.array([[-1, 0, 0]]), np.array([[1,  0,  -4]]), np.array([[-1, 0, 0]]), np.array([[-1,  0,  2]]), np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])] 
        
@@ -1118,6 +1161,12 @@ def check_ig_uf_relation(path):
         min_BEC_constraints_running = [np.array([[0, 0 ,-1]])]
 
         # ig_const = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, constraint, params.weights['val'], params.step_cost_flag)
+
+
+        # create figure for each particle filter
+
+
+
 
         particles_ig = pd.DataFrame()
         max_info_gain = {}
@@ -1138,9 +1187,9 @@ def check_ig_uf_relation(path):
                 N_updates_kc = N_updates[kc_id]
                 constraints_list = constraints_dict[kc_id+1]
 
-                particles_member = copy.deepcopy(particles_initial['p1'])  # for updating only one constraint at a time individually; but from each "ideal" KC state
+                # particles_member = copy.deepcopy(particles_initial['p1'])  # for updating only one constraint at a time individually; but from each "ideal" KC state
                 for p_cnst in prev_constraints_list:
-                    particles_member.update(p_cnst, 1, model_type = 'no_noise')
+                    particles_member.update(p_cnst, 1, model_type = 'noise')
 
 
                 for update_id in range(N_updates_kc):
@@ -1156,7 +1205,7 @@ def check_ig_uf_relation(path):
                         print('N_previous_cnst: ', N_previous_cnst, '. cnst_index: ', cnst_index, '. cnst_id: ', cnst_id)
 
                         # constraint = [constraint]
-                        # particles_member = copy.deepcopy(particles_initial['p1'])  # only for one update; for updating only one constraint at a time individually; 
+                        particles_member = copy.deepcopy(particles_initial['p1'])  # only for one update; for updating only one constraint at a time individually; 
                         ig_const = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, constraint, params.weights['val'], params.step_cost_flag)
                         print('Constraint: ', constraint, '. Info gain const: ', ig_const)
 
@@ -1165,9 +1214,20 @@ def check_ig_uf_relation(path):
                         particles_ig_dict = {'member_id': member_id, 'lf': lf, 'kc_id': kc_id+1, 'update_id': update_id+1, 'info_gain_pf': particles_member.calc_info_gain(constraint, lf), \
                                             'ig_const': ig_const, 'cnst_id': cnst_id, 'cnst': constraint}  # calculate before update
                         plot_title = 'Update no. ' + str(update_id+1) + ' for constraint ' + str(constraint) + ' and lf ' + str(lf)
-                        particles_member.update(constraint, lf, viz_flag = viz_flag, plot_title = plot_title, model_type = 'no_noise', vars_filename = filename)
-                        
+                        particles_member.update(constraint, lf, viz_flag = False, plot_title = plot_title, model_type = 'no_noise', vars_filename = filename)
                         particles_ig = particles_ig.append(particles_ig_dict, ignore_index=True)
+
+                        # plot particle distribution
+                        particles_member.plot(fig=fig, ax=ax[i])
+                        # BEC_viz.visualize_planes(constraint, fig=fig, ax=axs[i])
+                        ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraint)
+                        poly = Polyhedron.Polyhedron(ieqs=ieqs)
+                        BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax[i], plot_ref_sphere=False, alpha=0.75)
+                        plt.rcParams.update({"text.usetex": True})
+                        ax[i].set_title('$u$ = ' + str(lf), fontsize=14)
+                        plt.rcParams.update({"text.usetex": False})
+                        fig.savefig(path + '/learner_particles_' + str(kc_id) + '_' + str(update_id) + '_' + str(cnst_index) + '.png')
+                        
 
                 if len(prev_constraints_list) == 0:
                     prev_constraints_list = copy.deepcopy(constraints_list)
@@ -1181,7 +1241,6 @@ def check_ig_uf_relation(path):
                     min_BEC_constraints_running.extend(constraint)
                 
                 min_BEC_constraints_running = BEC_helpers.remove_redundant_constraints(min_BEC_constraints_running, params.weights['val'], params.step_cost_flag)
-
 
 
         # find info gain proportion
@@ -1213,20 +1272,20 @@ def check_ig_uf_relation(path):
 
     #
     plot_data = particles_ig[(particles_ig['lf']>0.5) & (particles_ig['update_id']==1)]
-    fig, ax = plt.subplots(ncols=1,  sharex=True, sharey=True, figsize=(10,6))
+    fig3, ax3 = plt.subplots(ncols=1,  sharex=True, sharey=True, figsize=(10,6))
     plt.subplots_adjust(wspace=0.1, hspace=0.1)
     # sns.lineplot(plot_data, x = 'lf', y = 'info_gain', hue = 'update_id', ax=ax, errorbar=('se', 1), err_style="band").set(title='Understanding factor vs. Info gain')
-    sns.lineplot(plot_data, x = 'lf', y = 'info_gain_proportion', hue = 'cnst_id', ax=ax, errorbar=('se', 1), err_style="band", palette = palette).set(title='Understanding factor vs. Info gain proportion')
+    sns.lineplot(plot_data, x = 'lf', y = 'info_gain_proportion', hue = 'cnst_id', ax=ax3, errorbar=('se', 1), err_style="band", palette = palette).set(title='Understanding factor vs. Info gain proportion')
 
     
-    fig2, ax2 = plt.subplots(ncols=1,  sharex=True, sharey=True, figsize=(10,6))
+    fig4, ax4 = plt.subplots(ncols=1,  sharex=True, sharey=True, figsize=(10,6))
     plt.subplots_adjust(wspace=0.1, hspace=0.1)
     # sns.lineplot(plot_data, x = 'lf', y = 'info_gain', hue = 'update_id', ax=ax, errorbar=('se', 1), err_style="band").set(title='Understanding factor vs. Info gain')
-    sns.lineplot(plot_data, x = 'lf', y = 'info_gain_proportion', ax=ax2, errorbar=('se', 1), err_style="band", palette = palette).set(title='Understanding factor vs. Info gain proportion')
+    sns.lineplot(plot_data, x = 'lf', y = 'info_gain_proportion', ax=ax4, errorbar=('se', 1), err_style="band", palette = palette).set(title='Understanding factor vs. Info gain proportion')
 
     
     #
-    N_kcs = 3
+    N_kcs = 1
     constraints_dict = {1: [[np.array([[-1, 0, 0]]), np.array([[1,  0,  -4]])], [np.array([[-1, 0, 0]]), np.array([[-1,  0,  2]])]], 
                             2: [[np.array([[0, 1, 2]]), np.array([[0, 1, 0]])], [np.array([[  0,  -1, -10]]), np.array([[ 0, -1, -4]])]],
                             3: [[np.array([[1, 1, 0]])]]
@@ -1262,6 +1321,98 @@ def check_ig_uf_relation(path):
     plt.show()
 
 
+########################################
+    
+def check_constraints_area():
+
+    def label_axes(ax, mdp_class, weights=None, view_params = None):
+        fs = 14
+        ax.set_facecolor('white')
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
+        if weights is not None:
+            ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100/2)
+        if mdp_class == 'augmented_taxi2':
+            ax.set_xlabel(r'$\mathregular{w_0}$: Mud', fontsize = fs)
+            ax.set_ylabel(r'$\mathregular{w_1}$: Recharge', fontsize = fs)
+        elif mdp_class == 'colored_tiles':
+            ax.set_xlabel('X: Tile A (brown)')
+            ax.set_ylabel('Y: Tile B (green)')
+        else:
+            ax.set_xlabel('X: Goal')
+            ax.set_ylabel('Y: Skateboard')
+        ax.set_zlabel('$\mathregular{w_2}$: Action', fontsize = fs)
+
+        # ax.view_init(elev=16, azim=-160)
+        if not view_params is None:
+            elev = view_params[0]
+            azim = view_params[1]
+        else:
+            elev=16
+            azim = -160
+
+        
+        ax.view_init(elev=elev, azim=azim)
+
+    
+
+    all_test_constraints = {  1: [[np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]])]], \
+                                        2: [[np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])]], \
+                                        3: [[np.array([[1, 1, 0]])]], \
+                                        4: [[np.array([[ 1,  0, -4]]), np.array([[-1,  0,  2]]), np.array([[0, 1, 2]]), np.array([[ 0, -1, -4]])]], \
+                                        5: [[np.array([[1, 1, 0]]), np.array([[-1,  0,  2]]), np.array([[ 0, -1, -4]])]]}
+
+    mdp_class = params.mdp_class
+    weights = params.weights['val']
+
+    fig = plt.figure()
+    ax1 = fig.add_subplot(2, 3, 1, projection='3d')
+    ax2 = fig.add_subplot(2, 3, 2, projection='3d', sharex=ax1, sharey=ax1, sharez=ax1)
+    ax3 = fig.add_subplot(2, 3, 3, projection='3d', sharex=ax1, sharey=ax1, sharez=ax1)
+    ax4 = fig.add_subplot(2, 3, 4, projection='3d', sharex=ax1, sharey=ax1, sharez=ax1)
+    ax5 = fig.add_subplot(2, 3, 5, projection='3d', sharex=ax1, sharey=ax1, sharez=ax1)
+    ax1.title.set_text('Constraints area for KC 1')
+    ax2.title.set_text('Constraints area for KC 2')
+    ax3.title.set_text('Constraints area for KC 3')
+    ax4.title.set_text('Constraints area for KC 1 and 2')
+    ax5.title.set_text('Constraints area for entire robot reward BEC')
+
+    for id, cnsts in all_test_constraints.items():
+        print('id: ', id, '. key: ', cnsts, 'area:', BEC_helpers.calc_solid_angles(cnsts))
+        if id == 1:
+            axn = ax1
+        elif id == 2:
+            axn = ax2
+        elif id == 3:
+            axn = ax3
+        elif id ==4:
+            axn = ax4
+        else:
+            axn = ax5
+
+        if id == 4:
+            cnsts = [BEC_helpers.remove_redundant_constraints(cnsts[0], params.weights['val'], params.step_cost_flag)]
+
+        ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(cnsts[0])
+        poly = Polyhedron.Polyhedron(ieqs=ieqs)
+        BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=axn, plot_ref_sphere=False, alpha=0.80)
+        BEC_viz.visualize_planes(cnsts[0], fig=fig, ax=axn, alpha=0.3)
+
+        if cnsts[0][0][0][0] == 0:
+            view_params = [16, -160]
+        elif cnsts[0][0][0][1] == 0:
+            view_params = [2, -100]
+        elif cnsts[0][0][0][2] == 0:
+            view_params = [2, -60]
+        else:
+            view_params = [16, -160]
+
+        label_axes(axn, mdp_class, weights, view_params = view_params)
+
+
+
+    plt.show()
 
 
 
@@ -2216,19 +2367,19 @@ if __name__ == "__main__":
     # mu_rep = np.array([1,  0,  0])
     # x_edge_rep = np.array([0,  0,  1])  # a point on the edge of the constraint mu
     # # x_edge = [1/np.sqrt(2), 1/np.sqrt(2), 0] 
-    # kappa = 1.23
+    # kappa = 0.8
     # vmf = vonmises_fisher(mu_rep, kappa)
     # pdf_vmf = vmf.pdf(x_edge_rep)
-    # # print(pdf_vmf)
+    # print(pdf_vmf)
 
     # phi_lim = [0, np.pi]
     # theta_lim = [np.pi/2, 3*np.pi/2]    # these limits are specific to the constraint mu = [1, 0, 0]
     # f1 = lambda phi, theta: kappa*np.exp(kappa*np.array([np.cos(theta)* np.sin(phi), np.sin(theta) * np.sin(phi), np.cos(phi)]).dot(mu_rep))*np.sin(phi)/(2*np.pi*(np.exp(kappa)-np.exp(-kappa)))
     # int_probability_vmf = integrate.dblquad(f1, theta_lim[0], theta_lim[1], phi_lim[0], phi_lim[1])
-    # x1 = 1 / (4 * np.pi * pdf_vmf)
-    # x2 = 1 / (int_probability_vmf * x1 + 0.5)
-
-    # print(int_probability_vmf)
+    # # x1 = 1 / (4 * np.pi * pdf_vmf)
+    # # x2 = 1 / (int_probability_vmf[0] * x1 + 0.5)
+    # # print('x1: ', x1, 'x2:', x2)
+    # print(int_probability_vmf[0])
 
 
 ############################
@@ -3382,18 +3533,18 @@ if __name__ == "__main__":
     # print(team_helpers.calc_knowledge_level(team_knowledge, min_unit_constraints))
     ######################################
 
-    path = 'models/augmented_taxi2'
+    # path = 'models/augmented_taxi2'
 
-    filename = 'wt_vi_traj_params_env00000.pickle'
+    # filename = 'wt_vi_traj_params_env00000.pickle'
 
-    with open(path + '/' + filename, 'rb') as f:
-        best_env_idxs = pickle.load(f)
+    # with open(path + '/' + filename, 'rb') as f:
+    #     best_env_idxs = pickle.load(f)
 
-    mdp = best_env_idxs[0][1].mdp
+    # mdp = best_env_idxs[0][1].mdp
 
-    print(mdp)
+    # print(mdp)
 
-
+    ###################################
 
 
     x = 1

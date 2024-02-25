@@ -554,9 +554,9 @@ class Particles():
         # ax.scatter(centroid[0], centroid[1], centroid[2], marker='o', c='r', s=100)
 
         if matplotlib.get_backend() == 'TkAgg':
-            ax.set_xlabel('$\mathregular{w_0}$: Mud')
-            ax.set_ylabel('$\mathregular{w_1}$: Recharge')
-            ax.set_zlabel('$\mathregular{w_2}$: Action')
+            ax.set_xlabel('$\mathregular{w_0}$: Mud', fontsize=8)
+            ax.set_ylabel('$\mathregular{w_1}$: Recharge', fontsize=8)
+            ax.set_zlabel('$\mathregular{w_2}$: Action', fontsize=8)
 
     def resample_from_index(self, indexes, K=1):
         # resample

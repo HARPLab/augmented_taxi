@@ -74,7 +74,7 @@ class Particles_team():
         # self.VMF_kappa = 4                                # the concentration parameter of the VMF distribution
         
 
-        print('u_pdf_scaled: ', self.u_pdf_scaled, 'u_prob_mass_scaled: ', self.u_prob_mass_scaled, 'VMF_prob_mass_scaled: ', self.VMF_prob_mass_scaled, 'VMF_kappa: ', self.VMF_kappa, 'VMF_pdf: ', self.VMF_pdf, 'x1: ', self.x1, 'x2: ', self.x2) 
+        # print('u_pdf_scaled: ', self.u_pdf_scaled, 'u_prob_mass_scaled: ', self.u_prob_mass_scaled, 'VMF_prob_mass_scaled: ', self.VMF_prob_mass_scaled, 'VMF_kappa: ', self.VMF_kappa, 'VMF_pdf: ', self.VMF_pdf, 'x1: ', self.x1, 'x2: ', self.x2) 
 
 
 
@@ -273,18 +273,29 @@ class Particles_team():
         phi_lim = [0, np.pi]
         theta_lim = [np.pi/2, 3*np.pi/2]
 
-        # fix unscaled vmf_mass instead of making it variable for when u_cdf_scaled <= 0.5
-        vmf_mass = 0.25
+        # print('u_cdf_scaled: ', u_cdf_scaled)
         
-        if u_cdf_scaled > 0.5:
-            kappa = self.calc_kappa_from_cdf(1-u_cdf_scaled)
-            x1 = 1
-        else:
-            kappa = self.calc_kappa_from_cdf(vmf_mass)
-            f = lambda phi, theta: kappa*np.exp(kappa*np.array([np.cos(theta)* np.sin(phi), np.sin(theta) * np.sin(phi), np.cos(phi)]).dot(mu))*np.sin(phi)/(2*np.pi*(np.exp(kappa)-np.exp(-kappa)))
-            VMF_cdf, err = integrate.dblquad(f, theta_lim[0], theta_lim[1], phi_lim[0], phi_lim[1])  # limits for 2nd argument first; https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.dblquad.html
-            print('VMF_cdf: ', VMF_cdf)
-            x1 = (1-u_cdf_scaled)/VMF_cdf
+        
+        #Code to run normally
+        # if u_cdf_scaled > 0.5:
+        #     kappa = self.calc_kappa_from_cdf(1-u_cdf_scaled)
+        #     x1 = 1
+        # else:
+        #     vmf_mass = 0.25 # fix unscaled vmf_mass instead of making it variable for when u_cdf_scaled <= 0.5 and then rescale (x1) according to the cdf value
+        #     kappa = self.calc_kappa_from_cdf(vmf_mass)
+        #     f = lambda phi, theta: kappa*np.exp(kappa*np.array([np.cos(theta)* np.sin(phi), np.sin(theta) * np.sin(phi), np.cos(phi)]).dot(mu))*np.sin(phi)/(2*np.pi*(np.exp(kappa)-np.exp(-kappa)))
+        #     VMF_cdf, err = integrate.dblquad(f, theta_lim[0], theta_lim[1], phi_lim[0], phi_lim[1])  # limits for 2nd argument first; https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.dblquad.html
+        #     # print('VMF_cdf: ', VMF_cdf)
+        #     x1 = (1-u_cdf_scaled)/VMF_cdf
+
+        # anyways when u_cdf_scaled > 0.5
+        kappa = self.calc_kappa_from_cdf(1-u_cdf_scaled)
+        x1 = 1
+
+        # # For parameter estimation from data
+        # # kappa = self.calc_kappa_from_cdf(1-u_cdf_scaled)
+        # kappa = 2
+        # x1 = 1
         ###################
 
         # kappa = self.calc_kappa_from_cdf(vmf_mass)
@@ -819,9 +830,9 @@ class Particles_team():
         # ax.scatter(centroid[0], centroid[1], centroid[2], marker='o', c='r', s=100)
 
         if matplotlib.get_backend() == 'TkAgg':
-            ax.set_xlabel('$\mathregular{w_0}$: Mud')
-            ax.set_ylabel('$\mathregular{w_1}$: Recharge')
-            ax.set_zlabel('$\mathregular{w_2}$: Action')
+            ax.set_xlabel('$\mathregular{w_0}$: Mud', fontsize=12)
+            ax.set_ylabel('$\mathregular{w_1}$: Recharge', fontsize=12)
+            ax.set_zlabel('$\mathregular{w_2}$: Action', fontsize=12)
 
 
 
@@ -896,10 +907,15 @@ class Particles_team():
             noise = np.array([np.random.normal(scale=max_ele_dist, size=len(positions_spherical)),
                             np.random.normal(scale=max_azi_dist, size=len(positions_spherical))]).T
             # print('Resampling with noise...')
-        else:
+        elif model_type == 'low_noise':
+            noise = np.array([np.random.normal(scale=max_ele_dist/10, size=len(positions_spherical)),
+                             np.random.normal(scale=max_azi_dist/10, size=len(positions_spherical))]).T
+        elif model_type == 'no_noise':
             noise = np.array([np.zeros(len(positions_spherical)),
                             np.zeros(len(positions_spherical))]).T
             # print('Resampling without noise...')
+        else:
+            RuntimeError('Invalid model type. Please choose from: noise, low_noise, no_noise')
         
         noise_before_transform = copy.deepcopy(noise)
 
@@ -919,7 +935,7 @@ class Particles_team():
         ################
         noise_norm = np.linalg.norm(noise, axis=1)
         self.noise_measures = [np.mean(noise_norm), np.std(noise_norm)]
-        print('Noise mean: ', self.noise_measures[0], '. Noise std: ', self.noise_measures[1])
+        # print('Noise mean: ', self.noise_measures[0], '. Noise std: ', self.noise_measures[1])
 
         positions_spherical += noise
 
@@ -1176,7 +1192,7 @@ class Particles_team():
     ################################################################################################
 
 
-    def update(self, constraints, learning_factor, c=0.5, reset_threshold_prob=0.001, plot_title = None, model_type = 'noise', viz_flag = False, vars_filename = 'sim_run'):
+    def update(self, constraints, learning_factor, c=0.5, reset_threshold_prob=0.001, plot_title = None, model_type = 'low_noise', viz_flag = False, vars_filename = 'sim_run'):
         self.weights_prev = self.weights.copy()
         self.positions_prev = self.positions.copy()
         # print(colored('constraints: ' + str(constraints), 'red'))
@@ -1243,8 +1259,7 @@ class Particles_team():
             #     ax2[cnst_id*3].hist(self.weights, bins=20)
             #     ax2[cnst_id*3].title.set_text('Particle distribution before reweighting')
             
-            # to accomodate different learning factors from corrective feedback based on correctness of constraints
-
+            # to accomodate different learning factors from corrective feedback based on correctness of constraints; lf should be a list in this case
             if type(learning_factor) == list:
                 if len(learning_factor) > 1:
                     cnst_lf = learning_factor[cnst_id]
@@ -1252,6 +1267,10 @@ class Particles_team():
                     cnst_lf = learning_factor[0]
             else:
                 cnst_lf = learning_factor
+
+
+
+
 
             self.reweight(constraint, cnst_lf)
             
@@ -1334,7 +1353,7 @@ class Particles_team():
                     
 
                 n_eff = self.calc_n_eff(self.weights)
-                print('N_particles: ', len(self.weights), 'n_eff: ', n_eff)
+                # print('N_particles: ', len(self.weights), 'n_eff: ', n_eff)
                 if n_eff < c * len(self.weights):
                     # a) use systematic resampling
                     # resample_indexes = p_utils.systematic_resample(self.weights)
@@ -1343,7 +1362,7 @@ class Particles_team():
                     # b) use KLD resampling
                     # print('Plotting before resampling..')
                     # self.plot()
-                    print(colored('Resampling...', 'red'))
+                    # print(colored('Resampling...', 'red'))
                     
                     # for debugging purposes
                     # self.cluster()
@@ -1443,7 +1462,7 @@ class Particles_team():
         :param k: concentration parameter of VMF
         :return: probability of x under this composite distribution (uniform + VMF)
         '''
-        print(colored('Reweighting particles for learning factor: ' + str(learning_factor), 'red'))
+        # print(colored('Reweighting particles for learning factor: ' + str(learning_factor), 'red'))
         # if learning_factor is None:
         #     u_pdf_scaled = self.u_pdf_scaled
         #     VMF_kappa = self.VMF_kappa
@@ -1468,9 +1487,9 @@ class Particles_team():
         for j, x in enumerate(self.positions):
             obs_prob = self.observation_probability(u_pdf_scaled, VMF_kappa, x, constraint, x1, x2)
             
-            # print('Old particle weight:', str(self.weights[j]), 'Observation probability:', str(obs_prob))
+            # print('Old particle weight:', str(self.weights[j]), 'Observation probability:', obs_prob)
             self.weights[j] = self.weights[j] * obs_prob
-            # print('New particle weight:', str(self.weights[j]))
+            # print('New particle weight:', self.weights[j])
 
             # self.plot_particles(x, constraints)
 
@@ -1490,11 +1509,13 @@ class Particles_team():
 
         if dot >= 0:
             # use the uniform dist
+            # print('Using the uniform distribution...')
             prob *= u_pdf_scaled
         else:
             # use the VMF dist
             # prob *= p_utils.VMF_pdf(constraint, VMF_kappa, p, x, dot=dot)
             # prob *= p_utils.VMF_pdf(constraint, VMF_kappa, p, x, dot=dot) * x1 * x2
+            # print('Using the VMF distribution...')
             prob *= p_utils.VMF_pdf(constraint[0], VMF_kappa, p, x, dot=dot) * x1 * x2   # only when for loop is not used.
 
         return prob

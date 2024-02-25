@@ -185,12 +185,17 @@ if __name__ == "__main__":
     # #################################
 
     # plot pf update process
-    path = 'models/augmented_taxi2'
-    file_prefix = 'debug_trials_01_23_no_noise_w_feedback_study_1_run_70'
-    asd.plot_pf_updates(path, file_prefix)
+    # path = 'models/augmented_taxi2'
+    # file_prefix = 'debug_trials_01_23_no_noise_w_feedback_study_1_run_70'
+    # asd.plot_pf_updates(path, file_prefix)
         
     ##########################
 
     # # # check information gain vs learning factor
     # path = 'models/augmented_taxi2'
     # dt.check_ig_uf_relation(path)
+
+    ###########################
+
+    # check constraints area
+    dt.check_constraints_area()
