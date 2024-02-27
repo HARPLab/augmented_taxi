@@ -599,13 +599,17 @@ def run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_l
                 teacher_pf_interaction.calc_particles_probability(min_BEC_constraints)
                 prop_particles_BEC_teacher = teacher_pf_interaction.particles_prob_correct
 
+                # calculate info gain
+                entropy_learner_pf = learner_pf.calc_entropy()
+                entropy_teacher_pf = teacher_pf_interaction.calc_entropy()
+
                 # save current interaction data
                 
                 interaction_data_dict = {'user_id': user_id, 'loop_condition': interaction_data_updated['loop_condition'].iloc[0], 'initial_learning_factor': initial_learning_factor, 'learning_factor_delta': learning_factor_delta, \
                                         'loop_id': loop_id, 'demo_id': demo_id, 'kc_id': current_kc_id, 'interaction_type': current_interaction_type, 'interaction_constraints': unit_constraints, 'test_constraints': test_constraints, 'study_constraints': study_constraints,\
                                         'learning_factor': learning_factor[0], 'is_opt_response': is_opt_response, 'prob_correct_response': prob_particles_correct, 'prop_particles_BEC': prop_particles_BEC, \
-                                        'prob_correct_response_teacher': prob_particles_correct_teacher, 'prob_particles_BEC_teacher': prop_particles_BEC_teacher, 'learner_pf_pos': learner_pf.positions, \
-                                        'learner_pf_weights': learner_pf.weights, 'teacher_pf_pos': teacher_pf_interaction.positions, 'teacher_pf_weights': teacher_pf_interaction.weights }
+                                        'prob_correct_response_teacher': prob_particles_correct_teacher, 'prob_particles_BEC_teacher': prop_particles_BEC_teacher, 'learner_pf_pos': learner_pf.positions, 'learner_pf_weights': learner_pf.weights, \
+                                        'teacher_pf_pos': teacher_pf_interaction.positions, 'teacher_pf_weights': teacher_pf_interaction.weights, 'entropy_learner_pf': entropy_learner_pf, 'entropy_teacher_pf': entropy_teacher_pf}
             
             else:
                 interaction_data_dict = {'user_id': user_id, 'loop_condition': interaction_data_updated['loop_condition'].iloc[0], 'initial_learning_factor': initial_learning_factor, 'learning_factor_delta': learning_factor_delta, \
@@ -672,6 +676,10 @@ def run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_l
     print('concept_end_id: ', concept_end_id)
     print('user_plot_data interactions: ', user_plot_data['interaction_type'], 'demo_id: ', user_plot_data['combined_demo_id'])
 
+    # info gain
+    user_plot_data['info_gain_learner'] = np.diff(user_plot_data['entropy_learner_pf'], n=1, prepend=-1)
+    user_plot_data['info_gain_teacher'] = np.diff(user_plot_data['entropy_teacher_pf'], n=1, prepend=-1)
+
 
     # plots
     plt.figure(user_id, figsize=(16, 12))
@@ -699,6 +707,10 @@ def run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_l
     # plot overall learning dynamics - probability of correct response
     sns.lineplot(data=user_plot_data_no_duplicates, x='combined_demo_id', y='prop_particles_BEC', ax=ax0, color = str(colors[3]), label = 'Total knowledge - learner')
     # sns.lineplot(data=user_plot_data_no_duplicates, x='combined_demo_id', y='prob_particles_BEC_teacher', ax=ax0, color = str(colors[4]), label = 'Total knowledge - teacher model of learner')
+    sns.lineplot(data=user_plot_data_no_duplicates, x='combined_demo_id', y='info_gain_learner', ax=ax_dup, color = str(colors[5]), label = 'Info gain - learner')
+    sns.lineplot(data=user_plot_data_no_duplicates, x='combined_demo_id', y='info_gain_teacher', ax=ax_dup, color = str(colors[6]), label = 'Info gain - teacher model of learner')
+
+
 
     # plot actual human learner responses to tests
     test_data = pd.DataFrame()
@@ -712,6 +724,7 @@ def run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_l
     test_data_incorrect = test_data[test_data['is_opt_response'] == 0]
     sns.scatterplot(data=test_data_correct, x='combined_demo_id', y='is_opt_response', marker = 'o', ax=ax0, color='green', s=100, label = 'Correct response - learner')
     sns.scatterplot(data=test_data_incorrect, x='combined_demo_id', y='is_opt_response', marker = 'x', ax=ax0, linewidth = 3, color='red', s=50, label = 'Incorrect response - learner')
+    
     
     
     for id, row in user_plot_data_no_duplicates.iterrows():
@@ -734,8 +747,8 @@ def run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_l
     ax_dup.set_ylabel('Understanding factor', fontsize=16)
     ax0.set_xlabel('Interaction number', fontsize=16)
 
-    ax0.set_ylim([-0.05, 1.4])
-    ax_dup.set_ylim([-0.05, 1.4])
+    # ax0.set_ylim([-0.05, 1.4])
+    # ax_dup.set_ylim([-0.05, 1.4])
 
     # Get the current y-ticks
     current_y_ticks = ax0.get_yticks()
@@ -1827,34 +1840,34 @@ if __name__ == "__main__":
 
     ###########################
 
-    # ##run learner model
-    # study_id = 2
-    # initial_learning_factor = [0.7]  #default: 0.92 (used in Mike's study)
-    # learning_factor_delta = [0.05, 0.10] #default: 0.0, 0.0
+    ##run learner model
+    study_id = 4
+    initial_learning_factor = [0.8]  #default: 0.92 (used in Mike's study)
+    learning_factor_delta = [0.035, 0.07] #default: 0.0, 0.0
 
-    # run_id = 2
-    # user_id = 16
+    run_id = 1
+    user_id = 30
 
-    # learner_update_type = 'no_noise'
-    # domain = 'at'
-    # path = 'data'
-
-
-    # # filename = 'interaction_data_' + str(user_id) + '.pickle'
-    # filename = 'interaction_data_w_mdp.pickle'
-
-    # with open(path + '/' + filename, 'rb') as f:
-    #     all_interaction_data = pickle.load(f)
-    # # interaction_data = all_interaction_data[(all_interaction_data['user_id'] == user_id) & (all_interaction_data['domain'] == domain)]
-    # interaction_data = all_interaction_data[(all_interaction_data['user_id'] == user_id)]
+    learner_update_type = 'no_noise'
+    domain = 'at'
+    path = 'data'
 
 
-    # params.max_learning_factor = 1.0
-    # params.team_size = 1
+    # filename = 'interaction_data_' + str(user_id) + '.pickle'
+    filename = 'interaction_data_w_mdp.pickle'
 
-    # # print('interaction_data: ', interaction_data)
+    with open(path + '/' + filename, 'rb') as f:
+        all_interaction_data = pickle.load(f)
+    # interaction_data = all_interaction_data[(all_interaction_data['user_id'] == user_id) & (all_interaction_data['domain'] == domain)]
+    interaction_data = all_interaction_data[(all_interaction_data['user_id'] == user_id)]
 
-    # run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_learning_factor, learning_factor_delta, learner_update_type, viz_flag=True, vars_filename_prefix = 'study_3_simulation_' + learner_update_type)
+
+    params.max_learning_factor = 1.0
+    params.team_size = 1
+
+    # print('interaction_data: ', interaction_data)
+
+    run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_learning_factor, learning_factor_delta, learner_update_type, viz_flag=True, vars_filename_prefix = 'study_3_simulation_' + learner_update_type)
 
     # ###############################
         
@@ -1901,37 +1914,38 @@ if __name__ == "__main__":
 
     # ####################################
     ## function to give output
-    params.team_size = 1
-    params.max_learning_factor = 1.0
+    # params.team_size = 1
+    # params.max_learning_factor = 1.0
 
-    all_learner_pf = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_learning_factor = [0.8], team_prior = params.team_prior, pf_flag='learner', model_type = 'no_noise')
+    # all_learner_pf = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_learning_factor = [0.8], team_prior = params.team_prior, pf_flag='learner', model_type = 'no_noise')
 
-    with open('data/prepared_interaction_data.pickle', 'rb') as f:
-        prepared_interaction_data_full = pickle.load(f)
+    # with open('data/prepared_interaction_data.pickle', 'rb') as f:
+    #     prepared_interaction_data_full = pickle.load(f)
 
-    with open('data/user_data_w_flag.pickle', 'rb') as f:
-        all_user_data = pickle.load(f)
+    # with open('data/user_data_w_flag.pickle', 'rb') as f:
+    #     all_user_data = pickle.load(f)
 
-    # user_data = all_user_data[(all_user_data['mislabeled_flag'] == 0) & (all_user_data['loop_condition'] != 'wt') & (all_user_data['loop_condition'] != 'wtcl') & (all_user_data['N_final_correct_at'] == 2)]
+    # # user_data = all_user_data[(all_user_data['mislabeled_flag'] == 0) & (all_user_data['loop_condition'] != 'wt') & (all_user_data['loop_condition'] != 'wtcl') & (all_user_data['N_final_correct_at'] == 2)]
     
-    user_data = all_user_data[(all_user_data['mislabeled_flag'] == 0) & (all_user_data['loop_condition'] != 'wt') & (all_user_data['loop_condition'] != 'wtcl') & \
-                              ((all_user_data['N_final_correct_at'] == 2) | (all_user_data['N_final_correct_at'] == 3) | (all_user_data['N_final_correct_at'] == 4))]
+    # user_data = all_user_data[(all_user_data['mislabeled_flag'] == 0) & (all_user_data['loop_condition'] != 'wt') & (all_user_data['loop_condition'] != 'wtcl') & \
+    #                           ((all_user_data['N_final_correct_at'] == 2) | (all_user_data['N_final_correct_at'] == 3) | (all_user_data['N_final_correct_at'] == 4))]
 
     
     
-    unique_user_ids = user_data['user_id'].unique()
-    print('user_data: ', user_data)
+    # unique_user_ids = user_data['user_id'].unique()
+    # print('user_data: ', user_data)
 
-    prepared_interaction_data = pd.DataFrame()
+    # prepared_interaction_data = pd.DataFrame()
 
-    for user_id in unique_user_ids:
-        prepared_interaction_data = prepared_interaction_data.append(prepared_interaction_data_full[prepared_interaction_data_full['user_id'] == user_id], ignore_index=True)
-    #  [0.5992593795130855, 0.1630325868102005, 0.03176307063688731]
-    #   [0.6685487563750678, 0.0]
-        #  [0.6568400939216162, 0.04]
-    # [0.7456719191538574, 0.04] for low learner full set
-    learning_params = {'initial_learning_factor': [0.74], 'learning_factor_delta': [0.02, 0.04]}
+    # for user_id in unique_user_ids:
+    #     prepared_interaction_data = prepared_interaction_data.append(prepared_interaction_data_full[prepared_interaction_data_full['user_id'] == user_id], ignore_index=True)
+    # #  [0.5992593795130855, 0.1630325868102005, 0.03176307063688731]
+    # #   [0.6685487563750678, 0.0]
+    # #  [0.6568400939216162, 0.04]
+    # # [0.7456719191538574, 0.04] for low learner full set
+    # # [0.6624425805340786, 0.02, 0.02] for test; 100 func evals
+    # learning_params = {'initial_learning_factor': [0.74], 'learning_factor_delta': [0.02, 0.04]}
 
-    objective = simulate_objective(learning_params)
+    # objective = simulate_objective(learning_params)
 
-    print('Objective: ', objective)
+    # print('Objective: ', objective)

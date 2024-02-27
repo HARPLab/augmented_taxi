@@ -23,6 +23,8 @@ import params_team as params
 import teams.teams_helpers as team_helpers
 import analyze_study_3_data as asd
 
+from multiprocessing import Pool
+
 
 np.random.seed(237)
 
@@ -366,6 +368,63 @@ def load_abc_data(learner_type = 'low'):
 ###########################
 
 
+
+def plot_param_distribution(filename):
+    
+    max_error = 0.1
+    
+    with open (filename, 'rb') as f:
+        parameter_estimation_output = pickle.load(f)
+
+    # fig = plt.subplots(ncols=3, sharex=True, sharey=True, figsize=(12, 4))
+        
+    fig = plt.figure()
+    axs = fig.add_subplot(1, 1, 1, projection='3d')
+
+    fig2, ax2 = plt.subplots(ncols=3, sharex=True, sharey=True, figsize=(12, 4))
+    
+    # scatter plot
+    hist_plot_data = pd.DataFrame()
+    for params_id in range(len(parameter_estimation_output)):
+        if parameter_estimation_output['objective'][params_id] < max_error:
+            plot_color = 'blue'
+            hist_plot_data = hist_plot_data.append(parameter_estimation_output.iloc[params_id], ignore_index=True)
+        else:
+            plot_color = 'red'
+        
+
+            
+        # axs[0].scatter(parameter_estimation_output['initial_learning_factor'][params_id], parameter_estimation_output['learning_factor_delta_correct'][params_id], color=plot_color)
+        # axs[1].scatter(parameter_estimation_output['initial_learning_factor'][params_id], parameter_estimation_output['learning_factor_delta_incorrect'][params_id], color=plot_color)
+        # axs[2].scatter(parameter_estimation_output['learning_factor_delta_correct'][params_id], parameter_estimation_output['learning_factor_delta_incorrect'][params_id], color=plot_color)   
+        
+        axs.scatter(parameter_estimation_output['initial_learning_factor'][params_id], parameter_estimation_output['learning_factor_delta_correct'][params_id], parameter_estimation_output['learning_factor_delta_incorrect'][params_id], color=plot_color)
+
+
+
+    # axs[0].set_xlabel('Initial learning factor')
+    # axs[0].set_ylabel('Learning factor delta correct')
+    # axs[1].set_xlabel('Initial learning factor')
+    # axs[1].set_ylabel('Learning factor delta incorrect')
+    # axs[2].set_xlabel('Learning factor delta correct')
+    # axs[2].set_ylabel('Learning factor delta incorrect')
+
+    axs.set_xlabel('Initial learning factor')
+    axs.set_ylabel('Learning factor delta correct')
+    axs.set_zlabel('Learning factor delta incorrect')
+
+
+
+    # histogram plot
+    sns.histplot(data=hist_plot_data, x='initial_learning_factor', ax=ax2[0], stat='probability', kde=True, color='blue')
+    sns.histplot(data=hist_plot_data, x='learning_factor_delta_correct', ax=ax2[1], stat='probability', kde=True, color='blue')
+    sns.histplot(data=hist_plot_data, x='learning_factor_delta_incorrect', ax=ax2[2], stat='probability', kde=True, color='blue')
+    
+    plt.show()
+
+###############################################
+
+
 if __name__ == "__main__":
 
     params.team_size = 1
@@ -381,39 +440,66 @@ if __name__ == "__main__":
 
     # ## Custom grid search
     # learner_type = 'test'  # low, high, test
+    # dataset_type = 'train'  # train or test
     # N_runs = 2
-    # filename = 'data/simulation/sim_experiments/parameter_estimation/parameter_estimation_output_' + learner_type + '.pickle'
+    # filename_prefix = 'data/simulation/sim_experiments/parameter_estimation/parameter_estimation_output_' + learner_type + '_' + dataset_type
 
     # # load train test data
     # x_train, x_test, y_train, y_test = load_train_test_data(learner_type = learner_type)
+
+    # if dataset_type == 'train':
+    #     prepared_interaction_data = x_train
+    #     interaction_output = y_train
+    # elif dataset_type == 'test':
+    #     prepared_interaction_data = x_test
+    #     interaction_output = y_test
+    # else:
+    #     RuntimeError('Invalid dataset type')
 
     # params_list = {'initial_learning_factor': np.arange(0.5, 0.9, 0.05), 'learning_factor_delta_correct': np.arange(0.0, 0.2, 0.02), 'learning_factor_delta_incorrect': np.arange(0.0, 0.2, 0.02)}
     # pg = list(ParameterGrid(params_list))
     # params_to_eval = []
     # for pg_ind in pg:
     #     if (pg_ind['learning_factor_delta_incorrect'] > pg_ind['learning_factor_delta_correct']) and (pg_ind['initial_learning_factor'] > 0.5):
-    #         params_to_eval.append(pg_ind)
+    #         # params_to_eval.append(pg_ind)
+
+    #         for run_id in range(N_runs):
+    #             params_to_eval.append([pg_ind['initial_learning_factor'], pg_ind['learning_factor_delta_correct'], pg_ind['learning_factor_delta_incorrect']])
+    
     # print(len(params_to_eval))
     
 
     # parameter_estimation_output = pd.DataFrame()
+
+    # # Prepare parameters for parallel processing
+    # # params_grid_run_eval = [(params_to_eval[params_id]) for params_id in range(len(params_to_eval))]
+
+    # # Set up multiprocessing Pool
+    # with Pool() as pool:
+    #     results = pool.map(simulate_objective, params_to_eval)
+
+    # # Flatten the list of results
+    # objective = [item for sublist in results for item in sublist]
+
     # for params_id in range(len(params_to_eval)):
 
     #     for run_id in range(N_runs):
 
     #         print('Running params_id:', params_id, 'params:', params_to_eval[params_id])
-    #         objective = simulate_objective(params_to_eval[params_id]['initial_learning_factor'], params_to_eval[params_id]['learning_factor_delta_correct'], params_to_eval[params_id]['learning_factor_delta_incorrect'])
-    #         print('Objective:', objective)
+    #         # objective = simulate_objective(params_to_eval[params_id]['initial_learning_factor'], params_to_eval[params_id]['learning_factor_delta_correct'], params_to_eval[params_id]['learning_factor_delta_incorrect'])
+    #         # print('Objective:', objective)
 
     #         output_data = {'params_id': params_id, 'run_id': run_id, 'initial_learning_factor': params_to_eval[params_id]['initial_learning_factor'], 'learning_factor_delta_correct': params_to_eval[params_id]['learning_factor_delta_correct'], \
-    #                        'learning_factor_delta_incorrect': params_to_eval[params_id]['learning_factor_delta_incorrect'], 'objective': objective}
+    #                        'learning_factor_delta_incorrect': params_to_eval[params_id]['learning_factor_delta_incorrect']}
                 
     #         parameter_estimation_output = parameter_estimation_output.append(output_data, ignore_index=True)
 
-    # with open(filename, 'wb') as f:
+    # parameter_estimation_output['objective'] = objective
+
+    # with open(filename_prefix + '.pickle', 'wb') as f:
     #     pickle.dump(parameter_estimation_output, f)
 
-    # parameter_estimation_output.to_csv('data/simulation/sim_experiments/parameter_estimation/parameter_estimation_output.csv', index=False)
+    # parameter_estimation_output.to_csv(filename_prefix + '.csv', index=False)
 
     #####################
     ## Custom search on lsd params
@@ -468,11 +554,11 @@ if __name__ == "__main__":
     ######################################
     # ## Bayesian hyperparameter optimization (somewhat worksl gave the highest params values for high learners; point estimate only!)
 
-    # params_to_study = {'initial_learning_factor': (0.5, 1), 'learning_factor_delta_incorrect': (0.04, 0.2)}
+    params_to_study = {'initial_learning_factor': (0.5, 1), 'learning_factor_delta_incorrect': (0.04, 0.2)}
 
-    # params_to_study = {'initial_learning_factor': np.arange(0.5, 1, 0.05), 'learning_factor_delta_incorrect': np.arange(0.02, 0.2, 0.02)}
+    params_to_study = {'initial_learning_factor': np.arange(0.5, 1, 0.05), 'learning_factor_delta_incorrect': np.arange(0.02, 0.2, 0.02)}
 
-    learner_type = 'test'
+    learner_type = 'high'
 
     prepared_interaction_data, interaction_output = load_abc_data(learner_type = learner_type)
 
@@ -482,10 +568,14 @@ if __name__ == "__main__":
                       n_calls=100,         # the number of evaluations of f
                       n_random_starts=20,  # the number of random initialization points
                       noise=0,              # the noise level (optional)
-                      random_state=1234)   # the random seed
+                      random_state=1234,   # the random seed
+                      n_jobs=-1)       # # Set n_jobs to -1 for parallel processing
+    
+    with open('data/simulation/sim_experiments/parameter_estimation/bayesian_optimization_output_' + learner_type + '.pickle', 'wb') as f:
+        pickle.dump(res, f)
 
     print(res)
-    # #############
+    # # #############
 
     # ## Random CV search (Not working; need to create an estimator object to pass to RandomizedSearchCV)
     # # Create a scorer object based on the custom objective function
@@ -509,7 +599,7 @@ if __name__ == "__main__":
 
     ###############################################
 
-    # Bayesian model (not working)
+    # # Bayesian model (not working)
     # basic_model = pm.Model()
 
     # with basic_model:
@@ -528,7 +618,7 @@ if __name__ == "__main__":
     #     # Y_obs = pm.Normal('Y_obs', mu=mu, sigma=u_sd, observed=interaction_output)
 
     #     # Custom likelihood (negative because PyMC maximizes log likelihood)
-    #     pm.Potential('likelihood', -simulate_objective(u, delta_i))
+    #     pm.Potential('likelihood', -simulate_objective(u, delta_c, delta_i))
 
 
     #     # draw 500 posterior samples
@@ -613,3 +703,8 @@ if __name__ == "__main__":
     #     Y_obs = pm.Normal("Y_obs", mu=mu, sigma=sigma, observed=Y)
 
     ###########################
+
+    # plot custom grid search results
+
+    # filename = 'data/simulation/sim_experiments/parameter_estimation/parameter_estimation_output_test_train.pickle'
+    # plot_param_distribution(filename)

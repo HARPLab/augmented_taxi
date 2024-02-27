@@ -21,7 +21,7 @@ plt.rcParams['figure.figsize'] = [15, 10]
 
 import teams.teams_helpers as team_helpers
 import params_team as params
-import simulation.sim_helpers as sim_helpers
+# import simulation.sim_helpers as sim_helpers
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -1324,16 +1324,21 @@ def analyze_individual_runs(path, file):
 
 
 
-def sensitivity_analysis(path, files, file_prefix_list, runs_to_exclude_list=[], runs_to_analyze_list = [], vars_filename_prefix = ''):
+def run_sensitivity_analysis(path, files, file_prefix_list, runs_to_exclude_list=[], runs_to_analyze_list = [], vars_filename_prefix = ''):
 
     
-    def convert_to_dict(sim_vars):
+    def convert_to_dict(sim_vars, parameter_combinations):
         demo_strategy = sim_vars['demo_strategy'].iloc[0]
         team_composition = sim_vars['team_composition'].iloc[0]
-        max_loop_count = sim_vars['loop_count'].iloc[-1]
+
+        study_id = int(sim_vars['study_id'].iloc[0])
+        run_id = sim_vars['run_no'].iloc[0] 
+
         max_learning_factor = np.round(sim_vars['max_learning_factor'].iloc[0],2)
-        team_learning_factor = sim_vars['team_learning_factor'].iloc[0]
+        team_learning_factor = sim_vars['initial_learning_factor'].iloc[0]
         # team_learning_rate = sim_vars['team_learning_rate'].iloc[0]
+
+
         learning_factor_high_learner = []
         learning_factor_low_learner = []
         for i in range(len(team_composition)):
@@ -1344,27 +1349,59 @@ def sensitivity_analysis(path, files, file_prefix_list, runs_to_exclude_list=[],
 
         # for i in range(len(team_learning_rate)):
         #     team_learning_rate[i] = np.round(team_learning_rate[i], 2)
+        
+
+        max_loop_count = sim_vars['loop_count'].iloc[-1]
+        bec_final = sim_vars['BEC_knowledge_level'][len(sim_vars)-1]
+
 
         
         sensitivity_data_dict = {}
-        sensitivity_data_dict['run_no'] = run_no
+
         sensitivity_data_dict['demo_strategy'] = demo_strategy
         sensitivity_data_dict['team_composition'] = team_composition
-        sensitivity_data_dict['max_loop_count'] = max_loop_count
+        sensitivity_data_dict['study_id'] = study_id
+        sensitivity_data_dict['run_id'] = run_id
+        
         sensitivity_data_dict['max_learning_factor'] = max_learning_factor
         sensitivity_data_dict['learning_factor_high_learner'] = learning_factor_high_learner
         sensitivity_data_dict['learning_factor_low_learner'] = learning_factor_low_learner
+
+        sensitivity_data_dict['teacher_learning_factor'] = parameter_combinations[study_id-1][4]
+        sensitivity_data_dict['learning_rate'] = parameter_combinations[study_id-1][2]
+        
+        sensitivity_data_dict['parameter_combinations'] = parameter_combinations[study_id-1]
         # sensitivity_data_dict['team_learning_rate'] = team_learning_rate
+
+        sensitivity_data_dict['max_loop_count'] = max_loop_count
+        sensitivity_data_dict['bec_final'] = bec_final
+
 
         return sensitivity_data_dict
 
     #####################
+    # read parameter combinations
+    with open('data/simulation/sim_experiments/sensitivity_analysis/param_combinations.pickle', 'rb') as f:
+            parameter_combinations = pickle.load(f)
 
+    
+    params_pd = pd.DataFrame()
+    for i in range(len(parameter_combinations)):
+        params_dict = {'study_id': i+1, 'learning_factor_low': parameter_combinations[i][0], 'learning_factor_high': parameter_combinations[i][1], 'learning_rate': parameter_combinations[i][2], 'max_learning_factor': parameter_combinations[i][3], 'teacher_learning_factor': parameter_combinations[i][4]}
+        params_pd = params_pd.append(params_dict, ignore_index=True)
+
+    params_pd.to_csv('data/simulation/sim_experiments/sensitivity_analysis/param_combinations.csv')
+
+#     print('parameter_combinations:', parameter_combinations)
+
+
+
+    #############
     run_no = 1
     sensitivity_data = pd.DataFrame()
     for file in files:
 
-        # check if file is a valid csv
+        # check if file is a valid file
         for file_prefix in file_prefix_list:
             if file_prefix in file and '.pickle' in file:
                 run_file_flag = True
@@ -1384,19 +1421,25 @@ def sensitivity_analysis(path, files, file_prefix_list, runs_to_exclude_list=[],
             with open(path + '/' + file, 'rb') as f:
                 sim_vars = pickle.load(f)
             
-            # check if there are multiple runs
+            print('Reading file: ', file)
+
+            # check if there are multiple runs in the same file
             loop_count_var = sim_vars['loop_count']
             run_change_idx = [idx for idx in range(len(loop_count_var)-1) if loop_count_var[idx] > loop_count_var[idx+1]]
 
+#             print('run_change_idx: ', run_change_idx)
             if len(run_change_idx) > 0:
 
                 for run_idx in range(2):
                     if run_idx == 0:
-                        run_sim_vars = sim_vars.iloc[:run_change_idx]
+                        run_sim_vars = sim_vars.iloc[:run_change_idx[0]+1]
                     else:
-                        run_sim_vars = sim_vars.iloc[run_change_idx+1:]
+                        run_sim_vars = sim_vars.iloc[run_change_idx[0]+2:]
+                        
+                    # reset index
+                    run_sim_vars = run_sim_vars.reset_index(drop=True)
 
-                    
+
                     bec_final = run_sim_vars['BEC_knowledge_level'][len(run_sim_vars)-1]
                     # check if learning was completed
                     learning_complete = True
@@ -1406,7 +1449,7 @@ def sensitivity_analysis(path, files, file_prefix_list, runs_to_exclude_list=[],
                             break
                     
                     if learning_complete:
-                        sensitivity_data_dict = convert_to_dict(run_sim_vars)
+                        sensitivity_data_dict = convert_to_dict(run_sim_vars, parameter_combinations)
                         sensitivity_data = sensitivity_data.append(sensitivity_data_dict, ignore_index=True)
             else:
 
@@ -1419,13 +1462,17 @@ def sensitivity_analysis(path, files, file_prefix_list, runs_to_exclude_list=[],
                         break
             
                 if learning_complete:
-                    sensitivity_data_dict = convert_to_dict(sim_vars)
+                    sensitivity_data_dict = convert_to_dict(sim_vars, parameter_combinations)
                     sensitivity_data = sensitivity_data.append(sensitivity_data_dict, ignore_index=True)
 
 
-                
+    sensitivity_data.to_csv(path + '/sensitivity_data.csv')
+    with open(path + '/sensitivity_data.pickle', 'wb') as f:
+        pickle.dump(sensitivity_data, f)
 
     print(sensitivity_data)
+
+############################
 
 
 def debug_calc_prob_mass_correct_side(constraints, particles, team_learning_factor):
@@ -2200,53 +2247,65 @@ def read_prob_data(path, file):
 
     
 
+################################
+    
+def analyze_sensitivity_data(path, file_prefix, cond):
+
+    filelist = os.listdir(path)
+
+    file_prefix = 1
+
+
+
+    return 1
+
 
 
 
 ####################################
 if __name__ == "__main__":
 
-    # process team knowledge data
-    path = 'models/augmented_taxi2'
-    # path = 'data/simulation/sim_experiments/w_feedback'
-    files = os.listdir(path)
+    # # process team knowledge data
+    # path = 'models/augmented_taxi2'
+    # # path = 'data/simulation/sim_experiments/w_feedback'
+    # files = os.listdir(path)
 
-    # all_file_prefix_list = ['debug_data_debug_trials_01_22_no_noise_w_feedback_study_1']
-    # all_runs_to_exclude_list = [[3, 12, 24, 7], [1,4,6,8], [], [1,3, 11, 12, 16, 18], [17, 21, 35], [], [], [], \
-    #                             [], [], [], [], [], [], []]
-    all_runs_to_exclude_list = []
+    # # all_file_prefix_list = ['debug_data_debug_trials_01_22_no_noise_w_feedback_study_1']
+    # # all_runs_to_exclude_list = [[3, 12, 24, 7], [1,4,6,8], [], [1,3, 11, 12, 16, 18], [17, 21, 35], [], [], [], \
+    # #                             [], [], [], [], [], [], []]
+    # all_runs_to_exclude_list = []
 
-    # sets_to_consider = [14]
-    # file_prefix_list = [all_file_prefix_list[i] for i in sets_to_consider]
-    # runs_to_exclude_list = [all_runs_to_exclude_list[i] for i in sets_to_consider]
+    # # sets_to_consider = [14]
+    # # file_prefix_list = [all_file_prefix_list[i] for i in sets_to_consider]
+    # # runs_to_exclude_list = [all_runs_to_exclude_list[i] for i in sets_to_consider]
 
-    # file_prefix_list = ['trials_12_29_w_updated', 'trials_12_30_w_updated', 'trials_12_31_w_updated', 'trials_01_01_w_updated', 
-    #                     'trials_01_02_w_updated', 'trials_01_03_w_updated', 'trials_01_04_w_updated']
+    # # file_prefix_list = ['trials_12_29_w_updated', 'trials_12_30_w_updated', 'trials_12_31_w_updated', 'trials_01_01_w_updated', 
+    # #                     'trials_01_02_w_updated', 'trials_01_03_w_updated', 'trials_01_04_w_updated']
     
-    file_prefix_list = ['debug_trials_02_05']
+    # file_prefix_list = ['debug_trials_02_05']
     
-    # runs_to_exclude_list = ['unfinished', 'trials_01_01_w_updated_noise_57'] 
-    runs_to_exclude_list = ['no_review']
-    # trials_01_01_w_updated_noise_57.csv - outlier, N = 48 trials
+    # # runs_to_exclude_list = ['unfinished', 'trials_01_01_w_updated_noise_57'] 
+    # runs_to_exclude_list = ['no_review']
+    # # trials_01_01_w_updated_noise_57.csv - outlier, N = 48 trials
 
-    vars_filename_prefix = 'analysis'
+    # vars_filename_prefix = 'analysis'
 
-    print(file_prefix_list)
-    print(runs_to_exclude_list)
+    # print(file_prefix_list)
+    # print(runs_to_exclude_list)
     
 
-    run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list = runs_to_exclude_list, vars_filename_prefix = vars_filename_prefix)
+    # run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list = runs_to_exclude_list, vars_filename_prefix = vars_filename_prefix)
 
-    # analyze_run_data(path, path + '/run_data.csv')
+    # # analyze_run_data(path, path + '/run_data.csv')
 
     ###########################################
 
     # # ## Sensitivity Analysis
-    # path = 'data/simulation/sim_experiments/sensitivity_analysis/sensitivity_analysis'
-    # files = os.listdir(path)
+    path = 'data/simulation/sim_experiments/sensitivity_analysis/w_feedback/augmented_taxi2'
+    files = os.listdir(path)
 
-    # file_prefix_list = ['trials_01_08']
-    # sensitivity_analysis(path, files, file_prefix_list, runs_to_exclude_list=[], runs_to_analyze_list = [], vars_filename_prefix = '')
+    file_prefix_list = ['trials_02_11_sensitivity_w_feedback_tc1_ck']
+    run_sensitivity_analysis(path, files, file_prefix_list, runs_to_exclude_list=[], runs_to_analyze_list = [], vars_filename_prefix = '')
 
 
 
