@@ -594,6 +594,7 @@ def process_human_scores_f23(test_env_dict, type='binary'):
     df_trials['reward_diff'] = np.zeros(len(df_trials))
     df_trials['human_reward'] = np.zeros(len(df_trials))
     df_trials['regret_norm'] = np.zeros(len(df_trials))
+    df_trials['is_opt_response'] = np.zeros(len(df_trials))
     df_trials_final_test = df_trials[df_trials.interaction_type == 'final test']
 
     if type == 'scaled' or type == 'scale-truncated':
@@ -637,6 +638,8 @@ def process_human_scores_f23(test_env_dict, type='binary'):
 
         # df_trials.at[i, 'scaled_diff'] = 1 - ((human_reward[0][0] - df_trials['opt_traj_reward'][i]) / df_trials['opt_traj_reward'][i])
         df_trials.at[i, 'regret_norm'] = (human_reward[0][0] - df_trials['opt_traj_reward'][i]) / df_trials['opt_traj_reward'][i] # normalized regret
+
+        df_trials.at[i, 'is_opt_response'] = int(reward_diff == 0)
 
         if df_trials['opt_traj_reward'][i] > 0 or human_reward[0][0] > 0:
             print('positive reward, need to reconsider diff calculations!')
