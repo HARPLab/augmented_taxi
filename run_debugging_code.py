@@ -191,9 +191,9 @@ if __name__ == "__main__":
         
     ##########################
 
-    # # # check information gain vs learning factor
-    # path = 'models/augmented_taxi2'
-    # dt.check_ig_uf_relation(path)
+    # # check information gain vs learning factor
+    path = 'models/augmented_taxi2'
+    dt.check_ig_uf_relation(path)
 
     ###########################
 

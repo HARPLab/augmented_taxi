@@ -56,6 +56,7 @@ import matplotlib as mpl
 mpl.rcParams['figure.facecolor'] = '1.0'
 mpl.rcParams['axes.labelsize'] = 'x-large'
 mpl.rcParams['xtick.labelsize'] = 'large'
+mpl.rcParams['figure.facecolor'] = 'white'
 
 
 
@@ -1127,8 +1128,8 @@ def check_ig_uf_relation(path):
         N_members = 10
 
         # plot particle distribution
-        fig = plt.figure(figsize=(18, 14))    
-        fig2 = plt.figure(figsize=(4, 3))
+        fig = plt.figure(figsize=(18, 14), facecolor='white')    
+        fig2 = plt.figure(figsize=(4, 3), facecolor='white')
         row_len, col_len = squarest_rectangle(N_members)
         print('row_len: ', row_len, '. col_len: ', col_len)
         ax = np.array([fig.add_subplot(row_len, col_len, i+1, projection='3d') for i in range(N_members)])   
@@ -1168,7 +1169,7 @@ def check_ig_uf_relation(path):
 
 
 
-        particles_ig = pd.DataFrame()
+        particles_ig_list = []
         max_info_gain = {}
         for i in range(N_members):
             member_id = 'p' + str(i+1)
@@ -1211,11 +1212,11 @@ def check_ig_uf_relation(path):
 
                         # max_info_gain_cnst = max(max_info_gain_cnst, ig_const)
                         
-                        particles_ig_dict = {'member_id': member_id, 'lf': lf, 'kc_id': kc_id+1, 'update_id': update_id+1, 'info_gain_pf': particles_member.calc_info_gain(constraint, lf), \
+                        particles_ig_dict = {'member_id': member_id, 'lf': lf, 'kc_id': kc_id+1, 'update_id': update_id+1, 'info_gain_pf': particles_member.calc_info_gain(constraint, lf, model_type='low_noise'), \
                                             'ig_const': ig_const, 'cnst_id': cnst_id, 'cnst': constraint}  # calculate before update
                         plot_title = 'Update no. ' + str(update_id+1) + ' for constraint ' + str(constraint) + ' and lf ' + str(lf)
                         particles_member.update(constraint, lf, viz_flag = False, plot_title = plot_title, model_type = 'no_noise', vars_filename = filename)
-                        particles_ig = particles_ig.append(particles_ig_dict, ignore_index=True)
+                        particles_ig_list.append(particles_ig_dict)
 
                         # plot particle distribution
                         particles_member.plot(fig=fig, ax=ax[i])
@@ -1244,7 +1245,7 @@ def check_ig_uf_relation(path):
 
 
         # find info gain proportion
-        
+        particles_ig = pd.DataFrame(particles_ig_list)
         cnst_id_list = particles_ig['cnst_id'].unique()
 
         print('cnst_id_list: ', cnst_id_list)
@@ -1254,7 +1255,7 @@ def check_ig_uf_relation(path):
             print('cnst_id: ', cnst_id, '. Max info gain: ', max_info_gain)
 
             if len(info_gain_proportion)==0:
-                info_gain_proportion = particles_ig[particles_ig['cnst_id']==cnst_id]['info_gain_pf']/max_info_gain
+                info_gain_proportion = [particles_ig[particles_ig['cnst_id']==cnst_id]['info_gain_pf']/max_info_gain]
             else:
                 info_gain_proportion = info_gain_proportion.append(particles_ig[particles_ig['cnst_id']==cnst_id]['info_gain_pf']/max_info_gain)
 
@@ -1272,6 +1273,7 @@ def check_ig_uf_relation(path):
 
     #
     plot_data = particles_ig[(particles_ig['lf']>0.5) & (particles_ig['update_id']==1)]
+    print(plot_data)
     fig3, ax3 = plt.subplots(ncols=1,  sharex=True, sharey=True, figsize=(10,6))
     plt.subplots_adjust(wspace=0.1, hspace=0.1)
     # sns.lineplot(plot_data, x = 'lf', y = 'info_gain', hue = 'update_id', ax=ax, errorbar=('se', 1), err_style="band").set(title='Understanding factor vs. Info gain')

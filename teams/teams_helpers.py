@@ -422,23 +422,25 @@ def calc_expected_learning(team_knowledge_expected, teacher_learning_factor, kc_
             plot_title = 'Interaction no. ' + str(loop_count+1) + '.Expected knowledge change for KC ' + str(kc_id) + ' for player ' + member_id
             visualize_transition(demo_constraints, particles_team_teacher[member_id], params.mdp_class, params.weights['val'], text = plot_title, vars_filename=vars_filename)
         p += 1
-            
-    # Update common knowledge model
-    plot_title = 'Interaction No. ' + str(loop_count+1) + '. Teacher belief (Expected knowledge change) for loop ' + str(loop_count+1) + ' for common knowledge'
-    # print('Teacher update. Updating particles for common knowledge for kc_id ', kc_id, ' in ', model_type, ' condition...')
-    particles_team_teacher['common_knowledge'].update(demo_constraints, params.default_learning_factor_teacher, plot_title = plot_title, viz_flag = viz_flag, vars_filename=vars_filename, model_type = params.teacher_update_model_type)  # PF update of common_knowledge
-    if viz_flag:
-        visualize_transition(demo_constraints, particles_team_teacher['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set' + str(loop_count+1) + ' for common knowledge', plot_filename ='ek_ck_loop_' + str(loop_count+1))
     
-    # Method: Use new joint knowledge of team
-    new_constraints_team = []
-    for p in range(params.team_size):
-        new_constraints_team.append(demo_constraints)
 
-    particles_team_teacher['joint_knowledge'].update_jk(new_constraints_team, params.default_learning_factor_teacher)
+    if params.team_size > 1:
+        # Update common knowledge model
+        plot_title = 'Interaction No. ' + str(loop_count+1) + '. Teacher belief (Expected knowledge change) for loop ' + str(loop_count+1) + ' for common knowledge'
+        # print('Teacher update. Updating particles for common knowledge for kc_id ', kc_id, ' in ', model_type, ' condition...')
+        particles_team_teacher['common_knowledge'].update(demo_constraints, params.default_learning_factor_teacher, plot_title = plot_title, viz_flag = viz_flag, vars_filename=vars_filename, model_type = params.teacher_update_model_type)  # PF update of common_knowledge
+        if viz_flag:
+            visualize_transition(demo_constraints, particles_team_teacher['common_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set' + str(loop_count+1) + ' for common knowledge', plot_filename ='ek_ck_loop_' + str(loop_count+1))
+        
+        # Method: Use new joint knowledge of team
+        new_constraints_team = []
+        for p in range(params.team_size):
+            new_constraints_team.append(demo_constraints)
 
-    if viz_flag:
-        visualize_transition(new_constraints_team, particles_team_teacher['joint_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set ' + str(loop_count+1) + ' for joint knowledge',  knowledge_type = 'joint_knowledge', plot_filename ='ek_jk_loop_' + str(loop_count+1))
+        particles_team_teacher['joint_knowledge'].update_jk(new_constraints_team, params.default_learning_factor_teacher)
+
+        if viz_flag:
+            visualize_transition(new_constraints_team, particles_team_teacher['joint_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set ' + str(loop_count+1) + ' for joint knowledge',  knowledge_type = 'joint_knowledge', plot_filename ='ek_jk_loop_' + str(loop_count+1))
 
     return team_knowledge_expected, particles_team_teacher, pf_update_args
 
@@ -575,7 +577,7 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team_te
 
         else:
             for kc_index in kc_id_list:
-                # print('team_knowledge[knowledge_type][kc_index]: ', team_knowledge[knowledge_type][kc_index])
+                print('team_knowledge[knowledge_type]: ', team_knowledge[knowledge_type])
                 if len(team_knowledge_constraints) == 0:
                     team_knowledge_constraints = copy.deepcopy(team_knowledge[knowledge_type][kc_index])
                 else:
@@ -762,9 +764,12 @@ def particles_for_demo_strategy(demo_strategy, team_knowledge, team_particles, t
     
     elif demo_strategy == 'common_knowledge' or demo_strategy == 'joint_knowledge':
         knowledge_id = demo_strategy
+
+    elif demo_strategy == 'baseline':
+        knowledge_id = 'p1'
     
-    # else:
-        # print('Unsupported demo strategy for sampling particles!')
+    else:
+        print('Unsupported demo strategy for sampling particles!')
 
     particles = copy.deepcopy(team_particles[knowledge_id])
 
@@ -884,7 +889,7 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, teacher_lear
             particles_team[member_id].knowledge_update(team_prior[member_id])
 
 
-    if pf_flag == 'teacher':
+    if pf_flag == 'teacher' and team_size>1:
         # particles for aggregated team knowledge - common knowledge (using the last person learning factor for common and joint knowledge. Not an issue now as the teacher's learning factor is the same for all team members)
         particles_team['common_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), learning_factor)
         if team_prior is not None:
@@ -916,6 +921,10 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, teacher_lear
         
         return team_prior, particles_team
     
+    elif pf_flag == 'teacher' and team_size == 1:
+        team_knowledge = {}
+        team_knowledge['p1'] = copy.deepcopy(team_prior['p1'])
+        return team_knowledge, particles_team
     else:
         return particles_team
 
@@ -2027,8 +2036,6 @@ def check_unit_learning_goal_reached(team_knowledge, min_unit_constraints, kc_id
     
     knowledge_level = calc_knowledge_level(team_knowledge, min_unit_constraints, kc_id_list=[kc_id])
     
-    # if knowledge_level['common_knowledge'] > 0.7:
-    #     unit_learning_goal_reached_flag = True
     knowledge_types = list(team_knowledge.keys())
 
     unit_learning_goal_reached_flag = True

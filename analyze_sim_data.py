@@ -18,6 +18,7 @@ import pickle
 from ast import literal_eval
 import copy
 plt.rcParams['figure.figsize'] = [15, 10]
+plt.rcParams['figure.facecolor'] = 'white'
 
 import teams.teams_helpers as team_helpers
 import params_team as params
@@ -2733,7 +2734,7 @@ if __name__ == "__main__":
     # file_prefix_list = ['trials_12_29_w_updated', 'trials_12_30_w_updated', 'trials_12_31_w_updated', 'trials_01_01_w_updated', 
     #                     'trials_01_02_w_updated', 'trials_01_03_w_updated', 'trials_01_04_w_updated']
     
-    file_prefix_list = ['03_02_sim_study_test_learner_noise_duplicate_tests_study_17']
+    file_prefix_list = ['03_02_sim_study_test_N_dup_tests_2_study_101']
     
     # runs_to_exclude_list = ['unfinished', 'trials_01_01_w_updated_noise_57'] 
     runs_to_exclude_list = ['no_review']

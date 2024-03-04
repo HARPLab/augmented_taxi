@@ -20,7 +20,7 @@ import random
 import teams.utils_teams as utils_teams
 import sage.geometry.polyhedron.base as Polyhedron
 from teams import particle_filter_team as pf_team
-
+import copy
 
 def sample_from_distribution(condition, points, probabilities, points_to_avoid = []):
     # Step 1: Normalize Probabilities
@@ -48,7 +48,7 @@ def sample_from_distribution(condition, points, probabilities, points_to_avoid =
     loop_count = 0
     sampled_point = []
 
-    while not sampling_complete and loop_count < 100:
+    while not sampling_complete and loop_count < 300:
         r = random.uniform(0, 1)
         # print('Loop count: ', loop_count)
         for i, cumulative_prob in enumerate(cdf):
@@ -497,7 +497,7 @@ def get_human_response_each_test(condition, env_idx, particles_to_sample, opt_tr
     
 
 
-def get_human_response_all_tests(particles_to_sample, preliminary_tests, learning_factor, args = []):
+def get_human_response_all_tests(particles_to_sample, preliminary_tests, N_duplicate_sets, learning_factor, args = []):
 
     if len(args) != 0:
         set_id, member_id, test_constraints, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, set_id_history, skip_model_history, cluster_id_history, point_probability, team_learning_factor_history, \
@@ -534,169 +534,185 @@ def get_human_response_all_tests(particles_to_sample, preliminary_tests, learnin
     #     # print('test_mdp: ', test_mdp)
     #     # print('test_agent: ', test_agent)
     #     # print('test_opt_traj: ', test_opt_traj)
+    
+    sampled_points_duplicates = []
+    for i in range(N_duplicate_sets):
 
+        skip_human_model = True
 
+        loop_count = 0
+        max_loop_count = 1
+        # differing_response_model_idx = []
+        # points_to_avoid = []
+        points_to_avoid = copy.deepcopy(sampled_points_duplicates)  # avoid sampling the same point again
 
-    skip_human_model = True
+        all_tests_correct_flag = True
 
-    loop_count = 0
-    max_loop_count = 1
-    differing_response_model_idx = []
-    points_to_avoid = []
-
-
-
-    # sample human models
-    while skip_human_model:
-        
-        # reset variables
-        if skip_human_model:
-            human_opt_trajs_all_tests = []
-            response_type_all_tests = []
-            human_model_weight_all_tests = []
-
-        ## Method 2: Sampling from all particles
-        sampled_point_flag = False
-        while not sampled_point_flag:
-            human_model_weight, cluster_id, rew_weight_prob, rand_number = sample_from_distribution('particles', particles_to_sample.positions, particles_to_sample.weights, points_to_avoid = points_to_avoid)
+        # sample human models
+        while skip_human_model:
             
-            if len(points_to_avoid) > 0:
-                point_already_sampled = False
-                for point_avd in points_to_avoid:
-                    print('Sampled point: ', human_model_weight, 'Sampled point probability: ', rew_weight_prob, 'point_avd: ', point_avd, 'rand_number: ', rand_number)
-                    if (human_model_weight == point_avd).all():
-                        point_already_sampled = True
+            # reset variables
+            if skip_human_model:
+                human_opt_trajs_all_tests = []
+                response_type_all_tests = []
+                human_model_weight_all_tests = []
 
-                if not point_already_sampled:
-                    sampled_point_flag = True
-                    # print('Point sampled!')
-            else:
-                sampled_point_flag = True
-                # print('Point sampled!')
+            ## Method 2: Sampling from all particles
+            sampled_point_flag = False
+            while not sampled_point_flag:
+                human_model_weight, cluster_id, rew_weight_prob, rand_number = sample_from_distribution('particles', particles_to_sample.positions, particles_to_sample.weights, points_to_avoid = points_to_avoid)
+                
+                if len(human_model_weight) > 0:
+                    if len(points_to_avoid) > 0:
+                        point_already_sampled = False
+                        for point_avd in points_to_avoid:
+                            # print('Sampled point: ', human_model_weight, 'Sampled point probability: ', rew_weight_prob, 'point_avd: ', point_avd, 'rand_number: ', rand_number)
+                            if (human_model_weight == point_avd).all():
+                                point_already_sampled = True
 
-        print('Sampled human model: ', human_model_weight)
-    ############################
-        
-        if len(human_model_weight) != 0:
-            points_to_avoid.append(human_model_weight)
+                        if not point_already_sampled:
+                            sampled_point_flag = True
+                            # print('Point sampled!')
+                    else:
+                        sampled_point_flag = True
+                        # print('Point sampled!')
 
-            # check for each test
-            test_id = 0
-            for test in preliminary_tests:
+            print('Sampled human model: ', human_model_weight)
+        ############################
+            
+            if len(human_model_weight) != 0:
+                points_to_avoid.append(human_model_weight)
 
                 # check for each test
-                env_idx, traj_idx = test[2]
-                opt_traj = test[1]
-                
-                filename = 'models/augmented_taxi2/gt_policies/wt_vi_traj_params_env' + str(env_idx).zfill(5) + '.pickle'
-                with open(filename, 'rb') as f:
-                    wt_vi_traj_env = pickle.load(f)
+                test_id = 0
+                for test in preliminary_tests:
 
-                # print('wt_vi_traj_env[0][1].mdp: ', wt_vi_traj_env[0][1].mdp)
-
-                mdp = wt_vi_traj_env[0][1].mdp
-                mdp.set_init_state(opt_traj[0][0])
-                mdp.weights = human_model_weight
-                vi_human = ValueIteration(mdp, sample_rate=1, max_iterations=100)
-                vi_human.run_vi()
-
-                test_constraints = test[3]
-                print('Checking sampled human model for test: ', test_id, ', for constraints: ', test_constraints)
-
-                if not vi_human.stabilized:
-                    print(colored('Human model with weight, ' + str(human_model_weight) + ', did not converge and skipping for response generation', 'red'))
-                    skip_human_model = True
-                else:
-                    print(colored('Human model with weight, ' + str(human_model_weight) + ', converged', 'green'))
-                    skip_human_model = False
-                
-
-                if not skip_human_model:
-                    cur_state = mdp.get_init_state()
-                    # print('Current state: ', cur_state)
-                    human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
-
-                    human_traj_rewards = mdp.accumulate_reward_features(human_opt_trajs[0], discount=True)  # just use the first optimal trajectory
-                    mu_sa = mdp.accumulate_reward_features(opt_traj, discount=True)
-                    new_constraint = mu_sa - human_traj_rewards
-
-                    # print('New constraint: ', new_constraint)
-                    if (new_constraint == np.array([0, 0, 0])).all():
-                        if params.debug_hm_sampling:
-                            print(colored('Correct response sampled', 'blue'))
-                        response_type = 'correct'
-                    else:
-                        if params.debug_hm_sampling:
-                            print(colored('Incorrect response sampled', 'red'))
-                        response_type = 'incorrect'
-
-
-                    # mdp.visualize_trajectory(traj_opt)
-                    # plt.show()
-                    # mdp.visualize_trajectory(human_opt_trajs[0])
-                    # plt.show()
-
-
-                else:
-                    response_type = 'NA'
-                    # visualize skipped trajectories
-                    cur_state = mdp.get_init_state()
-                    human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
-                    # mdp.visualize_trajectory(human_opt_trajs[0])
-                    # plt.show()
-                
-                # check for constraint satisfaction
-                if len(args) != 0:
-                    constraint_flag = True
-                    for constraint in test_constraints[0]:
-                        if constraint.dot(human_model_weight.T) < 0:
-                            constraint_flag = False
-                else:
-                    constraint_flag = True
-                    for constraint in test_constraints:
-                        if constraint.dot(human_model_weight.T) < 0:
-                            constraint_flag = False
-                
-                # save to history variables for debugging
-                if len(args) != 0:
-                    sampled_points_history.append(human_model_weight)
-                    response_history.append(response_type)
-                    member.append(member_id)
-                    constraint_history.append(test_constraints)
-                    constraint_flag_history.append(constraint_flag)
-                    set_id_history.append(set_id)
-                    cluster_id_history.append(cluster_id)
-                    skip_model_history.append(skip_human_model)
-                    point_probability.append(rew_weight_prob)
-                    team_learning_factor_history.append(learning_factor)
-                    prob_initial_history.append(prob_initial) 
-                    prob_reweight_history.append(prob_reweight) 
-                    prob_resample_history.append(prob_resample) 
-                    resample_flag_history.append(resample_flag)
-                    resample_noise_history.append(noise_measures)
-                    update_sequence_history.append(update_type)
-
-                # save sampled model if it provides a stable trajectory for all tests
-                if not skip_human_model:
-                    human_opt_trajs_all_tests.append(human_opt_trajs[0])
-                    response_type_all_tests.append(response_type)
-                    human_model_weight_all_tests.append(human_model_weight)
+                    # check for each test
+                    env_idx, traj_idx = test[2]
+                    opt_traj = test[1]
                     
-                test_id += 1 # update test_id
+                    filename = 'models/augmented_taxi2/gt_policies/wt_vi_traj_params_env' + str(env_idx).zfill(5) + '.pickle'
+                    with open(filename, 'rb') as f:
+                        wt_vi_traj_env = pickle.load(f)
+
+                    # print('wt_vi_traj_env[0][1].mdp: ', wt_vi_traj_env[0][1].mdp)
+
+                    mdp = wt_vi_traj_env[0][1].mdp
+                    mdp.set_init_state(opt_traj[0][0])
+                    mdp.weights = human_model_weight
+                    vi_human = ValueIteration(mdp, sample_rate=1, max_iterations=100)
+                    vi_human.run_vi()
+
+                    test_constraints = test[3]
+                    print('Checking sampled human model for test: ', test_id, ', for constraints: ', test_constraints)
+
+                    if not vi_human.stabilized:
+                        print(colored('Human model with weight, ' + str(human_model_weight) + ', did not converge and skipping for response generation', 'red'))
+                        skip_human_model = True
+                    else:
+                        print(colored('Human model with weight, ' + str(human_model_weight) + ', converged', 'green'))
+                        skip_human_model = False
+                    
+
+                    if not skip_human_model:
+                        cur_state = mdp.get_init_state()
+                        # print('Current state: ', cur_state)
+                        human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
+
+                        human_traj_rewards = mdp.accumulate_reward_features(human_opt_trajs[0], discount=True)  # just use the first optimal trajectory
+                        mu_sa = mdp.accumulate_reward_features(opt_traj, discount=True)
+                        new_constraint = mu_sa - human_traj_rewards
+
+                        # print('New constraint: ', new_constraint)
+                        if (new_constraint == np.array([0, 0, 0])).all():
+                            if params.debug_hm_sampling:
+                                print(colored('Correct response sampled', 'blue'))
+                            response_type = 'correct'
+                        else:
+                            if params.debug_hm_sampling:
+                                print(colored('Incorrect response sampled', 'red'))
+                            response_type = 'incorrect'
 
 
-            loop_count += 1
-            
-        else:
-            print('No valid human model sampled. Skipping ...')
-            human_opt_trajs_all_tests = [None]
-            response_type_all_tests = 'NA'
-            human_model_weight_all_tests = [None]
+                        # mdp.visualize_trajectory(traj_opt)
+                        # plt.show()
+                        # mdp.visualize_trajectory(human_opt_trajs[0])
+                        # plt.show()
+
+
+                    else:
+                        response_type = 'NA'
+                        # visualize skipped trajectories
+                        cur_state = mdp.get_init_state()
+                        human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
+                        # mdp.visualize_trajectory(human_opt_trajs[0])
+                        # plt.show()
+                    
+                    # check for constraint satisfaction
+                    if len(args) != 0:
+                        constraint_flag = True
+                        for constraint in test_constraints[0]:
+                            if constraint.dot(human_model_weight.T) < 0:
+                                constraint_flag = False
+                    else:
+                        constraint_flag = True
+                        for constraint in test_constraints:
+                            if constraint.dot(human_model_weight.T) < 0:
+                                constraint_flag = False
+                    
+                    # save to history variables for debugging
+                    if len(args) != 0:
+                        sampled_points_history.append(human_model_weight)
+                        response_history.append(response_type)
+                        member.append(member_id)
+                        constraint_history.append(test_constraints)
+                        constraint_flag_history.append(constraint_flag)
+                        set_id_history.append(set_id)
+                        cluster_id_history.append(cluster_id)
+                        skip_model_history.append(skip_human_model)
+                        point_probability.append(rew_weight_prob)
+                        team_learning_factor_history.append(learning_factor)
+                        prob_initial_history.append(prob_initial) 
+                        prob_reweight_history.append(prob_reweight) 
+                        prob_resample_history.append(prob_resample) 
+                        resample_flag_history.append(resample_flag)
+                        resample_noise_history.append(noise_measures)
+                        update_sequence_history.append(update_type)
+
+                    # save sampled model if it provides a stable trajectory for all tests
+                    if not skip_human_model:
+                        human_opt_trajs_all_tests.append(human_opt_trajs[0])
+                        response_type_all_tests.append(response_type)
+                        human_model_weight_all_tests.append(human_model_weight)
+                        sampled_points_duplicates.append(human_model_weight)
+                        
+                    test_id += 1 # update test_id
+
+
+                loop_count += 1
+                
+            else:
+                print('No valid human model sampled. Skipping ...')
+                human_opt_trajs_all_tests = [None]
+                response_type_all_tests = 'NA'
+                human_model_weight_all_tests = [None]
+                break
+        ###################
+    
+        # check if all responses are correct
+        for response_type_ind_test in response_type_all_tests:
+            print('response_type_ind_test: ', response_type_ind_test)
+            if response_type_ind_test != 'correct':
+                all_tests_correct_flag = False
+        
+
+        if not all_tests_correct_flag:
+            print('At least one duplicate test is incorrect. Moving to next nmember.')
             break
 
+        
 
-
-
+    ##################################################           
 
     if len(args) != 0:
         return human_model_weight_all_tests, human_opt_trajs_all_tests, response_type_all_tests, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, set_id_history, skip_model_history, cluster_id_history, \
@@ -704,6 +720,10 @@ def get_human_response_all_tests(particles_to_sample, preliminary_tests, learnin
                 prob_reweight_history, prob_resample_history, resample_flag_history, update_sequence_history, resample_noise_history
     else:
         return human_opt_trajs_all_tests, response_type_all_tests
+
+
+
+
 ####################################
     
 def plot_sampled_models(particles, test_constraints, human_model_weight_all_tests, test_no, fig=None, plot_title = 'Sampled models', vars_filename = 'sim_run'):

@@ -420,6 +420,11 @@ def run_reward_teaching(args):
             
             
             teacher_uf_demo = copy.deepcopy(teacher_learning_factor[int(knowledge_id.strip('p'))-1])
+
+        elif 'baseline' in demo_strategy:
+            knowledge_id = 'p1'
+            teacher_uf_demo = copy.deepcopy(teacher_learning_factor[int(knowledge_id.strip('p'))-1])
+            
         else:
             teacher_uf_demo = copy.deepcopy(params.default_learning_factor_teacher)  # use default learning factor for common and joint knowledge strategies
 
@@ -531,14 +536,14 @@ def run_reward_teaching(args):
             
             ########### New !!
             # Sample for N tests to avoid chance of sampling a correct response
-            N_duplicate_sets = 4
+            N_duplicate_sets = 2
             N_tests = len(preliminary_tests)
             
-            for i in range(N_duplicate_sets):
-                if i==0:
-                    preliminary_tests_extended = copy.deepcopy(preliminary_tests)
-                else:
-                    preliminary_tests_extended.extend(copy.deepcopy(preliminary_tests))
+            # for i in range(N_duplicate_sets):
+            #     if i==0:
+            #         preliminary_tests_extended = copy.deepcopy(preliminary_tests)
+            #     else:
+            #         preliminary_tests_extended.extend(copy.deepcopy(preliminary_tests))
 
             
             # prob_teacher_before_testing, prob_learner_before_testing, prob_teacher_after_testing, prob_learner_after_testing = [], [], [], []
@@ -555,6 +560,8 @@ def run_reward_teaching(args):
                 for i in range(params.team_size):
                     member_id = 'p' + str(i+1)
 
+                    print('Sampling for member: ', member_id)
+
                     prob_initial, prob_reweight, prob_resample, resample_flag, noise_measures = pf_update_args[i]
        
                     args = loop_count, member_id, [], sampled_points_history, response_history, member, constraint_history, constraint_flag_history, update_id_history, skip_model_history, \
@@ -563,41 +570,48 @@ def run_reward_teaching(args):
                      
                     # get response for extended tests
                     human_model_weight_all_tests, human_opt_trajs_all_tests, response_type_all_tests, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, update_id_history, skip_model_history, cluster_id_history, point_probability, team_learning_factor_history, \
-                           prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, prob_reweight_history, prob_resample_history, resample_flag_history, update_sequence_history, resample_noise_history = sim_helpers.get_human_response_all_tests(particles_team_learner[member_id], preliminary_tests_extended, team_learning_factor[i], args)
+                           prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, prob_reweight_history, prob_resample_history, resample_flag_history, update_sequence_history, resample_noise_history = sim_helpers.get_human_response_all_tests(particles_team_learner[member_id], preliminary_tests, N_duplicate_sets, team_learning_factor[i], args)
                     
-                    print('Number of tests: ', N_tests, 'N_extended_tests: ', len(preliminary_tests_extended))
-                    print('response_type_all_tests: ', response_type_all_tests)
-                    print('human_opt_trajs_all_tests: ', human_opt_trajs_all_tests)
-                    # check if all responses are correct
-                    all_tests_correct_flag = True
-                    resp_set_id = None
-                    for resp_ind in range(len(response_type_all_tests)):
-                        response_type_ind_test = response_type_all_tests[resp_ind]
-                        print('response_type_ind_test: ', response_type_ind_test)
-                        if response_type_ind_test != 'correct':
-                            all_tests_correct_flag = False
-                            resp_set_id = np.floor(resp_ind/N_tests).astype(int) + 1
-                            break
-
-                    if all_tests_correct_flag:
-                        resp_set_id = 1
-
-                    print('resp_set_id: ', resp_set_id)
-                    print('resp_ind_for_set: ', (resp_set_id-1)*N_tests, resp_set_id*N_tests-1)
-
-                    if N_tests == 1:
-                        human_opt_trajs_all_tests_team[member_id] = [human_opt_trajs_all_tests[resp_set_id-1]]
-                        response_type_all_tests_team[member_id] = response_type_all_tests[resp_set_id-1]
-                        human_model_weight_team[member_id] = human_model_weight_all_tests[resp_set_id-1]
-                    else:
-                        human_opt_trajs_all_tests_team[member_id] = human_opt_trajs_all_tests[(resp_set_id-1)*N_tests: resp_set_id*N_tests]  # python does not return end index
-                        response_type_all_tests_team[member_id] = response_type_all_tests[(resp_set_id-1)*N_tests: resp_set_id*N_tests]
-                        human_model_weight_team[member_id] = human_model_weight_all_tests[(resp_set_id-1)*N_tests: resp_set_id*N_tests]
+                    human_opt_trajs_all_tests_team[member_id] = human_opt_trajs_all_tests
+                    response_type_all_tests_team[member_id] = response_type_all_tests
+                    human_model_weight_team[member_id] = human_model_weight_all_tests
 
                     print('response_type_all_tests: ', response_type_all_tests)
-                    print('member_id: ', member_id,  '. response_type_all_tests_team: ', response_type_all_tests_team[member_id], 'human_model_weight: ', human_model_weight_team[member_id] )
-                    print('human_opt_trajs_all_: ',  human_opt_trajs_all_tests_team[member_id])
+                    print('human_model_weight: ', human_model_weight_all_tests)
 
+                    ############# Incorrect
+                    # # print('Number of tests: ', N_tests, 'N_extended_tests: ', len(preliminary_tests_extended))
+                    # print('response_type_all_tests: ', response_type_all_tests)
+                    # print('human_opt_trajs_all_tests: ', human_opt_trajs_all_tests)
+                    # # check if all responses are correct
+                    # all_tests_correct_flag = True
+                    # resp_set_id = None
+                    # for resp_ind in range(len(response_type_all_tests)):
+                    #     response_type_ind_test = response_type_all_tests[resp_ind]
+                    #     print('response_type_ind_test: ', response_type_ind_test)
+                    #     if response_type_ind_test != 'correct':
+                    #         all_tests_correct_flag = False
+                    #         resp_set_id = np.floor(resp_ind/N_tests).astype(int) + 1
+                    #         break
+
+                    # if all_tests_correct_flag:
+                    #     resp_set_id = 1
+
+                    # print('resp_set_id: ', resp_set_id)
+                    # print('resp_ind_for_set: ', (resp_set_id-1)*N_tests, resp_set_id*N_tests-1)
+
+                    # if N_tests == 1:
+                    #     human_opt_trajs_all_tests_team[member_id] = [human_opt_trajs_all_tests[resp_set_id-1]]
+                    #     response_type_all_tests_team[member_id] = response_type_all_tests[resp_set_id-1]
+                    #     human_model_weight_team[member_id] = human_model_weight_all_tests[resp_set_id-1]
+                    # else:
+                    #     human_opt_trajs_all_tests_team[member_id] = human_opt_trajs_all_tests[(resp_set_id-1)*N_tests: resp_set_id*N_tests]  # python does not return end index
+                    #     response_type_all_tests_team[member_id] = response_type_all_tests[(resp_set_id-1)*N_tests: resp_set_id*N_tests]
+                    #     human_model_weight_team[member_id] = human_model_weight_all_tests[(resp_set_id-1)*N_tests: resp_set_id*N_tests]
+
+                    # print('response_type_all_tests: ', response_type_all_tests)
+                    # print('member_id: ', member_id,  '. response_type_all_tests_team: ', response_type_all_tests_team[member_id], 'human_model_weight: ', human_model_weight_team[member_id] )
+                    # print('human_opt_trajs_all_: ',  human_opt_trajs_all_tests_team[member_id])
                     #####################
 
 
@@ -975,10 +989,11 @@ def run_reward_teaching(args):
                         particles_team_teacher['common_knowledge'].update(all_test_constraints_expanded, params.default_learning_factor_teacher, model_type = params.teacher_update_model_type, reset_threshold_prob = params.pf_reset_threshold)
                         particles_team_teacher['joint_knowledge'].update_jk(test_constraints_team, params.default_learning_factor_teacher, model_type = params.teacher_update_model_type)
 
-            else:   
-                ## update team knowledge based on the test responses of the team for intersecting constraints
-                team_knowledge['common_knowledge'] = copy.deepcopy(team_knowledge['p1'])
-                team_knowledge = team_helpers.update_team_knowledge(team_knowledge, kc_id, kc_reset_flag, [], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = ['joint_knowledge'])
+            # No need to track common and joint knowledge for single player
+            # else:   
+            #     ## update team knowledge based on the test responses of the team for intersecting constraints
+            #     team_knowledge['common_knowledge'] = copy.deepcopy(team_knowledge['p1'])
+            #     team_knowledge = team_helpers.update_team_knowledge(team_knowledge, kc_id, kc_reset_flag, [], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = ['joint_knowledge'])
                 
             ##########################################################################
 
@@ -1194,7 +1209,11 @@ if __name__ == "__main__":
     dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge'] # ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
 
     # team_composition_list = [[0,2,2]]
-    # dem_strategy_list = ['individual_knowledge_low']
+    # dem_strategy_list = ['joint_knowledge'] # ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
+
+    # team_composition_list = [[0], [2]]
+    # dem_strategy_list = ['baseline']  # for only one person
+    # params.team_size = 1
 
 
     ##########################
@@ -1284,7 +1303,7 @@ if __name__ == "__main__":
         args_list = []
         # for params_comb_run_id in range(len(parameter_combinations)):
         for params_comb_run_id in range(1):
-            sensitivity_run_id = 100
+            sensitivity_run_id = 200
 
 
             ## sensitivity runs
@@ -1307,7 +1326,7 @@ if __name__ == "__main__":
             ################
 
             ## sim runs
-            file_prefix = '03_02_sim_study_test_learner_noise_duplicate_tests'
+            file_prefix = '03_02_sim_study_test_final_2'
             params.max_learning_factor = 0.95
             params.default_learning_factor_teacher = 0.8
             
@@ -1393,7 +1412,7 @@ if __name__ == "__main__":
                 
         # ProcessingPool().map(run_reward_teaching, args_list)
                 
-        pool = NoDaemonProcessPool(processes=48, lock=lock)
+        pool = NoDaemonProcessPool(processes=8, lock=lock)
         pool.map(run_reward_teaching, args_list)
         # tqdm(pool.imap(run_reward_teaching, args_list), total=len(args_list))
                 
