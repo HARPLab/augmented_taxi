@@ -435,7 +435,7 @@ def calc_expected_learning(team_knowledge_expected, teacher_learning_factor, kc_
     for p in range(params.team_size):
         new_constraints_team.append(demo_constraints)
 
-    particles_team_teacher['joint_knowledge'].update_jk(new_constraints_team)
+    particles_team_teacher['joint_knowledge'].update_jk(new_constraints_team, params.default_learning_factor_teacher)
 
     if viz_flag:
         visualize_transition(new_constraints_team, particles_team_teacher['joint_knowledge'], params.mdp_class, params.weights['val'], text = 'Expected knowledge change for set ' + str(loop_count+1) + ' for joint knowledge',  knowledge_type = 'joint_knowledge', plot_filename ='ek_jk_loop_' + str(loop_count+1))
@@ -802,7 +802,7 @@ def sample_valid_region_jk(joint_constraints, min_azi, max_azi, min_ele, max_ele
 
 
 
-def obtain_team_summary(data_loc, run_env_loc, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
+def obtain_team_summary(data_loc, run_env_loc, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, lock, n_human_models, consistent_state_count,
                         n_train_demos, particles_demo, teacher_uf_demo, knowledge_id, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, obj_func_proportion=1, vars_filename='sim_run'):
 
 
@@ -818,7 +818,7 @@ def obtain_team_summary(data_loc, run_env_loc, min_subset_constraints_record, mi
     #     summary_count = len(BEC_summary)
 
     if summary_variant == 'counterfactual':
-        BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, teacher_uf_demo, knowledge_id, variable_filter, nonzero_counter, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
+        BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, teacher_uf_demo, knowledge_id, variable_filter, nonzero_counter, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, lock, n_human_models, consistent_state_count,
                        BEC_summary, summary_count, min_BEC_constraints_running, params.BEC['n_human_models_precomputed'], visited_env_traj_idxs = visited_env_traj_idxs, n_train_demos=np.inf, downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=obj_func_proportion, vars_filename = vars_filename)
 
         
@@ -841,13 +841,14 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, teacher_lear
         else:
             learning_factor = teacher_learning_factor[i]
 
-        try:
-            filename = 'initial_pf_' + str(learning_factor) + '_n_particles_' + str(n_particles) + '.pickle'
-            with open(path + filename, 'rb') as f:
-                particles_team[member_id] = pickle.load(f)
-        except:
-            print('Initializing particle filter..')
-            particles_team[member_id] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), learning_factor)
+        # try:
+        #     filename = 'initial_pf_' + str(learning_factor) + '_n_particles_' + str(n_particles) + '.pickle'
+        #     with lock:
+        #         with open(path + filename, 'rb') as f:
+        #             particles_team[member_id] = pickle.load(f)
+        # except:
+        print('Initializing particle filter..')
+        particles_team[member_id] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), learning_factor)
         
 
         #########
@@ -884,7 +885,7 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, teacher_lear
 
 
     if pf_flag == 'teacher':
-        # particles for aggregated team knowledge - common knowledge
+        # particles for aggregated team knowledge - common knowledge (using the last person learning factor for common and joint knowledge. Not an issue now as the teacher's learning factor is the same for all team members)
         particles_team['common_knowledge'] = pf_team.Particles_team(BEC_helpers.sample_human_models_uniform([], n_particles), learning_factor)
         if team_prior is not None:
             team_prior['common_knowledge'] = [calc_common_knowledge(team_prior, team_size, weights, step_cost_flag)]
@@ -903,7 +904,7 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, teacher_lear
             joint_constraints = []
             for p in range(team_size):
                 joint_constraints.append(team_prior['joint_knowledge'][0][p])
-            particles_team['joint_knowledge'].update_jk(joint_constraints)
+            particles_team['joint_knowledge'].update_jk(joint_constraints, learning_factor)
             particles_team['joint_knowledge'].knowledge_update(team_prior['joint_knowledge'])
     
 
@@ -1517,7 +1518,7 @@ def visualize_BEC_area(BEC_constraints, fig, ax1):
 
 
 
-def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, teacher_uf_demo, member_id, variable_filter, nonzero_counter, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, n_human_models, consistent_state_count,
+def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, teacher_uf_demo, member_id, variable_filter, nonzero_counter, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, lock, n_human_models, consistent_state_count,
                        summary, summary_count, min_BEC_constraints_running, n_human_models_precomputed, visited_env_traj_idxs=[], n_train_demos=3, downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=1, vars_filename = 'sim_run'):
 
     
@@ -1677,46 +1678,57 @@ def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, te
         if check_for_non_intersecting_constraints(constraint_space_to_sample_human_models, weights, step_cost_flag)[0]:
             constraint_space_to_sample_human_models = majority_rules_non_intersecting_team_constraints(constraint_space_to_sample_human_models, weights, step_cost_flag)[0]
     
-    print(colored('Initial knowledge constraints to sample human models from: ', 'blue')) 
-    print(constraint_space_to_sample_human_models)
+    # print(colored('Initial knowledge constraints to sample human models from: ', 'blue')) 
+    # print(constraint_space_to_sample_human_models)
     
     running_variable_filter = copy.deepcopy(variable_filter)
     # print('variable filter: {}'.format(variable_filter))
 
     # clear the demonstration generation log
-    open('models/' + data_loc + '/' + run_env_loc + '/demo_gen_log.txt', 'w').close()
+    # with lock:
+    #     open('models/' + data_loc + '/' + run_env_loc + '/demo_gen_log.txt', 'w').close()
+
 
     sample_human_models_ref = BEC_helpers.sample_human_models_uniform([], n_human_models_precomputed)
-    
+
+
     while summary_count < n_train_demos:
         
         # print('Knowledge constraints for sampling particles {}'.format(constraint_space_to_sample_human_models))
         # print('n_human_models: ', n_human_models)
         
-        # # sample counterfactual human models; sample equally from each team member knowledge for joint knowledge case
-        sample_human_models = []
-        if member_id != 'joint_knowledge':
-            sample_human_models = BEC_helpers.sample_human_models_uniform(constraint_space_to_sample_human_models, n_human_models)
-        else:
-            for i in range(len(constraint_space_to_sample_human_models)):
-                # print('constraint_space_to_sample_human_models[i]: ', constraint_space_to_sample_human_models[i])
-                if len(sample_human_models) == 0:
-                    sample_human_models.extend(BEC_helpers.sample_human_models_uniform(constraint_space_to_sample_human_models[i], int(n_human_models/len(constraint_space_to_sample_human_models))))
-                else:
-                    sample_human_models.extend(BEC_helpers.sample_human_models_uniform(constraint_space_to_sample_human_models[i], int(n_human_models/len(constraint_space_to_sample_human_models))))
+        # a) Sample from constraint space
+        # # # sample counterfactual human models; sample equally from each team member knowledge for joint knowledge case
+        # sample_human_models = []
+        # if member_id != 'joint_knowledge':
+        #     sample_human_models = BEC_helpers.sample_human_models_uniform(constraint_space_to_sample_human_models, n_human_models)
+        # else:
+        #     for i in range(len(constraint_space_to_sample_human_models)):
+        #         # print('constraint_space_to_sample_human_models[i]: ', constraint_space_to_sample_human_models[i])
+        #         if len(sample_human_models) == 0:
+        #             sample_human_models.extend(BEC_helpers.sample_human_models_uniform(constraint_space_to_sample_human_models[i], int(n_human_models/len(constraint_space_to_sample_human_models))))
+        #         else:
+        #             sample_human_models.extend(BEC_helpers.sample_human_models_uniform(constraint_space_to_sample_human_models[i], int(n_human_models/len(constraint_space_to_sample_human_models))))
+       #####################
 
-        
-        # sample_human_models, model_weights = BEC_helpers.sample_human_models_pf(particles_demo, n_human_models)
+        # b) Sample from particle filter
+        # # sample counterfactual human models; sample equally from each team member knowledge for joint knowledge case
+        sample_human_models, _, _ = BEC_helpers.sample_human_models_pf(particles_demo, n_human_models)
+
+        #####################################
 
         if len(sample_human_models) == 0:
             print(colored("Likely cannot reduce the BEC further through additional demonstrations. Returning.", 'red'))
             return summary, summary_count, visited_env_traj_idxs, min_BEC_constraints_running, particles_demo
         
         # print("Length of summary: {}".format(summary_count))
-        with open('models/' + data_loc + '/' + run_env_loc + '/demo_gen_log.txt', 'a') as myfile:
-            myfile.write('Length of summary: {}\n'.format(summary_count))
+        with lock:
+            with open('models/' + data_loc + '/' + run_env_loc + '/demo_gen_log.txt', 'a') as myfile:
+                myfile.write('Length of summary: {}\n'.format(summary_count))
+                myfile.write('constraint_space_to_sample_human_models: {}\n'.format(constraint_space_to_sample_human_models))
+                myfile.write('sample_human_models: {}\n'.format(sample_human_models))
 
-        # print(colored('sample_human_models: ', 'red'), sample_human_models)
+        # print(colored('constraint_space_to_sample_human_models: ' + str(constraint_space_to_sample_human_models) + '. sample_human_models: ' + str(sample_human_models), 'red'))
 
         # obtain the indices of the reference human models (that have precomputed constraints) that are closest to the sampled human models
         sample_human_models_ref_latllong = cg.cart2latlong(np.array(sample_human_models_ref).squeeze())
@@ -1724,19 +1736,30 @@ def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, te
         distances = haversine_distances(sample_human_models_latlong, sample_human_models_ref_latllong)
         min_model_idxs = np.argmin(distances, axis=1)
 
+
+        # # plot particles and sampled models
+        # print('Sampled human models and particle distribution for demos...')
+        # fig = plt.figure()
+        # ax0 = fig.add_subplot(1, 3, 1, projection='3d')
+        # for id in range(len(sample_human_models)):
+        #     ax0.scatter(sample_human_models[id][0][0], sample_human_models[id][0][1], sample_human_models[id][0][2], s=20, c='r', marker='o')
+        # particles_demo.plot(fig=fig, ax=ax0)
+        # plt.show()
+        
+
         # plot sampled human models and nearest particles
         if params.plot_sampled_counterfactual_models_flag:                    
             plot_sampled_counterfactual_models(particles_demo, min_BEC_constraints_running, sample_human_models, weights=weights, fig=None, text='Sampled human models based on ' + member_id)
 
 
 
-        # # print('min_model_idxs: ', min_model_idxs)
-        # # print('model distances:', distances[:, min_model_idxs])
+        # print('min_model_idxs: ', min_model_idxs)
+        # print('model distances:', distances[:, min_model_idxs])
 
         # # print("Combining the most limiting constraints across human models:")
         args = [(i, min_model_idxs, data_loc, 'precomputed', weights, step_cost_flag, variable_filter,
                     mdp_features_record[i],
-                    traj_record[i], min_BEC_constraints_running, None, True, True) for
+                    traj_record[i], min_BEC_constraints_running, None, True, True, lock) for
                 i in range(len(traj_record))]
         info_gains_record, min_env_constraints_record, n_diff_constraints_record, _, _ = zip(
             *pool.imap(BEC.combine_limiting_constraints_IG, tqdm(args)))
@@ -1750,12 +1773,13 @@ def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, te
         no_info_flag = False
         if consistent_state_count:
             info_gains = np.array(info_gains_record)
+            # print('Info gains from sampled counterfactuals: ', info_gains)
             if np.sum(info_gains > 1) == 0:
                 no_info_flag = True
         else:
             info_gains_flattened_across_envs_models = list(itertools.chain.from_iterable(info_gains_record))
-            # # print('info_gains_record 2: ', info_gains_record)
-            # # print('info_gains_flattened_across_models 2: ', info_gains_flattened_across_envs_models)
+            # print('info_gains_record 2: ', info_gains_record)
+            # print('info_gains_flattened_across_models 2: ', info_gains_flattened_across_envs_models)
             if sum(np.array(info_gains_flattened_across_envs_models) > 1) == 0:
                 no_info_flag = True
 
@@ -1767,9 +1791,9 @@ def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, te
 
         ####################################################################################################
 
-
-        with open('models/' + data_loc + '/' + run_env_loc + '/info_gains_joint' + str(summary_count) + '.pickle', 'wb') as f:
-            pickle.dump(info_gains_record, f)
+        with lock:
+            with open('models/' + data_loc + '/' + run_env_loc + '/info_gains_joint' + str(summary_count) + '.pickle', 'wb') as f:
+                pickle.dump(info_gains_record, f)
 
         differing_constraint_count = 1          # number of constraints in the running human model that would differ after showing a particular demonstration
         max_differing_constraint_count = max(list(itertools.chain(*n_diff_constraints_record)))
@@ -1933,14 +1957,17 @@ def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, te
         
         
         if best_env_idx is not None:
-            with open('models/' + data_loc +  '/' + run_env_loc + '/best_env_idxs' + str(summary_count) + '.pickle', 'wb') as f:
-                pickle.dump((best_env_idx, best_traj_idx, best_env_idxs, best_traj_idxs), f)
+            with lock:
+                with open('models/' + data_loc +  '/' + run_env_loc + '/best_env_idxs' + str(summary_count) + '.pickle', 'wb') as f:
+                    pickle.dump((best_env_idx, best_traj_idx, best_env_idxs, best_traj_idxs), f)
 
-            best_traj = traj_record[best_env_idx][best_traj_idx]
+                best_traj = traj_record[best_env_idx][best_traj_idx]
 
-            filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
-            with open(filename, 'rb') as f:
-                wt_vi_traj_env = pickle.load(f)
+                filename = mp_helpers.lookup_env_filename(data_loc, best_env_idx)
+                
+                with open(filename, 'rb') as f:
+                    wt_vi_traj_env = pickle.load(f)
+            
             best_mdp = wt_vi_traj_env[0][1].mdp
             best_mdp.set_init_state(best_traj[0][0]) # for completeness
             new_constraint = min_env_constraints_record[best_env_idx][best_traj_idx]
@@ -1967,21 +1994,23 @@ def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, te
         
 
         # # print(colored('Max infogain: {}'.format(max_info_gain), 'blue'))
-        with open('models/' + data_loc + '/' + run_env_loc + '/demo_gen_log.txt', 'a') as myfile:
-            myfile.write('Max infogain: {}\n'.format(max_info_gain))
-            myfile.write('\n')
+        with lock:
+            with open('models/' + data_loc + '/' + run_env_loc + '/demo_gen_log.txt', 'a') as myfile:
+                myfile.write('Max infogain: {}\n'.format(max_info_gain))
+                myfile.write('\n')
 
-        # save the summary along the way (for each completed unit)
-        with open('models/' + data_loc + '/' + run_env_loc + '/BEC_summary.pickle', 'wb') as f:
-            pickle.dump((summary, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo), f)
+            # save the summary along the way (for each completed unit)
+            with open('models/' + data_loc + '/' + run_env_loc + '/BEC_summary.pickle', 'wb') as f:
+                pickle.dump((summary, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo), f)
 
     # add any remaining demonstrations
     if len(unit) > 0:
         summary.append(unit)
 
     # this method doesn't always finish, so save the summary along the way (for each completed unit)
-    with open('models/' + data_loc + '/' + run_env_loc + '/BEC_summary.pickle', 'wb') as f:
-        pickle.dump((summary, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo), f)
+    with lock:
+        with open('models/' + data_loc + '/' + run_env_loc + '/BEC_summary.pickle', 'wb') as f:
+            pickle.dump((summary, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo), f)
 
     return summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo
 
@@ -2021,130 +2050,130 @@ def check_unit_learning_goal_reached(team_knowledge, min_unit_constraints, kc_id
 
 
 
-def compute_counterfactuals_team(args):
-    data_loc, run_env_loc, model_idx, env_idx, w_human_normalized, env_filename, trajs_opt, particles, min_BEC_constraints_running, step_cost_flag, summary_len, variable_filter, mdp_features, consider_human_models_jointly = args
+# def compute_counterfactuals_team(args):
+#     data_loc, run_env_loc, model_idx, env_idx, w_human_normalized, env_filename, trajs_opt, particles, min_BEC_constraints_running, step_cost_flag, summary_len, variable_filter, mdp_features, consider_human_models_jointly = args
 
-    skip_env = False
+#     skip_env = False
 
-    # if the mdp has a feature that is meant to be filtered out, then skip this environment
-    if variable_filter.dot(mdp_features.T) > 0:
-        skip_env = True
+#     # if the mdp has a feature that is meant to be filtered out, then skip this environment
+#     if variable_filter.dot(mdp_features.T) > 0:
+#         skip_env = True
 
-    if not skip_env:
-        with open(env_filename, 'rb') as f:
-            wt_vi_traj_env = pickle.load(f)
+#     if not skip_env:
+#         with open(env_filename, 'rb') as f:
+#             wt_vi_traj_env = pickle.load(f)
 
-        agent = wt_vi_traj_env[0][1]
-        weights = agent.mdp.weights
+#         agent = wt_vi_traj_env[0][1]
+#         weights = agent.mdp.weights
 
-        human = copy.deepcopy(agent)
-        mdp = human.mdp
-        mdp.weights = w_human_normalized
-        vi_human = ValueIteration(mdp, sample_rate=1)
-        vi_human.run_vi()
+#         human = copy.deepcopy(agent)
+#         mdp = human.mdp
+#         mdp.weights = w_human_normalized
+#         vi_human = ValueIteration(mdp, sample_rate=1)
+#         vi_human.run_vi()
 
-        if not vi_human.stabilized:
-            skip_env = True
-            # print(colored('Skipping environment' + str(env_idx) + '...', 'red'))
+#         if not vi_human.stabilized:
+#             skip_env = True
+#             # print(colored('Skipping environment' + str(env_idx) + '...', 'red'))
 
-    if not skip_env:
-        # only consider counterfactual trajectories from human models whose value iteration have converged and whose
-        # mdp does not have a feature that is meant to be filtered out
-        # best_human_trajs_record_env = []
-        constraints_env = []
-        info_gain_env = []
-        # human_rewards_env = []
-        overlap_in_opt_and_counterfactual_traj_env = []
+#     if not skip_env:
+#         # only consider counterfactual trajectories from human models whose value iteration have converged and whose
+#         # mdp does not have a feature that is meant to be filtered out
+#         # best_human_trajs_record_env = []
+#         constraints_env = []
+#         info_gain_env = []
+#         # human_rewards_env = []
+#         overlap_in_opt_and_counterfactual_traj_env = []
 
-        for traj_idx, traj_opt in enumerate(trajs_opt):
-            constraints = []
+#         for traj_idx, traj_opt in enumerate(trajs_opt):
+#             constraints = []
 
-            # # a) accumulate the reward features and generate a single constraint
-            # mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
-            # traj_hyp = mdp_helpers.rollout_policy(vi_human.mdp, vi_human)
-            # mu_sb = vi_human.mdp.accumulate_reward_features(traj_hyp, discount=True)
-            # constraints.append(mu_sa - mu_sb)
-            # best_human_trajs_record = [] # for symmetry with below
-            # best_human_reward = weights.dot(mu_sb.T)  # for symmetry with below
+#             # # a) accumulate the reward features and generate a single constraint
+#             # mu_sa = mdp.accumulate_reward_features(traj_opt, discount=True)
+#             # traj_hyp = mdp_helpers.rollout_policy(vi_human.mdp, vi_human)
+#             # mu_sb = vi_human.mdp.accumulate_reward_features(traj_hyp, discount=True)
+#             # constraints.append(mu_sa - mu_sb)
+#             # best_human_trajs_record = [] # for symmetry with below
+#             # best_human_reward = weights.dot(mu_sb.T)  # for symmetry with below
 
-            # b) contrast differing expected feature counts for each state-action pair along the agent's optimal trajectory
-            # best_human_trajs_record = []
-            # best_human_reward = 0
-            for sas_idx in range(len(traj_opt)):
-                # reward features of optimal action
-                mu_sa = mdp.accumulate_reward_features(traj_opt[sas_idx:], discount=True)
+#             # b) contrast differing expected feature counts for each state-action pair along the agent's optimal trajectory
+#             # best_human_trajs_record = []
+#             # best_human_reward = 0
+#             for sas_idx in range(len(traj_opt)):
+#                 # reward features of optimal action
+#                 mu_sa = mdp.accumulate_reward_features(traj_opt[sas_idx:], discount=True)
 
-                sas = traj_opt[sas_idx]
-                cur_state = sas[0]
+#                 sas = traj_opt[sas_idx]
+#                 cur_state = sas[0]
 
-                # obtain all optimal trajectory rollouts according to the human's model (assuming that it's a reasonable policy that has converged)
-                human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
+#                 # obtain all optimal trajectory rollouts according to the human's model (assuming that it's a reasonable policy that has converged)
+#                 human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
 
-                cur_best_reward = float('-inf')
-                best_reward_features = []
-                best_human_traj = []
-                # select the human's possible trajectory that has the highest true reward (i.e. give the human's policy the benefit of the doubt)
-                for traj in human_opt_trajs:
-                    mu_sb = mdp.accumulate_reward_features(traj, discount=True)  # the human and agent should be working with identical mdps
-                    reward_hyp = weights.dot(mu_sb.T)
-                    if reward_hyp > cur_best_reward:
-                        cur_best_reward = reward_hyp
-                        best_reward_features = mu_sb
-                        best_human_traj = traj
+#                 cur_best_reward = float('-inf')
+#                 best_reward_features = []
+#                 best_human_traj = []
+#                 # select the human's possible trajectory that has the highest true reward (i.e. give the human's policy the benefit of the doubt)
+#                 for traj in human_opt_trajs:
+#                     mu_sb = mdp.accumulate_reward_features(traj, discount=True)  # the human and agent should be working with identical mdps
+#                     reward_hyp = weights.dot(mu_sb.T)
+#                     if reward_hyp > cur_best_reward:
+#                         cur_best_reward = reward_hyp
+#                         best_reward_features = mu_sb
+#                         best_human_traj = traj
 
-                # # todo: for testing how much computation and time I save by not doing a recursive rollout
-                # best_human_traj = mdp_helpers.rollout_policy(vi_human.mdp, vi_human, cur_state, [])
-                # best_reward_features = mdp.accumulate_reward_features(best_human_traj,
-                #                                        discount=True)  # the human and agent should be working with identical mdps
-                # cur_best_reward = weights.dot(best_reward_features.T)
+#                 # # todo: for testing how much computation and time I save by not doing a recursive rollout
+#                 # best_human_traj = mdp_helpers.rollout_policy(vi_human.mdp, vi_human, cur_state, [])
+#                 # best_reward_features = mdp.accumulate_reward_features(best_human_traj,
+#                 #                                        discount=True)  # the human and agent should be working with identical mdps
+#                 # cur_best_reward = weights.dot(best_reward_features.T)
 
-                # only store the reward of the full trajectory
-                # if sas_idx == 0:
-                #     best_human_reward = cur_best_reward
-                #     traj_opt_feature_count = mu_sa
-                constraints.append(mu_sa - best_reward_features)
-                # best_human_trajs_record.append(best_human_traj)
+#                 # only store the reward of the full trajectory
+#                 # if sas_idx == 0:
+#                 #     best_human_reward = cur_best_reward
+#                 #     traj_opt_feature_count = mu_sa
+#                 constraints.append(mu_sa - best_reward_features)
+#                 # best_human_trajs_record.append(best_human_traj)
 
-            if len(constraints) > 0:
-                constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
+#             if len(constraints) > 0:
+#                 constraints = BEC_helpers.remove_redundant_constraints(constraints, weights, step_cost_flag)
 
-            if particles is not None:
-                info_gain = particles.calc_info_gain(constraints)
-            else:
-                info_gain = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, constraints,
-                                                                   weights, step_cost_flag)
+#             if particles is not None:
+#                 info_gain = particles.calc_info_gain(constraints)
+#             else:
+#                 info_gain = BEC_helpers.calculate_information_gain(min_BEC_constraints_running, constraints,
+#                                                                    weights, step_cost_flag)
 
-            # human_rewards_env.append(best_human_reward)
-            # best_human_trajs_record_env.append(best_human_trajs_record)
-            constraints_env.append(constraints)
-            info_gain_env.append(info_gain)
+#             # human_rewards_env.append(best_human_reward)
+#             # best_human_trajs_record_env.append(best_human_trajs_record)
+#             constraints_env.append(constraints)
+#             info_gain_env.append(info_gain)
 
-            # if not consider_human_models_jointly:
-            #     # you should only consider the overlap for the first counterfactual human trajectory (as opposed to
-            #     # counterfactual trajectories that could've arisen from states after the first state)
-            #     overlap_pct = BEC_helpers.calculate_counterfactual_overlap_pct(best_human_trajs_record[0], traj_opt)
-            #
-            #     overlap_in_opt_and_counterfactual_traj_env.append(overlap_pct)
+#             # if not consider_human_models_jointly:
+#             #     # you should only consider the overlap for the first counterfactual human trajectory (as opposed to
+#             #     # counterfactual trajectories that could've arisen from states after the first state)
+#             #     overlap_pct = BEC_helpers.calculate_counterfactual_overlap_pct(best_human_trajs_record[0], traj_opt)
+#             #
+#             #     overlap_in_opt_and_counterfactual_traj_env.append(overlap_pct)
 
-    # else just populate with dummy variables
-    else:
-        # best_human_trajs_record_env = [[[]] for i in range(len(trajs_opt))]
-        constraints_env = [[] for i in range(len(trajs_opt))]
-        info_gain_env = [0 for i in range(len(trajs_opt))]
-        if not consider_human_models_jointly:
-            overlap_in_opt_and_counterfactual_traj_env = [float('inf') for i in range(len(trajs_opt))]
-        # human_rewards_env = [np.array([[0]]) for i in range(len(trajs_opt))]
+#     # else just populate with dummy variables
+#     else:
+#         # best_human_trajs_record_env = [[[]] for i in range(len(trajs_opt))]
+#         constraints_env = [[] for i in range(len(trajs_opt))]
+#         info_gain_env = [0 for i in range(len(trajs_opt))]
+#         if not consider_human_models_jointly:
+#             overlap_in_opt_and_counterfactual_traj_env = [float('inf') for i in range(len(trajs_opt))]
+#         # human_rewards_env = [np.array([[0]]) for i in range(len(trajs_opt))]
 
-    if summary_len is not None:
-        with open('models/' + data_loc + '/' + run_env_loc + '/counterfactual_data_' + str(summary_len) + '/model' + str(model_idx) +
-                  '/cf_data_env' + str(env_idx).zfill(5) + '.pickle', 'wb') as f:
-            pickle.dump(constraints_env, f)
-        # # print('Info gain for Summary length ' + str(summary_len) + ' of model ' + str(model_idx) + 'of env' + str(env_idx) + 'is' + str(info_gain_env) + '...')
+#     if summary_len is not None:
+#         with open('models/' + data_loc + '/' + run_env_loc + '/counterfactual_data_' + str(summary_len) + '/model' + str(model_idx) +
+#                   '/cf_data_env' + str(env_idx).zfill(5) + '.pickle', 'wb') as f:
+#             pickle.dump(constraints_env, f)
+#         # # print('Info gain for Summary length ' + str(summary_len) + ' of model ' + str(model_idx) + 'of env' + str(env_idx) + 'is' + str(info_gain_env) + '...')
 
-    if consider_human_models_jointly:
-        return info_gain_env
-    else:
-        return info_gain_env, overlap_in_opt_and_counterfactual_traj_env
+#     if consider_human_models_jointly:
+#         return info_gain_env
+#     else:
+#         return info_gain_env, overlap_in_opt_and_counterfactual_traj_env
 
 
 
@@ -2469,8 +2498,11 @@ def plot_sampled_counterfactual_models(particles, constraints, human_models, wei
 
 #####################
 
-def obtain_diagnostic_tests(data_loc, previous_demos, visited_env_traj_idxs, min_BEC_constraints, min_subset_constraints_record, traj_record, traj_features_record, variable_filter, mdp_features_record, downsample_threshold=float("inf"), opt_simplicity=True, opt_similarity=True):
+def obtain_diagnostic_tests(lock, data_loc, previous_demos, visited_env_traj_idxs, min_BEC_constraints, min_subset_constraints_record, traj_record, traj_features_record, variable_filter, mdp_features_record, downsample_threshold=float("inf"), opt_simplicity=True, opt_similarity=True):
     
+
+    # print('variable filter diagnostic tests: ', variable_filter)
+
     preliminary_test_info = []
 
     # if you're looking for demonstrations that will convey the most constraining BEC region or will be employing scaffolding,
@@ -2587,8 +2619,9 @@ def obtain_diagnostic_tests(data_loc, previous_demos, visited_env_traj_idxs, min
         traj = traj_record[env_idx][traj_idx]
         constraints = info[1]
         filename = mp_helpers.lookup_env_filename(data_loc, env_idx)
-        with open(filename, 'rb') as f:
-            wt_vi_traj_env = pickle.load(f)
+        with lock:
+            with open(filename, 'rb') as f:
+                wt_vi_traj_env = pickle.load(f)
         vi = wt_vi_traj_env[0][1]
         best_mdp = wt_vi_traj_env[0][1].mdp
         best_mdp.set_init_state(traj[0][0])  # for completeness

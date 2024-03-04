@@ -102,7 +102,7 @@ if __name__ == "__main__":
     team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
     dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
 
-    viz_flag = [False, False, True] #[demo_viz, test_viz, pf_knowledge_viz]
+    viz_flag = [False, False, False] #[demo_viz, test_viz, pf_knowledge_viz]
     rev_flag = True
     fb_flag = True
 
@@ -116,7 +116,7 @@ if __name__ == "__main__":
     params.max_learning_factor = 0.9
     params.default_learning_factor_teacher = 0.8
 
-    file_prefix = 'debug_trials_02_11_no_noise_w_feedback_incorrect_w_plots'
+    file_prefix = 'debug_trials_02_29_no_noise_w_feedback'
     
     path = 'data/simulation/sim_experiments'
 

@@ -15,15 +15,15 @@ from sage.symbolic.integration.integral import indefinite_integral
 import numpy as np
 from numpy import linalg as LA
 from sklearn import metrics
-from scipy.stats import vonmises_fisher
-from scipy import integrate
-from scipy.optimize import fsolve
-from scipy.optimize import minimize
-import sympy as sym
-from scipy.optimize import least_squares as ls 
-from scipy.optimize import root_scalar
-from scipy.special import ive
-from scipy import special
+# from scipy.stats import vonmises_fisher
+# from scipy import integrate
+# from scipy.optimize import fsolve
+# from scipy.optimize import minimize
+# import sympy as sym
+# from scipy.optimize import least_squares as ls 
+# from scipy.optimize import root_scalar
+# from scipy.special import ive
+# from scipy import special
 import pandas as pd
 
 import params_team as params
@@ -42,8 +42,8 @@ import teams.teams_helpers as team_helpers
 from teams import particle_filter_team as pf_team
 import policy_summarization.particle_filter as pf
 import teams.utils_teams as utils_teams
-from simulation import human_learner_model as hlm
-from simulation.sim_helpers import get_human_response_all_tests, get_human_response_each_test
+# from simulation import human_learner_model as hlm
+# from simulation.sim_helpers import get_human_response_all_tests, get_human_response_each_test
 
 
 
@@ -3548,3 +3548,9 @@ if __name__ == "__main__":
 
 
     x = 1
+
+    test_constraints_team =  [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]]), np.array([[ 3,  0, -2]]), np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])]
+
+    min_constraints = BEC_helpers.remove_redundant_constraints(test_constraints_team, params.weights['val'], params.step_cost_flag)
+
+    print(min_constraints)

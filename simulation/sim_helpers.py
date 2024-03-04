@@ -11,7 +11,7 @@ from simple_rl.utils import mdp_helpers
 
 import policy_summarization.BEC_helpers as BEC_helpers
 import policy_summarization.BEC_visualization as BEC_viz
-import simulation.human_learner_model as hlm
+# import simulation.human_learner_model as hlm
 from termcolor import colored
 import matplotlib.pyplot as plt
 import params_team as params
@@ -560,10 +560,10 @@ def get_human_response_all_tests(particles_to_sample, preliminary_tests, learnin
         while not sampled_point_flag:
             human_model_weight, cluster_id, rew_weight_prob, rand_number = sample_from_distribution('particles', particles_to_sample.positions, particles_to_sample.weights, points_to_avoid = points_to_avoid)
             
-            # print('Sampled point: ', human_model_weight, 'Sampled point probability: ', rew_weight_prob, 'rand_number: ', rand_number)
             if len(points_to_avoid) > 0:
                 point_already_sampled = False
                 for point_avd in points_to_avoid:
+                    print('Sampled point: ', human_model_weight, 'Sampled point probability: ', rew_weight_prob, 'point_avd: ', point_avd, 'rand_number: ', rand_number)
                     if (human_model_weight == point_avd).all():
                         point_already_sampled = True
 

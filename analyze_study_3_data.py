@@ -16,6 +16,7 @@ import pandas as pd
 import copy
 from termcolor import colored
 import seaborn as sns
+from scipy.stats import norm, halfnorm
 
 import sage.all
 import sage.geometry.polyhedron.base as Polyhedron
@@ -1759,9 +1760,98 @@ def simulate_objective(learning_params):
 ######################
 
 
-def perform_grid_search():
+def analyze_grid_search():
 
+
+    try:
+        with open('data/simulation/sim_experiments/parameter_estimation/grid_search_results.pickle', 'rb') as f:
+            grid_search_results = pickle.load(f)
+
+    except:
+
+        path = 'data/simulation/sim_experiments/parameter_estimation/current'
+
+        files = os.listdir(path)
+
+        calib_vars_list = []
+        for learner_type in ['low', 'high']:
+            for file in files:
+                if learner_type in file:
+                    print('Reading file: ', file, '...')
+                    with open(path + '/' + file, 'rb') as f:
+                        learner_type, dataset_type, study_id, run_id, u, delta_c, delta_i, objective, prop_particles_BEC_list = pickle.load(f)
+                        objective = objective/len(prop_particles_BEC_list)
+                    calib_dict = {'learner_type': learner_type, 'dataset_type': dataset_type, 'study_id': study_id, 'run_id': run_id, 'u': np.round(u,2), 'delta_c': np.round(delta_c,2), 'delta_i': np.round(delta_i,2), 'objective': np.round(objective,2), 'prop_particles_BEC_list': prop_particles_BEC_list}
+                    calib_vars_list.append(calib_dict)
+
+
+        grid_search_results = pd.DataFrame(calib_vars_list)
+
+        with open('data/simulation/sim_experiments/parameter_estimation/grid_search_results.pickle', 'wb') as f:
+            pickle.dump(grid_search_results, f)
+
+        grid_search_results.to_csv('data/simulation/sim_experiments/parameter_estimation/grid_search_results.csv')
+    ###########################
+        
+    # plot grid search results performance
+    fig2, axs2 = plt.subplots(1, 2, figsize=(10, 5))
+    learner_list = ['low', 'high']
     
+    for i in range(len(learner_list)):
+        learner = learner_list[i]
+        grid_search_results_subset = grid_search_results[grid_search_results['learner_type'] == learner]
+        sns.histplot(data=grid_search_results_subset, x='objective', kde=True, ax=axs2[i]).set(title='Learner type: ' + learner)
+
+    #     # # Fit a Gaussian distribution
+    #     # mu, std = norm.fit(grid_search_results_subset['objective'])
+    #     # xmin, xmax = axs[i].get_xlim()
+    #     # x = np.linspace(xmin, xmax, 100)
+    #     # p = norm.pdf(x, mu, std)
+
+    #     # # Overlay the Gaussian distribution on the histogram
+    #     # axs[i].plot(x, p, 'k', linewidth=2)
+
+    #########################
+    # plot grid search parameters
+        
+    fig, axs = plt.subplots(2, 3, figsize=(10, 5))
+    learner_list = ['low', 'high']
+    vars_list = ['u', 'delta_c', 'delta_i']
+    max_objective_list = [0.2, 0.2]
+    params_ranges = [[0.5, 0.9], [0.0, 0.2], [0.0, 0.2]]
+    params_diff = [0.05, 0.02, 0.02]
+
+
+    for i in range(len(learner_list)):
+        for j in range(len(vars_list)):
+            learner = learner_list[i]
+            var = vars_list[j]
+            grid_search_results_subset = grid_search_results[(grid_search_results['learner_type'] == learner) & (grid_search_results['objective'] <= max_objective_list[i])]
+            sns.histplot(data=grid_search_results_subset, x=var, stat='density', binrange=params_ranges[j], binwidth=params_diff[j], ax=axs[i, j]).set(title='Learner type: ' + learner + '. Var: ' + var)
+
+            # Fit a Gaussian distribution
+            xmin, xmax = axs[i, j].get_xlim()
+            x = np.linspace(xmin, xmax, 100)
+            if var == 'u':
+                mu, std = norm.fit(grid_search_results_subset[var])
+                p = norm.pdf(x, mu, std)
+            else:
+                if var == 'delta_c':
+                    mu, std = halfnorm.fit(grid_search_results_subset[var])
+                    p = halfnorm.pdf(x, mu, std)
+                else:
+                    mu, std = halfnorm.fit(max(grid_search_results_subset[var])-grid_search_results_subset[var])
+                    p = np.flip(halfnorm.pdf(x, mu, std))
+
+
+            print('learner: ', learner, '. var: ', var, '. mu: ', mu, '. std: ', std)
+
+            # Overlay the Gaussian distribution on the histogram
+            axs[i, j].plot(x, p, 'k', linewidth=2)  
+    
+
+    plt.show()
+
     return 1
 
 
@@ -1840,34 +1930,34 @@ if __name__ == "__main__":
 
     ###########################
 
-    ##run learner model
-    study_id = 4
-    initial_learning_factor = [0.8]  #default: 0.92 (used in Mike's study)
-    learning_factor_delta = [0.035, 0.07] #default: 0.0, 0.0
+    # ##run learner model
+    # study_id = 4
+    # initial_learning_factor = [0.8]  #default: 0.92 (used in Mike's study)
+    # learning_factor_delta = [0.035, 0.07] #default: 0.0, 0.0
 
-    run_id = 1
-    user_id = 30
+    # run_id = 1
+    # user_id = 30
 
-    learner_update_type = 'no_noise'
-    domain = 'at'
-    path = 'data'
-
-
-    # filename = 'interaction_data_' + str(user_id) + '.pickle'
-    filename = 'interaction_data_w_mdp.pickle'
-
-    with open(path + '/' + filename, 'rb') as f:
-        all_interaction_data = pickle.load(f)
-    # interaction_data = all_interaction_data[(all_interaction_data['user_id'] == user_id) & (all_interaction_data['domain'] == domain)]
-    interaction_data = all_interaction_data[(all_interaction_data['user_id'] == user_id)]
+    # learner_update_type = 'no_noise'
+    # domain = 'at'
+    # path = 'data'
 
 
-    params.max_learning_factor = 1.0
-    params.team_size = 1
+    # # filename = 'interaction_data_' + str(user_id) + '.pickle'
+    # filename = 'interaction_data_w_mdp.pickle'
 
-    # print('interaction_data: ', interaction_data)
+    # with open(path + '/' + filename, 'rb') as f:
+    #     all_interaction_data = pickle.load(f)
+    # # interaction_data = all_interaction_data[(all_interaction_data['user_id'] == user_id) & (all_interaction_data['domain'] == domain)]
+    # interaction_data = all_interaction_data[(all_interaction_data['user_id'] == user_id)]
 
-    run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_learning_factor, learning_factor_delta, learner_update_type, viz_flag=True, vars_filename_prefix = 'study_3_simulation_' + learner_update_type)
+
+    # params.max_learning_factor = 1.0
+    # params.team_size = 1
+
+    # # print('interaction_data: ', interaction_data)
+
+    # run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_learning_factor, learning_factor_delta, learner_update_type, viz_flag=True, vars_filename_prefix = 'study_3_simulation_' + learner_update_type)
 
     # ###############################
         
@@ -1949,3 +2039,8 @@ if __name__ == "__main__":
     # objective = simulate_objective(learning_params)
 
     # print('Objective: ', objective)
+
+    #################################
+
+    ## analyze grid search
+    analyze_grid_search()

@@ -14,6 +14,10 @@ from policy_summarization import probability_utils as p_utils
 
 from policy_summarization import computational_geometry as cg
 
+import matplotlib.pyplot as plt
+
+
+
 def normalize_constraints(constraints):
     '''
     Summary: Normalize all constraints such that the L1 norm is equal to 1
@@ -222,6 +226,7 @@ def perform_BEC_constraint_bookkeeping(BEC_constraints, min_subset_constraints_r
     # keep track of which demo conveys which of the BEC constraints
     for env_idx, constraints_env in enumerate(min_subset_constraints_record):
         # skip any environments that have the potential of showing a filtered reward feature
+        # print('variable_filter: ', variable_filter)
         if np.any(variable_filter):
             if variable_filter.dot(mdp_features_record[env_idx].T) > 0:
                 # conveys information about feature designated to be filtered out, so skip this demonstration
@@ -718,8 +723,10 @@ def sample_average_model(constraints, sample_rate=1000):
 
     return sample_human_models
 
+
 def sample_human_models_pf(particles, n_models):
     sampled_human_model_idxs = []
+    select_idxs = []
 
     # while len(sampled_human_model_idxs) < n_models:
     #     # sample indexes of particles via systematic resampling
@@ -753,74 +760,102 @@ def sample_human_models_pf(particles, n_models):
     # # obtain the particles corresponding to the sampled indices
     # sampled_human_models = particles.positions[sampled_human_model_idxs]
     #
-    # c) use mean-shift clustering to sample human models
-    particles.cluster()
+    
+    # # c) use mean-shift clustering to sample human models
+    # particles.cluster()
+    # # particles.plot(cluster_centers=particles.cluster_centers, cluster_assignments=particles.cluster_assignments, cluster_weights=particles.cluster_weights)
 
-    print('Number of particle clusters: ', len(particles.cluster_centers))
+    # print('Number of particle clusters: ', len(particles.cluster_centers))
 
-    if len(particles.cluster_centers) > n_models:
-        # if there are more clusters than number of sought human models, return the spherical centroids of the top n
-        # most frequently counted cluster indexes selected by systematic resampling
-        while len(sampled_human_model_idxs) < n_models:
-            indexes = p_utils.systematic_resample(particles.cluster_weights)
-            unique_idxs, counts = np.unique(indexes, return_counts=True)
-            # order the unique indexes via their frequency
-            unique_idxs_sorted = [x for _, x in sorted(zip(counts, unique_idxs), reverse=True)]
-    
-            for idx in unique_idxs_sorted:
-                # add new unique indexes to the human models that will be considered for counterfactual reasoning
-                if idx not in sampled_human_model_idxs:
-                    sampled_human_model_idxs.append(idx)
-    
-                if len(sampled_human_model_idxs) == n_models:
-                    break
-    
-        sampled_human_models = [particles.cluster_centers[i] for i in sampled_human_model_idxs]
-        sampled_human_model_weights = np.array([particles.cluster_weights[i] for i in sampled_human_model_idxs])
-        sampled_human_model_weights /= np.sum(sampled_human_model_weights)  # normalize
-    elif len(particles.cluster_centers) == n_models:
-        sampled_human_models = particles.cluster_centers
-        sampled_human_model_weights = np.array(particles.cluster_weights)  # should already be normalized
-    else:
-        # if there are fewer clusters than number of sought human models, use systematic sampling to determine how many
-        # particles from each cluster to return (using the k-cities algorithm to ensure that they are diverse)
-        indexes = p_utils.systematic_resample(particles.cluster_weights, N=n_models)
-        unique_idxs, counts = np.unique(indexes, return_counts=True)
-    
-        sampled_human_models = []
-        sampled_human_model_weights = []
-        for j, unique_idx in enumerate(unique_idxs):
-            # particles of this cluster
-            clustered_particles = particles.positions[np.where(particles.cluster_assignments == unique_idx)]
-            clustered_particles_weights = particles.weights[np.where(particles.cluster_assignments == unique_idx)]
-    
-            # use the k-cities algorithm to obtain a diverse sample of weights from this cluster
-            clustered_particles_latllong = cg.cart2latlong(clustered_particles.squeeze())
-            pairwise = metrics.pairwise.haversine_distances(clustered_particles_latllong)
-            select_idxs = selectKcities(pairwise.shape[0], pairwise, counts[j])
-            sampled_human_models.extend(clustered_particles[select_idxs])
-            sampled_human_model_weights.extend(clustered_particles_weights[select_idxs])
-    
-        sampled_human_model_weights = np.array(sampled_human_model_weights)
-        sampled_human_model_weights /= np.sum(sampled_human_model_weights)
+    # if len(particles.cluster_centers) > n_models:
+    #     # if there are more clusters than number of sought human models, return the spherical centroids of the top n
+    #     # most frequently counted cluster indexes selected by systematic resampling
+    #     loop_id = 0
+    #     while len(sampled_human_model_idxs) < n_models:
+    #         if loop_id < 300:
+    #             indexes = p_utils.systematic_resample(particles.cluster_weights)
+    #             unique_idxs, counts = np.unique(indexes, return_counts=True)
+    #             # order the unique indexes via their frequency
+    #             unique_idxs_sorted = [x for _, x in sorted(zip(counts, unique_idxs), reverse=True)]
+    #             print('N models to sample: ', n_models, 'N unique cluster centers: ', len(unique_idxs_sorted), 'sampled_human_model_idxs: ', len(sampled_human_model_idxs))
+                
+    #             for idx in unique_idxs_sorted:
+    #                 # add new unique indexes to the human models that will be considered for counterfactual reasoning
+    #                 if idx not in sampled_human_model_idxs:
+    #                     sampled_human_model_idxs.append(idx)
+        
+    #                 if len(sampled_human_model_idxs) == n_models:
+    #                     break
+    #         else:
+    #             for idx in range(n_models-len(sampled_human_model_idxs)):
+    #                 if idx not in sampled_human_model_idxs:
+    #                     sampled_human_model_idxs.append(idx)
 
-    # # d) use the k-center algorithm to sample human models
-    # if (particles.weights == particles.weights[0]).all():
-    #     # utilize systematic resampling to account for the different weights of different particles (e.g. favor
-    #     # higher weighted particles for being accounted for in the k-center selection)
-    #     indexes = np.unique(p_utils.systematic_resample(particles.weights))
-    #     particle_positions_latllong = cg.cart2latlong(particles.positions[indexes].squeeze())
+    #             if len(sampled_human_model_idxs) < n_models: 
+    #                 for idx in range(n_models-len(sampled_human_model_idxs)):
+    #                     sampled_human_model_idxs.append(idx)
+    
+    #     sampled_human_models = [particles.cluster_centers[i] for i in sampled_human_model_idxs]
+    #     sampled_human_model_weights = np.array([particles.cluster_weights[i] for i in sampled_human_model_idxs])
+    #     sampled_human_model_weights /= np.sum(sampled_human_model_weights)  # normalize
+    # elif len(particles.cluster_centers) == n_models:
+    #     sampled_human_models = particles.cluster_centers
+    #     sampled_human_model_weights = np.array(particles.cluster_weights)  # should already be normalized
     # else:
-    #     # utilizing systematic resampling on a set of equal weights leads to all of them being sampled anyways, so you can just skip
-    #     indexes = np.arange(len(particles.weights))
-    #     particle_positions_latllong = cg.cart2latlong(particles.positions.squeeze())
+    #     # if there are fewer clusters than number of sought human models, use systematic sampling to determine how many
+    #     # particles from each cluster to return (using the k-cities algorithm to ensure that they are diverse)
+    #     indexes = p_utils.systematic_resample(particles.cluster_weights, N=n_models)
+    #     unique_idxs, counts = np.unique(indexes, return_counts=True)
+    
+    #     sampled_human_models = []
+    #     sampled_human_model_weights = []
+    #     for j, unique_idx in enumerate(unique_idxs):
+    #         # particles of this cluster
+    #         clustered_particles = particles.positions[np.where(particles.cluster_assignments == unique_idx)]
+    #         clustered_particles_weights = particles.weights[np.where(particles.cluster_assignments == unique_idx)]
+    
+    #         # use the k-cities algorithm to obtain a diverse sample of weights from this cluster
+    #         clustered_particles_latllong = cg.cart2latlong(clustered_particles.squeeze())
+    #         pairwise = metrics.pairwise.haversine_distances(clustered_particles_latllong)
+    #         select_idxs = selectKcities(pairwise.shape[0], pairwise, counts[j])
+    #         sampled_human_models.extend(clustered_particles[select_idxs])
+    #         sampled_human_model_weights.extend(clustered_particles_weights[select_idxs])
+    
+    #     sampled_human_model_weights = np.array(sampled_human_model_weights)
+    #     sampled_human_model_weights /= np.sum(sampled_human_model_weights)
 
-    # pairwise = metrics.pairwise.haversine_distances(particle_positions_latllong, particle_positions_latllong)
-    # select_idxs = selectKcities(pairwise.shape[0], pairwise, n_models)
-    # sampled_human_models = particles.positions[indexes[select_idxs]]
-    # sampled_human_model_weights = particles.weights[indexes[select_idxs]]
+
+    # d) use the k-center algorithm to sample human models
+    if (particles.weights == particles.weights[0]).all():
+        # utilize systematic resampling to account for the different weights of different particles (e.g. favor
+        # higher weighted particles for being accounted for in the k-center selection)
+        indexes = np.unique(p_utils.systematic_resample(particles.weights))
+        particle_positions_latllong = cg.cart2latlong(particles.positions[indexes].squeeze())
+    else:
+        # utilizing systematic resampling on a set of equal weights leads to all of them being sampled anyways, so you can just skip
+        indexes = np.arange(len(particles.weights))
+        particle_positions_latllong = cg.cart2latlong(particles.positions.squeeze())
+
+    pairwise = metrics.pairwise.haversine_distances(particle_positions_latllong, particle_positions_latllong)
+    select_idxs = selectKcities(pairwise.shape[0], pairwise, n_models)
+    sampled_human_models = particles.positions[indexes[select_idxs]]
+    sampled_human_model_weights = particles.weights[indexes[select_idxs]]
+
+    # # plot sampled human models
+    # # print('sampled_human_models: ', sampled_human_models)
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+    # # ax.scatter(sampled_human_models[:, 0, 0], sampled_human_models[:, 0, 1], sampled_human_models[:, 0, 2], s=20, c='r', marker='o')
+    # for model in sampled_human_models:
+    #     ax.scatter(model[0][0], model[0][1], model[0][2], s=20, c='r', marker='o')
+
+    # particles.plot(fig=fig, ax=ax)
+    # plt.show()
+
 
     return sampled_human_models, select_idxs, sampled_human_model_weights
+
+
 
 
 def sample_human_models_uniform(constraints, n_models):

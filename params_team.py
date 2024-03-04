@@ -294,7 +294,7 @@ BEC = {
 
     'test_difficulty': 'high',                # expected ease for human to correctly predict the agent's actions in this test environment (low, medium, high)
 
-    'n_human_models': 24,                     # number of human beliefs to actively consider; ensure that this is a multiple of the team size parameter below; needed for sampling models from joint team knowledge
+    'n_human_models': 12,                     # number of human beliefs to actively consider; ensure that this is a multiple of the team size parameter below; needed for sampling models from joint team knowledge
 
     'n_particles': 500,                      # number of particles in particle filter
 
@@ -347,7 +347,7 @@ debug_flag = False
 debug_kl_calc = False
 debug_hm_sampling = False
 plot_sampled_counterfactual_models_flag = False
-save_plots_flag = True
+save_plots_flag = False
 show_plots_flag = False
 
 team_size = 3

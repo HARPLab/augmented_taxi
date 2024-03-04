@@ -5,6 +5,7 @@ import numpy as np
 import copy
 from termcolor import colored
 from multiprocessing import Process, Queue, Pool
+from pathos.multiprocessing import ProcessingPool, ThreadingPool
 import sage.all
 import sage.geometry.polyhedron.base as Polyhedron
 import matplotlib
@@ -39,6 +40,9 @@ plt.rcParams['figure.figsize'] = [15, 10]
 import random
 import pandas as pd
 from numpy.linalg import norm
+
+import multiprocessing
+
 
 
 ############################################
@@ -140,11 +144,39 @@ def debug_calc_prob_mass_correct_side(team_size, constraints, particles):
 
 
 
-def run_reward_teaching(params, pool, initial_teacher_learning_factor, demo_strategy = 'common_knowledge', experiment_type = 'simulated', initial_team_learning_factor = [], 
-                        team_learning_rate = [], obj_func_prop = 1.0, run_no = 1, viz_flag=[False, False, False], \
-                        vars_filename_prefix = 'var_to_save', response_sampling_condition = 'particles', team_composition = None, learner_update_type = 'no_noise', study_id = 1, \
-                        feedback_flag = True, review_flag = True):
+# def run_reward_teaching(params, pool, initial_teacher_learning_factor, demo_strategy = 'common_knowledge', experiment_type = 'simulated', initial_team_learning_factor = [], 
+#                         team_learning_rate = [], obj_func_prop = 1.0, run_no = 1, viz_flag=[False, False, False], \
+#                         vars_filename_prefix = 'var_to_save', response_sampling_condition = 'particles', team_composition = None, learner_update_type = 'no_noise', study_id = 1, \
+#                         feedback_flag = True, review_flag = True, params_conditions = []):
 
+
+# def run_reward_teaching(params, initial_teacher_learning_factor, demo_strategy, experiment_type, initial_team_learning_factor, 
+#                         team_learning_rate, viz_flag, run_no, \
+#                         vars_filename_prefix, response_sampling_condition, team_composition, learner_update_type, study_id, \
+#                         params_conditions):
+
+def run_reward_teaching(args):
+
+
+
+    obj_func_prop = 1.0
+    feedback_flag = True 
+    review_flag = True
+
+    params, initial_teacher_learning_factor, demo_strategy, experiment_type, initial_team_learning_factor, team_learning_rate, viz_flag, run_no, vars_filename_prefix, response_sampling_condition, team_composition, learner_update_type, study_id, params_conditions = args
+            
+    summary_pool = Pool(min(params.n_cpu, 60))
+
+    vars_filename = vars_filename_prefix + '_study_' + str(study_id) + '_run_' + str(run_no)
+    full_path_filename = 'models/' + params.data_loc['BEC'] + '/' + vars_filename
+
+    # create a folder for this run
+    if not os.path.exists(full_path_filename):
+        with file_lock:
+            print(colored('Creating folder for this run: ', 'yellow'), full_path_filename)
+            os.makedirs(full_path_filename)
+            
+    
     ####### Initialize variables ########################
 
     ## Initialize run variables
@@ -156,12 +188,9 @@ def run_reward_teaching(params, pool, initial_teacher_learning_factor, demo_stra
     BEC_summary, visited_env_traj_idxs, min_BEC_constraints_running, prior_min_BEC_constraints_running = [], [], copy.deepcopy(params.prior), copy.deepcopy(params.prior)
     summary_count, prev_summary_len = 0, 0
 
-    vars_filename = vars_filename_prefix + '_study_' + str(study_id) + '_run_' + str(run_no)
-    full_path_filename = 'models/' + params.data_loc['BEC'] + '/' + vars_filename
 
-    # create a folder for this run
-    if not os.path.exists(full_path_filename):
-        os.makedirs(full_path_filename)
+
+
     
     ## Initialize teaching variables
     # particle filter models for individual and team knowledge of teachers and individual knowledge of learners; initialize expected and actual team knowledge
@@ -196,7 +225,7 @@ def run_reward_teaching(params, pool, initial_teacher_learning_factor, demo_stra
     ########################
 
     ### Get/calculate optimal policies
-    policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count, min_BEC_constraints, BEC_lengths_record = get_optimal_policies(params, pool)
+    policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count, min_BEC_constraints, BEC_lengths_record = get_optimal_policies(params, summary_pool)
     
     # unit (knowledge component/concept) initialization
     variable_filter, nonzero_counter, teaching_complete_flag = team_helpers.check_and_update_variable_filter(min_subset_constraints_record, initialize_filter_flag=True)
@@ -242,9 +271,6 @@ def run_reward_teaching(params, pool, initial_teacher_learning_factor, demo_stra
         particles_demo = copy.deepcopy(particles_team_teacher[knowledge_id])
         
 
-
-        
-
         ################################################
         
         ### Obtain BEC summary/demos for a new KC #######
@@ -263,11 +289,11 @@ def run_reward_teaching(params, pool, initial_teacher_learning_factor, demo_stra
 
         print(colored('Starting summary generation for unit no.  ', 'blue') + str(loop_count + 1) )
         BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = team_helpers.obtain_team_summary(params.data_loc['BEC'], vars_filename, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, params.weights['val'], params.step_cost_flag, 
-                                                                                                            pool, params.BEC['n_human_models'], consistent_state_count, params.BEC['n_train_demos'], particles_demo, teacher_uf_demo, knowledge_id, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, obj_func_proportion = obj_func_prop, vars_filename=vars_filename)        
+                                                                                                            summary_pool, file_lock, params.BEC['n_human_models'], consistent_state_count, params.BEC['n_train_demos'], particles_demo, teacher_uf_demo, knowledge_id, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, obj_func_proportion = obj_func_prop, vars_filename=vars_filename)        
         ## if there are no new demos; reuse the old ones
         if len(BEC_summary) == prev_summary_len:
             # check if it's for the same KC as previous interaction
-            print(colored('running_variable_filter_unit: ' + str(running_variable_filter_unit) + '. variable_filter: ' + str(variable_filter), 'green'))
+            # print(colored('running_variable_filter_unit: ' + str(running_variable_filter_unit) + '. variable_filter: ' + str(variable_filter), 'green'))
             if (variable_filter == running_variable_filter_unit).all():
                 
                 # # Approach 1:
@@ -277,14 +303,14 @@ def run_reward_teaching(params, pool, initial_teacher_learning_factor, demo_stra
                 # Approach 2:
                 print(colored('No new demos generated. Checking previously visited environments', 'red'))
                 BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = team_helpers.obtain_team_summary(params.data_loc['BEC'], vars_filename, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, params.weights['val'], params.step_cost_flag, 
-                                                                                                            pool, params.BEC['n_human_models'], consistent_state_count, params.BEC['n_train_demos'], particles_demo, teacher_uf_demo, knowledge_id, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, [], obj_func_proportion = obj_func_prop, vars_filename=vars_filename)        
+                                                                                                            summary_pool, params.BEC['n_human_models'], consistent_state_count, params.BEC['n_train_demos'], particles_demo, teacher_uf_demo, knowledge_id, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, [], obj_func_proportion = obj_func_prop, vars_filename=vars_filename)        
 
 
 
         ################################################
         ### Go into showing demos and tests if a new summary has been generated
         
-        print('Prev summary len: ', prev_summary_len, 'Current summary len: ', len(BEC_summary))
+        # print('Prev summary len: ', prev_summary_len, 'Current summary len: ', len(BEC_summary))
 
         if len(BEC_summary) > prev_summary_len:
 
@@ -305,8 +331,8 @@ def run_reward_teaching(params, pool, initial_teacher_learning_factor, demo_stra
             # DEBUG: calculate probability mass pf correct side before demo
             prob_teacher_pf_before_demo_dict = debug_calc_prob_mass_correct_side(params.team_size, min_KC_constraints, particles_team_teacher)
             prob_learner_pf_before_demo_dict = debug_calc_prob_mass_correct_side(params.team_size, min_KC_constraints, particles_team_learner)
-            teacher_pf_before_demo = copy.deepcopy(particles_team_teacher)
-            learner_pf_before_demo = copy.deepcopy(particles_team_learner)
+            # teacher_pf_before_demo = copy.deepcopy(particles_team_teacher)
+            # learner_pf_before_demo = copy.deepcopy(particles_team_learner)
 
             prob_teacher_before_demo_history.append(prob_teacher_pf_before_demo_dict)
             prob_learner_before_demo_history.append(prob_learner_pf_before_demo_dict)
@@ -324,8 +350,8 @@ def run_reward_teaching(params, pool, initial_teacher_learning_factor, demo_stra
             # DEBUG: calculate probability mass pf correct side after demo
             prob_teacher_pf_after_demo_dict = debug_calc_prob_mass_correct_side(params.team_size, min_KC_constraints, particles_team_teacher)
             prob_learner_pf_after_demo_dict = debug_calc_prob_mass_correct_side(params.team_size, min_KC_constraints, particles_team_learner)
-            teacher_pf_after_demo = copy.deepcopy(particles_team_teacher)
-            learner_pf_after_demo = copy.deepcopy(particles_team_learner)
+            # teacher_pf_after_demo = copy.deepcopy(particles_team_teacher)
+            # learner_pf_after_demo = copy.deepcopy(particles_team_learner)
 
             prob_teacher_after_demo_history.append(prob_teacher_pf_after_demo_dict)
             prob_learner_after_demo_history.append(prob_learner_pf_after_demo_dict)
@@ -819,6 +845,7 @@ def run_reward_teaching(params, pool, initial_teacher_learning_factor, demo_stra
 
             loop_vars['sim_status'] = 'Running'
             loop_vars['team_response_models'] = human_model_weight_team
+            loop_vars['params_conditions']  = params_conditions
 
             for i in range(len(team_knowledge)):
                 if i < params.team_size:

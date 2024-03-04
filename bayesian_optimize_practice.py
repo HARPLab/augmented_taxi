@@ -1,16 +1,14 @@
 import matplotlib.pyplot as plt
-from skopt.plots import plot_gaussian_process
-from skopt import gp_minimize
+# from skopt.plots import plot_gaussian_process
+# from skopt import gp_minimize
 
-
-
-import pymc as pm
+# import pymc as pm
 import dill as pickle
 import pandas as pd
 import seaborn as sns
 import copy
 import numpy as np
-import arviz as az
+# import arviz as az
 from pyDOE import lhs, fullfact
 
 from sklearn.model_selection import RandomizedSearchCV
@@ -24,17 +22,16 @@ import teams.teams_helpers as team_helpers
 import analyze_study_3_data as asd
 
 from multiprocessing import Pool
-
+import os
 
 np.random.seed(237)
-
 
 
 # def simulate_objective(learning_params):
 # def simulate_objective(u, delta_c, delta_i):
 def simulate_objective(x):
 
-    u, delta_c, delta_i = x
+    learner_type, dataset_type, study_id, run_id, u, delta_c, delta_i = x
 
     mdp_domain = 'augmented_taxi2'
     viz_flag = True
@@ -82,7 +79,7 @@ def simulate_objective(x):
     color_dict = {'demo': 'blue', 'remedial demo': 'purple', 'diagnostic test': 'red',  'remedial test': 'pink', 'diagnostic feedback': 'yellow', 'remedial feedback': 'orange', 'final test': 'green'}
     
 
-
+    prop_particles_BEC_list = []
     for user_id, user_interaction_data in prepared_interaction_data.iterrows():
 
         vars_filename_prefix = 'param_fit_user_' + str(user_id) + 'init_lf_' + str(u) + 'lf_delta_' + str(delta_c) + '_' + str(delta_i)
@@ -238,11 +235,17 @@ def simulate_objective(x):
 
         # update objective function
         objective += np.abs(prop_particles_BEC - test_perf)
+        prop_particles_BEC_list.append(prop_particles_BEC)
         # objective.append(prop_particles_BEC)
+        ########################  end of loop for each trial/user
 
-        # print('user_id: ', user_id, 'N_final_tests_correct: ', N_final_tests_correct, 'prop_particles_BEC: ', prop_particles_BEC, 'test_perf: ', test_perf, 'objective: ', prop_particles_BEC - test_perf)
+    filename = 'grid_search_' + learner_type + '_' + dataset_type + '_' + str(study_id) + '_' + str(run_id) + '.pickle'
 
-        
+    with open ('data/simulation/sim_experiments/parameter_estimation/' + filename, 'wb') as f:
+        pickle.dump([learner_type, dataset_type, study_id, run_id, u, delta_c, delta_i, objective, prop_particles_BEC_list], f)
+
+    print('Learner type: ',  learner_type, 'dataset: ', dataset_type, 'study_id: ', study_id, 'run_id: ', run_id, 'objective: ', objective/len(prepared_interaction_data))
+
 
     return objective/len(prepared_interaction_data)
         
@@ -423,7 +426,10 @@ def plot_param_distribution(filename):
     plt.show()
 
 ###############################################
+def set_nice_value(nice_value):
+    os.nice(nice_value)
 
+####################
 
 if __name__ == "__main__":
 
@@ -438,69 +444,77 @@ if __name__ == "__main__":
 
     ################################
 
-    # ## Custom grid search
-    # learner_type = 'test'  # low, high, test
-    # dataset_type = 'train'  # train or test
-    # N_runs = 2
-    # filename_prefix = 'data/simulation/sim_experiments/parameter_estimation/parameter_estimation_output_' + learner_type + '_' + dataset_type
+   ## Custom grid search
+    learner_type = 'high'  # low, high, test
+    dataset_type = 'train'  # train or test
+    N_runs = 3
+    filename_prefix = 'data/simulation/sim_experiments/parameter_estimation/parameter_estimation_output_' + learner_type + '_' + dataset_type
+# 
+    # load train test data
+    x_train, x_test, y_train, y_test = load_train_test_data(learner_type = learner_type)
+# 
+    if dataset_type == 'train':
+        prepared_interaction_data = x_train
+        interaction_output = y_train
+    elif dataset_type == 'test':
+        prepared_interaction_data = x_test
+        interaction_output = y_test
+    else:
+        RuntimeError('Invalid dataset type')
+# 
+    params_list = {'initial_learning_factor': np.arange(0.5, 0.9, 0.05), 'learning_factor_delta_correct': np.arange(0.0, 0.2, 0.02), 'learning_factor_delta_incorrect': np.arange(0.0, 0.2, 0.02)}
+    pg = list(ParameterGrid(params_list))
+    params_to_eval = []
+    study_id = 1
+    for pg_ind in pg:
+        if (pg_ind['learning_factor_delta_incorrect'] > pg_ind['learning_factor_delta_correct']) and (pg_ind['initial_learning_factor'] > 0.5):
+            # params_to_eval.append(pg_ind)
+            run_id = 1
+            for run_id in range(N_runs):
+                params_to_eval.append([learner_type, dataset_type, study_id, run_id, pg_ind['initial_learning_factor'], pg_ind['learning_factor_delta_correct'], pg_ind['learning_factor_delta_incorrect']])
+                run_id += 1
+        study_id += 1
 
-    # # load train test data
-    # x_train, x_test, y_train, y_test = load_train_test_data(learner_type = learner_type)
+    print(len(params_to_eval))
 
-    # if dataset_type == 'train':
-    #     prepared_interaction_data = x_train
-    #     interaction_output = y_train
-    # elif dataset_type == 'test':
-    #     prepared_interaction_data = x_test
-    #     interaction_output = y_test
-    # else:
-    #     RuntimeError('Invalid dataset type')
-
-    # params_list = {'initial_learning_factor': np.arange(0.5, 0.9, 0.05), 'learning_factor_delta_correct': np.arange(0.0, 0.2, 0.02), 'learning_factor_delta_incorrect': np.arange(0.0, 0.2, 0.02)}
-    # pg = list(ParameterGrid(params_list))
-    # params_to_eval = []
-    # for pg_ind in pg:
-    #     if (pg_ind['learning_factor_delta_incorrect'] > pg_ind['learning_factor_delta_correct']) and (pg_ind['initial_learning_factor'] > 0.5):
-    #         # params_to_eval.append(pg_ind)
-
-    #         for run_id in range(N_runs):
-    #             params_to_eval.append([pg_ind['initial_learning_factor'], pg_ind['learning_factor_delta_correct'], pg_ind['learning_factor_delta_incorrect']])
+    # params_to_eval = params_to_eval[790:]
+    # 
+# 
+    parameter_estimation_output = pd.DataFrame()
+# 
+    # Prepare parameters for parallel processing
+    # params_grid_run_eval = [(params_to_eval[params_id]) for params_id in range(len(params_to_eval))]
+#   
+    pool = Pool(initializer = set_nice_value, initargs=(18,))
+    print(pool)
+    # print(pool._processes)
+#     # Set up multiprocessing Pool
+#     with Pool(processes=32) as pool:
+    results = pool.map(simulate_objective, params_to_eval)
+# # 
+#     # Flatten the list of results
+    objective = [item for sublist in results for item in sublist]
+# 
+    for params_id in range(len(params_to_eval)):
+# 
+        for run_id in range(N_runs):
+# 
+            print('Running params_id:', params_id, 'params:', params_to_eval[params_id])
+            # objective = simulate_objective(params_to_eval[params_id]['initial_learning_factor'], params_to_eval[params_id]['learning_factor_delta_correct'], params_to_eval[params_id]['learning_factor_delta_incorrect'])
+            # print('Objective:', objective)
+# 
+            output_data = {'params_id': params_id, 'run_id': run_id, 'initial_learning_factor': params_to_eval[params_id]['initial_learning_factor'], 'learning_factor_delta_correct': params_to_eval[params_id]['learning_factor_delta_correct'], \
+                           'learning_factor_delta_incorrect': params_to_eval[params_id]['learning_factor_delta_incorrect']}
+                # 
+            parameter_estimation_output = parameter_estimation_output.append(output_data, ignore_index=True)
+# 
+    parameter_estimation_output['objective'] = objective
+# 
+    with open(filename_prefix + '.pickle', 'wb') as f:
+        pickle.dump(parameter_estimation_output, f)
+# 
+    parameter_estimation_output.to_csv(filename_prefix + '.csv', index=False)
     
-    # print(len(params_to_eval))
-    
-
-    # parameter_estimation_output = pd.DataFrame()
-
-    # # Prepare parameters for parallel processing
-    # # params_grid_run_eval = [(params_to_eval[params_id]) for params_id in range(len(params_to_eval))]
-
-    # # Set up multiprocessing Pool
-    # with Pool() as pool:
-    #     results = pool.map(simulate_objective, params_to_eval)
-
-    # # Flatten the list of results
-    # objective = [item for sublist in results for item in sublist]
-
-    # for params_id in range(len(params_to_eval)):
-
-    #     for run_id in range(N_runs):
-
-    #         print('Running params_id:', params_id, 'params:', params_to_eval[params_id])
-    #         # objective = simulate_objective(params_to_eval[params_id]['initial_learning_factor'], params_to_eval[params_id]['learning_factor_delta_correct'], params_to_eval[params_id]['learning_factor_delta_incorrect'])
-    #         # print('Objective:', objective)
-
-    #         output_data = {'params_id': params_id, 'run_id': run_id, 'initial_learning_factor': params_to_eval[params_id]['initial_learning_factor'], 'learning_factor_delta_correct': params_to_eval[params_id]['learning_factor_delta_correct'], \
-    #                        'learning_factor_delta_incorrect': params_to_eval[params_id]['learning_factor_delta_incorrect']}
-                
-    #         parameter_estimation_output = parameter_estimation_output.append(output_data, ignore_index=True)
-
-    # parameter_estimation_output['objective'] = objective
-
-    # with open(filename_prefix + '.pickle', 'wb') as f:
-    #     pickle.dump(parameter_estimation_output, f)
-
-    # parameter_estimation_output.to_csv(filename_prefix + '.csv', index=False)
-
     #####################
     ## Custom search on lsd params
     # run_start_id = 1

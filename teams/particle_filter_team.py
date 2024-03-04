@@ -36,8 +36,8 @@ class Particles_team():
         self.weights = np.ones(len(positions)) / len(positions)
         self.eps = eps
 
-        self.positions_prev = self.positions.copy()
-        self.weights_prev = self.weights.copy()
+        self.positions_prev = copy.deepcopy(self.positions)
+        self.weights_prev = copy.deepcopy(self.weights)
 
         # parameters for the custom uniform + VMF distribution
         # fix sampling type
@@ -791,6 +791,11 @@ class Particles_team():
             cluster_weights.append(sum(self.weights[np.where(mean_shift_result.cluster_assignments == j)[0]]))
         self.cluster_weights = cluster_weights
 
+        # scale cluster weights add up to 1
+        # if sum(self.cluster_weights) < 1:
+        #     print('Cluster weights sum to less than 1. ', sum(self.cluster_weights), '. Normalizing weights.')
+        self.cluster_weights = np.array(self.cluster_weights) / sum(self.cluster_weights)
+
     
     def plot(self, centroid=None, fig=None, ax=None, cluster_centers=None, cluster_weights=None,
                        cluster_assignments=None, plot_prev=False):
@@ -801,7 +806,8 @@ class Particles_team():
             particle_positions = self.positions
             particle_weights = self.weights
 
-        vis_scale_factor = 10 * len(particle_positions) * (1/sum(particle_weights))
+        # vis_scale_factor = 10 * len(particle_positions) * (1/sum(particle_weights))
+        vis_scale_factor = 5000
         if fig == None:
             fig = plt.figure()
         if ax == None:
@@ -908,12 +914,18 @@ class Particles_team():
                             np.random.normal(scale=max_azi_dist, size=len(positions_spherical))]).T
             # print('Resampling with noise...')
         elif model_type == 'low_noise':
-            noise = np.array([np.random.normal(scale=max_ele_dist/10, size=len(positions_spherical)),
-                             np.random.normal(scale=max_azi_dist/10, size=len(positions_spherical))]).T
+            noise = np.array([np.random.normal(scale=max_ele_dist/3, size=len(positions_spherical)),
+                             np.random.normal(scale=max_azi_dist/3, size=len(positions_spherical))]).T
         elif model_type == 'no_noise':
             noise = np.array([np.zeros(len(positions_spherical)),
                             np.zeros(len(positions_spherical))]).T
             # print('Resampling without noise...')
+        elif model_type == 'med_noise':
+            noise = np.array([np.random.normal(scale=max_ele_dist*3, size=len(positions_spherical)),
+                             np.random.normal(scale=max_azi_dist*3, size=len(positions_spherical))]).T
+        elif model_type == 'high_noise':
+            noise = np.array([np.random.normal(scale=max_ele_dist*10, size=len(positions_spherical)),
+                             np.random.normal(scale=max_azi_dist*10, size=len(positions_spherical))]).T
         else:
             RuntimeError('Invalid model type. Please choose from: noise, low_noise, no_noise')
         
@@ -1049,9 +1061,9 @@ class Particles_team():
 
         return entropy
 
-    def calc_info_gain(self, new_constraints, learning_factor):
+    def calc_info_gain(self, new_constraints, learning_factor, model_type):
         new_particles = copy.deepcopy(self)
-        new_particles.update(new_constraints, learning_factor=learning_factor)
+        new_particles.update(new_constraints, learning_factor=learning_factor, model_type=model_type)
 
         return self.calc_entropy() - new_particles.calc_entropy()
 
@@ -1193,8 +1205,9 @@ class Particles_team():
 
 
     def update(self, constraints, learning_factor, c=0.5, reset_threshold_prob=0.001, plot_title = None, model_type = 'low_noise', viz_flag = False, vars_filename = 'sim_run'):
-        self.weights_prev = self.weights.copy()
-        self.positions_prev = self.positions.copy()
+        
+        self.weights_prev = copy.deepcopy(self.weights)
+        self.positions_prev = copy.deepcopy(self.positions)
         # print(colored('constraints: ' + str(constraints), 'red'))
 
         # debug - reset noise measures
@@ -1403,10 +1416,7 @@ class Particles_team():
                     resample_flag.append(False)
                     prob_resample.append(self.particles_prob_correct) # will give the same value as prob_reweight
 
-            # update prev positions
-            self.positions_prev = copy.deepcopy(self.positions)
-            self.weights_prev = copy.deepcopy(self.weights)
-            
+
             
             # # https://stackoverflow.com/questions/41167196/using-matplotlib-3d-axes-how-to-drag-two-axes-at-once
             # # link the pan of the three axes together
@@ -1533,17 +1543,17 @@ class Particles_team():
 
     ## Unique functions for the team case
 
-    def update_jk(self, joint_knowledge, c=0.5, reset_threshold_prob=0.001):
+    def update_jk(self, joint_knowledge, learning_factor, model_type = 'low_noise',  c=0.5, reset_threshold_prob=0.001):
         
         # joint_constraints = joint_knowledge[0]
         joint_constraints = joint_knowledge
 
         print('Update JK with constraints: {}'.format(joint_constraints))
         
-        self.weights_prev = self.weights.copy()
-        self.positions_prev = self.positions.copy()
+        self.weights_prev = copy.deepcopy(self.weights)
+        self.positions_prev = copy.deepcopy(self.positions)
 
-        self.reweight_jk(joint_constraints) # particles reweighted even if one of the original constraints is satisfied.
+        self.reweight_jk(joint_constraints, learning_factor) # particles reweighted even if one of the original constraints is satisfied.
 
         # Joint particles reset temporarily removed. To be fixed and added back!
 
@@ -1565,6 +1575,23 @@ class Particles_team():
         #         resample_indexes = self.KLD_resampling()
         #         print('Resampling...')
         #         self.resample_from_index(np.array(resample_indexes))
+
+        
+        ##################
+        
+        self.weights /= sum(self.weights)
+        # Only resample particles
+        n_eff = self.calc_n_eff(self.weights)
+        # print('n_eff: {}'.format(n_eff))
+        if n_eff < c * len(self.weights):
+            # a) use systematic resampling
+            # resample_indexes = p_utils.systematic_resample(self.weights)
+            # self.resample_from_index(resample_indexes)
+
+            # b) use KLD resampling
+            resample_indexes = self.KLD_resampling()
+            print('Resampling...')
+            self.resample_from_index(np.array(resample_indexes), model_type)
 
         self.binned = False
 
@@ -1621,7 +1648,7 @@ class Particles_team():
 
 
 
-    def reweight_jk(self, constraints, plot_particles_flag = False):
+    def reweight_jk(self, constraints, learning_factor, plot_particles_flag = False):
         '''
         :param constraints: normal of constraints / mean direction of VMF
         :param k: concentration parameter of VMF
@@ -1634,10 +1661,13 @@ class Particles_team():
         
         plot_particles_flag = False
         # cnt = 0
+
+        u_pdf_scaled = learning_factor/(2*np.pi)
+        VMF_kappa, x1 = self.solve_for_distribution_params(learning_factor)
         
         for j, x in enumerate(self.positions):
             
-            prob = self.observation_probability_jk(self.u_pdf_scaled, self.VMF_kappa, x, constraints, plot_particles_flag, self.x1, self.x2)
+            prob = self.observation_probability_jk(u_pdf_scaled, VMF_kappa, x, constraints, plot_particles_flag, self.x1, self.x2)
             self.weights[j] = self.weights[j] * prob
             
             # debug (only possible for high von-mises probabilities. should not normllay happen)            

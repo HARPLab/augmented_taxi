@@ -230,11 +230,18 @@ def systematic_resample(weights, N=None):
 
     indexes = np.zeros(N, 'i')
     cumulative_sum = np.cumsum(weights)
+
+    # print('positions: ', positions, 'cumulative_sum: ', cumulative_sum, 'N: ', N, 'weights: ', weights)
+
     i, j = 0, 0
-    while i < N:
+    loop_idx = 0
+    while (i < N) & (j < N) & (loop_idx < 500):
+        # print('i: ', i, 'N: ', N, 'j: ', j, 'cumulative_sum: ', cumulative_sum, 'N indexes: ', len(indexes))
         if positions[i] < cumulative_sum[j]:
             indexes[i] = j
             i += 1
         else:
             j += 1
+
+        loop_idx += 1
     return indexes

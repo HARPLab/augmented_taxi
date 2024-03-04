@@ -23,6 +23,12 @@ import teams.teams_helpers as team_helpers
 import params_team as params
 # import simulation.sim_helpers as sim_helpers
 
+# from SALib.analyze import sobol
+from pingouin import partial_corr
+import teams.utils_teams as utils_teams
+
+
+
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
@@ -128,11 +134,26 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
         particles_prob = pd.DataFrame()
         learning_incomplete_runs = pd.DataFrame()
 
+        team_unit_knowledge_level_list = []
+        team_BEC_knowledge_level_expected_list = []
+        team_BEC_knowledge_level_list = []
+        learning_incomplete_runs_list = []
+        run_data_list = []
+        particles_prob_list = []
+        interaction_count_list = []
+
+
         learning_complete_history = []
         run_history = []
 
         # intiialize unique simulation run id
         run_id = 0
+
+        # initialize particles
+        params.tean_size = 1
+        # particles_team_learner = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, team_learning_factor = [0.8], team_prior = params.team_prior, pf_flag='learner', vars_filename='', model_type='no_noise')
+        # particles_initial = copy.deepcopy(particles_team_learner['p1'])
+
 
         for file in files:
 
@@ -169,7 +190,9 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
                     sim_vars = pickle.load(f)
                 
                 bec_final = sim_vars['BEC_knowledge_level'][len(sim_vars)-1]
-                
+                study_id = sim_vars['study_id'][0]
+                sim_run_id = sim_vars['run_no'][0]
+
                 # check if learning was completed
                 learning_complete = True
                 for k_type, k_val in bec_final.items():
@@ -204,8 +227,8 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
                         ## common vars
                         test_constraints = sim_vars['test_constraints'][i]
                         team_composition = str(sim_vars['team_composition'][i])
-                        print('team_composition: ', type(team_composition))
-                        print('test_constraints: ', test_constraints)
+                        # print('team_composition: ', type(team_composition))
+                        # print('test_constraints: ', test_constraints)
 
 
                         ### Unit knowledge level
@@ -217,12 +240,14 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
                             unit_knowledge_dict[key] = float(val[0])
 
                         unit_knowledge_dict['run_no'] = run_id
+                        unit_knowledge_dict['study_id'] = study_id
                         unit_knowledge_dict['demo_strategy'] = sim_vars['demo_strategy'][i]
                         unit_knowledge_dict['loop_count'] = int(sim_vars['loop_count'][i])
                         unit_knowledge_dict['knowledge_comp_id'] = int(sim_vars['knowledge_comp_id'][i])
                         unit_knowledge_dict['file_name'] = file
                         # print('unit_knowledge_dict: ', unit_knowledge_dict)
-                        team_unit_knowledge_level = team_unit_knowledge_level.append(unit_knowledge_dict, ignore_index=True)
+                        # team_unit_knowledge_level = team_unit_knowledge_level.append(unit_knowledge_dict, ignore_index=True, sort=False)
+                        team_unit_knowledge_level_list.append(unit_knowledge_dict)
 
                         ### BEC knowledge level 
                         # BEC_team_knowledge_dict = str_to_dict(bec_k, var_type = 'float')
@@ -232,6 +257,7 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
                             BEC_team_knowledge_dict[key] = float(val[0])
 
                         BEC_team_knowledge_dict['run_no'] = run_id
+                        BEC_team_knowledge_dict['study_id'] = study_id
                         BEC_team_knowledge_dict['loop_count'] = int(sim_vars['loop_count'][i])
                         BEC_team_knowledge_dict['demo_strategy'] = sim_vars['demo_strategy'][i]
                         BEC_team_knowledge_dict['knowledge_comp_id'] = int(sim_vars['knowledge_comp_id'][i])
@@ -239,7 +265,8 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
                         BEC_team_knowledge_dict['file_name'] = file
 
                         # print('BEC_team_knowledge_dict: ', BEC_team_knowledge_dict)
-                        team_BEC_knowledge_level = team_BEC_knowledge_level.append(BEC_team_knowledge_dict, ignore_index=True)
+                        # team_BEC_knowledge_level = team_BEC_knowledge_level.append(BEC_team_knowledge_dict, ignore_index=True, sort=False)
+                        team_BEC_knowledge_level_list.append(BEC_team_knowledge_dict)
                     
                         ### expected BEC knowledge level
                         # BEC_team_knowledge_dict_expected = str_to_dict(bec_k_e, var_type = 'float')
@@ -249,11 +276,13 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
                             BEC_team_knowledge_dict_expected[key] = float(val[0])
 
                         BEC_team_knowledge_dict_expected['run_no'] = run_id
+                        BEC_team_knowledge_dict_expected['study_id'] = study_id
                         BEC_team_knowledge_dict_expected['loop_count'] = int(sim_vars['loop_count'][i])
                         BEC_team_knowledge_dict_expected['demo_strategy'] = sim_vars['demo_strategy'][i]
                         BEC_team_knowledge_dict_expected['knowledge_comp_id'] = int(sim_vars['knowledge_comp_id'][i])
                         BEC_team_knowledge_dict_expected['file_name'] = file
-                        team_BEC_knowledge_level_expected = team_BEC_knowledge_level_expected.append(BEC_team_knowledge_dict_expected, ignore_index=True)
+                        # team_BEC_knowledge_level_expected = team_BEC_knowledge_level_expected.append(BEC_team_knowledge_dict_expected, ignore_index=True, sort=False)
+                        team_BEC_knowledge_level_expected_list.append(BEC_team_knowledge_dict_expected)
 
                         # # knowledge mix condition
                         # learning_rate_dict = str_to_dict(ilv, var_type = 'array', splitter='),')
@@ -301,7 +330,7 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
 
                         ### knowledge component and learning factor
                         kc_variables = sim_vars['variable_filter'][i]
-                        print('kc_variables: ', type(kc_variables))
+                        # print('kc_variables: ', type(kc_variables))
                         if i==0:
                             current_kc_variable = kc_variables
                         if (current_kc_variable != kc_variables).any():
@@ -365,7 +394,7 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
 
                         
                             # test_id = 1
-                            print('sim_vars[var_name][i]:', sim_vars[var_name][i])
+                            # print('sim_vars[var_name][i]:', sim_vars[var_name][i])
 
                             # ##  each test has probability separately
                             # for prob_dict in sim_vars[var_name][i]:
@@ -381,11 +410,12 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
                             #     team_particles_probability_dict = str_to_dict(sim_vars[var_name][i], var_type=float)
                             ###########
 
-                            print('team_particles_probability_dict: ', team_particles_probability_dict)
+                            # print('team_particles_probability_dict: ', team_particles_probability_dict)
 
                             for p_id, player in enumerate(team_particles_probability_dict):
                                 particles_probability_dict = {}
                                 particles_probability_dict['run_no'] = run_id
+                                particles_probability_dict['study_id'] = study_id
                                 particles_probability_dict['demo_strategy'] = sim_vars['demo_strategy'][i]
                                 particles_probability_dict['team_composition'] = team_composition
                                 particles_probability_dict['loop_count'] = int(sim_vars['loop_count'][i])
@@ -396,10 +426,27 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
                                 particles_probability_dict['kc_id'] = kc_variables
                                 particles_probability_dict['player_id'] = player
                                 particles_probability_dict['learning_factor'] = lf_array[p_id]
-                                particles_probability_dict['particles_prob'] = float(team_particles_probability_dict[player])
+                                particles_probability_dict['kc_prob'] = float(team_particles_probability_dict[player])
                                 particles_probability_dict['file_name'] = file
 
-                                particles_prob = particles_prob.append(particles_probability_dict, ignore_index=True)
+
+                                particles_teacher_current = sim_vars['particles_team_teacher_final'][i][player]
+                                particles_learner_current = sim_vars['particles_team_learner_final'][i][player]
+
+                                # print(particles_teacher_current.positions)
+                                # print(particles_learner_current.positions)
+                                # print(particles_teacher_current.weights)
+                                # print(particles_learner_current.weights)
+                                min_BEC_constraints = sim_vars['min_BEC_constraints'][i]
+
+                                
+                                particles_learner_current.calc_particles_probability(min_BEC_constraints)
+                                BEC_prob = particles_learner_current.particles_prob_correct
+                                # print('min_BEC_constraints: ', min_BEC_constraints, 'BEC_prob: ', BEC_prob)
+                                particles_probability_dict['BEC_prob'] = BEC_prob
+
+                                # particles_prob = particles_prob.append(particles_probability_dict, ignore_index=True, sort=False)
+                                particles_prob_list.append(particles_probability_dict)
 
                                 # test_id += 1
                         ################   
@@ -430,17 +477,25 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
                     print(colored('Learning incomplete for file: ' + file + '. Run id: ' + str(run_id), 'red' ))
                     learning_incomplete_runs_dict = {}
                     learning_incomplete_runs_dict['run_no'] = run_id
+                    learning_incomplete_runs_dict['study_id'] = study_id
                     learning_incomplete_runs_dict['file_name'] = file
                     learning_incomplete_runs_dict['team_composition'] = str(sim_vars['team_composition'][0])
                     learning_incomplete_runs_dict['demo_strategy'] = sim_vars['demo_strategy'][0]
                     learning_incomplete_runs_dict['max_loop_count'] = sim_vars['loop_count'].iloc[-1]
-                    learning_incomplete_runs = learning_incomplete_runs.append(learning_incomplete_runs_dict, ignore_index=True)
+                    # learning_incomplete_runs = learning_incomplete_runs.append(learning_incomplete_runs_dict, ignore_index=True, sort=False)
+                    learning_incomplete_runs_list.append(learning_incomplete_runs_dict)
                 
                 ######
                 run_history.append(run_id)
                 learning_complete_history.append(learning_complete)
                 run_id += 1
                 
+        # datafraames
+        team_unit_knowledge_level = pd.DataFrame(team_unit_knowledge_level_list)
+        team_BEC_knowledge_level = pd.DataFrame(team_BEC_knowledge_level_list)
+        team_BEC_knowledge_level_expected = pd.DataFrame(team_BEC_knowledge_level_expected_list)
+        learning_incomplete_runs = pd.DataFrame(learning_incomplete_runs_list)
+        particles_prob = pd.DataFrame(particles_prob_list)
 
 
 
@@ -453,7 +508,7 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
         lcr_var = []
         team_mix_var = []
         team_knowledge_level_min = team_BEC_knowledge_level.copy(deep=True)
-        print('team_knowledge_level_min columns: ', team_knowledge_level_min.columns)
+        # print('team_knowledge_level_min columns: ', team_knowledge_level_min.columns)
         team_knowledge_level_min = team_knowledge_level_min.drop(['p1', 'p2', 'p3', 'common_knowledge', 'joint_knowledge'], axis=1)
 
 
@@ -495,7 +550,7 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
         interaction_count = pd.DataFrame()
 
         team_BEC_knowledge_level.to_csv(path + '/' + vars_filename_prefix + '_' + 'team_BEC_knowledge_level.csv')
-        print(team_BEC_knowledge_level)
+        # print(team_BEC_knowledge_level)
 
         # for id in unique_ids:
         for id in range(len(run_history)):
@@ -528,9 +583,12 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
                 interaction_count_dict['Int_end_id_concept_'+str(concept_ids[c_id])] = max(loop_id_list)
                 interaction_count_dict['N_int_concept_'+str(concept_ids[c_id])] = max_loop_count    
 
-            interaction_count = interaction_count.append(interaction_count_dict, ignore_index=True)
+            # interaction_count = interaction_count.append(interaction_count_dict, ignore_index=True)
+            interaction_count_list.append(interaction_count_dict)
 
-        print('interaction_count: ', interaction_count)
+        interaction_count = pd.DataFrame(interaction_count_list)
+
+        # print('interaction_count: ', interaction_count)
         interaction_count.to_csv(path + '/' + vars_filename_prefix + '_' + 'interaction_count.csv')
         with open (path + '/' + vars_filename_prefix + '_' + 'interaction_count.pickle', 'wb') as f:
             pickle.dump(interaction_count, f)
@@ -557,8 +615,10 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
                 run_data_dict['team_composition'] = ''
                 run_data_dict['file_name'] = ''
 
-            run_data = run_data.append(run_data_dict, ignore_index=True)
+            # run_data = run_data.append(run_data_dict, ignore_index=True)
+            run_data_list.append(run_data_dict)
 
+        run_data = pd.DataFrame(run_data_list)
         run_data.to_csv(path + '/' + vars_filename_prefix + '_' + 'run_data.csv')
         with open (path + '/' + vars_filename_prefix + '_' + 'run_data.pickle', 'wb') as f:
             pickle.dump(run_data, f)
@@ -569,6 +629,8 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
 
         print('Incomplete runs: ', learning_incomplete_runs)
         learning_incomplete_runs.to_csv(path + '/' + vars_filename_prefix + '_' + 'learning_incomplete_runs.csv')
+        with open (path + '/' + vars_filename_prefix + '_' + 'learning_incomplete_runs.pickle', 'wb') as f:
+            pickle.dump(learning_incomplete_runs, f)
         
         ###
         particles_prob.to_csv(path + '/' + vars_filename_prefix + '_' + 'particles_prob.csv')
@@ -625,21 +687,21 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
     know_list = know_list_full[0:]
     team_mix = team_mix_full[0:]
 
-    # Plot knowledge level for each combination of team composition and knowledge type
-    col_id = 0
-    for team_mix_cond in team_mix:
-        col_id = 0
-        f, ax = plt.subplots(ncols=3, sharex=True, sharey=True, figsize=(10,6))
-        plt.subplots_adjust(wspace=0.1, hspace=0.1)
-        for know_id in know_list:    
-            plot_data = team_knowledge_level_long[(team_knowledge_level_long['knowledge_type']==know_id) & (team_knowledge_level_long['team_composition']==str(team_mix_cond))]
+    # # Plot knowledge level for each combination of team composition and knowledge type
+    # col_id = 0
+    # for team_mix_cond in team_mix:
+    #     col_id = 0
+    #     f, ax = plt.subplots(ncols=3, sharex=True, sharey=True, figsize=(10,6))
+    #     plt.subplots_adjust(wspace=0.1, hspace=0.1)
+    #     for know_id in know_list:    
+    #         plot_data = team_knowledge_level_long[(team_knowledge_level_long['knowledge_type']==know_id) & (team_knowledge_level_long['team_composition']==str(team_mix_cond))]
             
-            # plot_data.to_csv('models/augmented_taxi2/plot_data_' + know_id + '_' + str(team_mix_cond) + '.csv')
-            # print('Plotting  ', 'row_id: ', row_id, ' col_id: ', col_id, ' know_id: ', know_id, ' team_mix_cond: ', team_mix_cond)
-            sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[col_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge']).set(title='Knowledge level for ' + know_id + ' with a team mix: ' + str(team_mix_cond))
-            # sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[row_id, col_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge'], legend=False).set(title='Knowledge level for ' + know_id + ' with a team mix: ' + str(team_mix_cond))
+    #         # plot_data.to_csv('models/augmented_taxi2/plot_data_' + know_id + '_' + str(team_mix_cond) + '.csv')
+    #         # print('Plotting  ', 'row_id: ', row_id, ' col_id: ', col_id, ' know_id: ', know_id, ' team_mix_cond: ', team_mix_cond)
+    #         sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[col_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge']).set(title='Knowledge level for ' + know_id + ' with a team mix: ' + str(team_mix_cond))
+    #         # sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[row_id, col_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge'], legend=False).set(title='Knowledge level for ' + know_id + ' with a team mix: ' + str(team_mix_cond))
 
-            col_id += 1 
+    #         col_id += 1 
         
     # plt.show()
             
@@ -647,41 +709,41 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
     # plt.close()
     ########
         
-    ## plot knowledge level for all conditions
-    f, ax = plt.subplots(ncols=3, sharex=True, sharey=True, figsize=(10,6))
-    plt.subplots_adjust(wspace=0.1, hspace=0.1)
-    col_id = 0
-    for know_id in know_list:  
-        plot_data = team_knowledge_level_long[(team_knowledge_level_long['knowledge_type']==know_id) ]
-        sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', ax=ax[col_id], errorbar=('se', 1), err_style="band").set(title='Knowledge level for a team mix: ' + str(team_mix_cond))
-        # sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[row_id, col_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge'], legend=False).set(title='Knowledge level for ' + know_id + ' with a team mix: ' + str(team_mix_cond))
-        col_id += 1 
-    # plt.show()
+    # # ## plot knowledge level for all conditions
+    # f, ax = plt.subplots(ncols=3, sharex=True, sharey=True, figsize=(10,6))
+    # plt.subplots_adjust(wspace=0.1, hspace=0.1)
+    # col_id = 0
+    # for know_id in know_list:  
+    #     plot_data = team_knowledge_level_long[(team_knowledge_level_long['knowledge_type']==know_id) ]
+    #     sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', ax=ax[col_id], errorbar=('se', 1), err_style="band").set(title='Knowledge level for a team mix: ' + str(team_mix_cond))
+    #     # sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[row_id, col_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge'], legend=False).set(title='Knowledge level for ' + know_id + ' with a team mix: ' + str(team_mix_cond))
+    #     col_id += 1 
+    # # plt.show()
     ########
 
-    ## plot knowledge level for all team composition
-    for team_mix_cond in team_mix:
-        f, ax = plt.subplots(ncols=3, sharex=True, sharey=True, figsize=(10,6))
-        plt.subplots_adjust(wspace=0.1, hspace=0.1)
-        col_id = 0
-        for know_id in know_list:  
-            plot_data = team_knowledge_level_long[(team_knowledge_level_long['knowledge_type']==know_id) &(team_knowledge_level_long['team_composition']==str(team_mix_cond))]
-            sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', ax=ax[col_id], errorbar=('se', 1), err_style="band").set(title='Knowledge level for a team mix: ' + str(team_mix_cond))
-            # sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[row_id, col_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge'], legend=False).set(title='Knowledge level for ' + know_id + ' with a team mix: ' + str(team_mix_cond))
-            col_id += 1 
-        # plt.show()
+    # ## plot knowledge level for all team composition
+    # for team_mix_cond in team_mix:
+    #     f, ax = plt.subplots(ncols=3, sharex=True, sharey=True, figsize=(10,6))
+    #     plt.subplots_adjust(wspace=0.1, hspace=0.1)
+    #     col_id = 0
+    #     for know_id in know_list:  
+    #         plot_data = team_knowledge_level_long[(team_knowledge_level_long['knowledge_type']==know_id) &(team_knowledge_level_long['team_composition']==str(team_mix_cond))]
+    #         sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', ax=ax[col_id], errorbar=('se', 1), err_style="band").set(title='Knowledge level for a team mix: ' + str(team_mix_cond))
+    #         # sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[row_id, col_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge'], legend=False).set(title='Knowledge level for ' + know_id + ' with a team mix: ' + str(team_mix_cond))
+    #         col_id += 1 
+    #     # plt.show()
 
-    # plot knowledge for demo strategy
-    for demo_id in demo_list:
-        f, ax = plt.subplots(ncols=3, sharex=True, sharey=True, figsize=(10,6))
-        plt.subplots_adjust(wspace=0.1, hspace=0.1)
-        col_id = 0
-        for know_id in know_list: 
-            plot_data = team_knowledge_level_long[(team_knowledge_level_long['knowledge_type']==know_id) &(team_knowledge_level_long['demo_strategy']==str(demo_id))]
-            sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', ax=ax[col_id], errorbar=('se', 1), err_style="band").set(title='Knowledge level for demo strategy: ' + str(demo_id))
-            # sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[row_id, col_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge'], legend=False).set(title='Knowledge level for ' + know_id + ' with a team mix: ' + str(team_mix_cond))
-            col_id += 1 
-        # plt.show()
+    # # plot knowledge for demo strategy
+    # for demo_id in demo_list:
+    #     f, ax = plt.subplots(ncols=3, sharex=True, sharey=True, figsize=(10,6))
+    #     plt.subplots_adjust(wspace=0.1, hspace=0.1)
+    #     col_id = 0
+    #     for know_id in know_list: 
+    #         plot_data = team_knowledge_level_long[(team_knowledge_level_long['knowledge_type']==know_id) &(team_knowledge_level_long['demo_strategy']==str(demo_id))]
+    #         sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', ax=ax[col_id], errorbar=('se', 1), err_style="band").set(title='Knowledge level for demo strategy: ' + str(demo_id))
+    #         # sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[row_id, col_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge'], legend=False).set(title='Knowledge level for ' + know_id + ' with a team mix: ' + str(team_mix_cond))
+    #         col_id += 1 
+    #     # plt.show()
     
     ########################
 
@@ -759,30 +821,36 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
 
         
     #############
-    # plot interaction count for concepts
-            
-    # histogram
-    f, ax_sbc = plt.subplots(ncols=1)
-    sns.histplot(data = run_data, x='max_loop_count', hue='learning_complete_flag', ax=ax_sbc).set(title='Distribution of maximum interactions for learning')
+    # # plot interaction count for concepts
+    # var_list = []
+    # for kc_id in range(1,4):
+    #     var_list.append('N_int_concept_'+str(kc_id))
 
-    # f, ax_sbc = plt.subplots(ncols=1)
-    # sns.barplot(data = interaction_count, x = 'knowledge_comp_id', y = 'max_loop_count', hue = 'demo_strategy', ax=ax_sbc, errorbar=('se',1)).set(title='Interaction count for concepts')
+    # kc_data_long = pd.melt(interaction_count, id_vars=['run_no', 'learning_complete_flag', 'demo_strategy', 'team_composition'], value_vars=var_list, var_name='knowledge_comp_id', value_name='N_interactions')
+    
+    # for id in range(len(kc_data_long)):
+    #     kc_data_long.loc[id, 'knowledge_comp_id'] = kc_data_long.loc[id, 'knowledge_comp_id'].split('_')[-1]
 
-    # column_data_types = run_data.dtypes
+    # print(kc_data_long)
 
-    # print('run_data column data type:', column_data_types)
+    # f_ic, ax_ic = plt.subplots(ncols=1)
+    # sns.barplot(data = kc_data_long, x = 'knowledge_comp_id', y = 'N_interactions', hue = 'demo_strategy', ax=ax_ic, errorbar=('se',1)).set(title='Interaction count for concepts')
 
-    # plot interaction count overall
-    f, ax_c = plt.subplots(ncols=1)
+    # plt.show()
+    ###################
+    # # Number of interactions histogram - overall
+    # f_sbc, ax_sbc = plt.subplots(ncols=1)
+    # sns.histplot(data = run_data, x='max_loop_count', hue='learning_complete_flag', ax=ax_sbc).set(title='Distribution of maximum interactions for learning')
+
+    # # plot interaction count for both experimental conditions
+    f_c, ax_c = plt.subplots(ncols=1)
     sns.barplot(data = run_data, x = 'demo_strategy', y = 'max_loop_count', hue = 'team_composition', ax=ax_c, errorbar=('se',1)).set(title='Max number of interactions')
 
-
+    # interaction count for each experimental condition
     f2, ax_2 = plt.subplots(ncols=2)
     sns.barplot(data = run_data, x = 'demo_strategy', y = 'max_loop_count', ax=ax_2[0], errorbar=('se',1)).set(title='Max number of interactions vs. Demo Strategy')
     sns.barplot(data = run_data, x = 'team_composition', y = 'max_loop_count', ax=ax_2[1], errorbar=('se',1)).set(title='Max number of interactions vs. Team composition')
-    
-    
-    
+    plt.show()
     
     #############
 
@@ -796,13 +864,13 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
     
     
 
-    # ## plotting seprately for each team condition and demo strategy
+    # # plotting seprately for each team condition and demo strategy
     # for team_composition in team_mix_list:
     #     for dem_strategy in dem_strategy_list:
 
-    #         run_data = particles_prob[(particles_prob['team_composition']==str(team_composition)) & (particles_prob['demo_strategy']==dem_strategy)]
+    #         trial_data = particles_prob[(particles_prob['team_composition']==str(team_composition)) & (particles_prob['demo_strategy']==dem_strategy)]
 
-    #         if len(run_data) > 0:
+    #         if len(trial_data) > 0:
     #             f3, ax3 = plt.subplots(nrows=2, ncols=3, sharex=True, sharey=True, figsize=(10,6))
     #             plt.subplots_adjust(wspace=0.1, hspace=0.5)  
             
@@ -821,35 +889,168 @@ def run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list=[], 
     #                     sns.lineplot(plot_data, x = 'learning_factor', y = 'particles_prob', hue = 'update_id', ax=ax3[1, kc_no], legend=True).set(title=wrapped_title)
     #                     kc_no += 1
         
-    #             plt.show()
+    #             # plt.show()
+
+    # plot individual run learning dynamics
+    # if len(files) == 1:
+
+
+
+
+
+
     ########
 
 
     # ## plotting for all experiment conditions
 
-    f3, ax3 = plt.subplots(nrows=2, ncols=3, sharex=True, sharey=True, figsize=(10,6))
-    plt.subplots_adjust(wspace=0.1, hspace=0.5)  
+    # f3, ax3 = plt.subplots(nrows=2, ncols=3, sharex=True, sharey=True, figsize=(10,6))
+    # plt.subplots_adjust(wspace=0.1, hspace=0.5)  
 
-    kc_no = 0
-    for kc_id in kc_id_list:
-        print('kc_id: ', kc_id, 'particles_prob[kc_id]: ', type(particles_prob['kc_id']))
-        plot_data_idx = []
-        for idx, row in particles_prob.iterrows():
-            if (row['kc_id'] == kc_id).all():
-                plot_data_idx.append(idx)
-        plot_data = particles_prob.loc[plot_data_idx]
-        # plot_data = particles_prob[(particles_prob['kc_id'][0]==kc_id).all()]
-        if len(plot_data) > 0:
-            print('plot_data: ', plot_data)
-            plot_title = 'Learning factor vs. particles_probability for kc ' +  kc_id 
-            wrapped_title = "\n".join(textwrap.wrap(plot_title, 40))
-            sns.lineplot(plot_data, x = 'learning_factor', y = 'particles_prob', ax=ax3[0, kc_no], legend=True).set(title=wrapped_title)
-            plot_title = 'Updatewise Learning factor vs. particles_probability for kc ' +  kc_id
-            wrapped_title = "\n".join(textwrap.wrap(plot_title, 40))
-            sns.lineplot(plot_data, x = 'learning_factor', y = 'particles_prob', hue = 'update_id', ax=ax3[1, kc_no], legend=True).set(title=wrapped_title)
-            kc_no += 1
+    # kc_no = 0
+    # for kc_id in kc_id_list:
+    #     print('kc_id: ', kc_id, 'particles_prob[kc_id]: ', type(particles_prob['kc_id']))
+    #     plot_data_idx = []
+    #     for idx, row in particles_prob.iterrows():
+    #         if (row['kc_id'] == kc_id):
+    #             plot_data_idx.append(idx)
+    #     plot_data = particles_prob.loc[plot_data_idx]
+    #     # plot_data = particles_prob[(particles_prob['kc_id'][0]==kc_id).all()]
+    #     if len(plot_data) > 0:
+    #         print('plot_data: ', plot_data)
+    #         plot_title = 'Learning factor vs. particles_probability for kc ' +  kc_id 
+    #         wrapped_title = "\n".join(textwrap.wrap(plot_title, 40))
+    #         sns.lineplot(plot_data, x = 'learning_factor', y = 'particles_prob', ax=ax3[0, kc_no], legend=True).set(title=wrapped_title)
+    #         plot_title = 'Learning factor vs. particles_probability for kc ' +  kc_id
+    #         wrapped_title = "\n".join(textwrap.wrap(plot_title, 40))
+    #         sns.lineplot(plot_data, x = 'learning_factor', y = 'particles_prob', hue = 'update_id', ax=ax3[1, kc_no], legend=True).set(title=wrapped_title)
+    #         kc_no += 1
 
-    plt.show()
+    #################
+
+    # # Plot knowledge level for each combination of team composition and knowledge type
+    # f_p, ax_p = plt.subplots(nrows = 2, ncols=4, sharex=True, sharey=True, figsize=(10,6))
+    # for team_id in range(len(team_mix)):
+    #     team_mix_cond = team_mix[team_id]
+    #     plt.subplots_adjust(wspace=0.1, hspace=0.1)   
+        
+    #     # print('Plotting  ', 'row_id: ', row_id, ' col_id: ', col_id, ' know_id: ', know_id, ' team_mix_cond: ', team_mix_cond)
+    #     plot_data = particles_prob[(particles_prob['update_type']=='particles_prob_learner_after_feedback') & (particles_prob['team_composition']==str(team_mix_cond))]
+    #     sns.lineplot(plot_data, x = 'loop_count', y = 'kc_prob', hue = 'demo_strategy', ax=ax_p[0, team_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge']).set(title='Prob. particles learn concept')
+    #     sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_prob', hue = 'demo_strategy', ax=ax_p[1, team_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge']).set(title='Prob. particles learn entire reward')
+
+    #############
+    ## inidividual prob at end of interaction
+    # run_id_list = particles_prob['run_no'].unique() 
+
+    # for run_id in run_id_list:
+    #     plot_data = particles_prob[(particles_prob['update_type']=='particles_prob_learner_after_feedback') & (particles_prob['run_no']==run_id)]
+
+    #     print('plot_data: ', plot_data)
+
+    #     f_p, ax_p = plt.subplots(ncols=2)
+
+    #     sns.lineplot(plot_data, x = 'loop_count', y = 'kc_prob', hue='player_id', ax=ax_p[0], errorbar=('se', 1), err_style="band", hue_order = ['p1','p2','p3'])
+    #     sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_prob', hue='player_id', ax=ax_p[1], errorbar=('se', 1), err_style="band", hue_order = ['p1','p2','p3'])
+
+    #     # ax_p[0].set_title('Prob. particles learn concept')
+    #     # ax_p[1].set_title('Prob. particles learn entire reward')
+    #     f_p.suptitle('Run: ' + str(run_id))
+    #     plt.show()
+    ##############
+
+    ## individual through interactions
+
+    colors = sns.color_palette("colorblind", 7).as_hex()
+    color_dict = {'particles_prob_learner_before_demo': str(colors[0]), 'particles_prob_learner_after_demo': str(colors[1]), 'particles_prob_learner_before_test': str(colors[2]),  'particles_prob_learner_after_feedback': str(colors[3])}
+    run_id_list = particles_prob['run_no'].unique()
+    study_id = particles_prob['study_id'].iloc[0]
+
+    for run_id in run_id_list:
+        plot_data = particles_prob[(particles_prob['run_no']==run_id) & \
+                                   ((particles_prob['update_type']=='particles_prob_learner_before_demo') | (particles_prob['update_type']=='particles_prob_learner_after_demo') | \
+                                    (particles_prob['update_type']=='particles_prob_learner_before_test') | (particles_prob['update_type']=='particles_prob_learner_after_feedback'))]
+        
+        f_p, ax_p = plt.subplots(nrows=2, figsize=(15, 10))
+
+        player_id_list = plot_data['player_id'].unique()
+
+        int_fill_flag=False
+        for player_id in player_id_list:
+            plot_data_player = plot_data[plot_data['player_id']==player_id]
+            interaction_number = np.arange(1, len(plot_data_player)+1)
+            plot_data_player['interaction_number'] = interaction_number
+            plot_data_player = plot_data_player.reset_index(drop=True)
+
+            # plot
+            sns.lineplot(plot_data_player, x = 'interaction_number', y = 'kc_prob', ax=ax_p[0]) 
+            sns.lineplot(plot_data_player, x = 'interaction_number', y = 'BEC_prob', ax=ax_p[1])
+
+
+            if not int_fill_flag:
+                for id, row in plot_data_player.iterrows():
+                    print('id:', id)
+                    if id > 0:
+                        # plt.axvline(x=row['combined_demo_id'], color='red', linestyle='--')
+                        ax_p[0].axvspan(plot_data_player['interaction_number'].iloc[id-1], row['interaction_number'], alpha=0.2, color=color_dict[row['update_type']])
+                        ax_p[0].text(row['interaction_number']-0.5, 0.3, row['update_type'], rotation=90, fontsize=10, weight="bold")
+
+                        ax_p[1].axvspan(plot_data_player['interaction_number'].iloc[id-1], row['interaction_number'], alpha=0.2, color=color_dict[row['update_type']])
+                        ax_p[1].text(row['interaction_number']-0.5, 0.3, row['update_type'], rotation=90, fontsize=10, weight="bold")
+                int_fill_flag = True
+
+        filename = 'Study ' + str(study_id) + '. Run ' + str(run_id) + '. Team mix ' + str(plot_data['team_composition'].iloc[0]) + '. Demo strategy ' + str(plot_data['demo_strategy'].iloc[0])
+        f_p.suptitle(filename)
+
+
+        # plt.show()
+        plt.savefig('models/augmented_taxi2/' + filename + '.png')
+
+
+
+    # plt.show()
+            
+    # plt.savefig('models/augmented_taxi2/BEC_knowledge_level_' + know_id + '.png')
+    # plt.close()
+    ########
+        
+    # ## plot knowledge level for all conditions
+    # f, ax = plt.subplots(ncols=3, sharex=True, sharey=True, figsize=(10,6))
+    # plt.subplots_adjust(wspace=0.1, hspace=0.1)
+    # col_id = 0
+    # for know_id in know_list:  
+    #     plot_data = team_knowledge_level_long[(team_knowledge_level_long['knowledge_type']==know_id) ]
+    #     sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', ax=ax[col_id], errorbar=('se', 1), err_style="band").set(title='Knowledge level for a team mix: ' + str(team_mix_cond))
+    #     # sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[row_id, col_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge'], legend=False).set(title='Knowledge level for ' + know_id + ' with a team mix: ' + str(team_mix_cond))
+    #     col_id += 1 
+    # # plt.show()
+    # ########
+
+    # ## plot knowledge level for all team composition
+    # for team_mix_cond in team_mix:
+    #     f, ax = plt.subplots(ncols=3, sharex=True, sharey=True, figsize=(10,6))
+    #     plt.subplots_adjust(wspace=0.1, hspace=0.1)
+    #     col_id = 0
+    #     for know_id in know_list:  
+    #         plot_data = team_knowledge_level_long[(team_knowledge_level_long['knowledge_type']==know_id) &(team_knowledge_level_long['team_composition']==str(team_mix_cond))]
+    #         sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', ax=ax[col_id], errorbar=('se', 1), err_style="band").set(title='Knowledge level for a team mix: ' + str(team_mix_cond))
+    #         # sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[row_id, col_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge'], legend=False).set(title='Knowledge level for ' + know_id + ' with a team mix: ' + str(team_mix_cond))
+    #         col_id += 1 
+    #     # plt.show()
+
+    # # plot knowledge for demo strategy
+    # for demo_id in demo_list:
+    #     f, ax = plt.subplots(ncols=3, sharex=True, sharey=True, figsize=(10,6))
+    #     plt.subplots_adjust(wspace=0.1, hspace=0.1)
+    #     col_id = 0
+    #     for know_id in know_list: 
+    #         plot_data = team_knowledge_level_long[(team_knowledge_level_long['knowledge_type']==know_id) &(team_knowledge_level_long['demo_strategy']==str(demo_id))]
+    #         sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', ax=ax[col_id], errorbar=('se', 1), err_style="band").set(title='Knowledge level for demo strategy: ' + str(demo_id))
+    #         # sns.lineplot(plot_data, x = 'loop_count', y = 'BEC_knowledge_level', hue = 'demo_strategy', ax=ax[row_id, col_id], errorbar=('se', 1), err_style="band", hue_order = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge'], legend=False).set(title='Knowledge level for ' + know_id + ' with a team mix: ' + str(team_mix_cond))
+    #         col_id += 1 
+    #     # plt.show()
+
+    # plt.show()
     #############
 
 ################################################################################
@@ -1327,7 +1528,12 @@ def analyze_individual_runs(path, file):
 def run_sensitivity_analysis(path, files, file_prefix_list, runs_to_exclude_list=[], runs_to_analyze_list = [], vars_filename_prefix = ''):
 
     
-    def convert_to_dict(sim_vars, parameter_combinations):
+    def convert_to_dict(sim_vars, param_varied=None, parameter_combinations=None):
+
+        # list of params
+        params_to_study = {'learning_factor_low': np.linspace(0.6, 0.8, 11), 'learning_factor_high': np.linspace(0.7, 0.9, 11), 'learning_rate': np.linspace(0.0, 0.2, 11), \
+                           'max_learning_factor': np.linspace(0.85, 1.0, 11), 'default_learning_factor_teacher': np.linspace(0.7, 0.9, 11)}  # list of parameter values that were used for the sensitivity analysis
+
         demo_strategy = sim_vars['demo_strategy'].iloc[0]
         team_composition = sim_vars['team_composition'].iloc[0]
 
@@ -1335,7 +1541,7 @@ def run_sensitivity_analysis(path, files, file_prefix_list, runs_to_exclude_list
         run_id = sim_vars['run_no'].iloc[0] 
 
         max_learning_factor = np.round(sim_vars['max_learning_factor'].iloc[0],2)
-        team_learning_factor = sim_vars['initial_learning_factor'].iloc[0]
+        team_learning_factor = sim_vars['initial_team_learning_factor'].iloc[0]
         # team_learning_rate = sim_vars['team_learning_rate'].iloc[0]
 
 
@@ -1343,19 +1549,17 @@ def run_sensitivity_analysis(path, files, file_prefix_list, runs_to_exclude_list
         learning_factor_low_learner = []
         for i in range(len(team_composition)):
             if team_composition[i] == 0:
-                learning_factor_high_learner = np.round(team_learning_factor[i],2)
-            elif team_composition[i] == 2:
                 learning_factor_low_learner = np.round(team_learning_factor[i],2)
+            elif team_composition[i] == 2:
+                learning_factor_high_learner = np.round(team_learning_factor[i],2)
 
         # for i in range(len(team_learning_rate)):
         #     team_learning_rate[i] = np.round(team_learning_rate[i], 2)
         
 
         max_loop_count = sim_vars['loop_count'].iloc[-1]
-        bec_final = sim_vars['BEC_knowledge_level'][len(sim_vars)-1]
+        # bec_final = sim_vars['BEC_knowledge_level'][len(sim_vars)-1]
 
-
-        
         sensitivity_data_dict = {}
 
         sensitivity_data_dict['demo_strategy'] = demo_strategy
@@ -1367,110 +1571,226 @@ def run_sensitivity_analysis(path, files, file_prefix_list, runs_to_exclude_list
         sensitivity_data_dict['learning_factor_high_learner'] = learning_factor_high_learner
         sensitivity_data_dict['learning_factor_low_learner'] = learning_factor_low_learner
 
-        sensitivity_data_dict['teacher_learning_factor'] = parameter_combinations[study_id-1][4]
-        sensitivity_data_dict['learning_rate'] = parameter_combinations[study_id-1][2]
+        # for parameters that were missed to directly be recorded
+        if parameter_combinations is not None:
+            sensitivity_data_dict['teacher_learning_factor'] = np.round(parameter_combinations[study_id-1][4], 2)
+            sensitivity_data_dict['learning_rate'] = np.round(parameter_combinations[study_id-1][2],2)
+        else:
+            if param_varied == 'default_learning_factor_teacher':
+                sensitivity_data_dict['teacher_learning_factor'] = params_to_study[param_varied][study_id-1]
+            else:
+                print('teacher factor center value: ', params_to_study['default_learning_factor_teacher'][5])
+                sensitivity_data_dict['teacher_learning_factor'] = params_to_study['default_learning_factor_teacher'][5] # center value!
+
+            if param_varied == 'learning_rate':
+                sensitivity_data_dict['learning_rate'] = params_to_study[param_varied][study_id-1]
+            else:
+                print('learning rate center value: ', params_to_study['learning_rate'][5])
+                sensitivity_data_dict['learning_rate'] = params_to_study['learning_rate'][5]
+            
+            
+        if param_varied is not None:
+            sensitivity_data_dict['param_varied'] = param_varied
         
-        sensitivity_data_dict['parameter_combinations'] = parameter_combinations[study_id-1]
+
+        # sensitivity_data_dict['parameter_combinations'] = parameter_combinations[study_id-1]
         # sensitivity_data_dict['team_learning_rate'] = team_learning_rate
 
-        sensitivity_data_dict['max_loop_count'] = max_loop_count
-        sensitivity_data_dict['bec_final'] = bec_final
+        sensitivity_data_dict['max_loop_count'] = int(max_loop_count)
+        # sensitivity_data_dict['bec_final'] = bec_final
 
 
         return sensitivity_data_dict
 
     #####################
-    # read parameter combinations
-    with open('data/simulation/sim_experiments/sensitivity_analysis/param_combinations.pickle', 'rb') as f:
-            parameter_combinations = pickle.load(f)
 
-    
-    params_pd = pd.DataFrame()
-    for i in range(len(parameter_combinations)):
-        params_dict = {'study_id': i+1, 'learning_factor_low': parameter_combinations[i][0], 'learning_factor_high': parameter_combinations[i][1], 'learning_rate': parameter_combinations[i][2], 'max_learning_factor': parameter_combinations[i][3], 'teacher_learning_factor': parameter_combinations[i][4]}
-        params_pd = params_pd.append(params_dict, ignore_index=True)
+    try: 
+        with open(path + '/sensitivity_data.pickle', 'rb') as f:
+            sensitivity_data = pickle.load(f)
 
-    params_pd.to_csv('data/simulation/sim_experiments/sensitivity_analysis/param_combinations.csv')
-
-#     print('parameter_combinations:', parameter_combinations)
-
-
-
-    #############
-    run_no = 1
-    sensitivity_data = pd.DataFrame()
-    for file in files:
-
-        # check if file is a valid file
-        for file_prefix in file_prefix_list:
-            if file_prefix in file and '.pickle' in file:
-                run_file_flag = True
-                break
-            else:
-                run_file_flag = False
-
-        # check if file needs to be excluded
-        for runs_to_exclude in runs_to_exclude_list:
-            if runs_to_exclude in file:
-                run_file_flag = False
-                break
+    except:
+        # read parameter combinations
+        # with open('data/simulation/sim_experiments/sensitivity_analysis/w_feedback/param_combinations_forte.pickle', 'rb') as f:
+        #         parameter_combinations = pickle.load(f)
 
         
-        if run_file_flag:
+        # params_pd = pd.DataFrame()
+        # for i in range(len(parameter_combinations)):
+        #     params_dict = {'study_id': i+1, 'learning_factor_low': parameter_combinations[i][0], 'learning_factor_high': parameter_combinations[i][1], 'learning_rate': parameter_combinations[i][2], 'max_learning_factor': parameter_combinations[i][3], 'teacher_learning_factor': parameter_combinations[i][4]}
+        #     print(params_dict)
+        #     params_pd = params_pd.append(params_dict, ignore_index=True)
+
+        # params_pd.to_csv('data/simulation/sim_experiments/sensitivity_analysis/w_feedback/param_combinations_forte.csv')
+
+        # print('parameter_combinations:', parameter_combinations)
+
+
+
+    #     #############
+        run_no = 1
+        sensitivity_data_list = []
+        for file in files:
+
+            # check if file is a valid file
+            for file_prefix in file_prefix_list:
+                if file_prefix in file and '.pickle' in file:
+                    run_file_flag = True
+                    break
+                else:
+                    run_file_flag = False
+
+            # check if file needs to be excluded
+            for runs_to_exclude in runs_to_exclude_list:
+                if runs_to_exclude in file:
+                    run_file_flag = False
+                    break
+
             
-            with open(path + '/' + file, 'rb') as f:
-                sim_vars = pickle.load(f)
-            
-            print('Reading file: ', file)
+            if run_file_flag:
+                
+                with open(path + '/' + file, 'rb') as f:
+                    sim_vars = pickle.load(f)
+                
+                print('Reading file: ', file)
 
-            # check if there are multiple runs in the same file
-            loop_count_var = sim_vars['loop_count']
-            run_change_idx = [idx for idx in range(len(loop_count_var)-1) if loop_count_var[idx] > loop_count_var[idx+1]]
+                # check if there are multiple runs in the same file
+                loop_count_var = sim_vars['loop_count']
+                run_change_idx = [idx for idx in range(len(loop_count_var)-1) if loop_count_var[idx] > loop_count_var[idx+1]]
 
-#             print('run_change_idx: ', run_change_idx)
-            if len(run_change_idx) > 0:
+                if 'lfh' in file:
+                    param_varied = 'learning_factor_high'
+                elif 'lfl' in file:
+                    param_varied = 'learning_factor_low'
+                elif 'lr' in file:
+                    param_varied = 'learning_rate'
+                elif 'mlf' in file:
+                    param_varied = 'max_learning_factor'
+                elif 'tlf' in file:
+                    param_varied = 'default_learning_factor_teacher'
+                else:
+                    RuntimeError('Parameter varied not found in file name')
 
-                for run_idx in range(2):
-                    if run_idx == 0:
-                        run_sim_vars = sim_vars.iloc[:run_change_idx[0]+1]
-                    else:
-                        run_sim_vars = sim_vars.iloc[run_change_idx[0]+2:]
+    #             print('run_change_idx: ', run_change_idx)
+                if len(run_change_idx) > 0:
+
+                    for run_idx in range(2):
+                        if run_idx == 0:
+                            run_sim_vars = sim_vars.iloc[:run_change_idx[0]+1]
+                        else:
+                            run_sim_vars = sim_vars.iloc[run_change_idx[0]+2:]
+                            
+                        # reset index
+                        run_sim_vars = run_sim_vars.reset_index(drop=True)
+
+
+                        bec_final = run_sim_vars['BEC_knowledge_level'][len(run_sim_vars)-1]
+                        # check if learning was completed
+                        learning_complete = True
+                        for k_type, k_val in bec_final.items():
+                            if k_val[0] != 1:
+                                learning_complete = False
+                                break
                         
-                    # reset index
-                    run_sim_vars = run_sim_vars.reset_index(drop=True)
+                        if learning_complete:
+                            # sensitivity_data_dict = convert_to_dict(run_sim_vars, parameter_combinations)
+                            sensitivity_data_dict = convert_to_dict(run_sim_vars, param_varied=param_varied)
+                            sensitivity_data_list.append(sensitivity_data_dict)
+                else:
 
-
-                    bec_final = run_sim_vars['BEC_knowledge_level'][len(run_sim_vars)-1]
+                    bec_final = sim_vars['BEC_knowledge_level'][len(sim_vars)-1]
                     # check if learning was completed
                     learning_complete = True
                     for k_type, k_val in bec_final.items():
                         if k_val[0] != 1:
                             learning_complete = False
                             break
-                    
+                
                     if learning_complete:
-                        sensitivity_data_dict = convert_to_dict(run_sim_vars, parameter_combinations)
-                        sensitivity_data = sensitivity_data.append(sensitivity_data_dict, ignore_index=True)
-            else:
+                        # sensitivity_data_dict = convert_to_dict(sim_vars, parameter_combinations)
+                        sensitivity_data_dict = convert_to_dict(sim_vars, param_varied=param_varied)
+                        sensitivity_data_list.append(sensitivity_data_dict)
 
-                bec_final = sim_vars['BEC_knowledge_level'][len(sim_vars)-1]
-                # check if learning was completed
-                learning_complete = True
-                for k_type, k_val in bec_final.items():
-                    if k_val[0] != 1:
-                        learning_complete = False
-                        break
-            
-                if learning_complete:
-                    sensitivity_data_dict = convert_to_dict(sim_vars, parameter_combinations)
-                    sensitivity_data = sensitivity_data.append(sensitivity_data_dict, ignore_index=True)
-
-
-    sensitivity_data.to_csv(path + '/sensitivity_data.csv')
-    with open(path + '/sensitivity_data.pickle', 'wb') as f:
-        pickle.dump(sensitivity_data, f)
-
+        sensitivity_data = pd.DataFrame(sensitivity_data_list)
+        sensitivity_data.to_csv(path + '/sensitivity_data.csv')
+        with open(path + '/sensitivity_data.pickle', 'wb') as f:
+            pickle.dump(sensitivity_data, f)
+    #############
     print(sensitivity_data)
+
+    ##############
+    # plot
+
+    fig, axs = plt.subplots(2, 3, figsize=(20, 6), sharey=True)
+
+    row_id, col_id = 0, 0
+    for i, param_varied in enumerate(['learning_factor_low_learner', 'learning_factor_high_learner', 'learning_rate', 'max_learning_factor', 'teacher_learning_factor']):
+        
+        sns.lineplot(data=sensitivity_data, x=param_varied, y='max_loop_count', ax=axs[row_id, col_id], errorbar='se').set(title=  param_varied)
+        col_id += 1
+
+        if i==2:
+            row_id += 1
+            col_id = 0
+
+    plt.show()
+
+
+
+
+    
+    # # calculate SOBOL indices
+    # problem = {
+    #     'num_vars': 5,
+    #     'names': ['learning_factor_low', 'learning_factor_high', 'learning_rate', 'max_learning_factor', 'default_learning_factor_teacher'],
+    #     'bounds': [[0.6, 0.7], [0.75, 0.85], [0.0, 0.1], [0.85, 1.0], [0.6, 0.9]]
+    # }
+
+    # # Perform Sobol sensitivity analysis
+    # Si = sobol.analyze(problem, sensitivity_data['max_loop_count'], print_to_console=True)
+
+    # # Print the results
+    # print(Si)
+
+    # Using .dtypes attribute
+    # column_data_types = sensitivity_data.dtypes
+    # print("Data Types of Columns (using .dtypes attribute):\n", column_data_types)
+
+
+    # sensitivity_data_short = sensitivity_data[['max_loop_count', 'max_learning_factor', 'learning_factor_high_learner', 'teacher_learning_factor', 'learning_rate']]
+
+
+    # # Compute partial rank correlation coefficients
+    # partial_corr_results = {}
+    # var_list = ['max_learning_factor', 'learning_factor_high_learner', 'teacher_learning_factor', 'learning_rate']
+    # for var in var_list:
+    #     covars = [var2 for var2 in var_list if var2 != var]
+                
+    #     partial_corr_results[var] = partial_corr(data=sensitivity_data_short, x='max_loop_count', y=var, covar=covars, method='pearson')
+
+    # # Print the results
+    # print("Partial Rank Correlation Coefficients:")
+    # print(partial_corr_results)
+
+    # fig, ax = plt.subplots(1, len(var_list), figsize=(10, 6))
+
+    # for i, var in enumerate(var_list):
+    #     ax[i].scatter(sensitivity_data_short[var], sensitivity_data_short['max_loop_count'])
+    #     ax[i].set_xlabel(var)
+    #     ax[i].set_ylabel('N_interactions')
+    #     ax[i].set_title('Partial Rank Correlation Coefficient')
+
+    # plt.show()
+
+    # # Calculate correlation coefficients
+    # correlation_matrix = sensitivity_data_short.corr()
+
+    # # Plot heatmap
+    # plt.figure(figsize=(10, 8))
+    # sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f")
+    # plt.title('Correlation Heatmap between Input Parameters and Output')
+    # plt.show()
+
+
 
 ############################
 
@@ -1867,6 +2187,8 @@ def simulate_individual_runs_w_feedback(params, path, file, run_id, feedback_fla
 
 
 def plot_pf_updates(path, file_prefix):
+    # plots probbability
+
 
     filelist = os.listdir(path)
     save_filename = path + '/' + file_prefix + '_full_compiled_data_uf_test.csv'
@@ -2248,16 +2570,145 @@ def read_prob_data(path, file):
     
 
 ################################
-    
-def analyze_sensitivity_data(path, file_prefix, cond):
 
-    filelist = os.listdir(path)
+def plot_pf_dist(path, file):
 
-    file_prefix = 1
+    with open(path + '/' + file, 'rb') as f:
+        pf_data = pickle.load(f)
+
+    # print(pf_data)
+
+    # plot data
+
+
+    for int_id in range(len(pf_data)):
+        learner_pf_after_demo = pf_data['particles_team_learner_after_demos'].iloc[int_id]
+        learner_pf_after_test = pf_data['particles_team_learner_final'].iloc[int_id]
+        teacher_pf_after_demo = pf_data['particles_team_teacher_after_demos'].iloc[int_id]
+        teacher_pf_after_test = pf_data['particles_team_teacher_final'].iloc[int_id]
+
+        sampled_models = pf_data['team_response_models'].iloc[int_id]
+        min_KC_constraints = pf_data['min_KC_constraints'].iloc[int_id]
+        min_BEC_constraints = pf_data['min_BEC_constraints'].iloc[int_id]
+
+
+        print('sampled_models: ', sampled_models)
+
+        # f2, ax2 = plt.subplots(nrows=2, ncols=5, sharex=True, sharey=True, figsize=(15,10))
+        # plt.subplots_adjust(wspace=0.1, hspace=0.1)
+
+        f2 = plt.figure(figsize=(15,10))
+        ax2_0 = f2.add_subplot(2, 5, 1, projection='3d')
+        ax2_list = [ax2_0]
+        
+        for i in range(1, 10):
+            # Create each subplot with shared axes
+            ax = f2.add_subplot(2, 5, i + 1, projection='3d', sharex=ax2_0, sharey=ax2_0, sharez=ax2_0)
+            # Append the subplot to the list
+            ax2_list.append(ax)
+        ax2 = np.array(ax2_list)
+
+        print(len(ax2))
+
+        for p in range(params.team_size):
+            member_id = 'p' + str(p+1)
+            teacher_pf_after_demo[member_id].plot(fig=f2, ax=ax2[p])
+            teacher_pf_after_demo[member_id].calc_particles_probability(min_KC_constraints)
+            print('teacher_pf_prob_after_demo: ', teacher_pf_after_demo[member_id].particles_prob_correct)
+
+            print('p: ', p)
+            N_models = len(sampled_models[member_id])
+            for model_id in range(N_models):
+                print('model: ', sampled_models[member_id][model_id])
+                if N_models ==1 :
+                    ax2[p].scatter(sampled_models[member_id][model_id][0], sampled_models[member_id][model_id][1], sampled_models[member_id][model_id][2],  color='r', s=50)
+                else:
+                    ax2[p].scatter(sampled_models[member_id][model_id][0][0], sampled_models[member_id][model_id][0][1], sampled_models[member_id][model_id][0][2],  color='r', s=50)
+            
+            ax2[p].set_title('Teacher after demo ' + member_id)
+            teacher_pf_after_test[member_id].plot(fig=f2, ax=ax2[5+p])
+            ax2[5+p].set_title('Teacher after test ' + member_id)
+
+            teacher_pf_after_test[member_id].calc_particles_probability(min_KC_constraints)
+            print('teacher_pf_after_test: ', teacher_pf_after_test[member_id].particles_prob_correct)
+
+        teacher_pf_after_demo['common_knowledge'].plot(fig=f2, ax=ax2[3])
+        ax2[3].set_title('Teacher after demo common knowledge')
+        teacher_pf_after_test['common_knowledge'].plot(fig=f2, ax=ax2[4])
+        ax2[4].set_title('Teacher after test common knowledge')
+        teacher_pf_after_demo['joint_knowledge'].plot(fig=f2, ax=ax2[8])
+        ax2[8].set_title('Teacher after demo joint knowledge')
+        teacher_pf_after_test['joint_knowledge'].plot(fig=f2, ax=ax2[9])
+        ax2[9].set_title('Teacher after test joint knowledge')
+
+
+        teacher_pf_after_demo['common_knowledge'].calc_particles_probability(min_KC_constraints)
+        print('teacher_pf_after_demo: ', teacher_pf_after_demo['common_knowledge'].particles_prob_correct)
+
+        teacher_pf_after_test['common_knowledge'].calc_particles_probability(min_KC_constraints)
+        print('teacher_pf_after_test: ', teacher_pf_after_test['common_knowledge'].particles_prob_correct)
+
+        teacher_pf_after_demo['common_knowledge'].calc_particles_probability(min_BEC_constraints)
+        print('teacher_pf_BEC_after_demo: ', teacher_pf_after_demo['common_knowledge'].particles_prob_correct)
+
+        teacher_pf_after_test['common_knowledge'].calc_particles_probability(min_BEC_constraints)
+        print('teacher_pf_BEC_after_test: ', teacher_pf_after_test['common_knowledge'].particles_prob_correct)
+
+        f2.suptitle('Teacher Particle Filter Distribution int no: ' + str(int_id))
+
+        plt.savefig(path + '/pf_dist_teacher_' + file + str(int_id) + '.png')
 
 
 
-    return 1
+        f = plt.figure(figsize=(15,10))
+        ax1_0 = f.add_subplot(2, 3, 1, projection='3d')
+        ax1_list = [ax1_0]
+        
+        for i in range(1, 6):
+            # Create each subplot with shared axes
+            ax = f.add_subplot(2, 3, i + 1, projection='3d', sharex=ax1_0, sharey=ax1_0, sharez=ax1_0)
+            # Append the subplot to the list
+            ax1_list.append(ax)
+        ax1 = np.array(ax1_list)
+        
+        for p in range(params.team_size):
+            member_id = 'p' + str(p+1)
+            learner_pf_after_demo[member_id].plot(fig=f, ax=ax1[p])
+            utils_teams.visualize_planes_team(min_KC_constraints, fig=f, ax= ax1[p])
+            
+            print('p: ', p)
+            N_models = len(sampled_models[member_id])
+            for model_id in range(N_models):
+                print('model: ', sampled_models[member_id][model_id])
+                if N_models ==1 :
+                    ax1[p].scatter(sampled_models[member_id][model_id][0], sampled_models[member_id][model_id][1], sampled_models[member_id][model_id][2],  color='r', s=50)
+                else:
+                    ax1[p].scatter(sampled_models[member_id][model_id][0][0], sampled_models[member_id][model_id][0][1], sampled_models[member_id][model_id][0][2],  color='r', s=50)
+            
+            ax1[p].set_title('Learner after demo ' + member_id)
+            learner_pf_after_demo[member_id].plot(fig=f2, ax=ax1[3+p])
+            utils_teams.visualize_planes_team(min_KC_constraints, fig=f, ax= ax1[3+p])
+            ax1[3+p].set_title('Learner after test ' + member_id)
+
+            learner_pf_after_demo[member_id].calc_particles_probability(min_KC_constraints)
+            print('learner_pf_after_demo: ', learner_pf_after_demo[member_id].particles_prob_correct)
+
+            learner_pf_after_test[member_id].calc_particles_probability(min_KC_constraints)
+            print('learner_pf_after_test: ', learner_pf_after_test[member_id].particles_prob_correct)
+
+            learner_pf_after_demo[member_id].calc_particles_probability(min_BEC_constraints)
+            print('learner_pf_BEC_after_demo: ', learner_pf_after_demo[member_id].particles_prob_correct)
+
+            learner_pf_after_test[member_id].calc_particles_probability(min_BEC_constraints)
+            print('learner_pf_BEC_after_test: ', learner_pf_after_test[member_id].particles_prob_correct)
+
+        f.suptitle('Learner Particle Filter Distribution int no: ' + str(int_id))
+
+        plt.savefig(path + '/pf_dist_learner_' + file + str(int_id) + '.png')
+
+        plt.show()
+
+
 
 
 
@@ -2266,46 +2717,53 @@ def analyze_sensitivity_data(path, file_prefix, cond):
 if __name__ == "__main__":
 
     # # process team knowledge data
+    path = 'models/augmented_taxi2'
+    # path = 'data/simulation/sim_experiments/w_feedback'
+    files = os.listdir(path)
+
+    # all_file_prefix_list = ['debug_data_debug_trials_01_22_no_noise_w_feedback_study_1']
+    # all_runs_to_exclude_list = [[3, 12, 24, 7], [1,4,6,8], [], [1,3, 11, 12, 16, 18], [17, 21, 35], [], [], [], \
+    #                             [], [], [], [], [], [], []]
+    all_runs_to_exclude_list = []
+
+    # sets_to_consider = [14]
+    # file_prefix_list = [all_file_prefix_list[i] for i in sets_to_consider]
+    # runs_to_exclude_list = [all_runs_to_exclude_list[i] for i in sets_to_consider]
+
+    # file_prefix_list = ['trials_12_29_w_updated', 'trials_12_30_w_updated', 'trials_12_31_w_updated', 'trials_01_01_w_updated', 
+    #                     'trials_01_02_w_updated', 'trials_01_03_w_updated', 'trials_01_04_w_updated']
+    
+    file_prefix_list = ['03_02_sim_study_test_learner_noise_duplicate_tests_study_17']
+    
+    # runs_to_exclude_list = ['unfinished', 'trials_01_01_w_updated_noise_57'] 
+    runs_to_exclude_list = ['no_review']
+    # trials_01_01_w_updated_noise_57.csv - outlier, N = 48 trials
+
+    vars_filename_prefix = 'analysis'
+
+    print(file_prefix_list)
+    print(runs_to_exclude_list)
+    
+
+    run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list = runs_to_exclude_list, vars_filename_prefix = vars_filename_prefix)
+
+    ##################################################
     # path = 'models/augmented_taxi2'
-    # # path = 'data/simulation/sim_experiments/w_feedback'
-    # files = os.listdir(path)
 
-    # # all_file_prefix_list = ['debug_data_debug_trials_01_22_no_noise_w_feedback_study_1']
-    # # all_runs_to_exclude_list = [[3, 12, 24, 7], [1,4,6,8], [], [1,3, 11, 12, 16, 18], [17, 21, 35], [], [], [], \
-    # #                             [], [], [], [], [], [], []]
-    # all_runs_to_exclude_list = []
+    # filename = '03_02_sim_study_test_ck_jk_w_feedback_4_duplicate_tests_study_17_run_42.pickle'
 
-    # # sets_to_consider = [14]
-    # # file_prefix_list = [all_file_prefix_list[i] for i in sets_to_consider]
-    # # runs_to_exclude_list = [all_runs_to_exclude_list[i] for i in sets_to_consider]
+    # plot_pf_dist(path, filename)
 
-    # # file_prefix_list = ['trials_12_29_w_updated', 'trials_12_30_w_updated', 'trials_12_31_w_updated', 'trials_01_01_w_updated', 
-    # #                     'trials_01_02_w_updated', 'trials_01_03_w_updated', 'trials_01_04_w_updated']
-    
-    # file_prefix_list = ['debug_trials_02_05']
-    
-    # # runs_to_exclude_list = ['unfinished', 'trials_01_01_w_updated_noise_57'] 
-    # runs_to_exclude_list = ['no_review']
-    # # trials_01_01_w_updated_noise_57.csv - outlier, N = 48 trials
 
-    # vars_filename_prefix = 'analysis'
-
-    # print(file_prefix_list)
-    # print(runs_to_exclude_list)
-    
-
-    # run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list = runs_to_exclude_list, vars_filename_prefix = vars_filename_prefix)
-
-    # # analyze_run_data(path, path + '/run_data.csv')
 
     ###########################################
 
-    # # ## Sensitivity Analysis
-    path = 'data/simulation/sim_experiments/sensitivity_analysis/w_feedback/augmented_taxi2'
-    files = os.listdir(path)
+    # # # ## Sensitivity Analysis
+    # path = 'data/simulation/sensitivity_analysis/one_out'
+    # files = os.listdir(path)
 
-    file_prefix_list = ['trials_02_11_sensitivity_w_feedback_tc1_ck']
-    run_sensitivity_analysis(path, files, file_prefix_list, runs_to_exclude_list=[], runs_to_analyze_list = [], vars_filename_prefix = '')
+    # file_prefix_list = ['02_28_sensitivity_tc2_jk']
+    # run_sensitivity_analysis(path, files, file_prefix_list, runs_to_exclude_list=[], runs_to_analyze_list = [], vars_filename_prefix = '')
 
 
 

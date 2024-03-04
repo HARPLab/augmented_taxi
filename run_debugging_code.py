@@ -198,4 +198,6 @@ if __name__ == "__main__":
     ###########################
 
     # check constraints area
-    dt.check_constraints_area()
+    # dt.check_constraints_area()
+
+    x=1

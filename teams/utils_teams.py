@@ -13,6 +13,25 @@ def plot_normal(normal, X, Y, Z, ax=None):
     ax.quiver(startX, startY, startZ, delta[0, 0], delta[0, 1], delta[0, 2], arrow_length_ratio=0.15, linewidth=2, color='red')
 
 
+def subset_surface_plot_data(X, Y, Z):
+
+
+    # for [-3,0,2] constraint
+    x_min, x_max = -10, 10
+    y_min, y_max = -8, 8
+
+    # # for [-2,0,1] constraint
+    # x_min, x_max = -10, 10
+    # y_min, y_max = -8, 8     
+
+    # Slice the data arrays to the desired region
+    X_subset = X[x_min:x_max, y_min:y_max]
+    Y_subset = Y[x_min:x_max, y_min:y_max]
+    Z_subset = Z[x_min:x_max, y_min:y_max]
+
+    return X_subset, Y_subset, Z_subset
+
+
 
 def visualize_planes_team(constraints, fig=None, ax=None, alpha=0.5, color=None):
     '''
@@ -30,13 +49,23 @@ def visualize_planes_team(constraints, fig=None, ax=None, alpha=0.5, color=None)
     y = np.linspace(-1, 1, 10)
     z = np.linspace(-1, 1, 10)
 
-    X_xy, Y_xy, = np.meshgrid(x, y)
+    
 
-    for constraint in constraints:
+    for constraint_id in range(len(constraints)):
+        constraint = constraints[constraint_id]
+        # print('constraint:', constraint)
         if constraint[0, 2] != 0:
+            X_xy, Y_xy, = np.meshgrid(x, y)
             Z = (-constraint[0, 0] * X_xy - constraint[0, 1] * Y_xy) / constraint[0, 2]
+            if (constraint == np.array([[3,  0,  -2]])).all():
+                X_xy, Y_xy, Z = subset_surface_plot_data(X_xy, Y_xy, Z)
             if color is not None:
-                ax.plot_surface(X_xy, Y_xy, Z, alpha=alpha, color=color)
+                if len(color) == len(constraints):
+                    print('color:', color[constraint_id])
+                    ax.plot_surface(X_xy, Y_xy, Z, alpha=alpha, color=color[constraint_id])
+                else:
+                    print('color:', color)
+                    ax.plot_surface(X_xy, Y_xy, Z, alpha=alpha, color=color)
             else:
                 ax.plot_surface(X_xy, Y_xy, Z, alpha=alpha)
             if plot_normal_flag:
@@ -44,8 +73,15 @@ def visualize_planes_team(constraints, fig=None, ax=None, alpha=0.5, color=None)
         elif constraint[0, 1] != 0:
             X_xz, Z_xz, = np.meshgrid(x, z)
             Y = (-constraint[0, 0] * X_xz - constraint[0, 2] * Z_xz) / constraint[0, 1]
+            if (constraint == np.array([[3,  0,  -2]])).all():
+                X_xz, Y, Z_xz = subset_surface_plot_data(X_xz, Y, Z_xz)
             if color is not None:
-                ax.plot_surface(X_xz, Y, Z_xz, alpha=alpha, color=color)
+                if len(color) == len(constraints):
+                    print('color:', color[constraint_id])
+                    ax.plot_surface(X_xz, Y, Z_xz, alpha=alpha, color=color[constraint_id])
+                else:
+                    print('color:', color)
+                    ax.plot_surface(X_xz, Y, Z_xz, alpha=alpha, color=color)
             else:
                 ax.plot_surface(X_xz, Y, Z_xz, alpha=alpha)
             if plot_normal_flag:
@@ -53,8 +89,15 @@ def visualize_planes_team(constraints, fig=None, ax=None, alpha=0.5, color=None)
         else:
             Y_yz, Z_yz, = np.meshgrid(y, z)
             X = (-constraint[0, 1] * Y_yz - constraint[0, 2] * Z_yz) / constraint[0, 0]
+            if (constraint == np.array([[3,  0,  -2]])).all():
+                X, Y_yz, Z_yz = subset_surface_plot_data(X, Y_yz, Z_yz)
             if color is not None:
-                ax.plot_surface(X, Y_yz, Z_yz, alpha=alpha, color=color)
+                if len(color) == len(constraints):
+                    print('color:', color[constraint_id])
+                    ax.plot_surface(X, Y_yz, Z_yz, alpha=alpha, color=color[constraint_id])
+                else:
+                    print('color:', color)
+                    ax.plot_surface(X, Y_yz, Z_yz, alpha=alpha, color=color)
             else:
                 ax.plot_surface(X, Y_yz, Z_yz, alpha=alpha)
             if plot_normal_flag:
