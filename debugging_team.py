@@ -1130,11 +1130,14 @@ def check_ig_uf_relation(path):
         # plot particle distribution
         fig = plt.figure(figsize=(18, 14), facecolor='white')    
         fig2 = plt.figure(figsize=(4, 3), facecolor='white')
+        fig3 = plt.figure(figsize=(18, 14), facecolor='white')  
         row_len, col_len = squarest_rectangle(N_members)
         print('row_len: ', row_len, '. col_len: ', col_len)
         ax = np.array([fig.add_subplot(row_len, col_len, i+1, projection='3d') for i in range(N_members)])   
+        ax3 = np.array([fig.add_subplot(row_len, col_len, i+1, projection='3d') for i in range(N_members)])   
         fig.tight_layout(pad=3)
         ax2 = fig2.add_subplot(1,1,1, projection='3d')
+        ax2.set_facecolor('white')
         fig.suptitle('Learning dynamics for various understanding factors.')
         
         learning_factor = np.round(np.linspace(0.55, 1, num=10),2)
@@ -1166,9 +1169,6 @@ def check_ig_uf_relation(path):
 
         # create figure for each particle filter
 
-
-
-
         particles_ig_list = []
         max_info_gain = {}
         for i in range(N_members):
@@ -1189,8 +1189,8 @@ def check_ig_uf_relation(path):
                 constraints_list = constraints_dict[kc_id+1]
 
                 # particles_member = copy.deepcopy(particles_initial['p1'])  # for updating only one constraint at a time individually; but from each "ideal" KC state
-                for p_cnst in prev_constraints_list:
-                    particles_member.update(p_cnst, 1, model_type = 'noise')
+                # for p_cnst in prev_constraints_list:
+                #     particles_member.update(p_cnst, 1, model_type = 'noise')
 
 
                 for update_id in range(N_updates_kc):
@@ -1212,7 +1212,7 @@ def check_ig_uf_relation(path):
 
                         # max_info_gain_cnst = max(max_info_gain_cnst, ig_const)
                         
-                        particles_ig_dict = {'member_id': member_id, 'lf': lf, 'kc_id': kc_id+1, 'update_id': update_id+1, 'info_gain_pf': particles_member.calc_info_gain(constraint, lf, model_type='low_noise'), \
+                        particles_ig_dict = {'member_id': member_id, 'lf': lf, 'kc_id': kc_id+1, 'update_id': update_id+1, 'info_gain_pf': particles_member.calc_info_gain(constraint, lf, model_type='no_noise'), \
                                             'ig_const': ig_const, 'cnst_id': cnst_id, 'cnst': constraint}  # calculate before update
                         plot_title = 'Update no. ' + str(update_id+1) + ' for constraint ' + str(constraint) + ' and lf ' + str(lf)
                         particles_member.update(constraint, lf, viz_flag = False, plot_title = plot_title, model_type = 'no_noise', vars_filename = filename)
@@ -1220,6 +1220,8 @@ def check_ig_uf_relation(path):
 
                         # plot particle distribution
                         particles_member.plot(fig=fig, ax=ax[i])
+                        particles_member.plot(fig=fig3, ax=ax[i])
+
                         # BEC_viz.visualize_planes(constraint, fig=fig, ax=axs[i])
                         ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraint)
                         poly = Polyhedron.Polyhedron(ieqs=ieqs)
@@ -1228,6 +1230,7 @@ def check_ig_uf_relation(path):
                         ax[i].set_title('$u$ = ' + str(lf), fontsize=14)
                         plt.rcParams.update({"text.usetex": False})
                         fig.savefig(path + '/learner_particles_' + str(kc_id) + '_' + str(update_id) + '_' + str(cnst_index) + '.png')
+                        plt.show()
                         
 
                 if len(prev_constraints_list) == 0:
@@ -1248,21 +1251,18 @@ def check_ig_uf_relation(path):
         particles_ig = pd.DataFrame(particles_ig_list)
         cnst_id_list = particles_ig['cnst_id'].unique()
 
-        print('cnst_id_list: ', cnst_id_list)
-        info_gain_proportion = []
+        particles_ig['info_gain_proportion'] = copy.deepcopy(particles_ig['info_gain_pf'])
+
+
         for cnst_id in cnst_id_list:
             max_info_gain = max(particles_ig[particles_ig['cnst_id']==cnst_id]['info_gain_pf'])
             print('cnst_id: ', cnst_id, '. Max info gain: ', max_info_gain)
 
-            if len(info_gain_proportion)==0:
-                info_gain_proportion = [particles_ig[particles_ig['cnst_id']==cnst_id]['info_gain_pf']/max_info_gain]
-            else:
-                info_gain_proportion = info_gain_proportion.append(particles_ig[particles_ig['cnst_id']==cnst_id]['info_gain_pf']/max_info_gain)
+            particles_ig.loc[particles_ig['cnst_id']==cnst_id, 'info_gain_proportion'] = particles_ig.loc[particles_ig['cnst_id']==cnst_id, 'info_gain_pf'] / max_info_gain
+            print('info_gain_proportion: ', particles_ig['info_gain_proportion'])
+
 
         print('particles_ig: ', particles_ig)
-        print('info_gain_proportion: ', info_gain_proportion)
-
-        particles_ig['info_gain_proportion'] = info_gain_proportion
 
         particles_ig.to_csv(path + '/' + filename + '.csv')
         print(particles_ig)
@@ -1277,13 +1277,13 @@ def check_ig_uf_relation(path):
     fig3, ax3 = plt.subplots(ncols=1,  sharex=True, sharey=True, figsize=(10,6))
     plt.subplots_adjust(wspace=0.1, hspace=0.1)
     # sns.lineplot(plot_data, x = 'lf', y = 'info_gain', hue = 'update_id', ax=ax, errorbar=('se', 1), err_style="band").set(title='Understanding factor vs. Info gain')
-    sns.lineplot(plot_data, x = 'lf', y = 'info_gain_proportion', hue = 'cnst_id', ax=ax3, errorbar=('se', 1), err_style="band", palette = palette).set(title='Understanding factor vs. Info gain proportion')
+    sns.lineplot(data=plot_data, x = 'lf', y = 'info_gain_proportion', hue = 'cnst_id', ax=ax3, errorbar=('se', 1), err_style="band", palette = palette).set(title='Understanding factor vs. Info gain proportion')
 
     
     fig4, ax4 = plt.subplots(ncols=1,  sharex=True, sharey=True, figsize=(10,6))
     plt.subplots_adjust(wspace=0.1, hspace=0.1)
     # sns.lineplot(plot_data, x = 'lf', y = 'info_gain', hue = 'update_id', ax=ax, errorbar=('se', 1), err_style="band").set(title='Understanding factor vs. Info gain')
-    sns.lineplot(plot_data, x = 'lf', y = 'info_gain_proportion', ax=ax4, errorbar=('se', 1), err_style="band", palette = palette).set(title='Understanding factor vs. Info gain proportion')
+    sns.lineplot(data=plot_data, x = 'lf', y = 'info_gain_proportion', ax=ax4, errorbar=('se', 1), err_style="band", palette = palette).set(title='Understanding factor vs. Info gain proportion')
 
     
     #

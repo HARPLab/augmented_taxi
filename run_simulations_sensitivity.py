@@ -20,6 +20,10 @@ import os
 import itertools
 from itertools import permutations, combinations
 import scipy.stats as stats
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
+
+from statsmodels.graphics.factorplots import interaction_plot
 
 # Other imports.
 sys.path.append("simple_rl")
@@ -1178,6 +1182,9 @@ def run_reward_teaching(args):
 
 
 
+
+
+
 if __name__ == "__main__":
     
     os.makedirs('models/' + params.data_loc['base'], exist_ok=True)
@@ -1188,14 +1195,14 @@ if __name__ == "__main__":
 
 
     ## varying parameters
-    N_runs_for_each_study_condition = 320
-    run_start_id = 1
+    N_runs_for_each_study_condition = 4
+    run_start_id = 2107
     sensitivity_run_start_id = 1
     N_combinations = 11
 
     
     
-    path = 'data/simulation/sensitivity_analysis/'
+    # path = 'data/simulation/sensitivity_analysis/'
 
     ## Learner model params sensitivity analysis
     # params_to_study = {'learning_factor_low': [0.6, 0.7], 'learning_factor_high': [0.75, 0.85], 'learning_rate': [0.0, 0.1], 'max_learning_factor': [0.85, 1.0]}
@@ -1205,11 +1212,11 @@ if __name__ == "__main__":
     
 
     # Experiemnt conditions to test - keep this fixed for a set of sensitivity runs
-    team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]  # [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
-    dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge'] # ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
+    # team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]  # [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
+    # dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge'] # ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
 
-    # team_composition_list = [[0,2,2]]
-    # dem_strategy_list = ['joint_knowledge'] # ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
+    team_composition_list = [[0,0,2]]
+    dem_strategy_list = ['joint_knowledge'] # ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
 
     # team_composition_list = [[0], [2]]
     # dem_strategy_list = ['baseline']  # for only one person
@@ -1245,20 +1252,25 @@ if __name__ == "__main__":
 
     # team_params_learning = {'low': [0.7, 0.03, 0.06], 
     #                         'high': [0.83, 0.02, 0.04]}
-            
+    
+    
+    # ## sim runs
+    file_prefix = '03_04_sim_study'
+    params.max_learning_factor = 0.95
+    params.default_learning_factor_teacher = 0.8
 
     # create the manager
     with Manager() as manager:
         # create the shared lock
         lock = manager.Lock()
     
-        # parameter_combinations = get_parameter_combination(params_to_study, N_combinations)
+        # # parameter_combinations = get_parameter_combination(params_to_study, N_combinations)
         # parameter_combinations = []
 
         # ## for sensitivity runs
         # file_prefix_list = []
         # params_list = ['learning_factor_low', 'learning_factor_high', 'learning_rate', 'max_learning_factor', 'default_learning_factor_teacher']
-        # params_id_list = [1,2,3,4]
+        # params_id_list = [3]
         # # params_list = [params_list_overall[i] for i in params_id_list]
         
         # for i in params_id_list:
@@ -1266,47 +1278,47 @@ if __name__ == "__main__":
         #         params_to_study = {'learning_factor_low': [0.6, 0.8], 'learning_factor_high': [0.8], 'learning_rate': [0.1], 'max_learning_factor': [0.925], 'default_learning_factor_teacher': [0.8]}   
         #         params_learning_factor_low = np.linspace(params_to_study['learning_factor_low'][0], params_to_study['learning_factor_low'][1], N_combinations)
         #         for ci in range(N_combinations):
-        #             file_prefix_list.append('02_28_sensitivity_tc2_jk_lfl')
+        #             file_prefix_list.append('03_04_sensitivity_tc2_jk_lfl')
         #             parameter_combinations.append([params_learning_factor_low[ci], params_to_study['learning_factor_high'][0], params_to_study['learning_rate'][0], params_to_study['max_learning_factor'][0], params_to_study['default_learning_factor_teacher'][0]])
             
         #     elif i==1:
         #         params_to_study = {'learning_factor_low': [0.7], 'learning_factor_high': [0.7, 0.9], 'learning_rate': [0.1], 'max_learning_factor': [0.925], 'default_learning_factor_teacher': [0.8]}
         #         params_learning_factor_high = np.linspace(params_to_study['learning_factor_high'][0], params_to_study['learning_factor_high'][1], N_combinations)
         #         for ci in range(N_combinations):
-        #             file_prefix_list.append('02_28_sensitivity_tc2_jk_lfh')
+        #             file_prefix_list.append('03_04_sensitivity_tc2_jk_lfh')
         #             parameter_combinations.append([params_to_study['learning_factor_low'][0], params_learning_factor_high[ci], params_to_study['learning_rate'][0], params_to_study['max_learning_factor'][0], params_to_study['default_learning_factor_teacher'][0]])
 
         #     elif i==2:
         #         params_to_study = {'learning_factor_low': [0.7], 'learning_factor_high': [0.8], 'learning_rate': [0.0, 0.2], 'max_learning_factor': [0.925], 'default_learning_factor_teacher': [0.8]}
         #         params_learning_rate = np.linspace(params_to_study['learning_rate'][0], params_to_study['learning_rate'][1], N_combinations)
         #         for ci in range(N_combinations):
-        #             file_prefix_list.append('02_28_sensitivity_tc2_jk_lr')
+        #             file_prefix_list.append('03_04_sensitivity_tc2_jk_lr')
         #             parameter_combinations.append([params_to_study['learning_factor_low'][0], params_to_study['learning_factor_high'][0], params_learning_rate[ci], params_to_study['max_learning_factor'][0], params_to_study['default_learning_factor_teacher'][0]])
                 
         #     elif i==3:
         #         params_to_study = {'learning_factor_low': [0.7], 'learning_factor_high': [0.8], 'learning_rate': [0.1], 'max_learning_factor': [0.85, 1.0], 'default_learning_factor_teacher': [0.8]}
         #         params_max_learning_factor = np.linspace(params_to_study['max_learning_factor'][0], params_to_study['max_learning_factor'][1], N_combinations)
         #         for ci in range(N_combinations):
-        #             file_prefix_list.append('02_28_sensitivity_tc2_jk_mlf')
+        #             file_prefix_list.append('03_04_sensitivity_tc2_jk_mlf')
         #             parameter_combinations.append([params_to_study['learning_factor_low'][0], params_to_study['learning_factor_high'][0], params_to_study['learning_rate'][0], params_max_learning_factor[ci], params_to_study['default_learning_factor_teacher'][0]])
 
         #     elif i==4:
         #         params_to_study = {'learning_factor_low': [0.7], 'learning_factor_high': [0.8], 'learning_rate': [0.1], 'max_learning_factor': [0.925], 'default_learning_factor_teacher': [0.7, 0.9]}
         #         params_default_learning_factor_teacher = np.linspace(params_to_study['default_learning_factor_teacher'][0], params_to_study['default_learning_factor_teacher'][1], N_combinations)
         #         for ci in range(N_combinations):
-        #             file_prefix_list.append('02_28_sensitivity_tc2_jk_tlf')
+        #             file_prefix_list.append('03_04_sensitivity_tc2_jk_tlf')
         #             parameter_combinations.append([params_to_study['learning_factor_low'][0], params_to_study['learning_factor_high'][0], params_to_study['learning_rate'][0], params_to_study['max_learning_factor'][0], params_default_learning_factor_teacher[ci]])
         # ############################## 
 
 
         # Define arguments for each sensitivity run
         args_list = []
-        # for params_comb_run_id in range(len(parameter_combinations)):
-        for params_comb_run_id in range(1):
-            sensitivity_run_id = 200
+        # for params_comb_run_id in range(len(parameter_combinations)):   # for sensitivity run
+        for params_comb_run_id in range(1):                 # for sim run
+            sensitivity_run_id = 1
 
 
-            ## sensitivity runs
+            # ## sensitivity runs
             # file_prefix = file_prefix_list[params_comb_run_id]
             
             # cur_param_comb_id = np.mod(params_comb_run_id+1, N_combinations)
@@ -1323,13 +1335,12 @@ if __name__ == "__main__":
             
             # print('param_varied_id: ', param_varied_id)
             # print('Param varied: ', params_list[param_varied_id], 'Sensitivity run: ', sensitivity_run_id, '. Team params: ', team_params_learning, '. Max learning factor: ', params.max_learning_factor, '. Learning_factor_teacher:', params.default_learning_factor_teacher)
-            ################
+            # ################
 
-            ## sim runs
-            file_prefix = '03_02_sim_study_test_final_2'
-            params.max_learning_factor = 0.95
-            params.default_learning_factor_teacher = 0.8
-            
+            ########################
+
+
+
             sim_conditions = get_sim_conditions(team_composition_list, dem_strategy_list, sampling_condition_list, N_runs_for_each_study_condition, run_start_id)
             
 
@@ -1348,8 +1359,7 @@ if __name__ == "__main__":
                 ilcr = np.zeros(params.team_size)
                 rlcr = np.zeros([params.team_size, 2])
 
-                ## for a single run or sensitivity runs
-
+                # ## for a single run or sensitivity runs
                 # for j in range(params.team_size):
                 #     if team_composition_for_run[j] == 0: 
                 #         ilcr[j] = team_params_learning['low'][0]
@@ -1363,6 +1373,7 @@ if __name__ == "__main__":
                 #         ilcr[j] = team_params_learning['high'][0]
                 #         rlcr[j,0] = team_params_learning['high'][1]
                 #         rlcr[j,1] = team_params_learning['high'][2]
+                # ###################
 
                 ## for simulation study - sample learning params
                 for j in range(params.team_size):
@@ -1412,7 +1423,7 @@ if __name__ == "__main__":
                 
         # ProcessingPool().map(run_reward_teaching, args_list)
                 
-        pool = NoDaemonProcessPool(processes=8, lock=lock)
+        pool = NoDaemonProcessPool(processes=4, lock=lock)
         pool.map(run_reward_teaching, args_list)
         # tqdm(pool.imap(run_reward_teaching, args_list), total=len(args_list))
                 

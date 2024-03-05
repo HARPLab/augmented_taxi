@@ -619,12 +619,12 @@ if __name__ == "__main__":
     # lock = multiprocessing.Lock()
 
     ## plot prior PF distribution and updated PF distribution
-    # params.team_size = 2
-    # team_prior, teacher_pf = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, teacher_learning_factor=[0.8, 0.8, 0.8], team_prior = params.team_prior)
+    params.team_size = 1
+    team_prior, teacher_pf = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, teacher_learning_factor=[0.8, 0.8, 0.8], team_prior = params.team_prior)
     
     # # plot_pf = copy.deepcopy(teacher_pf['p1'])
     # entire KC
-    # demo_constraints = [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])]
+    demo_constraints = [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])]
 
     # test_constraints = [[np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], \
     #                     [np.array([[3,  0,  -2]])], \
@@ -636,7 +636,7 @@ if __name__ == "__main__":
     # test_constraints = [[np.array([[-1,  0,  2]])], \
     #                     [np.array([[-2,  0,  1]])] ]
 
-    # teacher_pf['p1'].update(constraints, 0.9, model_type = 'high_noise')
+    teacher_pf['p1'].update(demo_constraints, 0.9, model_type = 'noise')
 
 
     # test_pf_1  = copy.deepcopy(teacher_pf['joint_knowledge'])
@@ -647,20 +647,20 @@ if __name__ == "__main__":
 
     # # plot_pf.plot()
     # # plt.show()
-    # # visualize_transition(constraints, teacher_pf['p1'], params.mdp_class, weights = params.weights['val'])
+    visualize_transition(demo_constraints, teacher_pf['p1'], params.mdp_class, weights = params.weights['val'])
 
     ##################
 
 
     ### plot team knowledge constraints
 
-    team_knowledge = {'p1': [np.array([[-1,  0,  2]])], 
-                    'p2': [np.array([[-5,  0,  2]])], 
-                    'common_knowledge': [np.array([[-1,  0,  2]]), np.array([[-5,  0,  2]])], 
-                    'joint_knowledge': [np.array([[-1,  0,  2]]), np.array([[-5,  0,  2]])]}
+    # team_knowledge = {'p1': [np.array([[-1,  0,  2]])], 
+    #                 'p2': [np.array([[-5,  0,  2]])], 
+    #                 'common_knowledge': [np.array([[-1,  0,  2]]), np.array([[-5,  0,  2]])], 
+    #                 'joint_knowledge': [np.array([[-1,  0,  2]]), np.array([[-5,  0,  2]])]}
 
 
-    visualize_team_knowledge_constraints(team_knowledge, params.weights['val'], params.step_cost_flag)
+    # visualize_team_knowledge_constraints(team_knowledge, params.weights['val'], params.step_cost_flag)
 
 
     ##################
