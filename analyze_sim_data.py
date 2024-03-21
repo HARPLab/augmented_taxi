@@ -21,6 +21,18 @@ import copy
 plt.rcParams['figure.figsize'] = [15, 10]
 plt.rcParams['figure.facecolor'] = 'white'
 plt.rcParams['axes.facecolor'] = 'white'
+plt.rcParams['axes.grid'] = True
+plt.rcParams['font.size'] = 14
+
+# Set the seaborn color palette to colorblind
+sns.set_palette("colorblind")
+
+# Get the colorblind palette with the desired number of colors
+colorblind_palette = sns.color_palette("colorblind", 6)
+
+# Set the default color cycle for Matplotlib using rcParams
+plt.rcParams['axes.prop_cycle'] = plt.cycler(color=colorblind_palette)
+
 
 
 import teams.teams_helpers as team_helpers
@@ -45,6 +57,13 @@ import statsmodels.api as sm
 from statsmodels.formula.api import ols
 from statsmodels.stats.multicomp import pairwise_tukeyhsd
 from statsmodels.sandbox.stats.multicomp import multipletests
+from sklearn import metrics
+from scipy.stats import bartlett, levene
+
+from policy_summarization import computational_geometry as cg
+
+import ast
+from statsmodels.stats.anova import anova_lm
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -133,15 +152,16 @@ def sim_study_data_analysis(path, files, file_prefix_list, data_condition = None
     interaction_data_list = []
     particles_prob_list = []
     concept_data_list = []
+    learning_incomplete_runs_list = []
 
     if data_condition is not None:
         vars_filename_prefix = vars_filename_prefix + '_' + data_condition
 
     for file in files:
         # check if file is a valid pickle file
-        print('Checking file: ', file)
+        print('Checking file: ', file, '. file prefix list: ', file_prefix_list)
         for file_prefix in file_prefix_list:
-            if file_prefix in file and '.pickle' in file:
+            if file_prefix in file and '.pickle' in file and '.png' not in file and '.csv' not in file and 'counterfactuals' not in file:
                 run_file_flag = True
                 break
             else:
@@ -157,18 +177,24 @@ def sim_study_data_analysis(path, files, file_prefix_list, data_condition = None
             with open(path + '/' + file, 'rb') as f:
                 sim_vars = pickle.load(f)
             print('Opening file: ', file)
-                
-            bec_final = sim_vars['BEC_knowledge_level'][len(sim_vars)-1]
+            
+            
+            # bec_final = sim_vars['BEC_knowledge_level'][len(sim_vars)-1]
             study_id = sim_vars['study_id'][0]
             sim_run_id = sim_vars['run_no'][0]
 
-            # check if learning was completed
-            learning_complete = True
-            for k_type, k_val in bec_final.items():
-                if k_val[0] != 1:
-                    learning_complete = False
-                    break
+            # check if learning was completed based on final BEC knowledge
+            # learning_complete = True
+            # for k_type, k_val in bec_final.items():
+            #     if k_val[0] != 1:
+            #         learning_complete = False
+            #         break
 
+            # check if learning was completed based on sim status flag
+            if sim_vars['sim_status'].iloc[-1] == 'Teaching complete':
+                learning_complete = True
+            else:
+                learning_complete = False
             
             
             if learning_complete:
@@ -183,7 +209,23 @@ def sim_study_data_analysis(path, files, file_prefix_list, data_condition = None
                 trial_data_dict['team_composition'] = str(sim_vars['team_composition'][0])
                 trial_data_dict['max_loop_count'] = sim_vars['loop_count'].iloc[-1]
                 trial_data_dict['file_name'] = file
+                trial_data_dict['sim_status'] = sim_vars['sim_status'].iloc[-1]
                 
+
+                # check for duplicate trials
+                kc_id_list = sim_vars['knowledge_comp_id']
+                run_start_id = []
+                for id in range(len(kc_id_list)-1):
+                    if kc_id_list[id+1] - kc_id_list[id] < 0:
+                        print(colored('Duplicate trials found for file: ' + file + '. Run id: ' + str(sim_run_id), 'red' ))
+                        run_start_id = [id+1]
+                        break
+                
+                if len(run_start_id) != 0:
+                    sim_vars = sim_vars.iloc[run_start_id[0]:].reset_index(drop=True)
+                    print(sim_vars['knowledge_comp_id'])
+
+
 
                 update_id = 1
                 prev_concept_end_id = -1
@@ -235,7 +277,12 @@ def sim_study_data_analysis(path, files, file_prefix_list, data_condition = None
                             min_BEC_constraints = sim_vars['min_BEC_constraints'][i]
                             particles_learner_current.calc_particles_probability(min_BEC_constraints)
                             BEC_prob = particles_learner_current.particles_prob_correct
-                            particles_probability_dict['BEC_prob'] = BEC_prob
+                            particles_probability_dict['BEC_prob'] = float(BEC_prob)
+
+                            min_KC_constraints = sim_vars['min_KC_constraints'][i]
+                            particles_learner_current.calc_particles_probability(min_KC_constraints)
+                            KC_prob = particles_learner_current.particles_prob_correct
+                            particles_probability_dict['calc_KC_prob'] = float(KC_prob)
 
                             if var_name == 'particles_prob_learner_after_feedback':
                                 learner_BEC_prob.append(BEC_prob)
@@ -300,16 +347,33 @@ def sim_study_data_analysis(path, files, file_prefix_list, data_condition = None
 
                 analysis_run_id += 1
 
+                #####################
+            else:
+                print(colored('Learning incomplete for file: ' + file + '. Run id: ' + str(sim_run_id), 'red' ))
+                learning_incomplete_runs_dict = {}
+                learning_incomplete_runs_dict['run_no'] = sim_run_id
+                learning_incomplete_runs_dict['study_id'] = study_id
+                learning_incomplete_runs_dict['file_name'] = file
+                learning_incomplete_runs_dict['team_composition'] = str(sim_vars['team_composition'][0])
+                learning_incomplete_runs_dict['demo_strategy'] = sim_vars['demo_strategy'][0]
+                learning_incomplete_runs_dict['max_loop_count'] = int(sim_vars['loop_count'].iloc[-1])
+                learning_incomplete_runs_dict['sim_status'] = str(sim_vars['sim_status'].iloc[-1])
+                learning_incomplete_runs_list.append(learning_incomplete_runs_dict)
+            
+            #############  Read all simulation trials data  ##########
+
 
     trial_data = pd.DataFrame(trial_data_list)
     interaction_data = pd.DataFrame(interaction_data_list)
     particles_prob = pd.DataFrame(particles_prob_list)  
     concept_data = pd.DataFrame(concept_data_list)
+    learning_incomplete_runs = pd.DataFrame(learning_incomplete_runs_list)
 
     trial_data.to_csv(path + '/' + vars_filename_prefix + '_' + 'trial_data.csv', index=False)
     interaction_data.to_csv(path + '/' + vars_filename_prefix + '_' + 'interaction_data.csv', index=False)
     particles_prob.to_csv(path + '/' + vars_filename_prefix + '_' + 'particles_prob.csv', index=False)
     concept_data.to_csv(path + '/' + vars_filename_prefix + '_' + 'concept_data.csv', index=False)
+    learning_incomplete_runs.to_csv(path + '/' + vars_filename_prefix + '_' + 'learning_incomplete_runs.csv', index=False)
 
 
     with open(path + '/' + vars_filename_prefix + '_' + 'trial_data.pickle', 'wb') as f:
@@ -324,11 +388,15 @@ def sim_study_data_analysis(path, files, file_prefix_list, data_condition = None
     with open(path + '/' + vars_filename_prefix + '_' + 'concept_data.pickle', 'wb') as f:
         pickle.dump(concept_data, f)
 
+    with open(path + '/' + vars_filename_prefix + '_' + 'learning_incomplete_runs.pickle', 'wb') as f:
+        pickle.dump(learning_incomplete_runs, f)
+
 
     print(colored('Number of trials processed: ' + str(len(trial_data)), 'blue'))
+    print(colored('Number of incomplete learning runs: ' + str(len(learning_incomplete_runs)), 'red'))
 
 
-    ##############################################
+    # ##############################################
         
     ## Choose conditions to plot
     know_list_full = ['individual', 'common_knowledge', 'joint_knowledge']
@@ -389,42 +457,113 @@ def squarest_rectangle(area):
         return length, width
 
 #########################
+def label_axes(ax, mdp_class, weights=None, view_params = None):
+    fs = 10
+    ax.set_facecolor('white')
+    ax.xaxis.pane.fill = False
+    ax.yaxis.pane.fill = False
+    ax.zaxis.pane.fill = False
+    if weights is not None:
+        ax.scatter(weights[0, 0], weights[0, 1], weights[0, 2], marker='o', c='r', s=100/2)
+    if mdp_class == 'augmented_taxi2':
+        ax.set_xlabel(r'$\mathregular{w_0}$: Mud', fontsize = fs)
+        ax.set_ylabel(r'$\mathregular{w_1}$: Recharge', fontsize = fs)
+    elif mdp_class == 'colored_tiles':
+        ax.set_xlabel('X: Tile A (brown)')
+        ax.set_ylabel('Y: Tile B (green)')
+    else:
+        ax.set_xlabel('X: Goal')
+        ax.set_ylabel('Y: Skateboard')
+    ax.set_zlabel('$\mathregular{w_2}$: Action', fontsize = fs)
+
+    # ax.view_init(elev=16, azim=-160)
+    if not view_params is None:
+        elev = view_params[0]
+        azim = view_params[1]
+    else:
+        elev = 30
+        azim = -140
+    ax.view_init(elev=elev, azim=azim)
+
+    ax.set_xlim(-1, 1)
+    ax.set_ylim(-1, 1)
+    ax.set_zlim(-1, 1)
+
+########################
     
-def sim_study_plots():
+def sim_study_plots(path, vars_filename_prefix = 'analysis'):
+
+    team_mix_full = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
+    demo_list = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge']
 
 
 
-    with open(path + '/analysis_trial_data.pickle', 'rb') as f:
-        trial_data_sc = pickle.load(f)
+    with open(path + '/' + vars_filename_prefix+ '_trial_data.pickle', 'rb') as f:
+        trial_data = pickle.load(f)
 
-    with open(path + '/analysis_interaction_data.pickle', 'rb') as f:
+
+    try:
+        with open(path + '/' + vars_filename_prefix+ '_trial_data_subset_N15_checked.pickle', 'rb') as f:
+            trial_data_subset = pickle.load(f)
+    except:
+        # For counterbalanced conditions
+        print('To calculate subset data')
+        
+        # # choose subset of counterbalanced conditions
+        # N=15 # number of conditions for each combination
+        
+        # subset_index = []
+        # for team in team_mix_full:
+        #     for demo in demo_list:
+        #         index = trial_data[(trial_data['team_composition'] == str(team)) & (trial_data['demo_strategy'] == demo)].index
+        #         print(len(index))
+        #         index_to_choose = random.sample(list(index), N)
+        #         subset_index.extend(index_to_choose)
+        # trial_data_subset = trial_data.loc[subset_index]
+
+        # with open(path + '/' + vars_filename_prefix + '_trial_data_subset_N15.pickle', 'wb') as f:
+        #     pickle.dump(trial_data_subset, f)
+
+        # trial_data_subset.to_csv(path + '/' + vars_filename_prefix + '_trial_data_subset_N15.csv', index=False)
+    ###############
+    
+    trial_data = copy.deepcopy(trial_data_subset)
+    
+
+    # with open(path + '/' + vars_filename_prefix+ '_trial_data_subset.pickle', 'rb') as f:
+    #     trial_data = pickle.load(f)
+
+    with open(path + '/' + vars_filename_prefix+ '_interaction_data.pickle', 'rb') as f:
         interaction_data = pickle.load(f)
 
-    with open(path + '/analysis_particles_prob.pickle', 'rb') as f:
+    with open(path + '/' + vars_filename_prefix+ '_particles_prob.pickle', 'rb') as f:
         prob_data = pickle.load(f)
 
-    with open(path + '/analysis_concept_data.pickle', 'rb') as f:
+    with open(path + '/' + vars_filename_prefix+ '_concept_data.pickle', 'rb') as f:
         concept_data = pickle.load(f)
 
-
+    # Combine with baseline
     with open(path + '/analysis_baseline_trial_data_teams.pickle', 'rb') as f:
         trial_data_base = pickle.load(f)
     
-    trial_data = pd.concat([trial_data_base, trial_data_sc], ignore_index=True)
+    trial_data_w_baseline = pd.concat([trial_data_base, trial_data], ignore_index=True)
 
-    trial_data.to_csv(path + '/analysis_trial_data_combined.csv', index=False)
+    # trial_data.to_csv(path + '/analysis_trial_data_combined.csv', index=False)
 
-    with open(path + '/analysis_trial_data_combined.pickle', 'wb') as f:
-        pickle.dump(trial_data, f)
+    # with open(path + '/analysis_trial_data_combined.pickle', 'wb') as f:
 
-    
-    # ## Choose conditions to plot
-    # know_list_full = ['individual', 'common_knowledge', 'joint_knowledge']
-    team_mix_full = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
-    # demo_list = ['individual_knowledge_low','individual_knowledge_high','common_knowledge','joint_knowledge', 'baseline']
-    
-    # know_list = know_list_full[0:]
-    # team_mix = team_mix_full[0:]
+    ##################
+
+    outliers = [14, 229] # identified from the boxplot; analysis_run_id; for N6 counterfactuals, N15 subset
+    trial_data = trial_data[~trial_data['analysis_run_id'].isin(outliers)]
+
+    print(len(trial_data), trial_data['analysis_run_id'])
+
+
+    #     pickle.dump(trial_data, f)
+
+    #####################################
+
 
     # # plot interaction count for both experimental conditions
     # f_c, ax_c = plt.subplots(ncols=1)
@@ -436,7 +575,7 @@ def sim_study_plots():
     # sns.barplot(data = trial_data, x = 'team_composition', y = 'max_loop_count', ax=ax_2[1], errorbar=('se',1)).set(title='Max number of interactions vs. Team composition')
     # plt.show()
 
-    # # #####################
+    # # # # #####################
 
     # f3, ax3 = plt.subplots(ncols=1)
     # sns.barplot(data = trial_data, x = 'demo_strategy', y = 'average_team_knowledge', hue = 'team_composition', ax=ax3, errorbar=('se',1)).set(title='Knowledge')
@@ -446,45 +585,188 @@ def sim_study_plots():
     # sns.barplot(data = trial_data, x = 'team_composition', y = 'average_team_knowledge', ax=ax_4[1], errorbar=('se',1)).set(title='Knowledge vs. Team composition')
     # plt.show()
 
-    #####################
-    # Learning dynamics over time
+    ###################
+    # ### Papper figure
+    demo_labels = ['Ind. (low)', 'Ind. (high)', 'Common', 'Joint']
+    order_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
 
-    # categorize low and high learners
-    prob_data['learner_type'] = np.where((prob_data['team_composition'][0]==0) & (), 'low', 'high')
+    f_c, ax_c = plt.subplots(nrows=2, ncols=2, figsize=(12, 10))
+    plt.subplots_adjust(wspace=0.3, hspace=0.3)
 
-    for i in range(4):
-        f5, ax5 = plt.subplots(ncols=1)
-        plot_data = prob_data[(prob_data['team_composition'] == str(team_mix_full[i])) & (prob_data['update_type'] == 'particles_prob_learner_after_feedback')]
-        sns.lineplot(data = plot_data, x = 'loop_count', y = 'BEC_prob', hue = 'demo_strategy', ax=ax5).set(title='Learning dynamics: ' + str(team_mix_full[i]))
-        plt.show()
+    
+    sns.barplot(data = trial_data, x = 'demo_strategy', y = 'max_loop_count', ax=ax_c[0,0], order=order_list, errorbar=('se',1)).set(title='Max number of interactions to learn')
+    ax_c[0,0].set_xlabel('Demo Strategy')
+    ax_c[0,0].set_ylabel('No. interactions')
+    ax_c[0,0].set_xticks(ticks=[0, 1, 2, 3], labels=demo_labels, fontsize=18)
+
+    sns.barplot(data = trial_data, x = 'demo_strategy', y = 'average_team_knowledge', ax=ax_c[0,1], order=order_list, errorbar=('se',1)).set(title='Average team knowledge')
+    ax_c[0,1].set_xlabel('Demo Strategy')
+    ax_c[0,1].set_ylabel('Average team knowledge, $\mathregular{p_{BEC}}$')
+    ax_c[0,1].set_xticks(ticks=[0, 1, 2, 3], labels=demo_labels, fontsize=18)
 
 
-    ##############
+    sns.barplot(data = trial_data, x = 'team_composition', y = 'max_loop_count', ax=ax_c[1,0], errorbar=('se',1)).set(title='Max number of interactions to learn')
+    ax_c[1,0].set_xlabel('Team Composition')
+    # ax_c[1,0].set_ylabel('No. interactions')
+
+    sns.barplot(data = trial_data, x = 'team_composition', y = 'average_team_knowledge', ax=ax_c[1,1], errorbar=('se',1)).set(title='Average team knowledge')
+    ax_c[1,1].set_xlabel('Team Composition')
+    # ax_c[1,1].set_ylabel('Average team knowledge, $\mathregular{p_{BEC}}$')    
+    
+    plt.show()
+    #############
+    # Violin plot - not uses
+
+    # f2, axv_2 = plt.subplots(nrows=2, ncols=2)
+    
+    
+    # sns.catplot(data=trial_data_w_baseline, x='demo_strategy', y='max_loop_count', kind="violin", cut=0)
+    # axv_2_1 = plt.gca()
+    # # axv_2_1.set_title('Max interactions to learn vs. Demo Strategy', fontsize=20)
+    # axv_2_1.set_xlabel('Demo Strategy')
+    # axv_2_1.set_ylabel('No. interactions')
+    # axv_2_1.set_xticks(ticks=[0, 1, 2, 3, 4], labels=demo_labels, fontsize=18)
+    # # axv_2_1.legend(title='Demo Strategy', title_fontsize='20', fontsize='20', labels=demo_labels)
+
+    # sns.catplot(data=trial_data_w_baseline, x="demo_strategy", y="average_team_knowledge", kind="violin", cut=0)
+    # axv_2_2 = plt.gca()
+    # # axv_2_2.set_title('Average team knowledge vs. Demo Strategy', fontsize=20)
+    # axv_2_2.set_xlabel('Demo Strategy')
+    # axv_2_2.set_ylabel('Average team knowledge, $\mathregular{p_{BEC}}$')
+    # axv_2_2.set_xticks(ticks=[0, 1, 2, 3, 4], labels=demo_labels, fontsize=18)
+
+    # plt.show()
+
+    # #####################
+    # # Learning dynamics over time
+    # team_mix_full = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
+    # # outliers = [103, 192, 316] run ids
+    # outliers = [113, 211, 350] # analysis run ids
+
+
+    # # categorize low and high learners
+    # learner_data_list = []
+    # prob_data['BEC_prob'] = prob_data['BEC_prob'].astype(float)
+    # run_id_list = prob_data['analysis_run_id'].unique()
+    # learner_data = pd.DataFrame()
+
+    # for analysis_run_id in run_id_list:
+    #     run_data = prob_data[(prob_data['analysis_run_id'] == analysis_run_id) & (prob_data['update_type'] == 'particles_prob_learner_after_feedback')].reset_index(drop=True)
+    #     # print('run_data: ', run_data)
+    #     team_composition = ast.literal_eval(run_data['team_composition'].iloc[0])
+    #     team_composition = [int(x) for x in team_composition]
+
+    #     loop_id_list = run_data['loop_count'].unique()
+
+    #     # for loop_id in loop_id_list:
+    #     loop_id = loop_id_list[-1]
+    #     loop_data = run_data[run_data['loop_count'] == loop_id]
+    #     # print('loop_data: ', loop_data)
+        
+    #     for member_id in range(len(team_composition)):
+    #         member = 'p' + str(member_id+1)
+    #         member_data = loop_data[loop_data['player_id'] == member]
+    #         # print('member_data: ', member_data)
+    #         if team_composition[member_id] == 0:
+    #             member_data['learner_type'] = 'naive'
+    #         else:
+    #             member_data['learner_type'] = 'proficient'
+
+    #         # learner_data_list.append(member_data.to_dict())
+    #         learner_data = pd.concat([learner_data, member_data], ignore_index=True)
+
+        
+    # # learner_data = pd.DataFrame(learner_data_list)
+
+    # with open(path + '/' + vars_filename_prefix + '_learner_data.pickle', 'wb') as f:
+    #     pickle.dump(learner_data, f)
+
+    # learner_data.to_csv(path + '/' + vars_filename_prefix + '_learner_data.csv', index=False)
+
+    # ###############################
+
+    # print(learner_data)
+
+    # ## learner data
+    # f6, ax6 = plt.subplots(ncols=1)
+    # sns.barplot(data = learner_data, x = 'demo_strategy', y = 'BEC_prob', hue = 'learner_type', ax=ax6, errorbar=('se',1)).set(title='Learner data vs. Demo Strategy')
+
+
+    # f7, ax7 = plt.subplots(ncols=1)
+    # sns.barplot(data = learner_data, x = 'team_composition', y = 'BEC_prob', hue = 'learner_type', ax=ax7, errorbar=('se',1)).set(title='Learner data vs. Team Composition')
+
+
+    # plt.show()
+    ##############################   
+
+    # Convert list to NumPy array
+        
+    #     ind_index_in_team = prob_data['player'][i].index(2)
+
+    # prob_data = prob_data.drop(prob_data[prob_data['analysis_run_id'].isin(outliers)].index)
+    # prob_data_plot = prob_data[prob_data['update_type'] == 'particles_prob_learner_after_feedback'].groupby(['analysis_run_id', 'team_composition', 'demo_strategy', 'loop_count']).agg({'BEC_prob': 'mean'}).reset_index()
+    # print(prob_data_plot)
+
+    # for i in range(4):
+    #     f5, ax5 = plt.subplots(ncols=1)
+
+    #     plot_data = prob_data_plot[(prob_data_plot['team_composition'] == str(team_mix_full[i]))]
+    #     print('plot_data: ', len(plot_data), 'i: ', i)
+    #     sns.lineplot(data = plot_data, x = 'loop_count', y = 'BEC_prob', hue = 'demo_strategy', hue_order = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge'], ax=ax5).set(title='Learning dynamics: ' + str(team_mix_full[i]))
+    #     plt.show()
+
+
+    #############
     # print(concept_data.dtypes)
 
     # concept_data['demo_strategy'] = concept_data['demo_strategy'].astype('string')
     # concept_data['team_composition'] = concept_data['team_composition'].astype('string')
-    # # Concept data
+
+    # run_list = trial_data['analysis_run_id'].unique()
+
+    # index = concept_data['analysis_run_id'].isin(run_list)
+
+    # concept_data = concept_data[index]
+
+
+    # Concept data
     # f6, ax6 = plt.subplots(ncols=1)
     # sns.barplot(data = concept_data, x = 'demo_strategy', y = 'N_interactions_learn_concept', hue = 'team_composition', ax=ax6, errorbar=('se',1)).set(title='Concept learning')
 
-    # # f7, ax7 = plt.subplots(ncols=1)
-    # # sns.barplot(data = concept_data, x = 'demo_strategy', y = 'avg_prob_learner_after_feedback', hue = 'team_composition', ax=ax7, errorbar=('se',1)).set(title='Concept learning')
-    
     # f7, ax7 = plt.subplots(ncols=1)
-    # sns.barplot(data = concept_data, x = 'demo_strategy', y = 'N_interactions_learn_concept', ax=ax7, errorbar=('se',1)).set(title='Concept learning')
-
+    # sns.barplot(data = concept_data, x = 'kc_id', y = 'N_interactions_learn_concept', hue = 'demo_strategy', ax=ax7, errorbar=('se',1)).set(title='Concept learning')
+    
     # f8, ax8 = plt.subplots(ncols=1)
-    # sns.barplot(data = concept_data, x = 'team_composition', y = 'N_interactions_learn_concept', ax=ax8, errorbar=('se',1)).set(title='Concept learning')
-
+    # sns.barplot(data = concept_data, x = 'kc_id', y = 'N_interactions_learn_concept', hue = 'team_composition', ax=ax8, errorbar=('se',1)).set(title='Concept learning')
+    
     # plt.show()
+
+    # kc_id_list = concept_data['kc_id'].unique()
+
+    # for kc_id in kc_id_list:
+    #     kc_data = concept_data[concept_data['kc_id'] == kc_id]
+
+    #     f7, ax7 = plt.subplots(ncols=1)
+    #     sns.barplot(data = kc_data, x = 'kc_id', y = 'avg_BEC_prob_learner_after_feedback', hue='demo_strategy', ax=ax7, errorbar=('se',1)).set(title='Concept learning for ' + str(kc_id))
+
+    #     f8, ax8 = plt.subplots(ncols=1)
+    #     sns.barplot(data = kc_data, x = 'kc_id', y = 'avg_BEC_prob_learner_after_feedback', hue='team_composition', ax=ax8, errorbar=('se',1)).set(title='Concept learning for ' + str(kc_id))
+
+    #     plt.show()
     #################
         
     # ## individual through interactions
     # colors = sns.color_palette("colorblind", 7).as_hex()
+    # players_color_dict = {'p1': str(colors[0]), 'p2': str(colors[1]), 'p3': str(colors[2])}
     # color_dict = {'particles_prob_learner_before_demo': str(colors[0]), 'particles_prob_learner_after_demo': str(colors[1]), 'particles_prob_learner_before_test': str(colors[2]),  'particles_prob_learner_after_feedback': str(colors[3])}
-    # run_id_list = [1147]
+    # run_id_list = [1130]
+    # run_filepath = 'N_diagnostic_tests/sim_study/03_02_sim_study_test_final_2_study_200_run_1130.pickle'
     # study_id = prob_data['study_id'].iloc[0]
+    # kc_id_list = prob_data['kc_id'].unique()
+    # print('kc_id_list: ', kc_id_list)
+
+
+
 
     # for run_id in run_id_list:
     #     plot_data = prob_data[(prob_data['run_no']==run_id) & \
@@ -494,6 +776,17 @@ def sim_study_plots():
     #     f_p, ax_p = plt.subplots(nrows=2, figsize=(15, 10))
 
     #     player_id_list = plot_data['player_id'].unique()
+    #     interaction_id_list = plot_data['loop_count'].unique()
+
+    #     with open(path + '/' + run_filepath, 'rb') as f:
+    #         pf_data = pickle.load(f)
+
+
+            
+
+
+
+
 
     #     int_fill_flag=False
     #     for player_id in player_id_list:
@@ -502,21 +795,78 @@ def sim_study_plots():
     #         plot_data_player['interaction_number'] = interaction_number
     #         plot_data_player = plot_data_player.reset_index(drop=True)
 
-    #         # plot
-    #         sns.lineplot(plot_data_player, x = 'interaction_number', y = 'kc_prob', ax=ax_p[0]) 
-    #         sns.lineplot(plot_data_player, x = 'interaction_number', y = 'BEC_prob', ax=ax_p[1])
+    #         # get particles prob
+    #         prob_particles = [0]
+    #         for id, row in pf_data.iterrows():
+    #             learner_pf_after_demo = row['particles_team_learner_after_demos'][player_id]
+    #             learner_pf_after_feedback = row['particles_team_learner_final'][player_id]
 
+
+
+    #             learner_pf_after_demo.calc_particles_probability(row['min_BEC_constraints'])
+    #             prob_particles.append(learner_pf_after_demo.particles_prob_correct) # after demo
+    #             prob_particles.append(learner_pf_after_demo.particles_prob_correct) # test
+                
+    #             learner_pf_after_feedback.calc_particles_probability(row['min_BEC_constraints'])
+    #             prob_particles.append(learner_pf_after_feedback.particles_prob_correct) # after feedback
+
+    #             if id != len(pf_data)-1:
+    #                 prob_particles.append(learner_pf_after_demo.particles_prob_correct) # before demo
+
+
+    #         print('player:', player_id, 'prob_particles: ', prob_particles)
+
+    #         plot_data_player['BEC_prob_pf'] = prob_particles
+
+    #         for kc_id in kc_id_list:
+    #             plot_data_player_kc = plot_data_player[plot_data_player['kc_id']==kc_id]
+    #             ax_p[0].axvline(x=plot_data_player_kc['interaction_number'].iloc[-1], color='black', linestyle='--')
+    #             ax_p[1].axvline(x=plot_data_player_kc['interaction_number'].iloc[-1], color='black', linestyle='--')
+
+    #         # plot for each interaction number
+    #         for int_id in interaction_id_list:
+    #             plot_data_int = plot_data_player[plot_data_player['loop_count']==int_id]
+                    
+    #             # plot for each KC of each player
+    #             sns.lineplot(data = plot_data_int, x = 'interaction_number', y = 'kc_prob', ax=ax_p[0], color=players_color_dict[player_id]) 
+    #             sns.lineplot(data = plot_data_int, x = 'interaction_number', y = 'BEC_prob_pf', ax=ax_p[1], color=players_color_dict[player_id])
+
+    #         xtick_values = []
+    #         xtick_pos = []
+    #         for id, row in plot_data_player.iterrows():
+    #             if row['update_type'] == 'particles_prob_learner_after_feedback':
+    #                 xtick_pos.append(row['interaction_number'])
+    #                 xtick_values.append(str(row['loop_count']))
+    #             else:
+    #                 xtick_pos.append(row['interaction_number'])
+    #                 xtick_values.append('')
+
+
+    #         ax_p[0].set_xticks(xtick_pos)
+    #         ax_p[1].set_xticks(xtick_pos)
+
+    #         ax_p[0].set_xticklabels(xtick_values)
+    #         ax_p[1].set_xticklabels(xtick_values)
 
     #         if not int_fill_flag:
     #             for id, row in plot_data_player.iterrows():
-    #                 print('id:', id)
+    #                 if row['update_type'] == 'particles_prob_learner_after_feedback':
+    #                     interaction_type = 'Feedback'
+    #                 elif row['update_type'] == 'particles_prob_learner_before_test':
+    #                     interaction_type = 'Test'
+    #                 elif row['update_type'] == 'particles_prob_learner_after_demo':
+    #                     interaction_type = 'Demo'
+    #                 else:
+    #                     interaction_type = ''
+                    
+    #                 # print('id:', id)
     #                 if id > 0:
     #                     # plt.axvline(x=row['combined_demo_id'], color='red', linestyle='--')
     #                     ax_p[0].axvspan(plot_data_player['interaction_number'].iloc[id-1], row['interaction_number'], alpha=0.2, color=color_dict[row['update_type']])
-    #                     ax_p[0].text(row['interaction_number']-0.5, 0.3, row['update_type'], rotation=90, fontsize=10, weight="bold")
+    #                     ax_p[0].text(row['interaction_number']-0.5, 0.1, interaction_type, rotation=90, fontsize=11, weight="bold")
 
     #                     ax_p[1].axvspan(plot_data_player['interaction_number'].iloc[id-1], row['interaction_number'], alpha=0.2, color=color_dict[row['update_type']])
-    #                     ax_p[1].text(row['interaction_number']-0.5, 0.3, row['update_type'], rotation=90, fontsize=10, weight="bold")
+    #                     ax_p[1].text(row['interaction_number']-0.5, 0.1, interaction_type, rotation=90, fontsize=11, weight="bold")
     #             int_fill_flag = True
 
     #     filename = 'Study ' + str(study_id) + '. Run ' + str(run_id) + '. Team mix ' + str(plot_data['team_composition'].iloc[0]) + '. Demo strategy ' + str(plot_data['demo_strategy'].iloc[0])
@@ -525,7 +875,7 @@ def sim_study_plots():
 
     #     plt.show()
     #     plt.savefig('models/augmented_taxi2/' + filename + '.png')
-    ##################################3
+    #################################3
     ## plot distributions
 
     # # plot particle distribution
@@ -2049,19 +2399,25 @@ def run_sensitivity_analysis(path, files, file_prefix_list, runs_to_exclude_list
         sensitivity_data_dict['learning_factor_high_learner'] = learning_factor_high_learner
         sensitivity_data_dict['learning_factor_low_learner'] = learning_factor_low_learner
 
+        sim_params = sim_vars['params_conditions'].iloc[0]
+
         # for parameters that were missed to directly be recorded
         if parameter_combinations is not None:
-            sensitivity_data_dict['teacher_learning_factor'] = np.round(parameter_combinations[study_id-1][4], 2)
-            sensitivity_data_dict['learning_rate'] = np.round(parameter_combinations[study_id-1][2],2)
+            # sensitivity_data_dict['teacher_learning_factor'] = np.round(parameter_combinations[study_id-1][4], 2)
+            # sensitivity_data_dict['learning_rate'] = np.round(parameter_combinations[study_id-1][2],2)
+            sensitivity_data_dict['teacher_learning_factor'] = np.round(sim_params[4], 2)
+            sensitivity_data_dict['learning_rate'] = np.round(sim_params[2],2)
         else:
             if param_varied == 'default_learning_factor_teacher':
-                sensitivity_data_dict['teacher_learning_factor'] = params_to_study[param_varied][study_id-1]
+                # sensitivity_data_dict['teacher_learning_factor'] = params_to_study[param_varied][study_id-1]
+                sensitivity_data_dict['teacher_learning_factor'] = np.round(sim_params[4],2)
             else:
                 print('teacher factor center value: ', params_to_study['default_learning_factor_teacher'][5])
                 sensitivity_data_dict['teacher_learning_factor'] = params_to_study['default_learning_factor_teacher'][5] # center value!
 
             if param_varied == 'learning_rate':
-                sensitivity_data_dict['learning_rate'] = params_to_study[param_varied][study_id-1]
+                # sensitivity_data_dict['learning_rate'] = params_to_study[param_varied][study_id-1]
+                sensitivity_data_dict['learning_rate'] = np.round(sim_params[2],2)
             else:
                 print('learning rate center value: ', params_to_study['learning_rate'][5])
                 sensitivity_data_dict['learning_rate'] = params_to_study['learning_rate'][5]
@@ -2078,12 +2434,33 @@ def run_sensitivity_analysis(path, files, file_prefix_list, runs_to_exclude_list
         # sensitivity_data_dict['bec_final'] = bec_final
 
 
+
+        # ##  each test has probability separately
+        # for prob_dict in sim_vars[var_name][i]:
+        ## joint test has probability separately
+        team_particles_probability_dict = {}
+        for key, val in sim_vars['particles_prob_learner_after_feedback'].iloc[-1].items():
+            # print('key: ', key, ' val: ', val)
+            team_particles_probability_dict[key] = float(val)
+
+        learner_BEC_prob = []
+        for p_id, player in enumerate(team_particles_probability_dict):
+            particles_learner_current = sim_vars['particles_team_learner_final'][i][player]
+            min_BEC_constraints = sim_vars['min_BEC_constraints'][i]
+            particles_learner_current.calc_particles_probability(min_BEC_constraints)
+            BEC_prob = particles_learner_current.particles_prob_correct
+
+            learner_BEC_prob.append(BEC_prob)
+
+        sensitivity_data_dict['average_BEC_prob'] = np.round(float(np.mean(learner_BEC_prob)),4)
+
+
         return sensitivity_data_dict
 
     #####################
 
     try: 
-        with open(path + '/sensitivity_data2.pickle', 'rb') as f:
+        with open(path + '/' + vars_filename_prefix + '_sensitivity_data.pickle', 'rb') as f:
             sensitivity_data = pickle.load(f)
 
     except:
@@ -2209,8 +2586,8 @@ def run_sensitivity_analysis(path, files, file_prefix_list, runs_to_exclude_list
                         sensitivity_data_list.append(sensitivity_data_dict)
 
         sensitivity_data = pd.DataFrame(sensitivity_data_list)
-        sensitivity_data.to_csv(path + '/sensitivity_data.csv')
-        with open(path + '/sensitivity_data.pickle', 'wb') as f:
+        sensitivity_data.to_csv(path + '/' + vars_filename_prefix + '_sensitivity_data.csv')
+        with open(path + '/' + vars_filename_prefix + '_sensitivity_data.pickle', 'wb') as f:
             pickle.dump(sensitivity_data, f)
     #############
     print(sensitivity_data)
@@ -2218,17 +2595,27 @@ def run_sensitivity_analysis(path, files, file_prefix_list, runs_to_exclude_list
     ##############
     # plot
 
-    fig, axs = plt.subplots(2, 3, figsize=(20, 6), sharey=True)
+    fig, axs = plt.subplots(2, 3, figsize=(15, 10))
 
     row_id, col_id = 0, 0
-    for i, param_varied in enumerate(['learning_factor_low_learner', 'learning_factor_high_learner', 'learning_rate', 'max_learning_factor', 'teacher_learning_factor']):
+    for i, param_varied in enumerate(['learning_factor_low_learner', 'learning_factor_high_learner', 'learning_rate']):
+
+        # if param_varied == 'learning_factor_low_learner':
+        #     param_label = 'Naive learner $\mathregular{\beta_0}$'
+        # elif param_varied == 'learning_factor_high_learner':
+        #     param_label = 'Proficient learner $\mathregular{\beta_1}$'
+        # elif param_varied == 'learning_rate':
+        #     param_label = 'Learning rate $\mathregular{\delta\, \beta_i}'
+        # elif param_varied == 'teacher_learning_factor':
+        #     param_label = 'Teacher $\mathregular{\beta}$'
         
-        sns.lineplot(data=sensitivity_data, x=param_varied, y='max_loop_count', ax=axs[row_id, col_id], errorbar='se').set(title=  param_varied)
+        sns.lineplot(data=sensitivity_data, x=param_varied, y='max_loop_count', ax=axs[0, col_id], errorbar='se').set(title =  param_varied)
+        sns.regplot(data=sensitivity_data, x=param_varied, y='max_loop_count', ax=axs[0, col_id]).set(title =  param_varied)
+        sns.regplot(data=sensitivity_data, x=param_varied, y='average_BEC_prob', ax=axs[1, col_id]).set(title=  param_varied)
+        sns.lineplot(data=sensitivity_data, x=param_varied, y='average_BEC_prob', ax=axs[1, col_id], errorbar='se').set(title=  param_varied)
         col_id += 1
 
-        if i==2:
-            row_id += 1
-            col_id = 0
+
 
     plt.show()
 
@@ -3068,29 +3455,228 @@ def read_prob_data(path, file):
     
 
 ################################
+    
+def read_demo_gen_log(demo_file_name, new_flag=False):
 
-def plot_pf_dist(path, file):
+    # Initialize the lists to store the data
+    lengths = []
+    constraint_spaces = []
+    sample_models = []
+    max_info_gains = []
+    N_clusters = []
+    cluster_weights = []
+    samp_models_cluster_idxs = []
+    
+
+
+    # Variable to collect sample models temporarily
+    temp_models = []
+
+    # Function to clean model lines
+    def clean_model_line(line):
+        return line.strip().replace('\n', '').replace('[', '').replace(']', '').split()
+
+    # # Read the file
+    if not new_flag:
+        with open(demo_file_name, 'r') as file:
+            for line in file:
+                if line.startswith('Length of summary:'):
+                    # Save previously collected models before resetting
+                    if temp_models:
+                        sample_models.append(temp_models)
+                        temp_models = []  # Reset for the next entry
+                    length = int(line.split(': ')[1].strip())
+                    lengths.append(length)
+                elif line.startswith('constraint_space_to_sample_human_models:'):
+                    constraint_space = line.split(': ')[1].strip()
+                    constraint_spaces.append(constraint_space)
+                elif line.startswith('sample_human_models:'):
+                    # print('line: ', line)
+                    short_line = line.split(': ')[1].strip()
+                    # print('short_line: ', short_line)
+                    temp_models.append(clean_model_line(short_line))
+                elif line.startswith(' [['):  # Assuming model lines start with '[['
+                    temp_models.append(clean_model_line(line))
+                elif line.startswith('Max infogain:'):  # End of current entry
+                    max_info_gain = float(line.split(': ')[1].strip())
+                    max_info_gains.append(max_info_gain)
+                elif line.startswith('N clusters:'):
+                    N_cluster = float(line.split(': ')[1].strip())
+                    N_clusters.append(N_cluster)
+                elif line.startswith('Cluster weights:'):
+                    Cluster_weight = line.split(': ')[1].strip()
+                    cluster_weights.append(Cluster_weight)
+                elif line.startswith('sampled_models_cluster_idxs:'):
+                    cluster_idx = line.split(': ')[1].strip()
+                    samp_models_cluster_idxs.append(cluster_idx)
+
+                    
+        # Add the last set of models collected if not already added
+        if temp_models:
+            sample_models.append(temp_models)
+        ##################
+    else:
+        # Read the file
+        with open(demo_file_name, 'r') as file:
+            for line in file:
+                if line.startswith('Length of summary:'):
+                    length = int(line.split(': ')[1].strip())
+                    lengths.append(length)
+                elif line.startswith('constraint_space_to_sample_human_models:'):
+                    constraint_space = line.split(': ')[1].strip()
+                    constraint_spaces.append(constraint_space)
+                elif line.startswith('sample_human_models:'):
+                    array_string = line.split(': ')[1].strip()
+                    temp_models = array_string.replace('array', '')
+                    # print('array_string: ', temp_models)
+
+                    array_strings = temp_models.split("]), ([")
+                    array_strings[0] = array_strings[0].replace("[([", "")
+                    array_strings[-1] = array_strings[-1].replace("])]", "")
+                    # print('array_strings: ', array_strings)
+
+                    # Convert array strings to NumPy arrays
+                    sample_arrays = [np.array(eval(arr)) for arr in array_strings]
+
+                    # print('sample_arrays: ', sample_arrays)
+                    sample_models.append(sample_arrays)
+                elif line.startswith('Max infogain:'):  # End of current entry
+                    max_info_gain = float(line.split(': ')[1].strip())
+                    max_info_gains.append(max_info_gain)
+                elif line.startswith('N clusters:'):
+                    N_cluster = float(line.split(': ')[1].strip())
+                    N_clusters.append(N_cluster)
+                elif line.startswith('Cluster weights:'):
+                    Cluster_weight = line.split(': ')[1].strip()
+                    cluster_weights.append(Cluster_weight)
+                elif line.startswith('sampled_models_cluster_idxs:'):
+                    cluster_idx = line.split(': ')[1].strip()
+                    samp_models_cluster_idxs.append(cluster_idx)
+
+
+    ##############################
+
+
+    max_info_gain_updated = []
+    # interaction_number = []  # does not collect it correctly; just compare summary lengths
+    max_info_id = 0
+    int_id = 1
+    for i in range(len(lengths)-1):
+        # interaction_number.append(int_id)
+
+        if lengths[i] == lengths[i+1]:
+            max_info_gain_updated.append(0)
+            # int_id += 1  # update interaction number
+        else:
+            max_info_gain_updated.append(max_info_gains[max_info_id])
+            max_info_id += 1
+
+    # interaction_number.append(int_id)
+    max_info_gain_updated.append(0) # for the final summary
+
+
+    # # clean interaction number! (not complete)
+    # int_no_to_adjust = []
+    # for length in lengths:
+    #     int_no_ids = [i for i, x in enumerate(lengths) if x == length]
+    #     uniq_int = interaction_number[int_no_ids].unique()
+    #     if len(uniq_int) > 2:
+    #         int_data = []
+    #         for uniq_i in uniq_int:
+    #             int_data.append([uniq_i, len(interaction_number[uniq_i])])
+
+    #         int_no_to_adjust.append()
+    # print('lengths: ', len(lengths))
+    # print('constraint_spaces: ', len(constraint_spaces))
+    # print('sample_models: ', len(sample_models))
+    # print('max_info_gains: ', len(max_info_gain_updated))
+
+    # print('lengths: ', lengths)
+    # print('constraint_spaces: ', constraint_spaces)
+    # print('sample_models: ', sample_models)
+    # print('max_info_gains: ', max_info_gain_updated)
+
+
+
+    # Create a DataFrame
+    df = pd.DataFrame({
+        'length_of_summary': lengths,
+        'constraint_space_to_sample_human_models': constraint_spaces,
+        'sample_human_models': sample_models,
+        'max_infogain': max_info_gain_updated,
+        'N_clusters': N_clusters,
+        'cluster_weights': cluster_weights,
+        'sampled_models_cluster_idxs': samp_models_cluster_idxs
+    })
+
+
+    return df
+
+##########################
+
+def plot_pf_dist(path, file, counterfactuals_plot_flag = False):
 
     with open(path + '/' + file, 'rb') as f:
         pf_data = pickle.load(f)
 
+    if counterfactuals_plot_flag:
+        folder = file.strip('.pickle')
+        demo_file_name = path + '/' + folder + '/demo_gen_log.txt'
+        counterfactuals = read_demo_gen_log(demo_file_name)
+        counterfactuals.to_csv(path + '/' + folder + '_counterfactuals.csv')
+            
+    for i in range(len(counterfactuals)):
+        counterfactuals['sample_human_models'].iloc[i] = [np.array(x).astype(float) for x in counterfactuals['sample_human_models'].iloc[i]]
+    
+    # print(counterfactuals)
+
+    # print(type(counterfactuals['sample_human_models'].iloc[0]))
+    # print(counterfactuals['sample_human_models'].iloc[0])
+
     # print(pf_data)
 
     # plot data
-
-
+    BEC_area_constraints_list = []
     for int_id in range(len(pf_data)):
         learner_pf_after_demo = pf_data['particles_team_learner_after_demos'].iloc[int_id]
         learner_pf_after_test = pf_data['particles_team_learner_final'].iloc[int_id]
         teacher_pf_after_demo = pf_data['particles_team_teacher_after_demos'].iloc[int_id]
-        teacher_pf_after_test = pf_data['particles_team_teacher_final'].iloc[int_id]
+        teacher_pf_after_feedback = pf_data['particles_team_teacher_final'].iloc[int_id]
 
-        sampled_models = pf_data['team_response_models'].iloc[int_id]
+        test_response_models = pf_data['team_response_models'].iloc[int_id]
         min_KC_constraints = pf_data['min_KC_constraints'].iloc[int_id]
         min_BEC_constraints = pf_data['min_BEC_constraints'].iloc[int_id]
+        test_responses = pf_data['test_constraints_team'].iloc[int_id]
+        team_learning_factor = pf_data['team_learning_factor'].iloc[int_id]
+        knowledge_id = pf_data['knowledge_id'].iloc[int_id]
 
+        unit_constraints = pf_data['unit_constraints'].iloc[int_id]
+        BEC_area_constraints = BEC_helpers.calc_solid_angles(unit_constraints)
+        BEC_area_constraints_list.append(BEC_area_constraints)
 
-        print('sampled_models: ', sampled_models)
+        # find sampled counterfactuals
+        summary_count = pf_data['summary_count'].iloc[int_id]
+        counterfactual_models_list = counterfactuals[counterfactuals['length_of_summary']==summary_count]['sample_human_models']
+        counterfactual_models = counterfactual_models_list.iloc[0]
+        
+        # find the summary counts for this interaction
+        indices_to_check = counterfactuals.index[(counterfactuals.index <= counterfactual_models_list.index[0]) & (counterfactuals.index > counterfactuals.index[0])]
+        indices_to_check = indices_to_check[::-1]
+        max_info_gain = []
+        for idx in indices_to_check:
+            if counterfactuals['length_of_summary'].iloc[idx] != counterfactuals['length_of_summary'].iloc[idx-1]:
+                max_info_gain.append(np.round(counterfactuals['max_infogain'].iloc[idx-1],2))
+            else:
+                break
+
+        # print('indices_to_check:', indices_to_check, 'max_info_gain:', max_info_gain)
+        # max_info_gain_list = counterfactuals[counterfactuals['length_of_summary']==summary_count]['max_infogain']
+        # max_info_gain = max_info_gain_list.iloc[0]
+        
+        
+
+        # print('summary_count: ', summary_count, 'counterfactual_models: ', counterfactual_models)
+        # print('sampled_models: ', test_response_models)
 
         # f2, ax2 = plt.subplots(nrows=2, ncols=5, sharex=True, sharey=True, figsize=(15,10))
         # plt.subplots_adjust(wspace=0.1, hspace=0.1)
@@ -3106,103 +3692,157 @@ def plot_pf_dist(path, file):
             ax2_list.append(ax)
         ax2 = np.array(ax2_list)
 
-        print(len(ax2))
+        # print(len(ax2))
 
         for p in range(params.team_size):
             member_id = 'p' + str(p+1)
             teacher_pf_after_demo[member_id].plot(fig=f2, ax=ax2[p])
             teacher_pf_after_demo[member_id].calc_particles_probability(min_KC_constraints)
-            print('teacher_pf_prob_after_demo: ', teacher_pf_after_demo[member_id].particles_prob_correct)
+            # print('teacher_pf_prob_after_demo: ', teacher_pf_after_demo[member_id].particles_prob_correct)
 
-            print('p: ', p)
-            N_models = len(sampled_models[member_id])
-            for model_id in range(N_models):
-                print('model: ', sampled_models[member_id][model_id])
-                if N_models ==1 :
-                    ax2[p].scatter(sampled_models[member_id][model_id][0], sampled_models[member_id][model_id][1], sampled_models[member_id][model_id][2],  color='r', s=50)
-                else:
-                    ax2[p].scatter(sampled_models[member_id][model_id][0][0], sampled_models[member_id][model_id][0][1], sampled_models[member_id][model_id][0][2],  color='r', s=50)
-            
+            # print('p: ', p)
+            # N_models = len(test_response_models[member_id])
+            # for model_id in range(N_models):
+                # print('model: ', test_response_models[member_id][model_id])
+                # if N_models ==1 :
+                #     print(sampled_models[member_id][model_id])
+                #     ax2[p].scatter(sampled_models[member_id][model_id][0], sampled_models[member_id][model_id][1], sampled_models[member_id][model_id][2],  color='r', s=50)
+                # else:
+                    # test response model
+                    # ax2[p].scatter(test_response_models[member_id][model_id][0][0], test_response_models[member_id][model_id][0][1], test_response_models[member_id][model_id][0][2],  color='r', s=50)
+
+                
+            # counterfactual model for next interaction! (just the first)
+            if knowledge_id == member_id:
+                for counterfactual_model in counterfactual_models:
+                    ax2[5+p].scatter(counterfactual_model[0], counterfactual_model[1], counterfactual_model[2],  color='r', marker='+', s=20)
+                ax2[5+p].text(-1, 1, 1, 'ig: ' + str(max_info_gain), color='k')
+
+
             ax2[p].set_title('Teacher after demo ' + member_id)
-            teacher_pf_after_test[member_id].plot(fig=f2, ax=ax2[5+p])
-            ax2[5+p].set_title('Teacher after test ' + member_id)
+            teacher_pf_after_feedback[member_id].plot(fig=f2, ax=ax2[5+p])
+            ax2[5+p].set_title('Teacher after feedback ' + member_id)
 
-            teacher_pf_after_test[member_id].calc_particles_probability(min_KC_constraints)
-            print('teacher_pf_after_test: ', teacher_pf_after_test[member_id].particles_prob_correct)
+            teacher_pf_after_feedback[member_id].calc_particles_probability(min_KC_constraints)
+            print('teacher_pf_after_feedback: ', teacher_pf_after_feedback[member_id].particles_prob_correct)
 
+            label_axes(ax2[p], params.mdp_class, params.weights['val'])
+            label_axes(ax2[5+p], params.mdp_class, params.weights['val'])
+
+
+        # common and joint after demo
         teacher_pf_after_demo['common_knowledge'].plot(fig=f2, ax=ax2[3])
         ax2[3].set_title('Teacher after demo common knowledge')
-        teacher_pf_after_test['common_knowledge'].plot(fig=f2, ax=ax2[4])
-        ax2[4].set_title('Teacher after test common knowledge')
-        teacher_pf_after_demo['joint_knowledge'].plot(fig=f2, ax=ax2[8])
-        ax2[8].set_title('Teacher after demo joint knowledge')
-        teacher_pf_after_test['joint_knowledge'].plot(fig=f2, ax=ax2[9])
-        ax2[9].set_title('Teacher after test joint knowledge')
+
+        teacher_pf_after_demo['joint_knowledge'].plot(fig=f2, ax=ax2[4])
+        ax2[4].set_title('Teacher after demo joint knowledge')
+
+
+        # common and joint after feedback
+        
+        teacher_pf_after_feedback['common_knowledge'].plot(fig=f2, ax=ax2[8])
+        ax2[8].set_title('Teacher after feedback common knowledge')
+        if knowledge_id == 'common_knowledge':
+            for counterfactual_model in counterfactual_models:
+                ax2[8].scatter(counterfactual_model[0], counterfactual_model[1], counterfactual_model[2],  color='r', marker='+', s=20)
+            ax2[8].text(-1, 1, 1, 'ig: ' + str(max_info_gain), color='k')
+
+        
+        teacher_pf_after_feedback['joint_knowledge'].plot(fig=f2, ax=ax2[9])
+        ax2[9].set_title('Teacher after feedback joint knowledge')
+        if knowledge_id == 'joint_knowledge':
+            for counterfactual_model in counterfactual_models:
+                ax2[9].scatter(counterfactual_model[0], counterfactual_model[1], counterfactual_model[2],  color='r', marker='+', s=20)
+            ax2[9].text(-1, 1, 1, 'ig: ' + str(max_info_gain), color='k')
+    
+        label_axes(ax2[3], params.mdp_class, params.weights['val'])
+        label_axes(ax2[4], params.mdp_class, params.weights['val'])
+        label_axes(ax2[8], params.mdp_class, params.weights['val'])
+        label_axes(ax2[9], params.mdp_class, params.weights['val'])
 
 
         teacher_pf_after_demo['common_knowledge'].calc_particles_probability(min_KC_constraints)
         print('teacher_pf_after_demo: ', teacher_pf_after_demo['common_knowledge'].particles_prob_correct)
 
-        teacher_pf_after_test['common_knowledge'].calc_particles_probability(min_KC_constraints)
-        print('teacher_pf_after_test: ', teacher_pf_after_test['common_knowledge'].particles_prob_correct)
+        teacher_pf_after_feedback['common_knowledge'].calc_particles_probability(min_KC_constraints)
+        print('teacher_pf_after_feedback: ', teacher_pf_after_feedback['common_knowledge'].particles_prob_correct)
 
         teacher_pf_after_demo['common_knowledge'].calc_particles_probability(min_BEC_constraints)
         print('teacher_pf_BEC_after_demo: ', teacher_pf_after_demo['common_knowledge'].particles_prob_correct)
 
-        teacher_pf_after_test['common_knowledge'].calc_particles_probability(min_BEC_constraints)
-        print('teacher_pf_BEC_after_test: ', teacher_pf_after_test['common_knowledge'].particles_prob_correct)
+        teacher_pf_after_feedback['common_knowledge'].calc_particles_probability(min_BEC_constraints)
+        print('teacher_pf_BEC_after_feedback: ', teacher_pf_after_feedback['common_knowledge'].particles_prob_correct)
 
-        f2.suptitle('Teacher Particle Filter Distribution int no: ' + str(int_id))
+        f2.suptitle('Teacher Particle Filter Distribution int no: ' + str(int_id+1))
 
-        plt.savefig(path + '/pf_dist_teacher_' + file + str(int_id) + '.png')
+        plt.savefig(path + '/pf_dist_teacher_' + file + str(int_id+1) + '.png')
+
+        #####################################
 
 
-
-        f = plt.figure(figsize=(15,10))
-        ax1_0 = f.add_subplot(2, 3, 1, projection='3d')
-        ax1_list = [ax1_0]
+        # f = plt.figure(figsize=(15,10))
+        # ax1_0 = f.add_subplot(2, 3, 1, projection='3d')
+        # ax1_list = [ax1_0]
         
-        for i in range(1, 6):
-            # Create each subplot with shared axes
-            ax = f.add_subplot(2, 3, i + 1, projection='3d', sharex=ax1_0, sharey=ax1_0, sharez=ax1_0)
-            # Append the subplot to the list
-            ax1_list.append(ax)
-        ax1 = np.array(ax1_list)
+        # for i in range(1, 6):
+        #     # Create each subplot with shared axes
+        #     ax = f.add_subplot(2, 3, i + 1, projection='3d', sharex=ax1_0, sharey=ax1_0, sharez=ax1_0)
+        #     # Append the subplot to the list
+        #     ax1_list.append(ax)
+        # ax1 = np.array(ax1_list)
         
-        for p in range(params.team_size):
-            member_id = 'p' + str(p+1)
-            learner_pf_after_demo[member_id].plot(fig=f, ax=ax1[p])
-            utils_teams.visualize_planes_team(min_KC_constraints, fig=f, ax= ax1[p])
+        # for p in range(params.team_size):
+        #     member_id = 'p' + str(p+1)
+        #     learner_pf_after_demo[member_id].plot(fig=f, ax=ax1[p])
+        #     utils_teams.visualize_planes_team(min_KC_constraints, fig=f, ax= ax1[p], alpha=0.25)
+        #     ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(min_KC_constraints)
+        #     poly = Polyhedron.Polyhedron(ieqs=ieqs)
+        #     BEC_viz.visualize_spherical_polygon(poly, fig=f, ax=ax1[p], plot_ref_sphere=False, alpha=0.25)
+
+
             
-            print('p: ', p)
-            N_models = len(sampled_models[member_id])
-            for model_id in range(N_models):
-                print('model: ', sampled_models[member_id][model_id])
-                if N_models ==1 :
-                    ax1[p].scatter(sampled_models[member_id][model_id][0], sampled_models[member_id][model_id][1], sampled_models[member_id][model_id][2],  color='r', s=50)
-                else:
-                    ax1[p].scatter(sampled_models[member_id][model_id][0][0], sampled_models[member_id][model_id][0][1], sampled_models[member_id][model_id][0][2],  color='r', s=50)
+        #     print('p: ', p)
+        #     N_models = len(test_response_models[member_id])
+        #     for model_id in range(N_models):
+        #         print('model: ', test_response_models[member_id][model_id])
+        #         # if N_models ==1 :
+        #         #     ax1[p].scatter(test_response_models[member_id][model_id][0], test_response_models[member_id][model_id][1], test_response_models[member_id][model_id][2],  color='r', s=50)
+        #         # else:
+        #         ax1[p].scatter(test_response_models[member_id][model_id][0][0], test_response_models[member_id][model_id][0][1], test_response_models[member_id][model_id][0][2],  color='r', s=50)
             
-            ax1[p].set_title('Learner after demo ' + member_id)
-            learner_pf_after_demo[member_id].plot(fig=f2, ax=ax1[3+p])
-            utils_teams.visualize_planes_team(min_KC_constraints, fig=f, ax= ax1[3+p])
-            ax1[3+p].set_title('Learner after test ' + member_id)
+        #     ax1[p].set_title('Learner after demo ' + member_id)
+        #     learner_pf_after_demo[member_id].plot(fig=f2, ax=ax1[3+p])
+        #     utils_teams.visualize_planes_team(test_responses[p], fig=f, ax= ax1[3+p], alpha=0.25)
+        #     ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(test_responses[p])
+        #     poly = Polyhedron.Polyhedron(ieqs=ieqs)
+        #     BEC_viz.visualize_spherical_polygon(poly, fig=f, ax=ax1[3+p], plot_ref_sphere=False, alpha=0.25)
+        #     ax1[3+p].set_title('Learner after feedback ' + member_id)
 
-            learner_pf_after_demo[member_id].calc_particles_probability(min_KC_constraints)
-            print('learner_pf_after_demo: ', learner_pf_after_demo[member_id].particles_prob_correct)
+        #     learner_pf_after_demo[member_id].calc_particles_probability(min_KC_constraints)
+        #     print('learner_pf_after_demo: ', learner_pf_after_demo[member_id].particles_prob_correct)
+        #     learner_after_demo_text = 'p_KC:' + str(np.round(learner_pf_after_demo[member_id].particles_prob_correct,3))
 
-            learner_pf_after_test[member_id].calc_particles_probability(min_KC_constraints)
-            print('learner_pf_after_test: ', learner_pf_after_test[member_id].particles_prob_correct)
+        #     learner_pf_after_test[member_id].calc_particles_probability(min_KC_constraints)
+        #     print('learner_pf_after_feedback: ', learner_pf_after_test[member_id].particles_prob_correct)
+        #     learner_after_test_text = 'p_KC:' + str(np.round(learner_pf_after_test[member_id].particles_prob_correct,3))
 
-            learner_pf_after_demo[member_id].calc_particles_probability(min_BEC_constraints)
-            print('learner_pf_BEC_after_demo: ', learner_pf_after_demo[member_id].particles_prob_correct)
+        #     learner_pf_after_demo[member_id].calc_particles_probability(min_BEC_constraints)
+        #     print('learner_pf_BEC_after_demo: ', learner_pf_after_demo[member_id].particles_prob_correct)
+        #     learner_after_demo_text = learner_after_demo_text + ', ' + 'p_BEC:' + str(np.round(learner_pf_after_demo[member_id].particles_prob_correct,4))
 
-            learner_pf_after_test[member_id].calc_particles_probability(min_BEC_constraints)
-            print('learner_pf_BEC_after_test: ', learner_pf_after_test[member_id].particles_prob_correct)
+        #     learner_pf_after_test[member_id].calc_particles_probability(min_BEC_constraints)
+        #     print('learner_pf_BEC_after_feedback: ', learner_pf_after_test[member_id].particles_prob_correct)
+        #     learner_after_test_text = learner_after_test_text + ', ' + 'p_BEC:' + str(np.round(learner_pf_after_test[member_id].particles_prob_correct,4))
 
-        f.suptitle('Learner Particle Filter Distribution int no: ' + str(int_id))
+        #     ax1[p].text(-1, -1, 1, learner_after_demo_text, color='black')
+        #     ax1[3+p].text(-1, -1, 1, learner_after_test_text, color='black')
 
-        plt.savefig(path + '/pf_dist_learner_' + file + str(int_id) + '.png')
+        #     ax1[p].text(-1,-1,-1, 'LF:' + str(np.round(team_learning_factor[p],2)), color='black')
+        #     ax1[3+p].text(-1,-1,-1, 'LF:' + str(np.round(team_learning_factor[p],2)), color='black')
+
+        # f.suptitle('Learner Particle Filter Distribution int no: ' + str(int_id))
+
+        # plt.savefig(path + '/pf_dist_learner_' + file + str(int_id) + '.png')
 
         plt.show()
 
@@ -3304,84 +3944,284 @@ def combine_baseline_data(path):
 ##########################################
 
 
-def anova():
+def anova(path, vars_filename_prefix):
 
-    with open('models/augmented_taxi2/analysis_trial_data_combined.pickle', 'rb') as f:
-        trial_data = pickle.load(f)
+    # with open('models/augmented_taxi2/analysis_trial_data_combined.pickle', 'rb') as f:
+    #     trial_data = pickle.load(f)
 
-    trial_data_wo_baseline = trial_data[trial_data['demo_strategy'] != 'baseline'].reset_index(drop=True)
+    # trial_data_wo_baseline = trial_data[trial_data['demo_strategy'] != 'baseline'].reset_index(drop=True)
+    # sns.boxplot(x='demo_strategy', y='max_loop_count', data=trial_data_wo_baseline)
 
-    sns.boxplot(x='demo_strategy', y='max_loop_count', data=trial_data_wo_baseline)
-    plt.show()
-
-
-    # Assuming you have a DataFrame 'df' with the columns 'FactorA', 'FactorB', and 'Response'
-    # Replace these with your actual column names
+    # ###############  independent variables  ###########################
+    with open(path + '/' + vars_filename_prefix+ '_trial_data_subset_N15_checked.pickle', 'rb') as f:
+        trial_data_wo_baseline = pickle.load(f)
 
 
+    # with open('models/augmented_taxi2/sim_study_2_dup_wo_rest_lc_flag_concept_data.pickle', 'rb') as f:
+    #     concept_data_total = pickle.load(f)
 
-    # Perform two-way ANOVA
-    model = ols('max_loop_count ~ C(demo_strategy) * C(team_composition)', data=trial_data_wo_baseline).fit()
-    anova_results = sm.stats.anova_lm(model, typ=2)
 
-    print(anova_results)
+    # unique_runs = trial_data_wo_baseline['analysis_run_id'].unique()
 
-    ## Tukey
-    tukey_results_demo = pairwise_tukeyhsd(endog=trial_data_wo_baseline['max_loop_count'], groups=trial_data_wo_baseline['demo_strategy'], alpha=0.05)
-    print(tukey_results_demo)
+    # unique_runs = [x for x in unique_runs if x not in [7]]
 
-    tukey_results_team = pairwise_tukeyhsd(endog=trial_data_wo_baseline['max_loop_count'], groups=trial_data_wo_baseline['team_composition'], alpha=0.05)
-    print(tukey_results_team)
+    # index = concept_data_total['analysis_run_id'].isin(unique_runs).index
 
-    d= trial_data.describe(include = [np.number])
-    d2 = trial_data_wo_baseline.describe(include = [np.number])
+    # concept_data = concept_data_total.iloc[index]
+    # print('Length of concept data: ', len(concept_data), 'Length of concept data total: ', len(concept_data_total))
 
-    # print(d)
+    # concept_data['delta_kc_team_avg_knowledge'] = np.zeros(len(concept_data))
+
+    # for id in range(len(concept_data)):
+
+    #     kc_id = concept_data['kc_id'].iloc[id]
+    #     run_id = concept_data['analysis_run_id'].iloc[id]
+
+    #     print(concept_data[(concept_data['analysis_run_id'] == run_id) & (concept_data['kc_id']==kc_id-1)])
+    #     if kc_id !=1:
+    #         concept_data['delta_kc_team_avg_knowledge'].iloc[id] = concept_data['avg_BEC_prob_learner_after_feedback'].iloc[id] - concept_data[(concept_data['analysis_run_id'] == run_id) & (concept_data['kc_id']==kc_id-1)]['avg_BEC_prob_learner_after_feedback'].iloc[0] # just the first one; sometimes trials get appended with another trial data
+
+    #     else:
+    #         concept_data['delta_kc_team_avg_knowledge'].iloc[id] = concept_data['avg_BEC_prob_learner_after_feedback'].iloc[id]
+
+
+    # concept_data.to_csv('models/augmented_taxi2/updated_concept_data.csv')
+    
+    # outliers = [103, 192, 316]
+
+    # trial_data_wo_baseline = trial_data_wo_baseline[~trial_data_wo_baseline['analysis_run_id'].isin(outliers)]
+
+    # print(len(trial_data_wo_baseline))
+
+    # sns.boxplot(x='demo_strategy', y='max_loop_count', data=trial_data_wo_baseline)
+    # plt.show()
+    ##################################################
+    
+    # fig, axs = plt.subplots(1, 2, figsize=(15,10))
+
+    # sns.boxplot(x='demo_strategy', y='max_loop_count', ax=axs[0], data=trial_data_wo_baseline).set_title('Number of interactions')
+    # sns.boxplot(x='demo_strategy', y='average_team_knowledge', ax=axs[1], data=trial_data_wo_baseline).set_title('Average team knowledge')
+    # axs[0].set_ylabel('Number of interactions')
+    # axs[1].set_ylabel('Average team knowledge')
+    # axs[0].set_xlabel('Demo strategy')
+    # axs[1].set_xlabel('Demo strategy')
+
+    # fig, axs = plt.subplots(1, 2, figsize=(15,10))
+
+    # sns.boxplot(x='team_composition', y='max_loop_count', ax=axs[0], data=trial_data_wo_baseline).set_title('Number of interactions')
+    # sns.boxplot(x='team_composition', y='average_team_knowledge', ax=axs[1], data=trial_data_wo_baseline).set_title('Average team knowledge')
+    # axs[0].set_ylabel('Number of interactions')
+    # axs[1].set_ylabel('Average team knowledge')
+    # axs[0].set_xlabel('Team composition')
+    # axs[1].set_xlabel('Team composition')
+
+    # plt.show()
+
+    outliers = [14, 229] # identified from the boxplot; analysis_run_id
+    trial_data_wo_baseline = trial_data_wo_baseline[~trial_data_wo_baseline['analysis_run_id'].isin(outliers)]
+
+
+    # print(colored('N_interactions Two-way ANOVA', 'blue'))
+    # # Perform two-way ANOVA
+    # model = ols('max_loop_count ~ C(demo_strategy) * C(team_composition)', data=trial_data_wo_baseline).fit()
+    # anova_results = sm.stats.anova_lm(model, typ=2)
+
+    # print(anova_results)
+
+    # # Tukey
+    # print(colored('N_interactions Tukey for demo strategy', 'blue'))
+    # tukey_results_demo = pairwise_tukeyhsd(endog=trial_data_wo_baseline['max_loop_count'], groups=trial_data_wo_baseline['demo_strategy'], alpha=0.05)
+    # print(tukey_results_demo)
+
+    # print(colored('N_interactions Tukey for team composition', 'blue'))
+    # tukey_results_team = pairwise_tukeyhsd(endog=trial_data_wo_baseline['max_loop_count'], groups=trial_data_wo_baseline['team_composition'], alpha=0.05)
+    # print(tukey_results_team)
+
+    # # # d= trial_data.describe(include = [np.number])
+    # # # print(d)
+    # d2 = trial_data_wo_baseline.describe(include = [np.number])
     # print(d2)
 
-    # Perform two-way ANOVA
-    model = ols('average_team_knowledge ~ C(demo_strategy) * C(team_composition)', data=trial_data_wo_baseline).fit()
-    anova_results = sm.stats.anova_lm(model, typ=2)
+    # # Perform two-way ANOVA
+    # print(colored('Average team knowledge Two-way ANOVA', 'blue'))
+    # model = ols('average_team_knowledge ~ C(demo_strategy) * C(team_composition)', data=trial_data_wo_baseline).fit()
+    # anova_results = sm.stats.anova_lm(model, typ=2)
 
-    print(anova_results)
+    # print(anova_results)
 
-    ## Tukey
-    tukey_results_demo = pairwise_tukeyhsd(endog=trial_data_wo_baseline['average_team_knowledge'], groups=trial_data_wo_baseline['demo_strategy'], alpha=0.05)
-    print(tukey_results_demo)
+    # # Tukey
+    # print(colored('Average team knowledge Tukey for demo strategy', 'blue'))
+    # tukey_results_demo = pairwise_tukeyhsd(endog=trial_data_wo_baseline['average_team_knowledge'], groups=trial_data_wo_baseline['demo_strategy'], alpha=0.05)
+    # print(tukey_results_demo)
 
-    tukey_results_team = pairwise_tukeyhsd(endog=trial_data_wo_baseline['average_team_knowledge'], groups=trial_data_wo_baseline['team_composition'], alpha=0.05)
-    print(tukey_results_team)
+    # print(colored('Average team knowledge Tukey for team composition', 'blue'))
+    # tukey_results_team = pairwise_tukeyhsd(endog=trial_data_wo_baseline['average_team_knowledge'], groups=trial_data_wo_baseline['team_composition'], alpha=0.05)
+    # print(tukey_results_team)
 
     # Interaction 
-    strategy_order = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
 
     ind = trial_data_wo_baseline['demo_strategy']=='individual_knowledge_low'
-    trial_data_wo_baseline.loc[ind, 'demo_strategy'] = '1. individual_knowledge_low'
+    trial_data_wo_baseline.loc[ind, 'demo_strategy'] = '1.individual_knowledge_low'
 
     ind = trial_data_wo_baseline['demo_strategy']=='individual_knowledge_high'
-    trial_data_wo_baseline.loc[ind, 'demo_strategy'] = '2. individual_knowledge_high'
+    trial_data_wo_baseline.loc[ind, 'demo_strategy'] = '2.individual_knowledge_high'
 
     ind = trial_data_wo_baseline['demo_strategy']=='common_knowledge'
-    trial_data_wo_baseline.loc[ind, 'demo_strategy'] = '3. common_knowledge'
+    trial_data_wo_baseline.loc[ind, 'demo_strategy'] = '3.common_knowledge'
 
     ind = trial_data_wo_baseline['demo_strategy']=='joint_knowledge'
-    trial_data_wo_baseline.loc[ind, 'demo_strategy'] = '4. joint_knowledge'
+    trial_data_wo_baseline.loc[ind, 'demo_strategy'] = '4.joint_knowledge'
+
+    trial_data_wo_baseline['demo_strategy'] = trial_data_wo_baseline['demo_strategy'].astype('str')
+    trial_data_wo_baseline['team_composition'] = trial_data_wo_baseline['team_composition'].astype('str')
+
+    trial_data_wo_baseline['Interaction'] = trial_data_wo_baseline['demo_strategy'].astype(str) + '-' + trial_data_wo_baseline['team_composition'].astype(str)
 
 
-    print(trial_data_wo_baseline['demo_strategy'])
+    # print(colored('Average team knowledge and Team composition interaction Tukey for team composition', 'blue'))
+    # tukey_results_team = pairwise_tukeyhsd(endog=trial_data_wo_baseline['average_team_knowledge'], groups=trial_data_wo_baseline['Interaction'], alpha=0.05)
+    # print(tukey_results_team)
 
-    # trial_data_wo_baseline['demo_strategy'] = trial_data_wo_baseline['demo_strategy'].astype('category')
-    # trial_data_wo_baseline['team_composition'] = trial_data_wo_baseline['team_composition'].astype('category')
+    # # separate ANOVAs
 
-    # trial_data_wo_baseline['demo_strategy'] = pd.Categorical(trial_data_wo_baseline['demo_strategy'], categories=strategy_order, ordered=True)
+    # for level in trial_data_wo_baseline['team_composition'].unique():
+    #     subset = trial_data_wo_baseline[trial_data_wo_baseline['team_composition'] == level]
+    #     model = ols('average_team_knowledge ~ demo_strategy', data=subset).fit()
+    #     anova_table = anova_lm(model)
+        
+    #     print(f"ANOVA for Level {level}:")
+    #     print(anova_table)
 
+    #     p_values = anova_table['PR(>F)'].values
+    #     adjusted_p_values = p_values * len(p_values)  # Bonferroni correction
 
-    # fig = interaction_plot(x=trial_data_wo_baseline['demo_strategy'], trace=trial_data_wo_baseline['team_composition'], response=trial_data_wo_baseline['average_team_knowledge'],
-    #                        colors=['red', 'blue', 'green', 'yellow'], markers=['D', '^', 'o', 's'], ms=10)
+        
+    #     print('adjusted_p_values:', adjusted_p_values)
+
+    #     print(colored(f'Tukey for Level {level}', 'blue'))
+    #     tukey_results_team = pairwise_tukeyhsd(endog=subset['average_team_knowledge'], groups=subset['demo_strategy'], alpha=0.05)
+    #     print(tukey_results_team)
+
     
+    # for level in trial_data_wo_baseline['team_composition'].unique():
+    #     subset = trial_data_wo_baseline[trial_data_wo_baseline['team_composition'] == level]
+    #     model = ols('max_loop_count ~ demo_strategy', data=subset).fit()
+    #     anova_table = anova_lm(model)
+        
+    #     print(f"ANOVA, max_loop_count, for Level {level}:")
+    #     print(anova_table)
+
+    #     p_values = anova_table['PR(>F)'].values
+    #     adjusted_p_values = p_values * len(p_values)  # Bonferroni correction
+
+        
+    #     print('adjusted_p_values:', adjusted_p_values)
+
+    #     print(colored(f'Tukey for Level {level}', 'blue'))
+    #     tukey_results_team = pairwise_tukeyhsd(endog=subset['max_loop_count'], groups=subset['demo_strategy'], alpha=0.05)
+    #     print(tukey_results_team)
+
+
+    # print(type(trial_data_wo_baseline['demo_strategy'].iloc[0]))
+    # print(type(trial_data_wo_baseline['team_composition'].iloc[0]))
+
+    trial_data_wo_baseline = trial_data_wo_baseline.reset_index(drop=True)
+
+    colors = sns.color_palette("colorblind", 7).as_hex()
+
+    colors = [str(color) for color in colors]
 
     fig = interaction_plot(x=trial_data_wo_baseline['demo_strategy'], trace=trial_data_wo_baseline['team_composition'], response=trial_data_wo_baseline['max_loop_count'],
-                           colors=['red', 'blue', 'green', 'yellow'], markers=['D', '^', 'o', 's'], ms=10)
+                           colors=[colors[0], colors[1], colors[2], colors[3]], markers=['D', '^', 'o', 's'], ms=10, linewidth = 10)
+    
+    ax1 = plt.gca()
+    ax1.set_title('No. of interactions vs. Demo Strategy and Team composition', fontsize=28)
+    ax1.set_xlabel('Demo Strategy')
+    ax1.set_ylabel('No. of interactions')
+    ax1.legend_.remove()
+
+    # plot error bars
+    # Calculate standard errors for each group
+    groups = trial_data_wo_baseline.groupby(['demo_strategy', 'team_composition']).agg({'max_loop_count':['mean', 'sem']})
+    # groups = trial_data_wo_baseline.groupby(['demo_strategy', 'team_composition'])
+    # means = groups.mean()['max_loop_count']
+    # std_errors = groups.sem()['max_loop_count']  # Change to .std() for standard deviation, if preferred
+
+    print(groups)
+    # Add error bars
+    for (demo_strat, team_comp), row_data in groups.iterrows():
+        # error = std_errors(demo_strat, team_comp)
+        # mean = means(demo_strat, team_comp)
+
+        error = row_data['max_loop_count']['sem']
+        mean = row_data['max_loop_count']['mean']
+
+        if demo_strat == '1.individual_knowledge_low':
+            x_val = 0
+        elif demo_strat == '2.individual_knowledge_high':
+            x_val = 1
+        elif demo_strat == '3.common_knowledge':
+            x_val = 2
+        else:
+            x_val = 3
+
+        if team_comp == '[0, 0, 0]':
+            ax1.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[0], capsize=8)
+        elif team_comp == '[0, 0, 2]':
+            ax1.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[1], capsize=8)
+        elif team_comp == '[0, 2, 2]':
+            ax1.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[2], capsize=8)
+        else:
+            ax1.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[3], capsize=8)
+        # ax1.errorbar(x_val, mean, yerr=error, fmt='none', color='black', capsize=5)
+
+
+
+
+    fig2 = interaction_plot(x=trial_data_wo_baseline['demo_strategy'], trace=trial_data_wo_baseline['team_composition'], response=trial_data_wo_baseline['average_team_knowledge'],
+                           colors=[colors[0], colors[1], colors[2], colors[3]], markers=['D', '^', 'o', 's'], ms=10,  linewidth = 10)
+    
+    ax2 = plt.gca()
+    ax2.set_title('Average team knowledge vs. Demo Strategy and Team composition', fontsize=28)
+    ax2.set_xlabel('Demo Strategy')
+    ax2.set_ylabel('Average team knowledge, $\mathregular{p_{BEC}}$')
+    ax2.legend_.remove()
+
+
+    # plot error bars
+    # Calculate standard errors for each group
+    groups = trial_data_wo_baseline.groupby(['demo_strategy', 'team_composition']).agg({'average_team_knowledge':['mean', 'sem']})
+    # groups = trial_data_wo_baseline.groupby(['demo_strategy', 'team_composition'])
+    # means = groups.mean()['max_loop_count']
+    # std_errors = groups.sem()['max_loop_count']  # Change to .std() for standard deviation, if preferred
+
+    print(groups)
+    # Add error bars
+    for (demo_strat, team_comp), row_data in groups.iterrows():
+        # error = std_errors(demo_strat, team_comp)
+        # mean = means(demo_strat, team_comp)
+
+        error = row_data['average_team_knowledge']['sem']
+        mean = row_data['average_team_knowledge']['mean']
+
+        if demo_strat == '1.individual_knowledge_low':
+            x_val = 0
+        elif demo_strat == '2.individual_knowledge_high':
+            x_val = 1
+        elif demo_strat == '3.common_knowledge':
+            x_val = 2
+        else:
+            x_val = 3
+
+        if team_comp == '[0, 0, 0]':
+            ax2.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[0], capsize=8)
+        elif team_comp == '[0, 0, 2]':
+            ax2.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[1], capsize=8)
+        elif team_comp == '[0, 2, 2]':
+            ax2.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[2], capsize=8)
+        else:
+            ax2.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[3], capsize=8)
+        # ax1.errorbar(x_val, mean, yerr=error, fmt='none', color='black', capsize=5)
 
     plt.show()
 
@@ -3389,68 +4229,792 @@ def anova():
     # ## BonFerroni
     # reject, pvals_corrected, _, _ = multipletests(pvals, alpha=0.05, method='bonferroni')
 
+    ##############################################
+
+    # kc_id_list = concept_data['kc_id'].unique()
+
+    # for kc_id in kc_id_list:
+    #     kc_data = concept_data[concept_data['kc_id'] == kc_id]
+    #     kc_data['team_composition'] = kc_data['team_composition'].astype('str')
+
+    #     print(colored('N_interactions Two-way ANOVA for KC: ' + str(kc_id), 'blue'))
+    #     # Perform two-way ANOVA
+    #     model = ols('N_interactions_learn_concept ~ C(demo_strategy) * C(team_composition)', data=kc_data).fit()
+    #     anova_results = sm.stats.anova_lm(model, typ=2)
+    #     print(anova_results)
+
+    #     # ## Tukey
+    #     print(colored('N_interactions Tukey for demo strategy for KC: ' + str(kc_id), 'blue'))
+    #     tukey_results_demo = pairwise_tukeyhsd(endog=kc_data['N_interactions_learn_concept'], groups=kc_data['demo_strategy'], alpha=0.05)
+    #     print(tukey_results_demo)
+
+    #     print(colored('N_interactions Tukey for team composition for KC: ' + str(kc_id), 'blue'))
+    #     tukey_results_team = pairwise_tukeyhsd(endog=kc_data['N_interactions_learn_concept'], groups=kc_data['team_composition'], alpha=0.05)
+    #     print(tukey_results_team)
+
+    #     # Perform two-way ANOVA
+    #     print(colored(' Average team knowledge Two-way ANOVA for KC: ' + str(kc_id), 'blue'))
+    #     model = ols('avg_BEC_prob_learner_after_feedback ~ C(demo_strategy) * C(team_composition)', data=kc_data).fit()
+    #     anova_results = sm.stats.anova_lm(model, typ=2)
+    #     print(anova_results)
+
+    #     # ## Tukey
+    #     print(colored(' Average team knowledge Tukey for demo strategy for KC: ' + str(kc_id), 'blue'))
+    #     tukey_results_demo = pairwise_tukeyhsd(endog=kc_data['avg_BEC_prob_learner_after_feedback'], groups=kc_data['demo_strategy'], alpha=0.05)
+    #     print(tukey_results_demo)
+
+    #     print(colored(' Average team knowledge Tukey for team composition for KC: ' + str(kc_id), 'blue'))
+    #     tukey_results_team = pairwise_tukeyhsd(endog=kc_data['avg_BEC_prob_learner_after_feedback'], groups=kc_data['team_composition'], alpha=0.05)
+    #     print(tukey_results_team)
+
+
+
+    # ######################################################
+
+    # #########  Dependent variables ########################
+
+
+    # with open(path + '/' + vars_filename_prefix+ '_demo_strategies_subset.pickle', 'rb') as f:
+    #     demo_constraints_data = pickle.load(f)
+
+    
+    # print(colored('Two-way ANOVA: Mean distance between sampled counterfactuals vs. Demo Strategy and Team composition', 'blue'))
+    # # Perform two-way ANOVA
+    # model = ols('pairwise_dist_mean ~ C(demo_strategy) * C(team_composition)', data=demo_constraints_data).fit()
+    # anova_results = sm.stats.anova_lm(model, typ=2)
+    # print(anova_results)
+
+    # print(colored('Two-way ANOVA: Std. dev distance between sampled counterfactuals vs. Demo Strategy and Team composition', 'blue'))
+    # # Perform two-way ANOVA
+    # model = ols('pairwise_dist_std ~ C(demo_strategy) * C(team_composition)', data=demo_constraints_data).fit()
+    # anova_results = sm.stats.anova_lm(model, typ=2)
+    # print(anova_results)
+
+    # print(colored('Two-way ANOVA: Running BEC constraints area vs. Demo Strategy and Team composition', 'blue'))
+    # # Perform two-way ANOVA
+    # model = ols('running_BEC_constraints_area ~ C(demo_strategy) * C(team_composition)', data=demo_constraints_data).fit()
+    # anova_results = sm.stats.anova_lm(model, typ=2)
+    # print(anova_results)
+    
+    # ## Tukey
+    # print(colored('Running BEC constraints area Tukey for demo strategy', 'blue'))
+    # tukey_results_demo = pairwise_tukeyhsd(endog=demo_constraints_data['running_BEC_constraints_area'], groups=demo_constraints_data['demo_strategy'], alpha=0.05)
+    # print(tukey_results_demo)
+
+    
+    # print(colored('Two-way ANOVA: KC_constraints area vs. Demo Strategy and Team composition', 'blue'))
+    # # Perform two-way ANOVA
+    # model = ols('KC_constraints_area ~ C(demo_strategy) * C(team_composition)', data=demo_constraints_data).fit()
+    # anova_results = sm.stats.anova_lm(model, typ=2)
+    # print(anova_results)
+    
+    # ## Tukey
+    # print(colored('Running BEC constraints area Tukey for demo strategy', 'blue'))
+    # tukey_results_demo = pairwise_tukeyhsd(endog=demo_constraints_data['KC_constraints_area'], groups=demo_constraints_data['demo_strategy'], alpha=0.05)
+    # print(tukey_results_demo)
+        
+    # colors = sns.color_palette("colorblind", 7).as_hex()
+
+    # colors = [str(color) for color in colors]
+
+
+    # # fig = interaction_plot(x=demo_constraints_data['demo_strategy'], trace=demo_constraints_data['kc_id'], response=demo_constraints_data['KC_constraints_area'],
+    # #                 colors=[colors[0], colors[1], colors[2]], markers=['D', '^', 'o'], ms=10)
+
+    # # fig2  = interaction_plot(x=demo_constraints_data['demo_strategy'], trace=demo_constraints_data['kc_id'], response=demo_constraints_data['running_BEC_constraints_area'],
+    # #                 colors=[colors[0], colors[1], colors[2]], markers=['D', '^', 'o'], ms=10)
+
+    # # plt.show()
+
+    # order_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
+    # demo_labels = ['', '', 'Ind. (high)', 'Common']
+
+
+    # f2, ax_2 = plt.subplots(ncols=1)
+    # sns.barplot(data = demo_constraints_data, x = 'demo_strategy', y = 'KC_constraints_area', order=order_list, ax=ax_2, errorbar=('se',1)).set(title='Demo constraints area vs. Demo Strategy')
+    # # sns.barplot(data = demo_constraints_data, x = 'team_composition', y = 'KC_constraints_area', ax=ax_2[1], errorbar=('se',1)).set(title='KC constraints area vs. Team composition')
+    # ax_2.set_xticklabels(demo_labels)
+    # plt.show()
+
+
+    # kc_id_list = demo_constraints_data['kc_id'].unique()
+
+    # for kc_id in kc_id_list:
+    #     kc_data = demo_constraints_data[demo_constraints_data['kc_id'] == kc_id]
+
+
+    #     print(colored('Demo constraints area Two-way ANOVA for kc id: ' + str(kc_id), 'blue'))
+    #     # Perform two-way ANOVA
+    #     model = ols('running_BEC_constraints_area ~ C(demo_strategy) * C(team_composition)', data=kc_data).fit()
+    #     anova_results = sm.stats.anova_lm(model, typ=2)
+
+    #     print(anova_results)
+
+    #     ## Tukey
+    #     print(colored('Demo constraints area Tukey for demo strategy for kc id: ' + str(kc_id), 'blue'))
+    #     tukey_results_demo = pairwise_tukeyhsd(endog=kc_data['running_BEC_constraints_area'], groups=kc_data['demo_strategy'], alpha=0.05)
+    #     print(tukey_results_demo)
+
+        # print(colored('Demo constraints area for team composition for kc id: ' + str(kc_id), 'blue'))
+        # tukey_results_team = pairwise_tukeyhsd(endog=kc_data['running_BEC_constraints_area'], groups=kc_data['team_composition'], alpha=0.05)
+        # print(tukey_results_team)
+        
+
+        # ind = demo_constraints_data['demo_strategy']=='individual_knowledge_low'
+        # demo_constraints_data.loc[ind, 'demo_strategy'] = '1. individual_knowledge_low'
+
+        # ind = demo_constraints_data['demo_strategy']=='individual_knowledge_high'
+        # demo_constraints_data.loc[ind, 'demo_strategy'] = '2. individual_knowledge_high'
+
+        # ind = demo_constraints_data['demo_strategy']=='common_knowledge'
+        # demo_constraints_data.loc[ind, 'demo_strategy'] = '3. common_knowledge'
+
+        # ind = demo_constraints_data['demo_strategy']=='joint_knowledge'
+        # demo_constraints_data.loc[ind, 'demo_strategy'] = '4. joint_knowledge'
+
+        # fig = interaction_plot(x=demo_constraints_data['demo_strategy'], trace=demo_constraints_data['kc_id'], response=demo_constraints_data['KC_constraints_area'],
+        #                     colors=['red', 'blue', 'green'], markers=['D', '^', 'o'], ms=10)
+
+        # plt.show()
+
+####################################
+
+def find_corrupt_file(path, files, file_prefix_list, runs_to_exclude_list = []):
+
+
+    # runs_to_exclude_list = []
+    excluded_exp_runs = [runs_to_exclude_list]
+    file_read_error_flag = True
+    exp_id = 0
+
+    files_to_exclude_list = []
+    
+    while file_read_error_flag:
+    
+        try:
+            print(colored('Experiment number: ' + str(exp_id+1) + '. Excluding runs: ' + str(excluded_exp_runs[exp_id]), 'blue'))
+            # print(files)
+            
+            for file in files:
+                # check if file is a valid pickle file
+                
+                for file_prefix in file_prefix_list:
+                    if file_prefix in file and '.pickle' in file and '.png' not in file:
+                        run_file_flag = True
+                        break
+                    else:
+                        run_file_flag = False
+
+
+                # check if file needs to be excluded
+                for runs_to_exclude in excluded_exp_runs[exp_id]:
+                    if runs_to_exclude in file:
+                        run_file_flag = False
+                        break
+                
+
+                if run_file_flag:
+                    with open(path + '/' + file, 'rb') as f:
+                        sim_vars = pickle.load(f)
+                    print('Opening file: ', file)
+
+                    run_id = int(file.split('_')[-1].split('.')[0])
+                    if exp_id == 0:
+                        runs_to_exclude_list.append(file)
+
+                    ###########################
+                    # if sim_vars['demo_strategy'].iloc[0] == 'joint_knowledge':
+                    #     files_to_exclude_list.append(file)
+
+
+                        ###########################
+
+            file_read_error_flag = False
+        except:
+            print(colored('Error reading file: ' + file, 'red'))
+            print('Runs to check: ', runs_to_exclude_list)
+            excluded_exp_runs.append([runs_to_exclude_list[exp_id]])
+            exp_id += 1
+            file_read_error_flag = True
+
+
+    ####################
+
+    # # remove joint knowledge files
+    # for file in files_to_exclude_list:
+    #     file_prefix = file.split('run')[0]
+    #     print('Removing file: ', file)
+    #     print('File prefix: ', file_prefix)
+
+    #     print('Removing file: ', file)
+    #     os.remove(path + '/' + file)
+    #     csv_file = file.split('.')[0] + '.csv'
+    #     print('Removing file: ', csv_file)
+    #     os.remove(path + '/' + csv_file)
+
+    #     for prefix in ['update_data_', 'prob_data_']:
+    #         file_remove = prefix + file_prefix + 'run' + file.split('run')[1].split('.')[0]
+    #         print('Removing file: ', file_remove)
+    #         os.remove(path + '/' + file_remove + '.csv')
+
+
+    
+            
+
+######################################
+            
+def analyze_incomplete_runs(path, file):
+
+    with open(path + '/' + file, 'rb') as f:
+        incomplete_runs = pickle.load(f)
+
+
+    run_data_list = []
+
+
+    for id, run in incomplete_runs.iterrows():
+        run_file = run['file_name']
+
+        if run['sim_status'] == 'No new demos' or run['sim_status'] == 'Teaching complete':
+            with open(path + '/' + run_file, 'rb') as f:
+                sim_vars = pickle.load(f)
+
+                study_id = sim_vars['study_id'].iloc[0]
+                run_id = sim_vars['run_no'].iloc[0]
+                team_composition = sim_vars['team_composition'].iloc[0]
+                demo_strategy = sim_vars['demo_strategy'].iloc[0]
+
+                for i, int_data in sim_vars.iterrows():
+                    run_data_dict = {'study_id': study_id, 'run_id': run_id, 'team_composition': team_composition, 'demo_strategy': demo_strategy, 'sim_status': run['sim_status'], \
+                                     'int_id': int_data['loop_count']}
+                    
+                    run_data_dict['kc_id'] = int_data['knowledge_comp_id']
+                    run_data_dict['min_KC_constraints'] = int_data['min_KC_constraints']
+
+                    BEC_knowledge_team = 0
+                    for member in int_data['BEC_knowledge_level']:
+                        run_data_dict['BEC_knowledge_level_' + member] = int_data['BEC_knowledge_level'][member]
+                        if 'p' in member:
+                            # print(int_data['BEC_knowledge_level'][member])
+                            mem_know = [float(x) for x in int_data['BEC_knowledge_level'][member]]
+                            # print(mem_know)
+                            BEC_knowledge_team += np.sum(mem_know)
+
+                    run_data_dict['BEC_knowledge_team'] = BEC_knowledge_team/3
+                
+                    run_data_list.append(run_data_dict)
+
+    run_data_df = pd.DataFrame(run_data_list)
+    run_data_df.to_csv(path + '/incomplete_runs_analyzed.csv')
+    with open(path + '/incomplete_runs_analyzed.pickle', 'wb') as f:
+        pickle.dump(run_data_df, f)
+
+
+#######################################
+        
+def analyze_demo_strategies(path, files, file_prefix_list, runs_to_exclude_list = [], vars_filename_prefix = ''):
+
+    # with open(path + '/' + vars_filename_prefix + '_trial_data_subset.pickle', 'rb') as f:
+    #     trial_data = pickle.load(f)
+
+    # run_list = trial_data['analysis_run_id'].unique()
+    # trial_data['BEC_know_learn_goal'] = np.zeros(len(trial_data), dtype=bool)
+
+    # for id, run in trial_data.iterrows():
+
+    #     file = run['file_name']
+
+    #     with open(path + '/' + file, 'rb') as f:
+    #         sim_vars = pickle.load(f)
+        
+    #     bec_final = sim_vars['BEC_knowledge_level'].iloc[-1]
+
+    #     # check if learning was completed
+    #     learning_complete = True
+    #     for k_type, k_val in bec_final.items():
+    #         if k_val[0] != 1:
+    #             learning_complete = False
+    #             break
+
+    #     if learning_complete:
+    #         trial_data['BEC_know_learn_goal'].loc[id] = True
+
+    # trial_data.to_csv(path + '/' + vars_filename_prefix + 'trial_data.csv')
+    # with open(path + '/' + vars_filename_prefix + 'trial_data.pickle', 'wb') as f:
+    #     pickle.dump(trial_data, f)
+
+
+        
+
+
+
+    try:
+        with open(path + '/' + vars_filename_prefix + '_demo_strategies_subset_N15_checked.pickle', 'rb') as f:
+            run_data_df_subset = pickle.load(f)
+        print('Opening file: ', vars_filename_prefix + '_demo_strategies_subset_N15_checked.pickle')
+
+    except:
+        run_data_list = []
+        run_data_learning_incomplete_list = []
+        analysis_run_id = 1
+
+        with open(path + '/' + vars_filename_prefix + '_trial_data_subset_N15_checked.pickle', 'rb') as f:
+            trial_data = pickle.load(f)
+
+        unique_runs = trial_data['analysis_run_id'].unique()
+
+
+        for file in files:
+            # check if file is a valid pickle file
+            
+            for file_prefix in file_prefix_list:
+                if file_prefix in file and '.pickle' in file and '.png' not in file and 'counterfactual' not in file:
+                    run_file_flag = True
+                    break
+                else:
+                    run_file_flag = False
+
+
+            # check if file needs to be excluded
+            for runs_to_exclude in runs_to_exclude_list:
+                if runs_to_exclude in file:
+                    run_file_flag = False
+                    break
+            
+
+            if run_file_flag:
+                with open(path + '/' + file, 'rb') as f:
+                    sim_vars = pickle.load(f)
+                print('Opening file: ', file)
+
+                
+                study_id = sim_vars['study_id'][0]
+                sim_run_id = sim_vars['run_no'][0]
+
+                # check if learning was completed based on final BEC knowledge
+                # learning_complete = True
+                # for k_type, k_val in bec_final.items():
+                #     if k_val[0] != 1:
+                #         learning_complete = False
+                #         break
+
+                # check if learning was completed based on sim status flag
+                if sim_vars['sim_status'].iloc[-1] == 'Teaching complete':
+                    learning_complete = True
+                else:
+                    learning_complete = False
+
+                # read counterfactuals sampled models data
+                folder = file.strip('.pickle')
+                demo_file_name = path + '/' + folder + '/demo_gen_log.txt'
+
+                try:
+                    # counterfactuals = pd.read_csv(path + '/' + folder + '_counterfactuals.csv')
+                    with open(path + '/' + folder + '_counterfactuals.pickle', 'rb') as f:
+                        counterfactuals = pickle.load(f)
+                    print('Already compiled counterfactuals data. Reading from file. ')
+                except:
+                    if 'missing' in file:
+                        counterfactuals = read_demo_gen_log(demo_file_name, new_flag=True)
+                    else:
+                        counterfactuals = read_demo_gen_log(demo_file_name, new_flag=True)
+                 #######################################
+                        
+                # for i in range(len(counterfactuals)):
+                #     counterfactuals['sample_human_models'].iloc[i] = [np.array(x).astype(float) for x in counterfactuals['sample_human_models'].iloc[i]]
+
+                # print('counterfactuals: ', counterfactuals['sample_human_models'])
+                # print('type: ', type(counterfactuals['sample_human_models'].iloc[0]))
+
+                ############## compile data
+                study_id = sim_vars['study_id'].iloc[0]
+                run_id = sim_vars['run_no'].iloc[0]
+                team_composition = str(sim_vars['team_composition'].iloc[0])
+                demo_strategy = str(sim_vars['demo_strategy'].iloc[0])
+                sim_status = str(sim_vars['sim_status'].iloc[-1])
+                min_BEC_constraints = sim_vars['min_BEC_constraints'].iloc[-1]
+                running_BEC_constraints = []
+
+                # filter extra sims in same file
+                kc_id_list = sim_vars['knowledge_comp_id']
+                run_start_id = []
+                for id in range(len(kc_id_list)-1):
+                    if kc_id_list[id+1] - kc_id_list[id] < 0:
+                        print(colored('Duplicate trials found for file: ' + file + '. Run id: ' + str(sim_run_id), 'red' ))
+                        run_start_id = [id+1]
+                        break
+                
+                if len(run_start_id) != 0:
+                    sim_vars = sim_vars.iloc[run_start_id[0]:].reset_index(drop=True)
+                ##################
+                    
+                for i, int_data in sim_vars.iterrows():
+                    # print('int_data: ', int_data)
+                    run_data_dict = {'study_id': study_id, 'run_id': run_id, 'analysis_run_id': analysis_run_id, 'team_composition': team_composition, 'demo_strategy': demo_strategy, 'sim_status': sim_status, \
+                                        'int_id': int_data['loop_count']}
+                    
+                    run_data_dict['kc_id'] = int_data['knowledge_comp_id']
+                    run_data_dict['min_KC_constraints'] = int_data['min_KC_constraints']
+                    
+
+                    running_BEC_constraints.extend(int_data['min_KC_constraints'])
+
+                    run_data_dict['KC_constraints_area'] = BEC_helpers.calc_solid_angles([int_data['min_KC_constraints']])[0]
+                    run_data_dict['BEC_constraints_area'] = BEC_helpers.calc_solid_angles([int_data['min_BEC_constraints']])[0]
+                    running_BEC_constraints = BEC_helpers.remove_redundant_constraints(running_BEC_constraints, params.weights['val'], params.step_cost_flag)
+                    run_data_dict['running_BEC_constraints_area'] = BEC_helpers.calc_solid_angles([running_BEC_constraints])[0]
+
+                    BEC_knowledge_team = 0
+                    for member in int_data['BEC_knowledge_level']:
+                        run_data_dict['BEC_knowledge_level_' + member] = int_data['BEC_knowledge_level'][member]
+                        if 'p' in member:
+                            # print(int_data['BEC_knowledge_level'][member])
+                            mem_know = [float(x) for x in int_data['BEC_knowledge_level'][member]]
+                            # print(mem_know)
+                            BEC_knowledge_team += np.sum(mem_know)
+
+                    run_data_dict['BEC_knowledge_team'] = BEC_knowledge_team/3
+
+                    # find sampled counterfactuals
+                    summary_count = int_data['summary_count']
+                    counterfactual_models_list = counterfactuals[counterfactuals['length_of_summary']==summary_count]['sample_human_models'].reset_index(drop=True)
+                    print(counterfactuals)
+                    print(summary_count)
+                    print(counterfactual_models_list)
+                    counterfactual_models = counterfactual_models_list.iloc[0]
+                    counterfactual_models = [np.array(x).astype(float) for x in counterfactual_models]
+                    # print(counterfactual_models)
+                    # print('type: ', type(counterfactual_models[0]))
+
+                    # calculate how close the sampled points are
+                    counterfactual_models_latllong = cg.cart2latlong(counterfactual_models)
+                    pairwise = metrics.pairwise.haversine_distances(counterfactual_models_latllong)
+                    # print(pairwise)
+                    run_data_dict['pairwise_dist_mean'] = np.mean(pairwise)
+                    run_data_dict['pairwise_dist_std'] = np.std(pairwise)
+                    run_data_dict['sampled_models_cluster_idxs'] = counterfactuals[counterfactuals['length_of_summary']==summary_count]['sampled_models_cluster_idxs'].iloc[0]
+                    run_data_dict['cluster_weights'] = counterfactuals[counterfactuals['length_of_summary']==summary_count]['cluster_weights'].iloc[0]
+
+                    # print(run_data_dict)
+                    if learning_complete:
+                        run_data_list.append(run_data_dict)
+                    else:
+                        run_data_learning_incomplete_list.append(run_data_dict)
+                    
+
+                    with open(path + '/' + folder + '_counterfactuals.pickle', 'wb') as f:
+                        pickle.dump(counterfactuals, f)
+                    counterfactuals.to_csv(path + '/' + folder + '_counterfactuals.csv')
+
+                ####################
+                if learning_complete:
+                    analysis_run_id += 1
+        
+        run_data_df = pd.DataFrame(run_data_list)
+        run_data_incomplete_df = pd.DataFrame(run_data_learning_incomplete_list)
+
+        with open(path + '/' + vars_filename_prefix + '_demo_strategies_N15_checked.pickle', 'wb') as f:
+            pickle.dump(run_data_df, f)
+
+        run_data_df.to_csv(path + '/' + vars_filename_prefix + '_demo_strategies_N15_checked.csv')
+
+
+        with open(path + '/' + vars_filename_prefix + '_demo_strategies_learning_incomplete.pickle', 'wb') as f:
+            pickle.dump(run_data_incomplete_df, f)
+        
+        run_data_incomplete_df.to_csv(path + '/' + vars_filename_prefix + '_demo_strategies_learning_incomplete.csv')
+
+        index_to_choose = run_data_df['analysis_run_id'].isin(unique_runs).index
+        run_data_df_subset = run_data_df.iloc[index_to_choose]
+
+        with open(path + '/' + vars_filename_prefix + '_demo_strategies_subset_N15_checked.pickle', 'wb') as f:
+            pickle.dump(run_data_df_subset, f)
+
+        run_data_df_subset.to_csv(path + '/' + vars_filename_prefix + '_demo_strategies_subset_N15_checked.csv')
+
+
+    # #####################################
+
+    # # How are the sampled models and constraints different?
+
+    # # sampled points
+
+    # fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    # sns.barplot(data=run_data_df_subset, x='demo_strategy', y='pairwise_dist_mean', order = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge'], ax=ax[0])
+    # sns.barplot(data=run_data_df_subset, x='demo_strategy', y='pairwise_dist_std', order = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge'], ax=ax[1])
+
+    # fig2, ax2 = plt.subplots(1, 2, figsize=(10, 5))
+    # sns.barplot(data=run_data_df_subset, x='team_composition', y='pairwise_dist_mean',  ax=ax2[0])
+    # sns.barplot(data=run_data_df_subset, x='team_composition', y='pairwise_dist_std', ax=ax2[1])
+
+    # # fig3, ax3 = plt.subplots(1, 2, figsize=(10, 5))
+    # # sns.barplot(data=run_data_df_subset, x='demo_strategy', y='pairwise_dist_mean', hue='team_composition', order = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge'], ax=ax3[0])
+    # # sns.barplot(data=run_data_df_subset, x='demo_strategy', y='pairwise_dist_std', hue = 'team_composition', order = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge'], ax=ax3[1])
+
+    # plt.show()
+
+    # ###########################
+
+    # # Unique constraints
+    unique_kc_lookup = pd.read_csv(path + '/unique_KC_constraints_lookup.csv')
+    unique_kc_lookup['min_KC_constraints_str'] = unique_kc_lookup['min_KC_constraints'].astype(str)
+
+    run_data_df_subset['min_KC_constraints_str'] = run_data_df_subset['min_KC_constraints'].astype(str)
+    
+    # #######################
+    unique_kc_cons = run_data_df_subset['min_KC_constraints_str'].unique()
+    
+    unique_kc_area = []
+    unique_kc_id = []
+    for i in range(len(unique_kc_cons)):
+        index = run_data_df_subset[run_data_df_subset['min_KC_constraints_str'] == unique_kc_cons[i]].index[0]
+        min_const = BEC_helpers.remove_redundant_constraints(run_data_df_subset['min_KC_constraints'].iloc[index], params.weights['val'], params.step_cost_flag)
+        unique_kc_area.append(np.round(BEC_helpers.calc_solid_angles([min_const])[0],3))
+        unique_kc_id.append(run_data_df_subset['kc_id'].iloc[index])
+
+    unique_kc_cons_df = pd.DataFrame(unique_kc_cons, columns=['min_KC_constraints'])
+    unique_kc_cons_df['KC_constraints_area'] = unique_kc_area
+    unique_kc_cons_df['kc_id'] = unique_kc_id
+
+
+    unique_kc_cons_df.to_csv(path + '/' + vars_filename_prefix + '_unique_kc_cons.csv')
+    # # ######################
+
+    sns.barplot(data=run_data_df_subset, x='demo_strategy', y='KC_constraints_area', order = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge'])
+    axn = plt.gca()
+    axn.set_title('Demo constraints area vs. Demo Strategy')
+    axn.set_xlabel('Demo Strategy')
+    axn.set_ylabel('Demo constraints area (1/information content)')
+    
+    plt.show()
+
+
+    # # # print('N runs: ', len(run_data_df['analysis_run_id'].unique()))
+
+    # #kc wise plotes
+    # kc_id_list = run_data_df_subset['kc_id'].unique()
+    # outlier = [] # analysis_run_id
+
+    # for kc_id in kc_id_list:
+
+    #     kc_run_data = run_data_df_subset[run_data_df_subset['kc_id'] == kc_id]
+
+
+    #     print(kc_id)
+    #     print(kc_run_data['min_KC_constraints_str'].unique())
+
+    #     fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+    #     sns.barplot(data=kc_run_data, x='demo_strategy', y='KC_constraints_area', ax=ax)
+
+    #     fig2, ax2 = plt.subplots(1, 1, figsize=(10, 5))
+    #     sns.barplot(data=kc_run_data, x='demo_strategy', hue='team_composition', y='KC_constraints_area', ax=ax2)
+    
+    #     plt.show()
+
+
+    #     # unique constraints for each demo
+    #     demo_list = kc_run_data['demo_strategy'].unique()
+    #     for demo in demo_list:
+    #         unique_kc_cons = kc_run_data[kc_run_data['demo_strategy']==demo]['min_KC_constraints_str'].unique()
+    #         print('demo: ', demo, 'kc_id: ', kc_id, 'N unique_kc_cons: ', len(unique_kc_cons), 'unique_kc_cons: ', unique_kc_cons)
+
+    #     ## knowledge for each KC for each demo
+        # fig3, ax3 = plt.subplots(1, 1, figsize=(10, 5))
+
+        # runs = kc_run_data['analysis_run_id'].unique()
+        # KC_end_data_list = []
+        # for run in runs:
+        #     if run not in outlier:
+        #         run_data = kc_run_data[kc_run_data['analysis_run_id'] == run].iloc[-1].to_dict()
+
+        #         KC_end_data_list.append(run_data)
+
+        # KC_end_data_df = pd.DataFrame(KC_end_data_list)
+
+
+        # sns.barplot(data=KC_end_data_df, x='demo_strategy', y='running_BEC_constraints_area', order = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge'], ax=ax3)
+
+        # plt.show()
+
+
+    ################
+    # fig4, ax4 = plt.subplots(1, 1, figsize=(10, 5))
+    # # Count repetitions
+    # unique_cnst_id = np.zeros(len(run_data_df_subset))
+    # for i in range(len(run_data_df_subset)):
+    #     unique_cnst_id[i] = unique_kc_lookup[unique_kc_lookup['min_KC_constraints_str'] == run_data_df_subset['min_KC_constraints_str'].iloc[i]]['unique_constraint_id'].iloc[0]
+    # run_data_df_subset['unique_constraint_id'] = unique_cnst_id
+
+    # kc_id_list = run_data_df_subset['kc_id'].unique()
+    # for kc_id in kc_id_list:
+    #     kc_run_data = run_data_df_subset[run_data_df_subset['kc_id'] == kc_id]
+    #     # print(kc_run_data['unique_constraint_id'].unique())
+    #     repetitions = kc_run_data.groupby(['team_composition', 'demo_strategy', 'unique_constraint_id']).size().reset_index(name='Count')
+
+    #     # Plot stacked bar chart using seaborn with hue
+    #     sns.barplot(y='Count', x='unique_constraint_id', data=repetitions, ax=ax4)
+    #     sns.barplot(y='Count', x='unique_constraint_id', hue='team_composition', data=repetitions,  ax=ax4)
+    #     sns.barplot(y='Count', x='unique_constraint_id', hue='demo_strategy',  data=repetitions, ax=ax4[1])
+        
+        
+    #     fig5, ax5 = plt.subplots(1, 1, figsize=(10, 5))
+    #     sns.barplot(y='Count', x='demo_strategy', hue='team_composition', data=repetitions, ax=ax5)
+
+    # plt.show()
+
+    ########################
+
+    # # Constraints area
+    # fig6, ax6 = plt.subplots(1, 2, figsize=(10, 5))
+    # sns.barplot(data=run_data_df, x='demo_strategy', y='KC_constraints_area', hue='kc_id', ax=ax6[0])
+    # sns.barplot(data=run_data_df, x='team_composition', y='KC_constraints_area', hue='kc_id', ax=ax6[1])
+    
+    # plt.show()
+
+
+###################################
+    
+def split_multiple_runs(path, files, file_prefix_list, runs_to_exclude_list = []):
+    
+
+    for file in files:
+        # check if file is a valid pickle file
+        
+        for file_prefix in file_prefix_list:
+            if file_prefix in file and '.pickle' in file and '.png' not in file:
+                run_file_flag = True
+                break
+            else:
+                run_file_flag = False
+
+
+        # check if file needs to be excluded
+        for runs_to_exclude in runs_to_exclude_list:
+            if runs_to_exclude in file:
+                run_file_flag = False
+                break
+        
+
+        if run_file_flag:
+            with open(path + '/' + file, 'rb') as f:
+                sim_vars = pickle.load(f)
+            print('Opening file: ', file)
+
+            # check if there are multiple runs in the same file
+            loop_count_var = sim_vars['loop_count']
+            run_change_idx = [idx for idx in range(len(loop_count_var)-1) if loop_count_var[idx] > loop_count_var[idx+1]]
+
+            print('Run change idx: ', run_change_idx)
+            if len(run_change_idx) > 0:
+
+                for run_idx in range(len(run_change_idx)+1):
+                    if run_idx == 0:
+                        run_sim_vars = sim_vars.iloc[:run_change_idx[run_idx]+1]
+                    elif run_idx == len(run_change_idx):
+                        run_sim_vars = sim_vars.iloc[run_change_idx[run_idx-1]+1:]
+                    else:
+                        run_sim_vars = sim_vars.iloc[run_change_idx[run_idx]+1:run_change_idx[run_idx+1]+1]
+                        
+                    # reset index
+                    run_sim_vars = run_sim_vars.reset_index(drop=True)
+
+                    print('Saving new file: ', path + '/' + file.split('.pickle')[0] + '_run_' + str(run_idx) + '.pickle')
+
+                    with open(path + '/' + file.split('.pickle')[0] + '_run_' + str(run_idx) + '.pickle', 'wb') as f:
+                        pickle.dump(run_sim_vars, f)
+                    
+                    run_sim_vars.to_csv(path + '/' + file.split('.pickle')[0] + '_run_' + str(run_idx) + '.csv')
 
 ####################################
 if __name__ == "__main__":
 
-    # # process team knowledge data
-    # path = 'models/augmented_taxi2'
-    # path = 'data/simulation/sim_experiments/w_feedback'
-    # files = os.listdir(path)
+    # process team knowledge data
+    path = 'models/augmented_taxi2'
+    # # path = 'data/simulation/sim_experiments/w_feedback'
+    files = os.listdir(path)
 
-    # # all_file_prefix_list = ['debug_data_debug_trials_01_22_no_noise_w_feedback_study_1']
-    # # all_runs_to_exclude_list = [[3, 12, 24, 7], [1,4,6,8], [], [1,3, 11, 12, 16, 18], [17, 21, 35], [], [], [], \
-    # #                             [], [], [], [], [], [], []]
-    # all_runs_to_exclude_list = []
+    # all_file_prefix_list = ['debug_data_debug_trials_01_22_no_noise_w_feedback_study_1']
+    # all_runs_to_exclude_list = [[3, 12, 24, 7], [1,4,6,8], [], [1,3, 11, 12, 16, 18], [17, 21, 35], [], [], [], \
+    #                             [], [], [], [], [], [], []]
+    all_runs_to_exclude_list = []
 
-    # # sets_to_consider = [14]
-    # # file_prefix_list = [all_file_prefix_list[i] for i in sets_to_consider]
-    # # runs_to_exclude_list = [all_runs_to_exclude_list[i] for i in sets_to_consider]
+    # sets_to_consider = [14]
+    # file_prefix_list = [all_file_prefix_list[i] for i in sets_to_consider]
+    # runs_to_exclude_list = [all_runs_to_exclude_list[i] for i in sets_to_consider]
 
-    # # file_prefix_list = ['trials_12_29_w_updated', 'trials_12_30_w_updated', 'trials_12_31_w_updated', 'trials_01_01_w_updated', 
-    # #                     'trials_01_02_w_updated', 'trials_01_03_w_updated', 'trials_01_04_w_updated']
+    # file_prefix_list = ['trials_12_29_w_updated', 'trials_12_30_w_updated', 'trials_12_31_w_updated', 'trials_01_01_w_updated', 
+    #                     'trials_01_02_w_updated', 'trials_01_03_w_updated', 'trials_01_04_w_updated']
     
-    # file_prefix_list = ['03_02_sim_study_test_final_2_study_200']
-    
-    # # runs_to_exclude_list = ['unfinished', 'trials_01_01_w_updated_noise_57'] 
-    # runs_to_exclude_list = ['no_review']
-    # # trials_01_01_w_updated_noise_57.csv - outlier, N = 48 trials
+    # file_prefix_list = ['03_04_sim_study_test_demo_strategies', '03_04_sim_study_forte_wo_test_sampling_restriction', '03_08_missing_sim_study_2_dup_no_restrictions_study_1']
+    # file_prefix_list = [file_prefix_list[1]]
+    # file_prefix_list = ['03_04_sim_study_forte_wo_test_sampling_restriction']
+    # file_prefix_list = ['03_07_sim_study_no_dup_tests_N8_noise_study_1']
 
-    # vars_filename_prefix = 'analysis'
+    file_prefix_list = ['03_18_sim_study_no_dup_N12_sample_cluster_weight_low_noise_no_sampling']
+    # file_prefix_list = ['03_08_sim_study_no_dup_N12_sample_cluster_weights_study_1']
+    
+    runs_to_exclude_list = ['unfinished'] 
+    # runs_to_exclude_list = ['low_noise']
+    
+   
+    # runs_to_exclude_ids = []
+    # runs_to_exclude_list = []
+    # for id in runs_to_exclude_ids:
+    #     runs_to_exclude_list.append(file_prefix_list[0] + '_run_' + str(id))
+    
+    
+    
+    # trials_01_01_w_updated_noise_57.csv - outlier, N = 48 trials
+
+    # vars_filename_prefix = 'sim_study_no_dup_tests_N8_noise'
+    # vars_filename_prefix = 'sim_study_2_dup_wo_rest_lc_flag'
+    # vars_filename_prefix = 'sim_study_no_dup_N12_sample_cluster_weights'
+    # vars_filename_prefix = 'sim_study_no_dup_N6'
+    # vars_filename_prefix = 'sim_study_no_dup_N12_sample_cluster_weights_study_1' 
+    vars_filename_prefix = 'sim_study_no_dup_N6_sample_cluster_weights'
+    # vars_filename_prefix = 'sim_study_no_dup_N6_sample_cluster_weights_low_noise'
+    # vars_filename_prefix = 'sim_study_no_dup_N12_sample_cluster_weight_low_noise_no_sampling'
 
     # print(file_prefix_list)
     # print(runs_to_exclude_list)
     
+    # find_corrupt_file(path, files, file_prefix_list, runs_to_exclude_list = runs_to_exclude_list)
 
-    # # run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list = runs_to_exclude_list, vars_filename_prefix = vars_filename_prefix)
+    # run_analysis_script(path, files, file_prefix_list, runs_to_exclude_list = runs_to_exclude_list, vars_filename_prefix = vars_filename_prefix)
     # sim_study_data_analysis(path, files, file_prefix_list, runs_to_exclude_list = runs_to_exclude_list, vars_filename_prefix = vars_filename_prefix)
-    # # sim_study_data_analysis(path, files, file_prefix_list, data_condition='baseline', runs_to_exclude_list = runs_to_exclude_list, vars_filename_prefix = vars_filename_prefix)
+    # sim_study_data_analysis(path, files, file_prefix_list, data_condition='baseline', runs_to_exclude_list = runs_to_exclude_list, vars_filename_prefix = vars_filename_prefix)
 
-    # # combine_baseline_data(path)
-    # sim_study_plots()
-    # # anova()
+
+    # split_multiple_runs(path, files, file_prefix_list, runs_to_exclude_list = runs_to_exclude_list)
+
+
+    # combine_baseline_data(path)
+    # sim_study_plots(path, vars_filename_prefix)
+    anova(path, vars_filename_prefix)
+
+    # analyze_demo_strategies(path, files, file_prefix_list, runs_to_exclude_list = runs_to_exclude_list, vars_filename_prefix = vars_filename_prefix)
+
+    # analyze_incomplete_runs(path, 'forte_study_no_samp_rest_learning_incomplete_runs.pickle')
 
     ##################################################
-    # path = 'models/augmented_taxi2'
+    # path = 'models/augmented_taxi2/'
 
-    # filename = '03_02_sim_study_test_ck_jk_w_feedback_4_duplicate_tests_study_17_run_42.pickle'
+    # filename = '03_04_sim_study_test_demo_strategies_study_1_run_5.pickle'
 
-    # plot_pf_dist(path, filename)
-
-
+    # plot_pf_dist(path, filename, counterfactuals_plot_flag=True)
 
     ###########################################
 
-    # # # ## Sensitivity Analysis
-    path = 'models/augmented_taxi2'
-    files = os.listdir(path)
+    # # # # # ## Sensitivity Analysis
+    # path = 'models/augmented_taxi2/'
+    # files = os.listdir(path)
 
-    file_prefix_list = ['02_28_sensitivity_tc2_jk', '03_02_sensitivity_tc2_jk', '03_04_sensitivity_tc2_jk']
-    # file_prefix_list = ['03_04_sensitivity_tc2_jk_lfl_study_1_run_5']
+    # file_prefix_list = ['03_17_sensitivity_tc2_jk']
+    # # file_prefix_list = ['03_04_sensitivity_tc2_jk_lfl_study_1_run_5']
 
-    runs_excluse_list = ['fixed', '03_04_sensitivity_tc2_jk_lfl_study_1_run_5', '03_04_sensitivity_tc2_jk_lfl_study_1_run_4', '03_04_sensitivity_tc2_jk_lfl_study_2_run_4', \
-                         '03_04_sensitivity_tc2_jk_lfl_study_4_run_4']
-    run_sensitivity_analysis(path, files, file_prefix_list, runs_to_exclude_list=runs_excluse_list, runs_to_analyze_list = [], vars_filename_prefix = '')
+    # runs_excluse_list = ['fixed', '03_04_sensitivity_tc2_jk_lfl_study_1_run_5', '03_04_sensitivity_tc2_jk_lfl_study_1_run_4', '03_04_sensitivity_tc2_jk_lfl_study_2_run_4', \
+    #                      '03_04_sensitivity_tc2_jk_lfl_study_4_run_4']
+    # run_sensitivity_analysis(path, files, file_prefix_list, runs_to_exclude_list=runs_excluse_list, runs_to_analyze_list = [], vars_filename_prefix = vars_filename_prefix)
 
 
 

@@ -6,9 +6,14 @@ import params_team as params
 import simulation.sim_helpers as sim_helpers
 import numpy as np
 
+import pickle
+
 import matplotlib
 matplotlib.use('TkAgg')
 # matplotlib.use('Agg')
+
+matplotlib.pyplot.rcParams['figure.facecolor'] = 'white'
+matplotlib.pyplot.rcParams['axes.facecolor'] = 'white'
 
 
 def get_sim_conditions(team_composition_list, N_runs, run_start_id):
@@ -192,12 +197,30 @@ if __name__ == "__main__":
     ##########################
 
     # # check information gain vs learning factor
-    path = 'models/augmented_taxi2'
-    dt.check_ig_uf_relation(path)
+    # path = 'models/augmented_taxi2'
+    # dt.check_ig_uf_relation(path)
 
     ###########################
 
     # check constraints area
     # dt.check_constraints_area()
+
+    ###########################
+
+    # convert string to float
+    path = 'models/augmented_taxi2'
+    file_prefix = 'sim_study_no_dup_N6_sample_cluster_weights_trial_data_subset_N15_checked'
+
+    with open(path + '/' + file_prefix + '.pickle', 'rb') as f:
+        data = pickle.load(f)
+
+    data = data.reset_index(drop=True)
+
+    for i in range(len(data)):
+        data['average_team_knowledge'][i] = np.round(float(data['average_team_knowledge'][i]), 4)
+
+
+    data.to_csv(path + '/' + file_prefix + '.csv')
+
 
     x=1

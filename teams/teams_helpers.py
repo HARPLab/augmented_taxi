@@ -883,7 +883,7 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, teacher_lear
             print('Updating particles for ', member_id, 'with prior knowledge in ', model_type, ' condition...')
             # prior is the same for all irrespective of their understanding/learning factor. So, prior learning factor is '1'
             particles_team[member_id].update(team_prior[member_id][0], prior_lf, plot_title = plot_title, viz_flag = False, vars_filename=vars_filename, model_type = model_type) # team prior is in team knowledge format. Hence use kc_id = 0 to get prior
-
+    
                 # visualize_transition(cnst, particles_team[member_id], params.mdp_class, params.weights['val'], text = 'Simulated knowledge change for ' + str(member_id) )
             
             particles_team[member_id].knowledge_update(team_prior[member_id])
@@ -895,7 +895,7 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, teacher_lear
         if team_prior is not None:
             team_prior['common_knowledge'] = [calc_common_knowledge(team_prior, team_size, weights, step_cost_flag)]
             plot_title = 'Teacher belief for common knowledge for prior'
-            particles_team['common_knowledge'].update(team_prior['common_knowledge'][0], 1, plot_title=plot_title, viz_flag = False, vars_filename=vars_filename, model_type=model_type)  # team prior is in team knowledge format. Hence use kc_id = 0 to get prior
+            particles_team['common_knowledge'].update(team_prior['common_knowledge'][0], prior_lf, plot_title=plot_title, viz_flag = False, vars_filename=vars_filename, model_type=model_type)  # team prior is in team knowledge format. Hence use kc_id = 0 to get prior
             particles_team['common_knowledge'].knowledge_update(team_prior['common_knowledge'])
         
 
@@ -909,7 +909,7 @@ def sample_team_pf(team_size, n_particles, weights, step_cost_flag, teacher_lear
             joint_constraints = []
             for p in range(team_size):
                 joint_constraints.append(team_prior['joint_knowledge'][0][p])
-            particles_team['joint_knowledge'].update_jk(joint_constraints, learning_factor)
+            particles_team['joint_knowledge'].update_jk(joint_constraints, prior_lf)
             particles_team['joint_knowledge'].knowledge_update(team_prior['joint_knowledge'])
     
 
@@ -1722,7 +1722,7 @@ def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, te
 
         # b) Sample from particle filter
         # # sample counterfactual human models; sample equally from each team member knowledge for joint knowledge case
-        sample_human_models, _, _ = BEC_helpers.sample_human_models_pf(particles_demo, n_human_models)
+        sample_human_models, sampled_models_cluster_idxs, _, _ = BEC_helpers.sample_human_models_pf(particles_demo, n_human_models)
 
         #####################################
 
@@ -1735,7 +1735,10 @@ def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, te
             with open('models/' + data_loc + '/' + run_env_loc + '/demo_gen_log.txt', 'a') as myfile:
                 myfile.write('Length of summary: {}\n'.format(summary_count))
                 myfile.write('constraint_space_to_sample_human_models: {}\n'.format(constraint_space_to_sample_human_models))
+                myfile.write('N clusters: {}\n'.format(len(particles_demo.cluster_weights)))
+                myfile.write('Cluster weights: {}\n'.format(particles_demo.cluster_weights))
                 myfile.write('sample_human_models: {}\n'.format(sample_human_models))
+                myfile.write('sampled_models_cluster_idxs: {}\n'.format(sampled_models_cluster_idxs))
 
         # print(colored('constraint_space_to_sample_human_models: ' + str(constraint_space_to_sample_human_models) + '. sample_human_models: ' + str(sample_human_models), 'red'))
 
@@ -1985,7 +1988,7 @@ def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, te
             
             # print('Updating particles with constraint: ', new_constraint)
             plot_title = 'Demo particles update after demonstration summary ' + str(summary_count)
-            particles_demo.update(new_constraint, teacher_uf_demo, plot_title = plot_title, vars_filename=vars_filename, model_type = params.teacher_update_model_type)
+            particles_demo.update(new_constraint, teacher_uf_demo, plot_title = plot_title, vars_filename=vars_filename, viz_flag=False, model_type = params.teacher_update_model_type)
 
             
             # added newly (12/1/23) to separate sampling space and demo info space

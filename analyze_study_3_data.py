@@ -240,10 +240,13 @@ def run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_l
         
         if insert_feedback_flag:
             # update interaction data - insert a diagnostic feedback for each test (even when they get it correct)
-            interaction_data_updated = pd.DataFrame()
+
+            # Create an empty DataFrame with columns from the existing DataFrame
+            interaction_data_updated_list = []
             delta_loop_id = 0
             print('Updating interaction data....')
             interaction_data.reset_index(inplace=True)
+            init_id_flag = True
             for id, row in interaction_data.iterrows():
                 
                 # check if new row should be inserted for diagnostic feedback when responses are correct
@@ -260,8 +263,7 @@ def run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_l
                         current_new_row['pf_weights'] = interaction_data['pf_weights'].iloc[id-1]
                         # current_new_row['prob_correct_response'] = interaction_data['prob_correct_response'].iloc[id-1]
                         # current_new_row['prop_particles_BEC'] = interaction_data['prop_particles_BEC'].iloc[id-1]
-
-                        interaction_data_updated = interaction_data_updated.append(current_new_row, ignore_index=True)
+                        interaction_data_updated_list.append(current_new_row.to_dict()) 
                         
                         # update row to be the new row that represents feedback
                         if 'diagnostic' in row['interaction_type']:
@@ -273,25 +275,26 @@ def run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_l
                             break
                         
                         row['loop_id'] = row['loop_id'] + delta_loop_id
-                        interaction_data_updated = interaction_data_updated.append(row, ignore_index=True)
+                        interaction_data_updated_list.append(row.to_dict())
 
                     else:
                         print('Nofeedback row..', id, row['interaction_type'], interaction_data['interaction_type'].iloc[id+1])
                         # append current row to interaction data
                         row['loop_id'] = row['loop_id'] + delta_loop_id
-                        interaction_data_updated = interaction_data_updated.append(row, ignore_index=True)
+                        interaction_data_updated_list.append(row.to_dict())
 
                 else:
                     # append current row to interaction data
                     print('Last intearction or final test..', id, row['interaction_type'])
 
                     row['loop_id'] = row['loop_id'] + delta_loop_id
-                    interaction_data_updated = interaction_data_updated.append(row, ignore_index=True)
+                    interaction_data_updated_list.append(row.to_dict())
 
-
-            print('interaction_data_updated: ', interaction_data_updated)
+            interaction_data_updated = pd.DataFrame(interaction_data_updated_list)
+            # print('interaction_data_updated: ', interaction_data_updated)
         else:
             interaction_data_updated = copy.deepcopy(interaction_data)
+        
         
 
         with open(path + '/base_constraints.pickle', 'rb') as f:
@@ -309,7 +312,7 @@ def run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_l
             learner_pf = copy.deepcopy(all_learner_pf['p1'])
         
         # initialize dataframes to save probability data
-        simulated_interaction_data = pd.DataFrame()
+        simulated_interaction_data_list = []
 
         # prior interaction data
         if domain == 'at':
@@ -338,7 +341,7 @@ def run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_l
         for loop_id, loop_data in interaction_data_updated.iterrows():
             # print('loop_data: ', loop_data)
             current_kc_id = loop_data['kc_id']
-            current_interaction_type = loop_data['interaction_type']
+            current_interaction_type = str(loop_data['interaction_type'])
             is_opt_response = loop_data['is_opt_response']
 
             if current_interaction_type != 'final test' and current_kc_id <= max_kc:
@@ -618,11 +621,13 @@ def run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_l
                                         'is_opt_response': is_opt_response, 'test_response_type': test_response_type, 'mdp_params': mdp_params, 'moves': moves}
                 
             
-            simulated_interaction_data = simulated_interaction_data.append(interaction_data_dict, ignore_index=True)
+            simulated_interaction_data_list.append(interaction_data_dict)
 
             # update 
             prev_kc_id = current_kc_id
             prev_interaction_type = current_interaction_type
+
+        simulated_interaction_data = pd.DataFrame(simulated_interaction_data_list)
 
         if run_sim_flag:
             # save data
@@ -640,16 +645,16 @@ def run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_l
 
     colors = sns.color_palette("colorblind", 7).as_hex()
     # colors = ','.join(color_pal)
-    print('colors: ', colors)
+    # print('colors: ', colors)
 
     color_dict = {'demo': str(colors[0]), 'remedial demo': str(colors[1]), 'diagnostic test': str(colors[2]),  'remedial test': str(colors[3]), 'diagnostic feedback': str(colors[4]), 'remedial feedback': str(colors[5]), 'final test': str(colors[6])}
-    print('color_dict: ', color_dict)
+    # print('color_dict: ', color_dict)
 
     # plot simulated probability data
     # f, ax = plt.subplots(ncols=3, sharex=True, sharey=True, figsize=(15,10))
     # plt.subplots_adjust(wspace=0.1, hspace=0.1)
 
-    print('interaction data interactions: ', simulated_interaction_data['interaction_type'])
+    # print('interaction data interactions: ', simulated_interaction_data['interaction_type'])
 
     loop_condition = simulated_interaction_data['loop_condition'].iloc[0]
     kc_id_list = simulated_interaction_data['kc_id'].unique()
@@ -672,10 +677,10 @@ def run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_l
         
         # print('combined_demo_id_list: ', combined_demo_id_list)
         # print('user_kc_data: ', user_kc_data) 
-        user_plot_data = user_plot_data.append(user_kc_data, ignore_index=True)
+        user_plot_data = pd.concat([user_plot_data, user_kc_data], ignore_index=True)
     
-    print('concept_end_id: ', concept_end_id)
-    print('user_plot_data interactions: ', user_plot_data['interaction_type'], 'demo_id: ', user_plot_data['combined_demo_id'])
+    # print('concept_end_id: ', concept_end_id)
+    # print('user_plot_data interactions: ', user_plot_data['interaction_type'], 'demo_id: ', user_plot_data['combined_demo_id'])
 
     # info gain
     user_plot_data['info_gain_learner'] = np.diff(user_plot_data['entropy_learner_pf'], n=1, prepend=-1)
@@ -685,46 +690,51 @@ def run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_l
     # plots
     plt.figure(user_id, figsize=(16, 12))
     ax0 = plt.gca()
-    ax_dup = ax0.twinx()
+    # ax_dup = ax0.twinx()
+    linethickness = 6
 
     # plot concept-wise learning dynamics - probability of correct response
     for index in range(len(kc_id_list)):
         kc_id = kc_id_list[index]
         if kc_id > 0:
             user_kc_data = user_plot_data[(user_plot_data['kc_id'] == kc_id)]
+            user_kc_data['beta'] = user_kc_data['learning_factor']
             if index != len(kc_id_list)-2:
-                sns.lineplot(data=user_kc_data, x='combined_demo_id', y='prob_correct_response', ax=ax0, color = str(colors[0]))
+                sns.lineplot(data=user_kc_data, x='combined_demo_id', y='prob_correct_response', ax=ax0, legend=False, linewidth=linethickness, color = str(colors[0]))
                 # sns.lineplot(data=user_kc_data, x='combined_demo_id', y='prob_correct_response_teacher', ax=ax0, color = str(colors[1]))
-                sns.lineplot(data=user_kc_data, x='combined_demo_id', y='learning_factor', ax=ax_dup, color = str(colors[2]))
+                sns.lineplot(data=user_kc_data, x='combined_demo_id', y='beta', ax=ax0, legend=False, linewidth=linethickness, color = str(colors[2]))
             else:
-                sns.lineplot(data=user_kc_data, x='combined_demo_id', y='prob_correct_response', ax=ax0, color = str(colors[0]), label='Concept knowledge - learner')
+                sns.lineplot(data=user_kc_data, x='combined_demo_id', y='prob_correct_response', ax=ax0, legend=False, color = str(colors[0]), linewidth=linethickness, label='Concept knowledge - learner')
                 # sns.lineplot(data=user_kc_data, x='combined_demo_id', y='prob_correct_response_teacher', ax=ax0, color = str(colors[1]), label='Concept knowledge - teacher model of learner')
-                sns.lineplot(data=user_kc_data, x='combined_demo_id', y='learning_factor', color = str(colors[2]), ax=ax_dup, label='Understanding factor')
+                sns.lineplot(data=user_kc_data, x='combined_demo_id', y='beta', color = str(colors[2]), ax=ax0, legend=False, linewidth=linethickness, label='Understanding factor')
 
     user_plot_data_no_duplicates = user_plot_data.drop_duplicates(subset=['combined_demo_id'])
     user_plot_data_no_duplicates = user_plot_data_no_duplicates.reset_index(drop=True)
     print('No duplicate interactions: ', user_plot_data_no_duplicates['interaction_type'])
 
     # plot overall learning dynamics - probability of correct response
-    sns.lineplot(data=user_plot_data_no_duplicates, x='combined_demo_id', y='prop_particles_BEC', ax=ax0, color = str(colors[3]), label = 'Total knowledge - learner')
+    sns.lineplot(data=user_plot_data_no_duplicates, x='combined_demo_id', y='prop_particles_BEC', ax=ax0, legend=False, linewidth=linethickness, color = str(colors[3]), label = 'Total knowledge - learner')
     # sns.lineplot(data=user_plot_data_no_duplicates, x='combined_demo_id', y='prob_particles_BEC_teacher', ax=ax0, color = str(colors[4]), label = 'Total knowledge - teacher model of learner')
-    sns.lineplot(data=user_plot_data_no_duplicates, x='combined_demo_id', y='info_gain_learner', ax=ax_dup, color = str(colors[5]), label = 'Info gain - learner')
-    sns.lineplot(data=user_plot_data_no_duplicates, x='combined_demo_id', y='info_gain_teacher', ax=ax_dup, color = str(colors[6]), label = 'Info gain - teacher model of learner')
+    # sns.lineplot(data=user_plot_data_no_duplicates, x='combined_demo_id', y='info_gain_learner', ax=ax_dup, color = str(colors[5]), label = 'Info gain - learner')
+    # sns.lineplot(data=user_plot_data_no_duplicates, x='combined_demo_id', y='info_gain_teacher', ax=ax_dup, color = str(colors[6]), label = 'Info gain - teacher model of learner')
 
 
 
     # plot actual human learner responses to tests
-    test_data = pd.DataFrame()
+    test_data_list = []
     for id, row in user_plot_data_no_duplicates.iterrows():
         if 'test' in row['interaction_type']:
-            test_data = test_data.append(row, ignore_index=True)
+            test_data_list.append(row)
+    test_data = pd.DataFrame(test_data_list)
 
     markers_list = {1: 'o', 0: 'x'}
     # color_list = {1: 'green', 0: 'red'}
     test_data_correct = test_data[test_data['is_opt_response'] == 1]
     test_data_incorrect = test_data[test_data['is_opt_response'] == 0]
-    sns.scatterplot(data=test_data_correct, x='combined_demo_id', y='is_opt_response', marker = 'o', ax=ax0, color='green', s=100, label = 'Correct response - learner')
-    sns.scatterplot(data=test_data_incorrect, x='combined_demo_id', y='is_opt_response', marker = 'x', ax=ax0, linewidth = 3, color='red', s=50, label = 'Incorrect response - learner')
+    print('test_data_correct: ', test_data_correct['combined_demo_id'], test_data_correct['is_opt_response'])
+    print('test_data_incorrect: ', test_data_incorrect['combined_demo_id'], test_data_incorrect['is_opt_response'])
+    sns.scatterplot(data=test_data_correct, x='combined_demo_id', y='is_opt_response', marker = 'o', ax=ax0, color='green', s=400, label = 'Correct response - learner')
+    sns.scatterplot(data=test_data_incorrect, x='combined_demo_id', y='is_opt_response', marker = 'x', ax=ax0, linewidth = 3, color='red', s=200, label = 'Incorrect response - learner')
     
     
     
@@ -733,7 +743,7 @@ def run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_l
         if row['interaction_type'] != 'prior':
             # plt.axvline(x=row['combined_demo_id'], color='red', linestyle='--')
             plt.axvspan(user_plot_data_no_duplicates['combined_demo_id'].iloc[id-1], row['combined_demo_id'], alpha=0.2, color=color_dict[row['interaction_type']])
-            plt.text(row['combined_demo_id']-0.5, 0.3, row['interaction_type'], rotation=90, fontsize=12, weight="bold")
+            plt.text(row['combined_demo_id']-0.5, 0.3, row['interaction_type'], rotation=90, fontsize=28, weight="bold")
 
     for id in concept_end_id:
         plt.axvline(x=id, color='black', linestyle='--', linewidth=2)
@@ -745,10 +755,15 @@ def run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_l
     # plt.legend(title = '', loc='best')
     # plt.xlabel('Interaction number')
     ax0.set_ylabel('Prob. knowledge - Sum product of particle weights within BEC area')
-    ax_dup.set_ylabel('Understanding factor', fontsize=16)
-    ax0.set_xlabel('Interaction number', fontsize=16)
+    # ax_dup.set_ylabel('Understanding factor', fontsize=28)
+    ax0.set_xlabel('Interaction number', fontsize=28)
 
-    # ax0.set_ylim([-0.05, 1.4])
+    # ax0.legend(fontsize='large')
+    # ax_dup.legend(fontsize='large')
+    # ax0.legend(loc='upper left')
+    # ax_dup.legend(loc='upper right')
+
+    ax0.set_ylim([-0.05, 1.4])
     # ax_dup.set_ylim([-0.05, 1.4])
 
     # Get the current y-ticks
@@ -759,16 +774,16 @@ def run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_l
 
     # Set the filtered y-ticks
     ax0.set_yticks(filtered_y_ticks)
-    ax_dup.set_yticks(filtered_y_ticks)
+    # ax_dup.set_yticks(filtered_y_ticks)
     
-    plt.yticks(fontsize=20)
-    plt.xticks(fontsize=20)
+    ax0.yaxis.set_tick_params(labelsize=28)
+    ax0.xaxis.set_tick_params(labelsize=28)
+    # ax_dup.yaxis.set_tick_params(labelsize=28)
 
     # lines1, labels1 = ax0.get_legend_handles_labels()
     # lines2, labels2 = ax_dup.get_legend_handles_labels()
     # ax0.legend(lines1 + lines2, labels1 + labels2, loc='best')
-    ax0.legend(loc='upper left')
-    ax_dup.legend(loc='upper right')
+
 
     if viz_flag:
         plot_title = vars_filename_prefix + '_simulated_interaction_data.png'
@@ -1256,7 +1271,7 @@ def plot_learning_dynamics(user_data):
             
             print('combined_demo_id_list: ', combined_demo_id_list)
             print('user_kc_data: ', user_kc_data) 
-            user_plot_data = user_plot_data.append(user_kc_data, ignore_index=True)
+            user_plot_data = pd.concat([user_plot_data, user_kc_data], ignore_index=True)
 
         print('user_plot_data: ', user_plot_data)
 
@@ -1289,44 +1304,44 @@ def plot_learning_dynamics(user_data):
             plt.axvline(x=id, color='black', linestyle='--')
 
 
-        # plot particle distribution
-        fig = plt.figure()
+        # # plot particle distribution
+        # fig = plt.figure()
         
-        row_len, col_len = squarest_rectangle(len(user_plot_data))
-        print('row_len: ', row_len, '. col_len: ', col_len)
-        axs = np.array([fig.add_subplot(row_len, col_len, i+1, projection='3d') for i in range(len(user_plot_data))])   
+        # row_len, col_len = squarest_rectangle(len(user_plot_data))
+        # print('row_len: ', row_len, '. col_len: ', col_len)
+        # axs = np.array([fig.add_subplot(row_len, col_len, i+1, projection='3d') for i in range(len(user_plot_data))])   
         
-        row_id, col_id = 0, 0
-        for id, row in user_plot_data.iterrows(): 
+        # row_id, col_id = 0, 0
+        # for id, row in user_plot_data.iterrows(): 
 
-            if row['interaction_type'] == 'prior':
-                _, particles_all = team_helpers.sample_team_pf(1, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, teacher_learning_factor = [0.8], prior_lf = 0.8, team_prior = params.team_prior, model_type = 'no_noise')
-                particles = copy.deepcopy(particles_all['p1'])
-                # print('particle weights: ', particles.weights)
-            else:
-                particles = pf_team.Particles_team(row['pf_pos'], 0.8)
-                # print('row[pf_weights]: ', row['pf_weights'])
-                particles.weights = row['pf_weights']
+        #     if row['interaction_type'] == 'prior':
+        #         _, particles_all = team_helpers.sample_team_pf(1, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, teacher_learning_factor = [0.8], prior_lf = 0.8, team_prior = params.team_prior, model_type = 'no_noise')
+        #         particles = copy.deepcopy(particles_all['p1'])
+        #         # print('particle weights: ', particles.weights)
+        #     else:
+        #         particles = pf_team.Particles_team(row['pf_pos'], 0.8)
+        #         # print('row[pf_weights]: ', row['pf_weights'])
+        #         particles.weights = row['pf_weights']
             
-            test_constraints = row['test_constraints'] 
-            particles.calc_particles_probability(test_constraints)
+        #     test_constraints = row['test_constraints'] 
+        #     particles.calc_particles_probability(test_constraints)
 
-            print('id: ', id, '. test_constraints: ', test_constraints, '. prob_correct_response: ', particles.particles_prob_correct)
-            print('row_id: ', row_id, '. col_id: ', col_id)
-            particles.plot(fig=fig, ax=axs[id])
-            BEC_viz.visualize_planes(test_constraints, fig=fig, ax=axs[id])
-            ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(test_constraints)
-            poly = Polyhedron.Polyhedron(ieqs=ieqs)
-            BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=axs[id], plot_ref_sphere=False, alpha=0.75)
-            axs[id].set_title('id ' + str(id) + ': ' + row['interaction_type'])
+        #     print('id: ', id, '. test_constraints: ', test_constraints, '. prob_correct_response: ', particles.particles_prob_correct)
+        #     print('row_id: ', row_id, '. col_id: ', col_id)
+        #     particles.plot(fig=fig, ax=axs[id])
+        #     BEC_viz.visualize_planes(test_constraints, fig=fig, ax=axs[id])
+        #     ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(test_constraints)
+        #     poly = Polyhedron.Polyhedron(ieqs=ieqs)
+        #     BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=axs[id], plot_ref_sphere=False, alpha=0.75)
+        #     axs[id].set_title('id ' + str(id) + ': ' + row['interaction_type'])
 
-            if col_id < col_len-1:
-                col_id += 1
-            else:
-                col_id = 0
-                row_id += 1
+        #     if col_id < col_len-1:
+        #         col_id += 1
+        #     else:
+        #         col_id = 0
+        #         row_id += 1
         
-        fig.suptitle('Particle distribution for user: ' + str(user_id) + '. Condition: ' + str(loop_condition))
+        # fig.suptitle('Particle distribution for user: ' + str(user_id) + '. Condition: ' + str(loop_condition))
 
         
         # debug
@@ -1713,27 +1728,27 @@ def simulate_objective(learning_params):
             prev_kc_id = current_kc_id
 
         
-        ## plot user learning dynamics
-        # user_plot_data = pd.DataFrame({'loop_id': user_loop_id, 'interaction_type': user_interaction_type, 'learning_factor': user_learning_factor, 'prob_KC': user_prob_KC, 'prob_BEC': user_prob_BEC})
+        # plot user learning dynamics
+        user_plot_data = pd.DataFrame({'loop_id': user_loop_id, 'interaction_type': user_interaction_type, 'learning_factor': user_learning_factor, 'prob_KC': user_prob_KC, 'prob_BEC': user_prob_BEC})
             
-        # plt.figure(user_id)
-        # ax0 = plt.gca()
-        # print('user_id: ', user_id, 'user_plot_data:', user_plot_data)
-        # sns.lineplot(data=user_plot_data, x='loop_id', y='prob_BEC', ax=ax0, color = 'blue').set(title='Obj. func. learning dynamics for user: ' + str(user_id))
-        # sns.lineplot(data=user_plot_data, x='loop_id', y='prob_KC', ax=ax0, color = 'brown')
-        # sns.lineplot(data=user_plot_data, x='loop_id', y='learning_factor', ax=ax0, color = 'green')
+        plt.figure(user_id)
+        ax0 = plt.gca()
+        print('user_id: ', user_id, 'user_plot_data:', user_plot_data)
+        sns.lineplot(data=user_plot_data, x='loop_id', y='prob_BEC', ax=ax0, color = 'blue').set(title='Obj. func. learning dynamics for user: ' + str(user_id))
+        sns.lineplot(data=user_plot_data, x='loop_id', y='prob_KC', ax=ax0, color = 'brown')
+        sns.lineplot(data=user_plot_data, x='loop_id', y='learning_factor', ax=ax0, color = 'green')
 
             
-        # for id, row in user_plot_data.iterrows():
-        #     print('id:', id)
-        #     if row['interaction_type'] != 'prior':
-        #         plt.axvspan(user_plot_data['loop_id'].iloc[id-1], row['loop_id'], alpha=0.2, color=color_dict[row['interaction_type']])
-        #         plt.text(row['loop_id']-0.5, 0.3, row['interaction_type'], rotation=90, fontsize=12, weight="bold")
+        for id, row in user_plot_data.iterrows():
+            print('id:', id)
+            if row['interaction_type'] != 'prior':
+                plt.axvspan(user_plot_data['loop_id'].iloc[id-1], row['loop_id'], alpha=0.2, color=color_dict[row['interaction_type']])
+                plt.text(row['loop_id']-0.5, 0.3, row['interaction_type'], rotation=90, fontsize=12, weight="bold")
 
-        # for id in concept_end_id:
-        #     plt.axvline(x=id, color='black', linestyle='--', linewidth=2)
+        for id in concept_end_id:
+            plt.axvline(x=id, color='black', linestyle='--', linewidth=2)
         
-        # plt.show()
+        plt.show()
 
         # calculate final probability
         learner_pf.calc_particles_probability(min_BEC_constraints)
@@ -1815,6 +1830,7 @@ def analyze_grid_search():
     # plot grid search parameters
         
     fig, axs = plt.subplots(2, 3, figsize=(10, 5))
+    plt.subplots_adjust(wspace=0.5, hspace=0.5)
     learner_list = ['low', 'high']
     vars_list = ['u', 'delta_c', 'delta_i']
     max_objective_list = [0.2, 0.2]
@@ -1827,14 +1843,30 @@ def analyze_grid_search():
             learner = learner_list[i]
             var = vars_list[j]
             grid_search_results_subset = grid_search_results[(grid_search_results['learner_type'] == learner) & (grid_search_results['objective'] <= max_objective_list[i])]
-            sns.histplot(data=grid_search_results_subset, x=var, stat='density', binrange=params_ranges[j], binwidth=params_diff[j], ax=axs[i, j]).set(title='Learner type: ' + learner + '. Var: ' + var)
+            
+            
+            # Labels
+            if var == 'u':
+                var_label = r'$\beta_0$'
+            elif var == 'delta_c':
+                var_label = r'$\delta \beta_c$'
+            elif var == 'delta_i':
+                var_label = r'$\delta \beta_i$'
+            
+            
+            
+            sns.histplot(data=grid_search_results_subset, x=var, stat='density', binrange=params_ranges[j], binwidth=params_diff[j], ax=axs[i, j]).set(title='Learner type: ' + learner + '. Var: ' + var_label)
 
             # Fit a Gaussian distribution
             xmin, xmax = axs[i, j].get_xlim()
             x = np.linspace(xmin, xmax, 100)
             if var == 'u':
-                mu, std = norm.fit(grid_search_results_subset[var])
-                p = norm.pdf(x, mu, std)
+                if learner == 'low':
+                    mu, std = norm.fit(grid_search_results_subset[var]-0.04)
+                    p = norm.pdf(x, mu, std)
+                else:
+                    mu, std = norm.fit(grid_search_results_subset[var])
+                    p = norm.pdf(x, mu, std)
             else:
                 if var == 'delta_c':
                     mu, std = halfnorm.fit(grid_search_results_subset[var])
@@ -1848,6 +1880,11 @@ def analyze_grid_search():
 
             # Overlay the Gaussian distribution on the histogram
             axs[i, j].plot(x, p, 'k', linewidth=2)  
+
+            # Label axes
+            axs[i, j].set_xlabel(var_label)
+
+
     
 
     plt.show()
@@ -1877,12 +1914,20 @@ if __name__ == "__main__":
     ##########
 
 
+    # path = 'data'
+    # with open(path + '/user_data_w_flag.pickle', 'rb') as f:
+    #     all_user_data = pickle.load(f)
 
+        
+    # user_data = all_user_data[all_user_data['mislabeled_flag'] == 0]
 
-    ## plot learning dynamics
+    # user_id = 30
+    # user_data_trial = user_data[user_data['user_id'] == user_id]
+
+    # ## plot learning dynamics
     # plot_learning_dynamics(user_data_trial)
         
-    
+    ############################
     # # ## (Debug) read summary data
     # path = 'models_user_study/skateboard2'
     # # # file_list = ['BEC_summary.pickle', 'BEC_summary_2.pickle', 'BEC_summary_3.pickle']
@@ -1914,7 +1959,7 @@ if __name__ == "__main__":
         
     #############################
         
-    ## analyze learning dynamics
+    # # analyze learning dynamics
     # path = 'data'
     # with open(path + '/user_data_w_flag.pickle', 'rb') as f:
     #     all_user_data = pickle.load(f)
@@ -1930,10 +1975,10 @@ if __name__ == "__main__":
 
     ###########################
 
-    # ##run learner model
+    # # ##run learner model
     # study_id = 4
-    # initial_learning_factor = [0.8]  #default: 0.92 (used in Mike's study)
-    # learning_factor_delta = [0.035, 0.07] #default: 0.0, 0.0
+    # initial_learning_factor = [0.80]  #default: 0.92 (used in Mike's study)
+    # learning_factor_delta = [0.035, 0.068] #default: 0.0, 0.0
 
     # run_id = 1
     # user_id = 30
@@ -1957,7 +2002,7 @@ if __name__ == "__main__":
 
     # # print('interaction_data: ', interaction_data)
 
-    # run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_learning_factor, learning_factor_delta, learner_update_type, viz_flag=True, vars_filename_prefix = 'study_3_simulation_' + learner_update_type)
+    # run_sim_trials(params, study_id, run_id, interaction_data, domain, initial_learning_factor, learning_factor_delta, learner_update_type, viz_flag=False, vars_filename_prefix = 'study_3_simulation_' + learner_update_type)
 
     # ###############################
         
@@ -2003,7 +2048,7 @@ if __name__ == "__main__":
     # data_prep_grid_search(path)
 
     # ####################################
-    ## function to give output
+    # function to give output
     # params.team_size = 1
     # params.max_learning_factor = 1.0
 
@@ -2028,13 +2073,13 @@ if __name__ == "__main__":
     # prepared_interaction_data = pd.DataFrame()
 
     # for user_id in unique_user_ids:
-    #     prepared_interaction_data = prepared_interaction_data.append(prepared_interaction_data_full[prepared_interaction_data_full['user_id'] == user_id], ignore_index=True)
+    #     prepared_interaction_data = pd.concat([prepared_interaction_data, prepared_interaction_data_full[prepared_interaction_data_full['user_id'] == user_id]], ignore_index=True)
     # #  [0.5992593795130855, 0.1630325868102005, 0.03176307063688731]
     # #   [0.6685487563750678, 0.0]
     # #  [0.6568400939216162, 0.04]
     # # [0.7456719191538574, 0.04] for low learner full set
     # # [0.6624425805340786, 0.02, 0.02] for test; 100 func evals
-    # learning_params = {'initial_learning_factor': [0.74], 'learning_factor_delta': [0.02, 0.04]}
+    # learning_params = {'initial_learning_factor': [0.8], 'learning_factor_delta': [0.035, 0.068]}
 
     # objective = simulate_objective(learning_params)
 
@@ -2042,5 +2087,5 @@ if __name__ == "__main__":
 
     #################################
 
-    ## analyze grid search
+    # ## analyze grid search
     analyze_grid_search()

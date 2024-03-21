@@ -49,6 +49,10 @@ import multiprocessing
 
 def initialize_loop_vars(params):
 
+    '''
+    Initialize interaction loop/period variables to be saved at the end of the interaction.
+    '''
+
     demo_vars_template = {'study_id': None,
                         'run_no': None,
                         'demo_strategy': None,
@@ -84,7 +88,6 @@ def initialize_loop_vars(params):
                         'unit_knowledge_level': None,
                         'BEC_knowledge_level': None,
                         'unit_knowledge_area': None,
-                        # 'all_unit_constraints_area': None,
                         'BEC_knowledge_area': None,
                         'pf_reset_count': np.zeros(params.team_size+2, dtype=int),
                         
@@ -143,17 +146,6 @@ def debug_calc_prob_mass_correct_side(team_size, constraints, particles):
     return prob_mass_correct_side_constraints
 
 
-
-# def run_reward_teaching(params, pool, initial_teacher_learning_factor, demo_strategy = 'common_knowledge', experiment_type = 'simulated', initial_team_learning_factor = [], 
-#                         team_learning_rate = [], obj_func_prop = 1.0, run_no = 1, viz_flag=[False, False, False], \
-#                         vars_filename_prefix = 'var_to_save', response_sampling_condition = 'particles', team_composition = None, learner_update_type = 'no_noise', study_id = 1, \
-#                         feedback_flag = True, review_flag = True, params_conditions = []):
-
-
-# def run_reward_teaching(params, initial_teacher_learning_factor, demo_strategy, experiment_type, initial_team_learning_factor, 
-#                         team_learning_rate, viz_flag, run_no, \
-#                         vars_filename_prefix, response_sampling_condition, team_composition, learner_update_type, study_id, \
-#                         params_conditions):
 
 def run_reward_teaching(args):
 

@@ -281,7 +281,7 @@ def get_optimal_policies(params, pool, lock):
             with open('models/' + params.data_loc['BEC'] + '/team_BEC_constraints.pickle', 'wb') as f:
                 pickle.dump((min_BEC_constraints, BEC_lengths_record), f)
         
-    print(colored('min_BEC_constraints for this run: ', 'red'), min_BEC_constraints)
+    # print(colored('min_BEC_constraints for this run: ', 'red'), min_BEC_constraints)
 
     return policy_constraints, min_subset_constraints_record, env_record, traj_record, traj_features_record, reward_record, mdp_features_record, consistent_state_count, min_BEC_constraints, BEC_lengths_record
 
@@ -391,6 +391,8 @@ def run_reward_teaching(args):
     # initialize human models for demo generation
     knowledge_id, particles_demo = team_helpers.particles_for_demo_strategy(demo_strategy, team_knowledge, particles_team_teacher, params.team_size, params.weights['val'], params.step_cost_flag, params.BEC['n_particles'], min_BEC_constraints)
 
+
+    particles_demo.plot()
     
     ########################
 
@@ -580,8 +582,8 @@ def run_reward_teaching(args):
                     response_type_all_tests_team[member_id] = response_type_all_tests
                     human_model_weight_team[member_id] = human_model_weight_all_tests
 
-                    print('response_type_all_tests: ', response_type_all_tests)
-                    print('human_model_weight: ', human_model_weight_all_tests)
+                    # print('response_type_all_tests: ', response_type_all_tests)
+                    # print('human_model_weight: ', human_model_weight_all_tests)
 
                     ############# Incorrect
                     # # print('Number of tests: ', N_tests, 'N_extended_tests: ', len(preliminary_tests_extended))
@@ -693,7 +695,7 @@ def run_reward_teaching(args):
                             human_model_weight = human_model_weight_team[member_id][test_no-1]
 
                         # sampled responses
-                        print('human model weight: ', human_model_weight, 'human_traj len: ', len(human_traj), 'response_type: ', response_type)
+                        # print('human model weight: ', human_model_weight, 'human_traj len: ', len(human_traj), 'response_type: ', response_type)
 
 
                         
@@ -701,7 +703,7 @@ def run_reward_teaching(args):
 
                 ### plot sampled human models
                 all_test_constraints_expanded = [item for tc in all_test_constraints for item in tc]
-                print('all_test_constraints_expanded: ', all_test_constraints_expanded)
+                # print('all_test_constraints_expanded: ', all_test_constraints_expanded)
                 if knowledge_viz_flag:  
                     # print('all_tests_constraints: ', all_tests_constraints, 'all_tests_constraints_expanded: ', all_tests_constraints_expanded, 'human_model_weight_team: ', human_model_weight_team)
                     plot_title = 'Interaction No.' + str(loop_count +1) + '. Human models for test ' + str(test_no) + ' of KC ' + str(kc_id)
@@ -719,7 +721,7 @@ def run_reward_teaching(args):
                 test_no += 1
                 # kc_reset_flag = False
 
-            print('all_test_constraints: ', all_test_constraints)
+            # print('all_test_constraints: ', all_test_constraints)
             # ##############################
 
             ## Method 2: Update PF after all tests
@@ -750,7 +752,7 @@ def run_reward_teaching(args):
                     test_mdp.set_init_state(opt_traj[0][0])
 
                     test_constraints = all_test_constraints[test_no]
-                    print('Test constraints: ', test_constraints)
+                    # print('Test constraints: ', test_constraints)
                     if test_no == 0:
                         test_constraints_team.append(copy.deepcopy(test_constraints))
                     else:
@@ -761,7 +763,7 @@ def run_reward_teaching(args):
                     
                     if test_viz_flag:
                         test_mdp.visualize_trajectory(human_traj)
-                    print('Human trajectory: ', human_traj)
+                    # print('Human trajectory: ', human_traj)
                     human_feature_count = test_mdp.accumulate_reward_features(human_traj, discount=True)
                     opt_feature_count = test_mdp.accumulate_reward_features(opt_traj, discount=True)
 
@@ -785,12 +787,12 @@ def run_reward_teaching(args):
                             response_type_team[p-1].extend(['incorrect'])
 
                             
-                print('Test responses team: ', test_responses_team, '. Response type team: ', response_type_team)
+                # print('Test responses team: ', test_responses_team, '. Response type team: ', response_type_team)
                 
                 # update team knowledge
-                print(colored('Current team knowledge for member id ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
+                # print(colored('Current team knowledge for member id ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
                 team_knowledge = team_helpers.update_team_knowledge(team_knowledge, kc_id, kc_reset_flag, test_responses_team[p-1], params.team_size, params.weights['val'], params.step_cost_flag, knowledge_to_update = [member_id])
-                print(colored('Updated team knowledge for member id ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
+                # print(colored('Updated team knowledge for member id ' + str(member_id) + ': ' + str(team_knowledge), 'blue'))
 
                 # update teacher model with test response
                 plot_title =  'Interaction No.' + str(loop_count +1) + '. Teacher belief for player ' + member_id + ' after all tests of KC ' + str(kc_id)
@@ -803,7 +805,7 @@ def run_reward_teaching(args):
                 # update team learning factor
                 if feedback_flag:
                     response_flag = True
-                    print('response_type_team: ', response_type_team)
+                    # print('response_type_team: ', response_type_team)
                     for response_type in response_type_team[p-1]:
                         if response_type == 'incorrect':
                             response_flag = False
@@ -848,7 +850,7 @@ def run_reward_teaching(args):
                     reset_index = [i for i in range(len(team_knowledge[member_id][kc_id])) if (team_knowledge[member_id][kc_id][i] == particles_team_teacher[member_id].reset_constraint).all()]
                     # print('Reset index: ', reset_index)
                     team_knowledge[member_id][kc_id] = team_knowledge[member_id][kc_id][reset_index[0]:]
-                    print('New constraints: ', team_knowledge[member_id])
+                    # print('New constraints: ', team_knowledge[member_id])
 
 
                 # display correct trajectory
@@ -1004,7 +1006,7 @@ def run_reward_teaching(args):
             loop_count += 1
 
             # Check if unit knowledge is sufficient to move on to the next unit (unit learning goal reached)
-            print('team_knowledge: ', team_knowledge, 'min_KC_constraints: ', min_KC_constraints)
+            # print('team_knowledge: ', team_knowledge, 'min_KC_constraints: ', min_KC_constraints)
             unit_learning_goal_reached = team_helpers.check_unit_learning_goal_reached(team_knowledge, min_KC_constraints, kc_id)
             print(colored('unit_learning_goal_reached: ', 'blue'), unit_learning_goal_reached)
 
@@ -1193,12 +1195,11 @@ if __name__ == "__main__":
     # file_lock = multiprocessing.Lock()
 
 
-
     ## varying parameters
-    N_runs_for_each_study_condition = 4
-    run_start_id = 2107
+    N_runs_for_each_study_condition = 1
+    run_start_id = 1
     sensitivity_run_start_id = 1
-    N_combinations = 11
+    N_combinations = 1
 
     
     
@@ -1215,8 +1216,8 @@ if __name__ == "__main__":
     # team_composition_list = [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]  # [[0,0,0], [0,0,2], [0,2,2], [2,2,2]]
     # dem_strategy_list = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge'] # ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
 
-    team_composition_list = [[0,0,2]]
-    dem_strategy_list = ['joint_knowledge'] # ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
+    team_composition_list = [[0,0,2], [2,2,2]]
+    dem_strategy_list = ['individual_knowledge_high'] # ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']
 
     # team_composition_list = [[0], [2]]
     # dem_strategy_list = ['baseline']  # for only one person
@@ -1226,7 +1227,7 @@ if __name__ == "__main__":
     ##########################
 
     # fixed parameters
-    learner_update_type = 'noise'
+    learner_update_type = 'low_noise'
     sampling_condition_list = ['particles']  # Conditions: ['particles', 'cluster_random', 'cluster_weight']sampling of human responses from learner PF models
     #################################
 
@@ -1247,15 +1248,24 @@ if __name__ == "__main__":
     #                              'high': [[0.829, 0.025], [0, 0.072], [0, 0.066]]}
     
 
-    team_params_learning_dist = {'low': [[0.703, 0.034], [0, 0.033], [0, 0.056]], 
-                                 'high': [[0.809, 0.025], [0, 0.022], [0, 0.052]]}
+    # team_params_learning_dist = {'low': [[0.703, 0.034], [0, 0.033], [0, 0.056]], 
+    #                              'high': [[0.809, 0.025], [0, 0.022], [0, 0.052]]}
 
-    # team_params_learning = {'low': [0.7, 0.03, 0.06], 
-    #                         'high': [0.83, 0.02, 0.04]}
+    team_params_learning = {'low': [0.7, 0.03, 0.06], 
+                            'high': [0.83, 0.02, 0.04]}
     
     
     # ## sim runs
-    file_prefix = '03_04_sim_study'
+    # file_prefix = '03_08_sim_study_no_dup_N12_sample_cluster_weights'
+    # file_prefix = '03_11_test_N12_direct_sampling'
+    # file_prefix = '03_08_sim_study_no_dup_N6_sample_cluster_weight_low_noise'
+    # file_prefix = '03_18_sim_study_no_dup_N6_sample_cluster_weight_low_noise_no_sampling'
+    file_prefix = '03_18_sim_study_sb_no_dup_N6_sample_cluster_weight_low_noise_no_sampling'
+    
+    
+    
+    params.BEC['n_human_models'] = 6
+    print('BEC params: ', params.BEC)
     params.max_learning_factor = 0.95
     params.default_learning_factor_teacher = 0.8
 
@@ -1265,12 +1275,12 @@ if __name__ == "__main__":
         lock = manager.Lock()
     
         # # parameter_combinations = get_parameter_combination(params_to_study, N_combinations)
-        # parameter_combinations = []
+        parameter_combinations = []
 
         # ## for sensitivity runs
         # file_prefix_list = []
         # params_list = ['learning_factor_low', 'learning_factor_high', 'learning_rate', 'max_learning_factor', 'default_learning_factor_teacher']
-        # params_id_list = [3]
+        # params_id_list = [4]
         # # params_list = [params_list_overall[i] for i in params_id_list]
         
         # for i in params_id_list:
@@ -1278,64 +1288,67 @@ if __name__ == "__main__":
         #         params_to_study = {'learning_factor_low': [0.6, 0.8], 'learning_factor_high': [0.8], 'learning_rate': [0.1], 'max_learning_factor': [0.925], 'default_learning_factor_teacher': [0.8]}   
         #         params_learning_factor_low = np.linspace(params_to_study['learning_factor_low'][0], params_to_study['learning_factor_low'][1], N_combinations)
         #         for ci in range(N_combinations):
-        #             file_prefix_list.append('03_04_sensitivity_tc2_jk_lfl')
+        #             file_prefix_list.append('03_17_sensitivity_tc2_jk_lfl')
         #             parameter_combinations.append([params_learning_factor_low[ci], params_to_study['learning_factor_high'][0], params_to_study['learning_rate'][0], params_to_study['max_learning_factor'][0], params_to_study['default_learning_factor_teacher'][0]])
             
         #     elif i==1:
         #         params_to_study = {'learning_factor_low': [0.7], 'learning_factor_high': [0.7, 0.9], 'learning_rate': [0.1], 'max_learning_factor': [0.925], 'default_learning_factor_teacher': [0.8]}
         #         params_learning_factor_high = np.linspace(params_to_study['learning_factor_high'][0], params_to_study['learning_factor_high'][1], N_combinations)
         #         for ci in range(N_combinations):
-        #             file_prefix_list.append('03_04_sensitivity_tc2_jk_lfh')
+        #             file_prefix_list.append('03_17_sensitivity_tc2_jk_lfh')
         #             parameter_combinations.append([params_to_study['learning_factor_low'][0], params_learning_factor_high[ci], params_to_study['learning_rate'][0], params_to_study['max_learning_factor'][0], params_to_study['default_learning_factor_teacher'][0]])
 
         #     elif i==2:
         #         params_to_study = {'learning_factor_low': [0.7], 'learning_factor_high': [0.8], 'learning_rate': [0.0, 0.2], 'max_learning_factor': [0.925], 'default_learning_factor_teacher': [0.8]}
         #         params_learning_rate = np.linspace(params_to_study['learning_rate'][0], params_to_study['learning_rate'][1], N_combinations)
         #         for ci in range(N_combinations):
-        #             file_prefix_list.append('03_04_sensitivity_tc2_jk_lr')
+        #             file_prefix_list.append('03_17_sensitivity_tc2_jk_lr')
         #             parameter_combinations.append([params_to_study['learning_factor_low'][0], params_to_study['learning_factor_high'][0], params_learning_rate[ci], params_to_study['max_learning_factor'][0], params_to_study['default_learning_factor_teacher'][0]])
                 
         #     elif i==3:
         #         params_to_study = {'learning_factor_low': [0.7], 'learning_factor_high': [0.8], 'learning_rate': [0.1], 'max_learning_factor': [0.85, 1.0], 'default_learning_factor_teacher': [0.8]}
         #         params_max_learning_factor = np.linspace(params_to_study['max_learning_factor'][0], params_to_study['max_learning_factor'][1], N_combinations)
         #         for ci in range(N_combinations):
-        #             file_prefix_list.append('03_04_sensitivity_tc2_jk_mlf')
+        #             file_prefix_list.append('03_17_sensitivity_tc2_jk_mlf')
         #             parameter_combinations.append([params_to_study['learning_factor_low'][0], params_to_study['learning_factor_high'][0], params_to_study['learning_rate'][0], params_max_learning_factor[ci], params_to_study['default_learning_factor_teacher'][0]])
 
         #     elif i==4:
         #         params_to_study = {'learning_factor_low': [0.7], 'learning_factor_high': [0.8], 'learning_rate': [0.1], 'max_learning_factor': [0.925], 'default_learning_factor_teacher': [0.7, 0.9]}
         #         params_default_learning_factor_teacher = np.linspace(params_to_study['default_learning_factor_teacher'][0], params_to_study['default_learning_factor_teacher'][1], N_combinations)
         #         for ci in range(N_combinations):
-        #             file_prefix_list.append('03_04_sensitivity_tc2_jk_tlf')
+        #             file_prefix_list.append('03_17_sensitivity_tc2_jk_tlf')
         #             parameter_combinations.append([params_to_study['learning_factor_low'][0], params_to_study['learning_factor_high'][0], params_to_study['learning_rate'][0], params_to_study['max_learning_factor'][0], params_default_learning_factor_teacher[ci]])
-        # ############################## 
+        # # ############################## 
 
 
-        # Define arguments for each sensitivity run
+        # # Define arguments for each sensitivity run
         args_list = []
         # for params_comb_run_id in range(len(parameter_combinations)):   # for sensitivity run
+        
         for params_comb_run_id in range(1):                 # for sim run
             sensitivity_run_id = 1
 
 
-            # ## sensitivity runs
-            # file_prefix = file_prefix_list[params_comb_run_id]
+        #     ## sensitivity runs
+        #     file_prefix = file_prefix_list[params_comb_run_id]
             
-            # cur_param_comb_id = np.mod(params_comb_run_id+1, N_combinations)
-            # param_varied_id = params_id_list[np.floor(params_comb_run_id/N_combinations).astype(int)]
+        #     cur_param_comb_id = np.mod(params_comb_run_id+1, N_combinations)
+        #     param_varied_id = params_id_list[np.floor(params_comb_run_id/N_combinations).astype(int)]
 
-            # sensitivity_run_id =  sensitivity_run_start_id + cur_param_comb_id - 1
+        #     sensitivity_run_id =  sensitivity_run_start_id + cur_param_comb_id - 1
             
             
-            # # Learner and teacher model params sensitivity analysis
-            # team_params_learning = {'low': [parameter_combinations[params_comb_run_id][0], parameter_combinations[params_comb_run_id][2]/2, parameter_combinations[params_comb_run_id][2]], 
-            #                         'high': [parameter_combinations[params_comb_run_id][1], parameter_combinations[params_comb_run_id][2]/2, parameter_combinations[params_comb_run_id][2]]}
-            # params.max_learning_factor = parameter_combinations[params_comb_run_id][3]
-            # params.default_learning_factor_teacher = parameter_combinations[params_comb_run_id][4]
+        #     # Learner and teacher model params sensitivity analysis
+        #     team_params_learning = {'low': [parameter_combinations[params_comb_run_id][0], parameter_combinations[params_comb_run_id][2]/2, parameter_combinations[params_comb_run_id][2]], 
+        #                             'high': [parameter_combinations[params_comb_run_id][1], parameter_combinations[params_comb_run_id][2]/2, parameter_combinations[params_comb_run_id][2]]}
+        #     params.max_learning_factor = parameter_combinations[params_comb_run_id][3]
+        #     params.default_learning_factor_teacher = parameter_combinations[params_comb_run_id][4]
+
+
             
-            # print('param_varied_id: ', param_varied_id)
-            # print('Param varied: ', params_list[param_varied_id], 'Sensitivity run: ', sensitivity_run_id, '. Team params: ', team_params_learning, '. Max learning factor: ', params.max_learning_factor, '. Learning_factor_teacher:', params.default_learning_factor_teacher)
-            # ################
+        #     print('param_varied_id: ', param_varied_id)
+        #     print('Param varied: ', params_list[param_varied_id], 'Sensitivity run: ', sensitivity_run_id, '. Team params: ', team_params_learning, '. Max learning factor: ', params.max_learning_factor, '. Learning_factor_teacher:', params.default_learning_factor_teacher)
+        #     ################
 
             ########################
 
@@ -1360,60 +1373,60 @@ if __name__ == "__main__":
                 rlcr = np.zeros([params.team_size, 2])
 
                 # ## for a single run or sensitivity runs
-                # for j in range(params.team_size):
-                #     if team_composition_for_run[j] == 0: 
-                #         ilcr[j] = team_params_learning['low'][0]
-                #         rlcr[j,0] = team_params_learning['low'][1]
-                #         rlcr[j,1] = team_params_learning['low'][2]     
-                #     elif team_composition_for_run[j] == 1:
-                #         ilcr[j] = team_params_learning['med'][0]
-                #         rlcr[j,0] = team_params_learning['med'][1]
-                #         rlcr[j,1] = team_params_learning['med'][2]
-                #     elif team_composition_for_run[j] == 2:
-                #         ilcr[j] = team_params_learning['high'][0]
-                #         rlcr[j,0] = team_params_learning['high'][1]
-                #         rlcr[j,1] = team_params_learning['high'][2]
-                # ###################
-
-                ## for simulation study - sample learning params
                 for j in range(params.team_size):
                     if team_composition_for_run[j] == 0: 
-                        sample_flag = True
-                        while sample_flag:
-                            ilcr[j] = stats.norm.rvs(team_params_learning_dist['low'][0][0], team_params_learning_dist['low'][0][1], 1)
-                            if ilcr[j] > 0.6:
-                                sample_flag = False
+                        ilcr[j] = team_params_learning['low'][0]
+                        rlcr[j,0] = team_params_learning['low'][1]
+                        rlcr[j,1] = team_params_learning['low'][2]     
+                    elif team_composition_for_run[j] == 1:
+                        ilcr[j] = team_params_learning['med'][0]
+                        rlcr[j,0] = team_params_learning['med'][1]
+                        rlcr[j,1] = team_params_learning['med'][2]
+                    elif team_composition_for_run[j] == 2:
+                        ilcr[j] = team_params_learning['high'][0]
+                        rlcr[j,0] = team_params_learning['high'][1]
+                        rlcr[j,1] = team_params_learning['high'][2]
+                ###################
+
+                # ## for simulation study - sample learning params
+                # for j in range(params.team_size):
+                #     if team_composition_for_run[j] == 0: 
+                #         sample_flag = True
+                #         while sample_flag:
+                #             ilcr[j] = stats.norm.rvs(team_params_learning_dist['low'][0][0], team_params_learning_dist['low'][0][1], 1)
+                #             if ilcr[j] > 0.6:
+                #                 sample_flag = False
                         
-                        sample_flag = True
-                        while sample_flag:
-                            rlcr[j,0] = stats.halfnorm.rvs(team_params_learning_dist['low'][1][0], team_params_learning_dist['low'][1][1],1)
-                            rlcr[j,1] = stats.halfnorm.rvs(team_params_learning_dist['low'][2][0], team_params_learning_dist['low'][2][1],1)
+                #         sample_flag = True
+                #         while sample_flag:
+                #             rlcr[j,0] = stats.halfnorm.rvs(team_params_learning_dist['low'][1][0], team_params_learning_dist['low'][1][1],1)
+                #             rlcr[j,1] = stats.halfnorm.rvs(team_params_learning_dist['low'][2][0], team_params_learning_dist['low'][2][1],1)
 
-                            if (rlcr[j,0] < 0.08) & (rlcr[j, 1] < 0.08) & (rlcr[j,0] < rlcr[j,1]):
-                                sample_flag = False
+                #             if (rlcr[j,0] < 0.08) & (rlcr[j, 1] < 0.08) & (rlcr[j,0] < rlcr[j,1]):
+                #                 sample_flag = False
 
-                    if team_composition_for_run[j] == 2: 
-                        sample_flag = True
-                        while sample_flag:
-                            ilcr[j] = stats.norm.rvs(team_params_learning_dist['high'][0][0], team_params_learning_dist['high'][0][1], 1)
-                            if ilcr[j] > 0.6:
-                                sample_flag = False
+                #     if team_composition_for_run[j] == 2: 
+                #         sample_flag = True
+                #         while sample_flag:
+                #             ilcr[j] = stats.norm.rvs(team_params_learning_dist['high'][0][0], team_params_learning_dist['high'][0][1], 1)
+                #             if ilcr[j] > 0.6:
+                #                 sample_flag = False
                         
-                        sample_flag = True
-                        while sample_flag:
-                            rlcr[j,0] = stats.halfnorm.rvs(team_params_learning_dist['high'][1][0], team_params_learning_dist['high'][1][1],1)
-                            rlcr[j,1] = stats.halfnorm.rvs(team_params_learning_dist['high'][2][0], team_params_learning_dist['high'][2][1],1)
+                #         sample_flag = True
+                #         while sample_flag:
+                #             rlcr[j,0] = stats.halfnorm.rvs(team_params_learning_dist['high'][1][0], team_params_learning_dist['high'][1][1],1)
+                #             rlcr[j,1] = stats.halfnorm.rvs(team_params_learning_dist['high'][2][0], team_params_learning_dist['high'][2][1],1)
 
-                            if (rlcr[j,0] < 0.08) & (rlcr[j, 1] < 0.08) & (rlcr[j,0] < rlcr[j,1]):
-                                sample_flag = False
+                #             if (rlcr[j,0] < 0.08) & (rlcr[j, 1] < 0.08) & (rlcr[j,0] < rlcr[j,1]):
+                #                 sample_flag = False
                 
                 
                 ## simulation runs
-                # print(colored('Simulation run: ' + str(run_id) + '. Demo strategy: ' + str(dem_strategy_for_run) + '. Team composition:' + str(team_composition_for_run), 'red'), '. ilcr: ', ilcr, '. rlcr: ', rlcr)
+                print(colored('Simulation run: ' + str(run_id) + '. Demo strategy: ' + str(dem_strategy_for_run) + '. Team composition:' + str(team_composition_for_run), 'red'), '. ilcr: ', ilcr, '. rlcr: ', rlcr)
                 args_list.append([params, [params.default_learning_factor_teacher]*params.team_size, dem_strategy_for_run, 'simulated', ilcr, rlcr, [False, False, False], run_id, file_prefix, sampling_cond_for_run, team_composition_for_run, learner_update_type, sensitivity_run_id, [], lock])
 
                 ## sensitivity runs
-                # args_list.append([params, [params.default_learning_factor_teacher]*params.team_size, dem_strategy_for_run, 'simulated', ilcr, rlcr, [False, False, False], run_id, file_prefix, sampling_cond_for_run, team_composition_for_run, learner_update_type, sensitivity_run_id, params_conditions, lock])
+                # args_list.append([params, [params.default_learning_factor_teacher]*params.team_size, dem_strategy_for_run, 'simulated', ilcr, rlcr, [False, False, False], run_id, file_prefix, sampling_cond_for_run, team_composition_for_run, learner_update_type, sensitivity_run_id, parameter_combinations[params_comb_run_id], lock])
 
         #############
         print('Total number of simulations: ', len(args_list))
@@ -1423,7 +1436,7 @@ if __name__ == "__main__":
                 
         # ProcessingPool().map(run_reward_teaching, args_list)
                 
-        pool = NoDaemonProcessPool(processes=4, lock=lock)
+        pool = NoDaemonProcessPool(processes=1, lock=lock)
         pool.map(run_reward_teaching, args_list)
         # tqdm(pool.imap(run_reward_teaching, args_list), total=len(args_list))
                 

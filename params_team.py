@@ -7,9 +7,9 @@ import os
 # mdp_class = 'skateboard'
 
 # S22/IJCAI22 environments (doesn't allow exits)
-mdp_class = 'augmented_taxi2'
+# mdp_class = 'augmented_taxi2'
 # mdp_class = 'colored_tiles'
-# mdp_class = 'skateboard2'
+mdp_class = 'skateboard2'
 # mdp_class = 'two_goal2'
 
 # misc (allows exits)
@@ -294,7 +294,7 @@ BEC = {
 
     'test_difficulty': 'high',                # expected ease for human to correctly predict the agent's actions in this test environment (low, medium, high)
 
-    'n_human_models': 12,                     # number of human beliefs to actively consider; ensure that this is a multiple of the team size parameter below; needed for sampling models from joint team knowledge
+    'n_human_models': 24,                     # number of human beliefs to actively consider; ensure that this is a multiple of the team size parameter below; needed for sampling models from joint team knowledge
 
     'n_particles': 500,                      # number of particles in particle filter
 
@@ -377,8 +377,8 @@ for i in range(team_size):
 # demo_strategy = 'individual_knowledge_low'
 # demo_strategy = 'individual_knowledge_high'
 
-max_KC_loops = 20
-max_loops = 50
+max_KC_loops = 10
+max_loops = 20
 learning_goal = 1.0
 loop_threshold_demo_simplification = 100
 response_generation_type = 'All_tests'  #'Individual_tests', 'All_tests'
@@ -387,5 +387,5 @@ pf_reset_threshold = 0.001
 sens_low_learner_learning_factor_range = [0.55, 0.7]
 sens_high_learner_learning_factor_range = [0.75, 0.9]
 sens_learning_rate_range = [0, 0.1]
-teacher_update_model_type = 'noise'  # 'no_noise', 'noise'
+teacher_update_model_type = 'no_noise'  # 'no_noise', 'noise'
 learning_from_correction_flag = True

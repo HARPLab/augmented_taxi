@@ -57,6 +57,7 @@ mpl.rcParams['figure.facecolor'] = '1.0'
 mpl.rcParams['axes.labelsize'] = 'x-large'
 mpl.rcParams['xtick.labelsize'] = 'large'
 mpl.rcParams['figure.facecolor'] = 'white'
+plt.rcParams['axes.facecolor'] = 'white'
 
 
 
@@ -1130,11 +1131,10 @@ def check_ig_uf_relation(path):
         # plot particle distribution
         fig = plt.figure(figsize=(18, 14), facecolor='white')    
         fig2 = plt.figure(figsize=(4, 3), facecolor='white')
-        fig3 = plt.figure(figsize=(18, 14), facecolor='white')  
         row_len, col_len = squarest_rectangle(N_members)
         print('row_len: ', row_len, '. col_len: ', col_len)
         ax = np.array([fig.add_subplot(row_len, col_len, i+1, projection='3d') for i in range(N_members)])   
-        ax3 = np.array([fig.add_subplot(row_len, col_len, i+1, projection='3d') for i in range(N_members)])   
+       
         fig.tight_layout(pad=3)
         ax2 = fig2.add_subplot(1,1,1, projection='3d')
         ax2.set_facecolor('white')
@@ -1142,16 +1142,16 @@ def check_ig_uf_relation(path):
         
         learning_factor = np.round(np.linspace(0.55, 1, num=10),2)
 
-        _, particles_initial = team_helpers.sample_team_pf(1, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, teacher_learning_factor=[params.default_learning_factor_teacher], team_prior = params.team_prior, prior_lf=1)
+        _, particles_initial = team_helpers.sample_team_pf(1, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, model_type='no_noise', teacher_learning_factor=[params.default_learning_factor_teacher], team_prior = params.team_prior, prior_lf=1)
         # no prior
         # _, particles_initial = team_helpers.sample_team_pf(1, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, 0.8)
-        print(particles_initial)
+        # print(particles_initial)
         particles_initial['p1'].plot(fig=fig2, ax=ax2)
         fig2.suptitle('Prior knowledge of learner.')
 
         # constraints_list = [[np.array([[-1, 0, 0]]), np.array([[1,  0,  -4]])], [np.array([[-1, 0, 0]]), np.array([[-1,  0,  2]])]]
         
-        constraints_dict = {1: [[np.array([[-1, 0, 0]]), np.array([[1,  0,  -4]])], [np.array([[-1, 0, 0]]), np.array([[-1,  0,  2]])]], 
+        constraints_dict = {1: [[np.array([[1,  0,  -4]])], [np.array([[-1,  0,  2]])]], 
                             2: [[np.array([[0, 1, 2]]), np.array([[0, 1, 0]])], [np.array([[  0,  -1, -10]]), np.array([[ 0, -1, -4]])]],
                             3: [[np.array([[1, 1, 0]])]]
                             }
@@ -1172,7 +1172,10 @@ def check_ig_uf_relation(path):
         particles_ig_list = []
         max_info_gain = {}
         for i in range(N_members):
+            
+            print('Member: ', i)
             member_id = 'p' + str(i+1)
+
             lf = learning_factor[i]
             
             
@@ -1220,14 +1223,14 @@ def check_ig_uf_relation(path):
 
                         # plot particle distribution
                         particles_member.plot(fig=fig, ax=ax[i])
-                        particles_member.plot(fig=fig3, ax=ax[i])
+                        # particles_member.plot(fig=fig3, ax=ax[i])
 
                         # BEC_viz.visualize_planes(constraint, fig=fig, ax=axs[i])
                         ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraint)
                         poly = Polyhedron.Polyhedron(ieqs=ieqs)
-                        BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax[i], plot_ref_sphere=False, alpha=0.75)
+                        BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax[i], plot_ref_sphere=False, alpha=0.5)
                         plt.rcParams.update({"text.usetex": True})
-                        ax[i].set_title('$u$ = ' + str(lf), fontsize=14)
+                        ax[i].set_title('$u$ = ' + str(lf), fontsize=16)
                         plt.rcParams.update({"text.usetex": False})
                         fig.savefig(path + '/learner_particles_' + str(kc_id) + '_' + str(update_id) + '_' + str(cnst_index) + '.png')
                         plt.show()
@@ -3551,8 +3554,14 @@ if __name__ == "__main__":
 
     x = 1
 
-    test_constraints_team =  [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]]), np.array([[ 3,  0, -2]]), np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])]
+    # test_constraints_team =  [np.array([[-1,  0,  0]]), np.array([[ -1,  0, 2]]), np.array([[ 0,  1, 2]]), np.array([[0,  -1,  -4]]), np.array([[ 1,  1, 0]])]
+
+    test_constraints_team = [np.array([[ 0,  0, -1]]), np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]]), np.array([[0, -1, -4]]), np.array([[0, 1, 0]]), np.array([[ 1,  1, 0]])]
+
+    # test_constraints_team = [np.array([[ 0,  0, -1]]), np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]]), np.array([[0, 1, 2]]), np.array([[0, -1, -4]]), np.array([[ 1,  1, 0]])]
 
     min_constraints = BEC_helpers.remove_redundant_constraints(test_constraints_team, params.weights['val'], params.step_cost_flag)
 
     print(min_constraints)
+
+    print(BEC_helpers.calc_solid_angles([min_constraints]))

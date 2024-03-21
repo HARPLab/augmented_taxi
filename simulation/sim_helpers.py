@@ -543,8 +543,8 @@ def get_human_response_all_tests(particles_to_sample, preliminary_tests, N_dupli
         loop_count = 0
         max_loop_count = 1
         # differing_response_model_idx = []
-        # points_to_avoid = []
-        points_to_avoid = copy.deepcopy(sampled_points_duplicates)  # avoid sampling the same point again
+        points_to_avoid = []
+        # points_to_avoid = copy.deepcopy(sampled_points_duplicates)  # avoid sampling the same point again
 
         all_tests_correct_flag = True
 
