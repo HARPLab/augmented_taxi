@@ -14,7 +14,6 @@ import policy_summarization.BEC_visualization as BEC_viz
 # import simulation.human_learner_model as hlm
 from termcolor import colored
 import matplotlib.pyplot as plt
-import params_team as params
 import random
 
 import teams.utils_teams as utils_teams
@@ -262,7 +261,7 @@ def sample_from_cluster(particles_to_sample, cluster_id, mdp):
 
 
 
-def get_human_response_each_test(condition, env_idx, particles_to_sample, opt_traj, test_constraints, learning_factor, args = []):
+def get_human_response_each_test(params, condition, env_idx, particles_to_sample, opt_traj, test_constraints, learning_factor, args = []):
 
     if len(args) != 0:
         set_id, member_id, test_constraints, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, set_id_history, skip_model_history, cluster_id_history, point_probability, team_learning_factor_history, \
@@ -270,7 +269,8 @@ def get_human_response_each_test(condition, env_idx, particles_to_sample, opt_tr
                 update_type, update_sequence_history, noise_measures, resample_noise_history = args
 
 
-    filename = 'models/augmented_taxi2/gt_policies/wt_vi_traj_params_env' + str(env_idx).zfill(5) + '.pickle'
+    # filename = 'models/augmented_taxi2/gt_policies/wt_vi_traj_params_env' + str(env_idx).zfill(5) + '.pickle'
+    filename = 'models/' + params.mdp_class + '/gt_policies/wt_vi_traj_params_env' + str(env_idx).zfill(5) + '.pickle'
     
     with open(filename, 'rb') as f:
         wt_vi_traj_env = pickle.load(f)
@@ -497,7 +497,7 @@ def get_human_response_each_test(condition, env_idx, particles_to_sample, opt_tr
     
 
 
-def get_human_response_all_tests(particles_to_sample, preliminary_tests, N_duplicate_sets, learning_factor, args = []):
+def get_human_response_all_tests(params, particles_to_sample, preliminary_tests, N_duplicate_sets, learning_factor, args = []):
 
     if len(args) != 0:
         set_id, member_id, test_constraints, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, set_id_history, skip_model_history, cluster_id_history, point_probability, team_learning_factor_history, \
@@ -537,7 +537,7 @@ def get_human_response_all_tests(particles_to_sample, preliminary_tests, N_dupli
     
     sampled_points_duplicates = []
     for i in range(N_duplicate_sets):
-
+        print('Duplicate set: ', i+1)
         skip_human_model = True
 
         loop_count = 0
@@ -591,7 +591,7 @@ def get_human_response_all_tests(particles_to_sample, preliminary_tests, N_dupli
                     env_idx, traj_idx = test[2]
                     opt_traj = test[1]
                     
-                    filename = 'models/augmented_taxi2/gt_policies/wt_vi_traj_params_env' + str(env_idx).zfill(5) + '.pickle'
+                    filename = 'models/' + params.mdp_class + '/gt_policies/wt_vi_traj_params_env' + str(env_idx).zfill(5) + '.pickle'
                     with open(filename, 'rb') as f:
                         wt_vi_traj_env = pickle.load(f)
 
@@ -618,7 +618,7 @@ def get_human_response_all_tests(particles_to_sample, preliminary_tests, N_dupli
                         cur_state = mdp.get_init_state()
                         # print('Current state: ', cur_state)
                         human_opt_trajs = mdp_helpers.rollout_policy_recursive(vi_human.mdp, vi_human, cur_state, [])
-
+                        print('Human model trajectory: ', human_opt_trajs)
                         human_traj_rewards = mdp.accumulate_reward_features(human_opt_trajs[0], discount=True)  # just use the first optimal trajectory
                         mu_sa = mdp.accumulate_reward_features(opt_traj, discount=True)
                         new_constraint = mu_sa - human_traj_rewards
@@ -707,7 +707,7 @@ def get_human_response_all_tests(particles_to_sample, preliminary_tests, N_dupli
         
 
         if not all_tests_correct_flag:
-            print('At least one duplicate test is incorrect. Moving to next nmember.')
+            print('At least one test is incorrect. Moving to next nmember.')
             break
 
         
@@ -726,7 +726,7 @@ def get_human_response_all_tests(particles_to_sample, preliminary_tests, N_dupli
 
 ####################################
     
-def plot_sampled_models(particles, test_constraints, human_model_weight_all_tests, test_no, fig=None, plot_title = 'Sampled models', vars_filename = 'sim_run'):
+def plot_sampled_models(params, particles, test_constraints, human_model_weight_all_tests, test_no, fig=None, plot_title = 'Sampled models', vars_filename = 'sim_run'):
 
     '''
     Visualize the sampled human model

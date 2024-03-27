@@ -387,5 +387,6 @@ pf_reset_threshold = 0.001
 sens_low_learner_learning_factor_range = [0.55, 0.7]
 sens_high_learner_learning_factor_range = [0.75, 0.9]
 sens_learning_rate_range = [0, 0.1]
-teacher_update_model_type = 'no_noise'  # 'no_noise', 'noise'
+teacher_update_model_type = 'noise'  # 'no_noise', 'noise'
 learning_from_correction_flag = True
+N_duplicate_sets = 1

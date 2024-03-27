@@ -327,7 +327,7 @@ def run_reward_teaching(args):
     summary_pool = Pool(min(params.n_cpu, 60), initializer=init_pool_processes, initargs=(lock,))
 
     vars_filename = vars_filename_prefix + '_study_' + str(study_id) + '_run_' + str(run_no)
-    full_path_filename = 'models/' + params.data_loc['BEC'] + '/' + vars_filename
+    full_path_filename = 'models/' + params.data_loc['BEC'] + '/ind_sim_trials/' + vars_filename
 
     # create a folder for this run
     if not os.path.exists(full_path_filename):
@@ -398,7 +398,7 @@ def run_reward_teaching(args):
 
     ### Teaching-testing loop
     with lock:
-        open('models/' +  params.data_loc['BEC']  + '/' + vars_filename + '/demo_gen_log.txt', 'w').close()
+        open('models/' +  params.data_loc['BEC']  + '/ind_sim_trials/' + vars_filename + '/demo_gen_log.txt', 'w').close()
     
     while not teaching_complete_flag:
         
@@ -539,18 +539,9 @@ def run_reward_teaching(args):
             preliminary_tests, visited_env_traj_idxs = team_helpers.obtain_diagnostic_tests(lock, params.data_loc['BEC'], BEC_summary[-1], visited_env_traj_idxs, min_KC_constraints, min_subset_constraints_record, traj_record, traj_features_record, running_variable_filter_unit, mdp_features_record)
 
             ### query the human's response to the diagnostic tests
-            
-            ########### New !!
+        
             # Sample for N tests to avoid chance of sampling a correct response
-            N_duplicate_sets = 2
-            N_tests = len(preliminary_tests)
-            
-            # for i in range(N_duplicate_sets):
-            #     if i==0:
-            #         preliminary_tests_extended = copy.deepcopy(preliminary_tests)
-            #     else:
-            #         preliminary_tests_extended.extend(copy.deepcopy(preliminary_tests))
-
+            N_duplicate_sets = params.N_duplicate_sets
             
             # prob_teacher_before_testing, prob_learner_before_testing, prob_teacher_after_testing, prob_learner_after_testing = [], [], [], []
             kc_reset_flag = True  # flag to reset the KC constraints in the team knowledge
@@ -576,7 +567,7 @@ def run_reward_teaching(args):
                      
                     # get response for extended tests
                     human_model_weight_all_tests, human_opt_trajs_all_tests, response_type_all_tests, sampled_points_history, response_history, member, constraint_history, constraint_flag_history, update_id_history, skip_model_history, cluster_id_history, point_probability, team_learning_factor_history, \
-                           prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, prob_reweight_history, prob_resample_history, resample_flag_history, update_sequence_history, resample_noise_history = sim_helpers.get_human_response_all_tests(particles_team_learner[member_id], preliminary_tests, N_duplicate_sets, team_learning_factor[i], args)
+                           prob_initial, prob_reweight, prob_resample, resample_flag, prob_initial_history, prob_reweight_history, prob_resample_history, resample_flag_history, update_sequence_history, resample_noise_history = sim_helpers.get_human_response_all_tests(params, particles_team_learner[member_id], preliminary_tests, N_duplicate_sets, team_learning_factor[i], args)
                     
                     human_opt_trajs_all_tests_team[member_id] = human_opt_trajs_all_tests
                     response_type_all_tests_team[member_id] = response_type_all_tests
@@ -585,49 +576,12 @@ def run_reward_teaching(args):
                     # print('response_type_all_tests: ', response_type_all_tests)
                     # print('human_model_weight: ', human_model_weight_all_tests)
 
-                    ############# Incorrect
-                    # # print('Number of tests: ', N_tests, 'N_extended_tests: ', len(preliminary_tests_extended))
-                    # print('response_type_all_tests: ', response_type_all_tests)
-                    # print('human_opt_trajs_all_tests: ', human_opt_trajs_all_tests)
-                    # # check if all responses are correct
-                    # all_tests_correct_flag = True
-                    # resp_set_id = None
-                    # for resp_ind in range(len(response_type_all_tests)):
-                    #     response_type_ind_test = response_type_all_tests[resp_ind]
-                    #     print('response_type_ind_test: ', response_type_ind_test)
-                    #     if response_type_ind_test != 'correct':
-                    #         all_tests_correct_flag = False
-                    #         resp_set_id = np.floor(resp_ind/N_tests).astype(int) + 1
-                    #         break
-
-                    # if all_tests_correct_flag:
-                    #     resp_set_id = 1
-
-                    # print('resp_set_id: ', resp_set_id)
-                    # print('resp_ind_for_set: ', (resp_set_id-1)*N_tests, resp_set_id*N_tests-1)
-
-                    # if N_tests == 1:
-                    #     human_opt_trajs_all_tests_team[member_id] = [human_opt_trajs_all_tests[resp_set_id-1]]
-                    #     response_type_all_tests_team[member_id] = response_type_all_tests[resp_set_id-1]
-                    #     human_model_weight_team[member_id] = human_model_weight_all_tests[resp_set_id-1]
-                    # else:
-                    #     human_opt_trajs_all_tests_team[member_id] = human_opt_trajs_all_tests[(resp_set_id-1)*N_tests: resp_set_id*N_tests]  # python does not return end index
-                    #     response_type_all_tests_team[member_id] = response_type_all_tests[(resp_set_id-1)*N_tests: resp_set_id*N_tests]
-                    #     human_model_weight_team[member_id] = human_model_weight_all_tests[(resp_set_id-1)*N_tests: resp_set_id*N_tests]
-
-                    # print('response_type_all_tests: ', response_type_all_tests)
-                    # print('member_id: ', member_id,  '. response_type_all_tests_team: ', response_type_all_tests_team[member_id], 'human_model_weight: ', human_model_weight_team[member_id] )
-                    # print('human_opt_trajs_all_: ',  human_opt_trajs_all_tests_team[member_id])
-                    #####################
-
-
-
-
 
             #####################
             prob_teacher_pf_before_test_list, prob_learner_pf_before_test_list, prob_teacher_pf_after_test_list, prob_learner_pf_after_test_list = [], [], [], []
             all_test_constraints = []
             test_no = 1
+            
             ##### simulate response for each test
             for test in preliminary_tests:
         
@@ -707,7 +661,7 @@ def run_reward_teaching(args):
                 if knowledge_viz_flag:  
                     # print('all_tests_constraints: ', all_tests_constraints, 'all_tests_constraints_expanded: ', all_tests_constraints_expanded, 'human_model_weight_team: ', human_model_weight_team)
                     plot_title = 'Interaction No.' + str(loop_count +1) + '. Human models for test ' + str(test_no) + ' of KC ' + str(kc_id)
-                    sim_helpers.plot_sampled_models(particles_team_learner, all_test_constraints_expanded, human_model_weight_team, test_no, plot_title = plot_title, vars_filename = vars_filename)
+                    sim_helpers.plot_sampled_models(params, particles_team_learner, all_test_constraints_expanded, human_model_weight_team, test_no, plot_title = plot_title, vars_filename = vars_filename)
                     # print('human_opt_trajs_all_tests: ', human_opt_trajs_all_tests)
 
                 # ################################
@@ -861,7 +815,7 @@ def run_reward_teaching(args):
                         test_mdp.set_init_state(opt_traj[0][0])
                         human_traj = human_opt_trajs_all_tests_team[member_id][test_no]  # simulated human response
 
-                        if response_type_team[member_id][test_no] == 'incorrect':
+                        if response_type_team[p-1][test_no] == 'incorrect':
                             print('Here is the correct trajectory...')
                             test_mdp.visualize_trajectory_comparison(opt_traj, human_traj)
 
@@ -1166,20 +1120,20 @@ def run_reward_teaching(args):
             pickle.dump(vars_to_save, f)
 
 
-        ## debugging - save data
-        data_dict = {'update_id': update_id_history, 'member_id': member, 'learning_factor': team_learning_factor_history, 'model': sampled_points_history, 'point_probability': point_probability, 'skip_model': skip_model_history, \
-                    'constraints': constraint_history, 'constraint_flag': constraint_flag_history, 'response': response_history, 'cluster_id': cluster_id_history, \
-                    'prob_initial_history': prob_initial_history, 'prob_reweight_history': prob_reweight_history, 'prob_resample_history': prob_resample_history, \
-                    'resample_flag_history': resample_flag_history, 'update_type': update_sequence_history, 'resample_noise': resample_noise_history}
+        # ## debugging - save data
+        # data_dict = {'update_id': update_id_history, 'member_id': member, 'learning_factor': team_learning_factor_history, 'model': sampled_points_history, 'point_probability': point_probability, 'skip_model': skip_model_history, \
+        #             'constraints': constraint_history, 'constraint_flag': constraint_flag_history, 'response': response_history, 'cluster_id': cluster_id_history, \
+        #             'prob_initial_history': prob_initial_history, 'prob_reweight_history': prob_reweight_history, 'prob_resample_history': prob_resample_history, \
+        #             'resample_flag_history': resample_flag_history, 'update_type': update_sequence_history, 'resample_noise': resample_noise_history}
     
-        debug_data_response = pd.DataFrame(data=data_dict)
+        # debug_data_response = pd.DataFrame(data=data_dict)
 
-        debug_data_response.to_csv('models/' + params.data_loc['BEC'] + '/' + 'update_data_' + vars_filename + '.csv', index=False)
+        # debug_data_response.to_csv('models/' + params.data_loc['BEC'] + '/' + 'update_data_' + vars_filename + '.csv', index=False)
 
-        prob_data_dict = {'prob_teacher_before_demo_history': prob_teacher_before_demo_history, 'prob_learner_before_demo_history': prob_learner_before_demo_history, 'prob_teacher_after_demo_history': prob_teacher_after_demo_history, 'prob_learner_after_demo_history': prob_learner_after_demo_history, \
-                          'prob_teacher_before_test_history': prob_teacher_before_test_history, 'prob_learner_before_test_history': prob_learner_before_test_history, 'prob_teacher_after_test_history': prob_teacher_after_test_history, 'prob_teacher_after_feedback_history': prob_teacher_after_feedback_history, 'prob_learner_after_feedback_history': prob_learner_after_feedback_history}
-        debug_prob_data = pd.DataFrame(data=prob_data_dict)
-        debug_prob_data.to_csv('models/' + params.data_loc['BEC'] + '/' + 'prob_data_' + vars_filename + '.csv', index=False)
+        # prob_data_dict = {'prob_teacher_before_demo_history': prob_teacher_before_demo_history, 'prob_learner_before_demo_history': prob_learner_before_demo_history, 'prob_teacher_after_demo_history': prob_teacher_after_demo_history, 'prob_learner_after_demo_history': prob_learner_after_demo_history, \
+        #                   'prob_teacher_before_test_history': prob_teacher_before_test_history, 'prob_learner_before_test_history': prob_learner_before_test_history, 'prob_teacher_after_test_history': prob_teacher_after_test_history, 'prob_teacher_after_feedback_history': prob_teacher_after_feedback_history, 'prob_learner_after_feedback_history': prob_learner_after_feedback_history}
+        # debug_prob_data = pd.DataFrame(data=prob_data_dict)
+        # debug_prob_data.to_csv('models/' + params.data_loc['BEC'] + '/' + 'prob_data_' + vars_filename + '.csv', index=False)
 ####################################################################################
 
 
@@ -1197,7 +1151,7 @@ if __name__ == "__main__":
 
     ## varying parameters
     N_runs_for_each_study_condition = 1
-    run_start_id = 1
+    run_start_id = 10
     sensitivity_run_start_id = 1
     N_combinations = 1
 
@@ -1260,11 +1214,11 @@ if __name__ == "__main__":
     # file_prefix = '03_11_test_N12_direct_sampling'
     # file_prefix = '03_08_sim_study_no_dup_N6_sample_cluster_weight_low_noise'
     # file_prefix = '03_18_sim_study_no_dup_N6_sample_cluster_weight_low_noise_no_sampling'
-    file_prefix = '03_18_sim_study_sb_no_dup_N6_sample_cluster_weight_low_noise_no_sampling'
+    file_prefix = '03_18_sim_study_sb_no_dup_N20_sample_cluster_weight_low_noise_no_sampling'
     
     
     
-    params.BEC['n_human_models'] = 6
+    params.BEC['n_human_models'] = 20
     print('BEC params: ', params.BEC)
     params.max_learning_factor = 0.95
     params.default_learning_factor_teacher = 0.8
@@ -1423,7 +1377,7 @@ if __name__ == "__main__":
                 
                 ## simulation runs
                 print(colored('Simulation run: ' + str(run_id) + '. Demo strategy: ' + str(dem_strategy_for_run) + '. Team composition:' + str(team_composition_for_run), 'red'), '. ilcr: ', ilcr, '. rlcr: ', rlcr)
-                args_list.append([params, [params.default_learning_factor_teacher]*params.team_size, dem_strategy_for_run, 'simulated', ilcr, rlcr, [False, False, False], run_id, file_prefix, sampling_cond_for_run, team_composition_for_run, learner_update_type, sensitivity_run_id, [], lock])
+                args_list.append([params, [params.default_learning_factor_teacher]*params.team_size, dem_strategy_for_run, 'simulated', ilcr, rlcr, [True, True, True], run_id, file_prefix, sampling_cond_for_run, team_composition_for_run, learner_update_type, sensitivity_run_id, [], lock])
 
                 ## sensitivity runs
                 # args_list.append([params, [params.default_learning_factor_teacher]*params.team_size, dem_strategy_for_run, 'simulated', ilcr, rlcr, [False, False, False], run_id, file_prefix, sampling_cond_for_run, team_composition_for_run, learner_update_type, sensitivity_run_id, parameter_combinations[params_comb_run_id], lock])

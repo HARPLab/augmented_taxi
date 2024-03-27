@@ -900,7 +900,7 @@ def sample_human_models_pf(particles, n_models):
 
             unique_id += 1
 
-            print('Clustered_partices: ', clustered_particles, 'select_idxs: ', select_idxs, 'sampled_human_models: ', sampled_human_models)
+            # print('Clustered_partices: ', clustered_particles, 'select_idxs: ', select_idxs, 'sampled_human_models: ', sampled_human_models)
 
         sampled_human_model_weights = np.array(sampled_human_model_weights)
         sampled_human_model_weights /= np.sum(sampled_human_model_weights)
