@@ -32,7 +32,7 @@ colorblind_palette = sns.color_palette("colorblind", 6)
 
 # Set the default color cycle for Matplotlib using rcParams
 plt.rcParams['axes.prop_cycle'] = plt.cycler(color=colorblind_palette)
-
+matplotlib.use('TkAgg')
 
 
 import teams.teams_helpers as team_helpers
@@ -646,6 +646,8 @@ def sim_study_plots(path, vars_filename_prefix = 'analysis'):
     ax_c[0,1].set_xlabel('Demo Strategy')
     ax_c[0,1].set_ylabel('Average team knowledge, $\mathregular{p_{BEC}}$')
     ax_c[0,1].set_xticks(ticks=[0, 1, 2, 3], labels=demo_labels, fontsize=18)
+    ax_c[0,1].set_ylim(0, 0.8)
+    ax_c[0,1].set_yticks(ticks=[0, 0.2, 0.4, 0.6, 0.8], labels=[0, 0.2, 0.4, 0.6, 0.8], fontsize=18)
 
 
     sns.barplot(data = trial_data, x = 'team_composition', y = 'max_loop_count', ax=ax_c[1,0], errorbar=('se',1)).set(title='Max number of interactions to learn')
@@ -4001,11 +4003,11 @@ def anova(path, vars_filename_prefix):
     # sns.boxplot(x='demo_strategy', y='max_loop_count', data=trial_data_wo_baseline)
 
     # ###############  independent variables  ###########################
-    # with open(path + '/' + vars_filename_prefix+ '_trial_data_subset_N15_checked.pickle', 'rb') as f:
-    #     trial_data_wo_baseline = pickle.load(f)
-
     with open(path + '/' + vars_filename_prefix+ '_6_trial_data_N15_checked.pickle', 'rb') as f:
         trial_data_wo_baseline = pickle.load(f)
+
+    # with open(path + '/' + vars_filename_prefix+ '_trial_data_N15_checked.pickle', 'rb') as f:
+    #     trial_data_wo_baseline = pickle.load(f)
 
 
     # with open('models/augmented_taxi2/sim_study_2_dup_wo_rest_lc_flag_concept_data.pickle', 'rb') as f:
@@ -4093,40 +4095,40 @@ def anova(path, vars_filename_prefix):
     # d2 = trial_data_wo_baseline.describe(include = [np.number])
     # print(d2)
 
-    # # Perform two-way ANOVA
-    # print(colored('Average team knowledge Two-way ANOVA', 'blue'))
-    # model = ols('average_team_knowledge ~ C(demo_strategy) * C(team_composition)', data=trial_data_wo_baseline).fit()
-    # anova_results = sm.stats.anova_lm(model, typ=2)
+    # Perform two-way ANOVA
+    print(colored('Average team knowledge Two-way ANOVA', 'blue'))
+    model = ols('average_team_knowledge ~ C(demo_strategy) * C(team_composition)', data=trial_data_wo_baseline).fit()
+    anova_results = sm.stats.anova_lm(model, typ=2)
 
-    # print(anova_results)
+    print(anova_results)
 
-    # # Tukey
-    # print(colored('Average team knowledge Tukey for demo strategy', 'blue'))
-    # tukey_results_demo = pairwise_tukeyhsd(endog=trial_data_wo_baseline['average_team_knowledge'], groups=trial_data_wo_baseline['demo_strategy'], alpha=0.05)
-    # print(tukey_results_demo)
+    # Tukey
+    print(colored('Average team knowledge Tukey for demo strategy', 'blue'))
+    tukey_results_demo = pairwise_tukeyhsd(endog=trial_data_wo_baseline['average_team_knowledge'], groups=trial_data_wo_baseline['demo_strategy'], alpha=0.05)
+    print(tukey_results_demo)
 
-    # print(colored('Average team knowledge Tukey for team composition', 'blue'))
-    # tukey_results_team = pairwise_tukeyhsd(endog=trial_data_wo_baseline['average_team_knowledge'], groups=trial_data_wo_baseline['team_composition'], alpha=0.05)
-    # print(tukey_results_team)
+    print(colored('Average team knowledge Tukey for team composition', 'blue'))
+    tukey_results_team = pairwise_tukeyhsd(endog=trial_data_wo_baseline['average_team_knowledge'], groups=trial_data_wo_baseline['team_composition'], alpha=0.05)
+    print(tukey_results_team)
 
-    # # Interaction 
+    # Interaction 
 
-    # ind = trial_data_wo_baseline['demo_strategy']=='individual_knowledge_low'
-    # trial_data_wo_baseline.loc[ind, 'demo_strategy'] = '1.individual_knowledge_low'
+    ind = trial_data_wo_baseline['demo_strategy']=='individual_knowledge_low'
+    trial_data_wo_baseline.loc[ind, 'demo_strategy'] = '1.individual_knowledge_low'
 
-    # ind = trial_data_wo_baseline['demo_strategy']=='individual_knowledge_high'
-    # trial_data_wo_baseline.loc[ind, 'demo_strategy'] = '2.individual_knowledge_high'
+    ind = trial_data_wo_baseline['demo_strategy']=='individual_knowledge_high'
+    trial_data_wo_baseline.loc[ind, 'demo_strategy'] = '2.individual_knowledge_high'
 
-    # ind = trial_data_wo_baseline['demo_strategy']=='common_knowledge'
-    # trial_data_wo_baseline.loc[ind, 'demo_strategy'] = '3.common_knowledge'
+    ind = trial_data_wo_baseline['demo_strategy']=='common_knowledge'
+    trial_data_wo_baseline.loc[ind, 'demo_strategy'] = '3.common_knowledge'
 
-    # ind = trial_data_wo_baseline['demo_strategy']=='joint_knowledge'
-    # trial_data_wo_baseline.loc[ind, 'demo_strategy'] = '4.joint_knowledge'
+    ind = trial_data_wo_baseline['demo_strategy']=='joint_knowledge'
+    trial_data_wo_baseline.loc[ind, 'demo_strategy'] = '4.joint_knowledge'
 
-    # trial_data_wo_baseline['demo_strategy'] = trial_data_wo_baseline['demo_strategy'].astype('str')
-    # trial_data_wo_baseline['team_composition'] = trial_data_wo_baseline['team_composition'].astype('str')
+    trial_data_wo_baseline['demo_strategy'] = trial_data_wo_baseline['demo_strategy'].astype('str')
+    trial_data_wo_baseline['team_composition'] = trial_data_wo_baseline['team_composition'].astype('str')
 
-    # trial_data_wo_baseline['Interaction'] = trial_data_wo_baseline['demo_strategy'].astype(str) + '-' + trial_data_wo_baseline['team_composition'].astype(str)
+    trial_data_wo_baseline['Interaction'] = trial_data_wo_baseline['demo_strategy'].astype(str) + '-' + trial_data_wo_baseline['team_composition'].astype(str)
 
 
     # # print(colored('Average team knowledge and Team composition interaction Tukey for team composition', 'blue'))
@@ -4178,103 +4180,99 @@ def anova(path, vars_filename_prefix):
 
     # trial_data_wo_baseline = trial_data_wo_baseline.reset_index(drop=True)
 
-    # colors = sns.color_palette("colorblind", 7).as_hex()
+    colors = sns.color_palette("colorblind", 7).as_hex()
 
-    # colors = [str(color) for color in colors]
+    colors = [str(color) for color in colors]
 
-    # fig = interaction_plot(x=trial_data_wo_baseline['demo_strategy'], trace=trial_data_wo_baseline['team_composition'], response=trial_data_wo_baseline['max_loop_count'],
-    #                        colors=[colors[0], colors[1], colors[2], colors[3]], markers=['D', '^', 'o', 's'], ms=10, linewidth = 10)
+    fig = interaction_plot(x=trial_data_wo_baseline['demo_strategy'], trace=trial_data_wo_baseline['team_composition'], response=trial_data_wo_baseline['max_loop_count'],
+                           colors=[colors[0], colors[1], colors[2], colors[3]], markers=['D', '^', 'o', 's'], ms=10, linewidth = 10)
     
-    # ax1 = plt.gca()
-    # ax1.set_title('No. of interactions vs. Demo Strategy and Team composition', fontsize=28)
-    # ax1.set_xlabel('Demo Strategy')
-    # ax1.set_ylabel('No. of interactions')
-    # ax1.legend_.remove()
+    ax1 = plt.gca()
+    ax1.set_title('No. of interactions vs. Demo Strategy and Team composition', fontsize=28)
+    ax1.set_xlabel('Demo Strategy')
+    ax1.set_ylabel('No. of interactions')
+    ax1.legend_.remove()
 
-    # # plot error bars
-    # # Calculate standard errors for each group
-    # groups = trial_data_wo_baseline.groupby(['demo_strategy', 'team_composition']).agg({'max_loop_count':['mean', 'sem']})
-    # # groups = trial_data_wo_baseline.groupby(['demo_strategy', 'team_composition'])
-    # # means = groups.mean()['max_loop_count']
-    # # std_errors = groups.sem()['max_loop_count']  # Change to .std() for standard deviation, if preferred
+    # plot error bars
+    # Calculate standard errors for each group
+    groups = trial_data_wo_baseline.groupby(['demo_strategy', 'team_composition']).agg({'max_loop_count':['mean', 'sem']})
+
+    # Add error bars
+    for (demo_strat, team_comp), row_data in groups.iterrows():
+        # error = std_errors(demo_strat, team_comp)
+        # mean = means(demo_strat, team_comp)
+
+        error = row_data['max_loop_count']['sem']
+        mean = row_data['max_loop_count']['mean']
+
+        if demo_strat == '1.individual_knowledge_low':
+            x_val = 0
+        elif demo_strat == '2.individual_knowledge_high':
+            x_val = 1
+        elif demo_strat == '3.common_knowledge':
+            x_val = 2
+        else:
+            x_val = 3
+
+        if team_comp == '[0, 0, 0]':
+            ax1.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[0], capsize=8)
+        elif team_comp == '[0, 0, 2]':
+            ax1.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[1], capsize=8)
+        elif team_comp == '[0, 2, 2]':
+            ax1.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[2], capsize=8)
+        else:
+            ax1.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[3], capsize=8)
+        # ax1.errorbar(x_val, mean, yerr=error, fmt='none', color='black', capsize=5)
+
+
+
+
+    fig2 = interaction_plot(x=trial_data_wo_baseline['demo_strategy'], trace=trial_data_wo_baseline['team_composition'], response=trial_data_wo_baseline['average_team_knowledge'],
+                           colors=[colors[0], colors[1], colors[2], colors[3]], markers=['D', '^', 'o', 's'], ms=10,  linewidth = 10)
+    
+    ax2 = plt.gca()
+    ax2.set_title('Average team knowledge vs. Demo Strategy and Team composition', fontsize=28)
+    ax2.set_xlabel('Demo Strategy')
+    ax2.set_ylabel('Average team knowledge, $\mathregular{p_{BEC}}$')
+    ax2.legend_.remove()
+
+
+    # plot error bars
+    # Calculate standard errors for each group
+    groups = trial_data_wo_baseline.groupby(['demo_strategy', 'team_composition']).agg({'average_team_knowledge':['mean', 'sem']})
+    # groups = trial_data_wo_baseline.groupby(['demo_strategy', 'team_composition'])
+    # means = groups.mean()['max_loop_count']
+    # std_errors = groups.sem()['max_loop_count']  # Change to .std() for standard deviation, if preferred
 
     # print(groups)
-    # # Add error bars
-    # for (demo_strat, team_comp), row_data in groups.iterrows():
-    #     # error = std_errors(demo_strat, team_comp)
-    #     # mean = means(demo_strat, team_comp)
+    # Add error bars
+    for (demo_strat, team_comp), row_data in groups.iterrows():
+        # error = std_errors(demo_strat, team_comp)
+        # mean = means(demo_strat, team_comp)
 
-    #     error = row_data['max_loop_count']['sem']
-    #     mean = row_data['max_loop_count']['mean']
+        error = row_data['average_team_knowledge']['sem']
+        mean = row_data['average_team_knowledge']['mean']
 
-    #     if demo_strat == '1.individual_knowledge_low':
-    #         x_val = 0
-    #     elif demo_strat == '2.individual_knowledge_high':
-    #         x_val = 1
-    #     elif demo_strat == '3.common_knowledge':
-    #         x_val = 2
-    #     else:
-    #         x_val = 3
+        if demo_strat == '1.individual_knowledge_low':
+            x_val = 0
+        elif demo_strat == '2.individual_knowledge_high':
+            x_val = 1
+        elif demo_strat == '3.common_knowledge':
+            x_val = 2
+        else:
+            x_val = 3
 
-    #     if team_comp == '[0, 0, 0]':
-    #         ax1.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[0], capsize=8)
-    #     elif team_comp == '[0, 0, 2]':
-    #         ax1.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[1], capsize=8)
-    #     elif team_comp == '[0, 2, 2]':
-    #         ax1.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[2], capsize=8)
-    #     else:
-    #         ax1.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[3], capsize=8)
-    #     # ax1.errorbar(x_val, mean, yerr=error, fmt='none', color='black', capsize=5)
+        if team_comp == '[0, 0, 0]':
+            ax2.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[0], capsize=8)
+        elif team_comp == '[0, 0, 2]':
+            ax2.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[1], capsize=8)
+        elif team_comp == '[0, 2, 2]':
+            ax2.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[2], capsize=8)
+        else:
+            ax2.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[3], capsize=8)
+        # ax1.errorbar(x_val, mean, yerr=error, fmt='none', color='black', capsize=5)
 
-
-
-
-    # fig2 = interaction_plot(x=trial_data_wo_baseline['demo_strategy'], trace=trial_data_wo_baseline['team_composition'], response=trial_data_wo_baseline['average_team_knowledge'],
-    #                        colors=[colors[0], colors[1], colors[2], colors[3]], markers=['D', '^', 'o', 's'], ms=10,  linewidth = 10)
-    
-    # ax2 = plt.gca()
-    # ax2.set_title('Average team knowledge vs. Demo Strategy and Team composition', fontsize=28)
-    # ax2.set_xlabel('Demo Strategy')
-    # ax2.set_ylabel('Average team knowledge, $\mathregular{p_{BEC}}$')
-    # ax2.legend_.remove()
-
-
-    # # plot error bars
-    # # Calculate standard errors for each group
-    # groups = trial_data_wo_baseline.groupby(['demo_strategy', 'team_composition']).agg({'average_team_knowledge':['mean', 'sem']})
-    # # groups = trial_data_wo_baseline.groupby(['demo_strategy', 'team_composition'])
-    # # means = groups.mean()['max_loop_count']
-    # # std_errors = groups.sem()['max_loop_count']  # Change to .std() for standard deviation, if preferred
-
-    # print(groups)
-    # # Add error bars
-    # for (demo_strat, team_comp), row_data in groups.iterrows():
-    #     # error = std_errors(demo_strat, team_comp)
-    #     # mean = means(demo_strat, team_comp)
-
-    #     error = row_data['average_team_knowledge']['sem']
-    #     mean = row_data['average_team_knowledge']['mean']
-
-    #     if demo_strat == '1.individual_knowledge_low':
-    #         x_val = 0
-    #     elif demo_strat == '2.individual_knowledge_high':
-    #         x_val = 1
-    #     elif demo_strat == '3.common_knowledge':
-    #         x_val = 2
-    #     else:
-    #         x_val = 3
-
-    #     if team_comp == '[0, 0, 0]':
-    #         ax2.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[0], capsize=8)
-    #     elif team_comp == '[0, 0, 2]':
-    #         ax2.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[1], capsize=8)
-    #     elif team_comp == '[0, 2, 2]':
-    #         ax2.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[2], capsize=8)
-    #     else:
-    #         ax2.errorbar(x_val, mean, yerr=error, fmt='none', color=colors[3], capsize=8)
-    #     # ax1.errorbar(x_val, mean, yerr=error, fmt='none', color='black', capsize=5)
-
-    # plt.show()
+    plt.show()
 
     # pvals = []
     # ## BonFerroni
@@ -4328,8 +4326,8 @@ def anova(path, vars_filename_prefix):
     # with open(path + '/' + vars_filename_prefix+ '_demo_strategies_subset.pickle', 'rb') as f:
     #     demo_constraints_data = pickle.load(f)
 
-    with open(path + '/' + vars_filename_prefix+ '_demo_strategies_subset_N15_checked.pickle', 'rb') as f:
-        demo_constraints_data = pickle.load(f)
+    # with open(path + '/' + vars_filename_prefix+ '_demo_strategies_subset_N15_checked.pickle', 'rb') as f:
+    #     demo_constraints_data = pickle.load(f)
     
     # print(colored('Two-way ANOVA: Mean distance between sampled counterfactuals vs. Demo Strategy and Team composition', 'blue'))
     # # Perform two-way ANOVA
@@ -4349,16 +4347,16 @@ def anova(path, vars_filename_prefix):
     # anova_results = sm.stats.anova_lm(model, typ=2)
     # print(anova_results)
         
-    print(colored('Two-way ANOVA: Scale BEC constraints area vs. Demo Strategy and Team composition', 'blue'))
-    # Perform two-way ANOVA
-    model = ols('scale_reduce_BEC_constraints_area ~ C(demo_strategy) * C(team_composition)', data=demo_constraints_data).fit()
-    anova_results = sm.stats.anova_lm(model, typ=2)
-    print(anova_results)
+    # print(colored('Two-way ANOVA: Scale BEC constraints area vs. Demo Strategy and Team composition', 'blue'))
+    # # Perform two-way ANOVA
+    # model = ols('scale_reduce_BEC_constraints_area ~ C(demo_strategy) * C(team_composition)', data=demo_constraints_data).fit()
+    # anova_results = sm.stats.anova_lm(model, typ=2)
+    # print(anova_results)
 
-    ## Tukey
-    print(colored('scale_reduce_BEC_constraints_area Tukey for demo strategy', 'blue'))
-    tukey_results_demo = pairwise_tukeyhsd(endog=demo_constraints_data['scale_reduce_BEC_constraints_area'], groups=demo_constraints_data['demo_strategy'], alpha=0.05)
-    print(tukey_results_demo)
+    # ## Tukey
+    # print(colored('scale_reduce_BEC_constraints_area Tukey for demo strategy', 'blue'))
+    # tukey_results_demo = pairwise_tukeyhsd(endog=demo_constraints_data['scale_reduce_BEC_constraints_area'], groups=demo_constraints_data['demo_strategy'], alpha=0.05)
+    # print(tukey_results_demo)
     
     # ## Tukey
     # print(colored('Running BEC constraints area Tukey for demo strategy', 'blue'))
@@ -4578,42 +4576,9 @@ def analyze_incomplete_runs(path, file):
         
 def analyze_demo_strategies(path, files, file_prefix_list, runs_to_exclude_list = [], vars_filename_prefix = ''):
 
-    # with open(path + '/' + vars_filename_prefix + '_trial_data_subset.pickle', 'rb') as f:
-    #     trial_data = pickle.load(f)
-
-    # run_list = trial_data['analysis_run_id'].unique()
-    # trial_data['BEC_know_learn_goal'] = np.zeros(len(trial_data), dtype=bool)
-
-    # for id, run in trial_data.iterrows():
-
-    #     file = run['file_name']
-
-    #     with open(path + '/' + file, 'rb') as f:
-    #         sim_vars = pickle.load(f)
-        
-    #     bec_final = sim_vars['BEC_knowledge_level'].iloc[-1]
-
-    #     # check if learning was completed
-    #     learning_complete = True
-    #     for k_type, k_val in bec_final.items():
-    #         if k_val[0] != 1:
-    #             learning_complete = False
-    #             break
-
-    #     if learning_complete:
-    #         trial_data['BEC_know_learn_goal'].loc[id] = True
-
-    # trial_data.to_csv(path + '/' + vars_filename_prefix + 'trial_data.csv')
-    # with open(path + '/' + vars_filename_prefix + 'trial_data.pickle', 'wb') as f:
-    #     pickle.dump(trial_data, f)
-
-
-        
-
-
 
     try:
-        with open(path + '/' + vars_filename_prefix + '_demo_strategies_subset_N15_checked2.pickle', 'rb') as f:
+        with open(path + '/' + vars_filename_prefix + '_demo_strategies_subset_N15_checked.pickle', 'rb') as f:
             run_data_df_subset = pickle.load(f)
         print('Opening file: ', vars_filename_prefix + '_demo_strategies_subset_N15_checked.pickle')
 
@@ -4647,20 +4612,12 @@ def analyze_demo_strategies(path, files, file_prefix_list, runs_to_exclude_list 
             
 
             if run_file_flag:
-                with open(path + '/' + file, 'rb') as f:
+                with open(path + '/sim_data/' + file, 'rb') as f:
                     sim_vars = pickle.load(f)
                 print('Opening file: ', file)
-
-                
+       
                 study_id = sim_vars['study_id'][0]
                 sim_run_id = sim_vars['run_no'][0]
-
-                # check if learning was completed based on final BEC knowledge
-                # learning_complete = True
-                # for k_type, k_val in bec_final.items():
-                #     if k_val[0] != 1:
-                #         learning_complete = False
-                #         break
 
                 # check if learning was completed based on sim status flag
                 if sim_vars['sim_status'].iloc[-1] == 'Teaching complete':
@@ -4682,13 +4639,7 @@ def analyze_demo_strategies(path, files, file_prefix_list, runs_to_exclude_list 
                         counterfactuals = read_demo_gen_log(demo_file_name, new_flag=True)
                     else:
                         counterfactuals = read_demo_gen_log(demo_file_name, new_flag=True)
-                 #######################################
-                        
-                # for i in range(len(counterfactuals)):
-                #     counterfactuals['sample_human_models'].iloc[i] = [np.array(x).astype(float) for x in counterfactuals['sample_human_models'].iloc[i]]
 
-                # print('counterfactuals: ', counterfactuals['sample_human_models'])
-                # print('type: ', type(counterfactuals['sample_human_models'].iloc[0]))
 
                 ############## compile data
                 study_id = sim_vars['study_id'].iloc[0]
@@ -4697,7 +4648,7 @@ def analyze_demo_strategies(path, files, file_prefix_list, runs_to_exclude_list 
                 demo_strategy = str(sim_vars['demo_strategy'].iloc[0])
                 sim_status = str(sim_vars['sim_status'].iloc[-1])
                 min_BEC_constraints = sim_vars['min_BEC_constraints'].iloc[-1]
-                running_BEC_constraints = params.prior
+                running_BEC_constraints = copy.deepcopy(params.prior)
 
                 # filter extra sims in same file
                 kc_id_list = sim_vars['knowledge_comp_id']
@@ -4750,13 +4701,9 @@ def analyze_demo_strategies(path, files, file_prefix_list, runs_to_exclude_list 
                     # find sampled counterfactuals
                     summary_count = int_data['summary_count']
                     counterfactual_models_list = counterfactuals[counterfactuals['length_of_summary']==summary_count]['sample_human_models'].reset_index(drop=True)
-                    # print(counterfactuals)
-                    # print(summary_count)
-                    # print(counterfactual_models_list)
                     counterfactual_models = counterfactual_models_list.iloc[0]
                     counterfactual_models = [np.array(x).astype(float) for x in counterfactual_models]
-                    # print(counterfactual_models)
-                    # print('type: ', type(counterfactual_models[0]))
+
 
                     # calculate how close the sampled points are
                     counterfactual_models_latllong = cg.cart2latlong(counterfactual_models)
@@ -4858,32 +4805,39 @@ def analyze_demo_strategies(path, files, file_prefix_list, runs_to_exclude_list 
     ############## plots ####################
         
     ## Information content of constraints
+        
+    figh, axh = plt.subplots(1, 1, figsize=(10, 5))
+    plot_data = run_data_df_subset[run_data_df_subset['scale_reduce_BEC_constraints_area']!=1]
+    sns.barplot(data=plot_data, x='demo_strategy', y='scale_reduce_BEC_constraints_area', order = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge'], ax=axh)
+
     
     # # Histogram of contraints area ratio for each demo strategy
     
     # fig, ax = plt.subplots(2, 2, figsize=(10, 5))
     # fig2, ax2 = plt.subplots(2, 2, figsize=(10, 5))
+    fig3, ax3 = plt.subplots(2, 2, figsize=(10, 5))
 
-    # row_id, col_id = 0, 0
-    # for demo in ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']:
-    #     demo_data_non_repeat = run_data_df_subset[(run_data_df_subset['demo_strategy'] == demo) & (run_data_df_subset['scale_reduce_BEC_constraints_area']!=1)]
-    #     demo_data = run_data_df_subset[(run_data_df_subset['demo_strategy'] == demo)]
-    #     sns.histplot(demo_data_non_repeat['scale_reduce_BEC_constraints_area'], ax=ax[row_id, col_id], label=demo, kde=True).set(title='Constraints area change ratio for demo ' + str(demo), xlabel='Area reduction (information gain)', ylabel='Frequency')
+    row_id, col_id = 0, 0
+    for demo in ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge']:
+        # demo_data_non_repeat = run_data_df_subset[(run_data_df_subset['demo_strategy'] == demo) & (run_data_df_subset['scale_reduce_BEC_constraints_area']!=1)]
+        demo_data = run_data_df_subset[(run_data_df_subset['demo_strategy'] == demo)]
+        # sns.histplot(demo_data_non_repeat['scale_reduce_BEC_constraints_area'], ax=ax[row_id, col_id], label=demo, kde=True).set(title='Constraints area change ratio for demo ' + str(demo), xlabel='Area reduction (information gain)', ylabel='Frequency')
 
-    #     sns.lineplot(data=demo_data, x='int_id', y='scale_reduce_BEC_constraints_area', ax=ax2[row_id, col_id], label=demo).set(title='Constraints area change ratio for demo ' + str(demo), xlabel='Interaction id', ylabel='Area reduction (information gain)')
+        # sns.lineplot(data=demo_data, x='int_id', y='scale_reduce_BEC_constraints_area', ax=ax2[row_id, col_id], label=demo).set(title='Constraints area change ratio for demo ' + str(demo), xlabel='Interaction id', ylabel='Area reduction (information gain)')
 
-    #     if row_id == 1:
-    #         row_id = 0
-    #         col_id += 1
-    #     else:
-    #         row_id += 1
+        sns.lineplot(data=demo_data, x='int_id', y='scale_reduce_BEC_constraints_area', ax=ax3[row_id, col_id], label=demo).set(title='Constraints area for demo ' + str(demo), xlabel='Interaction id', ylabel='Constraints area')
+
+
+        if row_id == 1:
+            row_id = 0
+            col_id += 1
+        else:
+            row_id += 1
     
-    # plt.show()
-        
-    fig, ax = plt.subplots(1, 1, figsize=(10, 5))
-    sns.barplot(data=run_data_df_subset, x='demo_strategy', y='scale_reduce_BEC_constraints_area', order = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge'], ax=ax)
-
     plt.show()
+    
+        
+
 
     # sns.barplot(data=run_data_df_subset, x='demo_strategy', y='KC_constraints_area', order = ['individual_knowledge_low', 'individual_knowledge_high', 'common_knowledge', 'joint_knowledge'])
     # axn = plt.gca()
@@ -5036,7 +4990,7 @@ if __name__ == "__main__":
     # process team knowledge data
     path = 'models/augmented_taxi2'
     # # path = 'data/simulation/sim_experiments/w_feedback'
-    files = os.listdir(path)
+    files = os.listdir(path+'/sim_data')
 
     # all_file_prefix_list = ['debug_data_debug_trials_01_22_no_noise_w_feedback_study_1']
     # all_runs_to_exclude_list = [[3, 12, 24, 7], [1,4,6,8], [], [1,3, 11, 12, 16, 18], [17, 21, 35], [], [], [], \
@@ -5054,7 +5008,7 @@ if __name__ == "__main__":
     # file_prefix_list = ['03_18_sim_study_no_dup_N12_sample_cluster_weight_low_noise_no_sampling']
     # file_prefix_list = ['03_08_sim_study_no_dup_N12_sample_cluster_weights_study_1']
 
-    file_prefix_list = ['03_08_sim_study_no_dup_N6_sample_cluster_weights_study_1_run_22']
+    file_prefix_list = ['03_08_sim_study_no_dup_N6_sample_cluster_weights']
     
     runs_to_exclude_list = ['unfinished'] 
     # runs_to_exclude_list = ['low_noise']

@@ -47,7 +47,7 @@ def sample_from_distribution(condition, points, probabilities, points_to_avoid =
     loop_count = 0
     sampled_point = []
 
-    while not sampling_complete and loop_count < 300:
+    while not sampling_complete and loop_count < 1000:
         r = random.uniform(0, 1)
         # print('Loop count: ', loop_count)
         for i, cumulative_prob in enumerate(cdf):
@@ -566,7 +566,7 @@ def get_human_response_all_tests(params, particles_to_sample, preliminary_tests,
                     if len(points_to_avoid) > 0:
                         point_already_sampled = False
                         for point_avd in points_to_avoid:
-                            # print('Sampled point: ', human_model_weight, 'Sampled point probability: ', rew_weight_prob, 'point_avd: ', point_avd, 'rand_number: ', rand_number)
+                            print('Sampled point: ', human_model_weight, 'Sampled point probability: ', rew_weight_prob, 'point_avd: ', point_avd, 'rand_number: ', rand_number, 'N particles to sample: ', len(particles_to_sample.positions))
                             if (human_model_weight == point_avd).all():
                                 point_already_sampled = True
 

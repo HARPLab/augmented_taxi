@@ -1732,7 +1732,7 @@ def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, te
         
         # print("Length of summary: {}".format(summary_count))
         with lock:
-            with open('models/' + data_loc + '/' + run_env_loc + '/demo_gen_log.txt', 'a') as myfile:
+            with open('models/' + data_loc + '/ind_sim_trials/' + run_env_loc + '/demo_gen_log.txt', 'a') as myfile:
                 myfile.write('Length of summary: {}\n'.format(summary_count))
                 myfile.write('constraint_space_to_sample_human_models: {}\n'.format(constraint_space_to_sample_human_models))
                 myfile.write('N clusters: {}\n'.format(len(particles_demo.cluster_weights)))
@@ -1752,16 +1752,16 @@ def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, te
         # # plot particles and sampled models
         # print('Sampled human models and particle distribution for demos...')
         # fig = plt.figure()
-        # ax0 = fig.add_subplot(1, 3, 1, projection='3d')
+        # ax0 = fig.add_subplot(1, 1, 1, projection='3d')
         # for id in range(len(sample_human_models)):
-        #     ax0.scatter(sample_human_models[id][0][0], sample_human_models[id][0][1], sample_human_models[id][0][2], s=20, c='r', marker='o')
+        #     ax0.scatter(sample_human_models[id][0][0], sample_human_models[id][0][1], sample_human_models[id][0][2], s=50, c='r', marker='+')
         # particles_demo.plot(fig=fig, ax=ax0)
         # plt.show()
         
 
         # plot sampled human models and nearest particles
-        if params.plot_sampled_counterfactual_models_flag:                    
-            plot_sampled_counterfactual_models(particles_demo, min_BEC_constraints_running, sample_human_models, weights=weights, fig=None, text='Sampled human models based on ' + member_id)
+        # if params.plot_sampled_counterfactual_models_flag:                    
+        plot_sampled_counterfactual_models(particles_demo, min_BEC_constraints_running, sample_human_models, weights=weights, fig=None, text='Sampled human models based on ' + member_id)
 
 
 
@@ -1804,7 +1804,7 @@ def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, te
         ####################################################################################################
 
         with lock:
-            with open('models/' + data_loc + '/' + run_env_loc + '/info_gains_joint' + str(summary_count) + '.pickle', 'wb') as f:
+            with open('models/' + data_loc + '/ind_sim_trials/' + run_env_loc + '/info_gains_joint' + str(summary_count) + '.pickle', 'wb') as f:
                 pickle.dump(info_gains_record, f)
 
         differing_constraint_count = 1          # number of constraints in the running human model that would differ after showing a particular demonstration
@@ -1970,7 +1970,7 @@ def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, te
         
         if best_env_idx is not None:
             with lock:
-                with open('models/' + data_loc +  '/' + run_env_loc + '/best_env_idxs' + str(summary_count) + '.pickle', 'wb') as f:
+                with open('models/' + data_loc +  '/ind_sim_trials/' + run_env_loc + '/best_env_idxs' + str(summary_count) + '.pickle', 'wb') as f:
                     pickle.dump((best_env_idx, best_traj_idx, best_env_idxs, best_traj_idxs), f)
 
                 best_traj = traj_record[best_env_idx][best_traj_idx]
@@ -2007,12 +2007,12 @@ def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, te
 
         # # print(colored('Max infogain: {}'.format(max_info_gain), 'blue'))
         with lock:
-            with open('models/' + data_loc + '/' + run_env_loc + '/demo_gen_log.txt', 'a') as myfile:
+            with open('models/' + data_loc + '/ind_sim_trials/' + run_env_loc + '/demo_gen_log.txt', 'a') as myfile:
                 myfile.write('Max infogain: {}\n'.format(max_info_gain))
                 myfile.write('\n')
 
             # save the summary along the way (for each completed unit)
-            with open('models/' + data_loc + '/' + run_env_loc + '/BEC_summary.pickle', 'wb') as f:
+            with open('models/' + data_loc + '/ind_sim_trials/' + run_env_loc + '/BEC_summary.pickle', 'wb') as f:
                 pickle.dump((summary, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo), f)
 
     # add any remaining demonstrations
@@ -2021,7 +2021,7 @@ def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, te
 
     # this method doesn't always finish, so save the summary along the way (for each completed unit)
     with lock:
-        with open('models/' + data_loc + '/' + run_env_loc + '/BEC_summary.pickle', 'wb') as f:
+        with open('models/' + data_loc + '/ind_sim_trials/' + run_env_loc + '/BEC_summary.pickle', 'wb') as f:
             pickle.dump((summary, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo), f)
 
     return summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo
@@ -2491,8 +2491,8 @@ def plot_sampled_counterfactual_models(particles, constraints, human_models, wei
 
     fig.suptitle(text, fontsize=30)
 
-    # plot particles before and after the constraints
-    particles.plot(fig=fig, ax=ax)
+    # plot particles
+    particles.plot(fig=fig, ax=ax, cluster_centers = particles.cluster_centers, cluster_weights = particles.cluster_weights, cluster_assignments = particles.cluster_assignments)
 
     ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraints)
     poly = Polyhedron.Polyhedron(ieqs=ieqs)
@@ -2500,7 +2500,7 @@ def plot_sampled_counterfactual_models(particles, constraints, human_models, wei
 
     for hm in human_models:
         # print(hm)
-        ax.scatter(hm[0][0], hm[0][1], hm[0][2], marker='+', c='r', s=50)
+        ax.scatter(hm[0][0], hm[0][1], hm[0][2], marker='+', c='green', s=40)
 
     label_axes(ax)
     

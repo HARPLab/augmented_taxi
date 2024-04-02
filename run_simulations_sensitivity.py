@@ -643,7 +643,8 @@ def run_reward_teaching(args):
                             
                         
                         if params.response_generation_type == 'All_tests':
-
+                            print('human_opt_trajs_all_tests_team: ', human_opt_trajs_all_tests_team)
+                            print('test_no: ', test_no)
                             human_traj = human_opt_trajs_all_tests_team[member_id][test_no-1]
                             response_type = response_type_all_tests_team[member_id][test_no-1]
                             human_model_weight = human_model_weight_team[member_id][test_no-1]
@@ -1033,6 +1034,11 @@ def run_reward_teaching(args):
             loop_vars['sim_status'] = 'Running'
             loop_vars['team_response_models'] = human_model_weight_team
             loop_vars['params_conditions']  = params_conditions
+            loop_vars['params'] = params
+            loop_vars['initial_teacher_learning_factor'] = copy.deepcopy(initial_teacher_learning_factor)
+            loop_vars['experiment_type'] = experiment_type
+            loop_vars['learner_update_type'] = learner_update_type
+
 
             for i in range(len(team_knowledge)):
                 if i < params.team_size:
@@ -1151,7 +1157,7 @@ if __name__ == "__main__":
 
     ## varying parameters
     N_runs_for_each_study_condition = 1
-    run_start_id = 10
+    run_start_id = 2
     sensitivity_run_start_id = 1
     N_combinations = 1
 
@@ -1214,14 +1220,14 @@ if __name__ == "__main__":
     # file_prefix = '03_11_test_N12_direct_sampling'
     # file_prefix = '03_08_sim_study_no_dup_N6_sample_cluster_weight_low_noise'
     # file_prefix = '03_18_sim_study_no_dup_N6_sample_cluster_weight_low_noise_no_sampling'
-    file_prefix = '03_18_sim_study_sb_no_dup_N20_sample_cluster_weight_low_noise_no_sampling'
+    file_prefix = 'skateboard_test'
     
     
     
     params.BEC['n_human_models'] = 20
     print('BEC params: ', params.BEC)
     params.max_learning_factor = 0.95
-    params.default_learning_factor_teacher = 0.8
+    params.default_learning_factor_teacher = 0.95
 
     # create the manager
     with Manager() as manager:
@@ -1377,7 +1383,7 @@ if __name__ == "__main__":
                 
                 ## simulation runs
                 print(colored('Simulation run: ' + str(run_id) + '. Demo strategy: ' + str(dem_strategy_for_run) + '. Team composition:' + str(team_composition_for_run), 'red'), '. ilcr: ', ilcr, '. rlcr: ', rlcr)
-                args_list.append([params, [params.default_learning_factor_teacher]*params.team_size, dem_strategy_for_run, 'simulated', ilcr, rlcr, [True, True, True], run_id, file_prefix, sampling_cond_for_run, team_composition_for_run, learner_update_type, sensitivity_run_id, [], lock])
+                args_list.append([params, [params.default_learning_factor_teacher]*params.team_size, dem_strategy_for_run, 'simulated', ilcr, rlcr, [False, False, False], run_id, file_prefix, sampling_cond_for_run, team_composition_for_run, learner_update_type, sensitivity_run_id, [], lock])
 
                 ## sensitivity runs
                 # args_list.append([params, [params.default_learning_factor_teacher]*params.team_size, dem_strategy_for_run, 'simulated', ilcr, rlcr, [False, False, False], run_id, file_prefix, sampling_cond_for_run, team_composition_for_run, learner_update_type, sensitivity_run_id, parameter_combinations[params_comb_run_id], lock])

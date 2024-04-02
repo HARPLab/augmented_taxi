@@ -3558,18 +3558,18 @@ if __name__ == "__main__":
 
     # test_constraints_team = [np.array([[ 0,  0, -1]]), np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]]), np.array([[0, -1, -4]]), np.array([[0, 1, 0]]), np.array([[ 1,  1, 0]])]
 
-    # test_constraints_team = [np.array([[ 0,  0, -1]]), np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]]), np.array([[0, 1, 2]]), np.array([[0, -1, -4]]), np.array([[ 1,  1, 0]])]
+    all_demo_constraints = [np.array([[ 0,  0, -1]]), np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]]), np.array([[0, 1, 2]]), np.array([[0, -1, -4]]), np.array([[ 1,  1, 0]])]
 
 
     # skateboard domain
     # all_demo_constraints = [np.array([[0, 1, 0]]), np.array([[0, 5, 2]]), np.array([[0, -2, -1]]), np.array([[4, 0, 3]]), np.array([[1, 0, -1]]), np.array([[-6, 0, -5]]), np.array([[5, 2, 5]]), np.array([[-6, 4, -3]]), np.array([[3, -3, 1]])]
 
-    # min_constraints = BEC_helpers.remove_redundant_constraints(all_demo_constraints, params.weights['val'], params.step_cost_flag)
+    min_constraints = BEC_helpers.remove_redundant_constraints(all_demo_constraints, params.weights['val'], params.step_cost_flag)
 
-    # print(min_constraints)
+    print(min_constraints)
 
-    # print(BEC_helpers.calc_solid_angles([min_constraints]))
+    print(BEC_helpers.calc_solid_angles([min_constraints]))
 
-    ##############################
-    with open('models/skateboard2/team_BEC_constraints.pickle', 'rb') as f:
-        team_constraints = pickle.load(f)
+    # ##############################
+    # with open('models/skateboard2/team_BEC_constraints.pickle', 'rb') as f:
+    #     team_constraints = pickle.load(f)

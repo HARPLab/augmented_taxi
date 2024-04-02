@@ -439,6 +439,7 @@ def combine_limiting_constraints_IG(args):
         for model_idx in sample_human_model_idxs:
             # print('Opening models/' + data_loc + '/counterfactual_data_' + str(curr_summary_len) + '/model' + str(model_idx) + '/cf_data_env' + str(env_idx).zfill(5) + '.pickle')
             with lock:
+                print('Opening models/' + data_loc + '/counterfactual_data_' + str(curr_summary_len) + '/model' + str(model_idx) + '/cf_data_env' + str(env_idx).zfill(5) + '.pickle')
                 with open('models/' + data_loc + '/counterfactual_data_' + str(curr_summary_len) + '/model' + str(
                         model_idx) + '/cf_data_env' + str(
                     env_idx).zfill(5) + '.pickle', 'rb') as f:

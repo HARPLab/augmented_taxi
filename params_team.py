@@ -139,7 +139,8 @@ elif mdp_class == 'two_goal2':
     prior = [np.array([[1, 0, 0]]), np.array([[0, 1, 0]]), np.array([[0, 0, -1]])]
     posterior = [np.array([[1, 0, 0]]), np.array([[0, 1, 0]]), np.array([[0, 0, -1]])]
 elif mdp_class == 'skateboard2':
-    w = np.array([[-0.175, -0.5125, -1]]) # skateboard (you might want to go backward to retrieve it), path
+    # w = np.array([[-0.175, -0.5125, -1]]) # skateboard (you might want to go backward to retrieve it), path
+    w = np.array([[0.825, 0.4875, -1]]) # used in Mike's user studyq
     w_normalized = w / np.linalg.norm(w[0, :], ord=w_norm_order)
 
     mdp_parameters = {
@@ -296,7 +297,7 @@ BEC = {
 
     'n_human_models': 24,                     # number of human beliefs to actively consider; ensure that this is a multiple of the team size parameter below; needed for sampling models from joint team knowledge
 
-    'n_particles': 500,                      # number of particles in particle filter
+    'n_particles': 1000,                      # number of particles in particle filter
 
     'obj_func_proportion': 1,                 # proportion of the max objective function (i.e. info gain) to aim for
                                               # when selecting the next demonstration (range: 0 - 1). selecting a value
@@ -348,7 +349,7 @@ debug_kl_calc = False
 debug_hm_sampling = False
 plot_sampled_counterfactual_models_flag = False
 save_plots_flag = False
-show_plots_flag = False
+show_plots_flag = True
 
 team_size = 3
 

@@ -455,6 +455,35 @@ def visualize_transition_w_feedback(test_constraints, demo_constraints, particle
         utils_teams.visualize_planes_team(plot_constraints, fig=fig, ax=ax2)
     else:
         utils_teams.visualize_planes_team(test_constraints, fig=fig, ax=ax2)
+
+    # # plot constraints polygon
+    # if knowledge_type != 'joint_knowledge':
+    #     non_intersecting_constraints_flag, _ = team_helpers.check_for_non_intersecting_constraints(test_constraints, weights, params.step_cost_flag)
+    #     if non_intersecting_constraints_flag:
+    #         polygon_constraints, _ = team_helpers.majority_rules_non_intersecting_team_constraints(polygon_constraints, weights, params.step_cost_flag)
+        
+    #     ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(polygon_constraints)
+    #     poly = Polyhedron.Polyhedron(ieqs=ieqs)
+    #     BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax2, plot_ref_sphere=False, alpha=0.5)
+
+    # else:
+        # WIP edit from copy past from team_helpers
+    #     for i in range(len(plot_constraints)):
+    #         cnsts = plot_constraints[i]
+    #         non_intersecting_constraints_flag, _ = check_for_non_intersecting_constraints(cnsts, weights, step_cost_flag)
+    #         if non_intersecting_constraints_flag:
+    #             cnsts, _ = majority_rules_non_intersecting_team_constraints(cnsts, weights, step_cost_flag)
+    #             print(colored('Majority rules for non intersecting constraints plotting knowledge constraints of ' + str(knowledge_type), 'red'))
+    #             # print('cnsts after majority rules: ', cnsts)
+
+    #         cnsts = BEC_helpers.remove_redundant_constraints(cnsts, weights, step_cost_flag)
+    #         utils_teams.visualize_planes_team(cnsts, fig=fig, ax=plot_ax)
+    #         ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(cnsts)
+    #         poly = Polyhedron.Polyhedron(ieqs=ieqs)
+    #         BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=plot_ax, plot_ref_sphere=False, alpha=0.75)
+
+
+
     utils_teams.visualize_planes_team(demo_constraints, fig=fig, ax=ax3)
 
 
@@ -618,17 +647,17 @@ if __name__ == "__main__":
 
     # lock = multiprocessing.Lock()
 
-    ## plot prior PF distribution and updated PF distribution
-    params.team_size = 1
+    # ## plot prior PF distribution and updated PF distribution
+    # params.team_size = 1
     team_prior, teacher_pf = team_helpers.sample_team_pf(params.team_size, params.BEC['n_particles'], params.weights['val'], params.step_cost_flag, teacher_learning_factor=[0.8, 0.8, 0.8], team_prior = params.team_prior)
-    
+    print(teacher_pf)
     # # plot_pf = copy.deepcopy(teacher_pf['p1'])
     # entire KC
     demo_constraints = [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])]
 
-    # test_constraints = [[np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], \
-    #                     [np.array([[3,  0,  -2]])], \
-    #                     [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])] ]
+    test_constraints = [[np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])], \
+                        [np.array([[3,  0,  -2]])], [np.array([[-1,  0,  2]]), np.array([[ 1,  0, -4]])] ]                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
+                        
     
     # # just one constraint
     # demo_constraints = [np.array([[-1,  0,  2]])]
@@ -636,7 +665,7 @@ if __name__ == "__main__":
     # test_constraints = [[np.array([[-1,  0,  2]])], \
     #                     [np.array([[-2,  0,  1]])] ]
 
-    teacher_pf['p1'].update(demo_constraints, 0.9, model_type = 'noise')
+    # teacher_pf['p1'].update(demo_constraints, 0.9, model_type = 'noise')
 
 
     # test_pf_1  = copy.deepcopy(teacher_pf['joint_knowledge'])
@@ -647,7 +676,7 @@ if __name__ == "__main__":
 
     # # plot_pf.plot()
     # # plt.show()
-    visualize_transition(demo_constraints, teacher_pf['p1'], params.mdp_class, weights = params.weights['val'])
+    # visualize_transition(demo_constraints, teacher_pf['p1'], params.mdp_class, weights = params.weights['val'])
 
     ##################
 
@@ -664,32 +693,32 @@ if __name__ == "__main__":
 
 
     ##################
-    # learning_factor = 0.8
-    # test_constraints_team = []
-    # for id in range(params.team_size):
-    #     member = 'p' + str(id+1)
-    #     # visualize_transition_w_feedback(test_constraints[id], demo_constraints, teacher_pf[member], learning_factor, params.mdp_class, \
-    #     #                                 model_type = 'med_noise', weights = params.weights['val'], text=member)
+    learning_factor = 0.8
+    test_constraints_team = []
+    for id in range(params.team_size):
+        member = 'p' + str(id+1)
+        visualize_transition_w_feedback(test_constraints[id], demo_constraints, teacher_pf[member], learning_factor, params.mdp_class, \
+                                        model_type = 'med_noise', weights = params.weights['val'], text=member)
 
-    #     cnst_flag = True
-    #     if len(test_constraints_team) > 1:
+        cnst_flag = True
+        if len(test_constraints_team) > 1:
             
-    #         for cnst in test_constraints_team:
-    #             for cnst2 in test_constraints[id]:
-    #                 if (cnst == cnst2).all():
-    #                     cnst_flag = False
-    #                     break
+            for cnst in test_constraints_team:
+                for cnst2 in test_constraints[id]:
+                    if (cnst == cnst2).all():
+                        cnst_flag = False
+                        break
             
-    #     if cnst_flag:
-    #         test_constraints_team.extend(test_constraints[id])
+        if cnst_flag:
+            test_constraints_team.extend(test_constraints[id])
 
-    # print('test_constraints_team: ', test_constraints_team)
+    print('test_constraints_team: ', test_constraints_team)
 
 
-    # # visualize_transition_w_feedback(test_constraints_team, demo_constraints, teacher_pf['common_knowledge'], learning_factor, params.mdp_class, \
-    # #                                 model_type = 'med_noise', weights = params.weights['val'], text='common')
-    # visualize_transition_w_feedback(test_constraints, demo_constraints, teacher_pf['common_knowledge'], learning_factor, params.mdp_class, \
-    #                                 model_type = 'med_noise', text = 'joint', weights = params.weights['val'], knowledge_type='joint_knowledge', plot_constraints=test_constraints_team)
+    visualize_transition_w_feedback(test_constraints_team, demo_constraints, teacher_pf['common_knowledge'], learning_factor, params.mdp_class, \
+                                    model_type = 'med_noise', weights = params.weights['val'], text='common')
+    visualize_transition_w_feedback(test_constraints, demo_constraints, teacher_pf['common_knowledge'], learning_factor, params.mdp_class, \
+                                    model_type = 'med_noise', text = 'joint', weights = params.weights['val'], knowledge_type='joint_knowledge', plot_constraints=test_constraints_team)
 
     # visualize_transition_w_feedback(test_constraints[0], demo_constraints, test_pf_1, learning_factor, params.mdp_class, text = 'joint_1', \
     #                                 model_type = 'med_noise', weights = params.weights['val'], knowledge_type='jk_1')

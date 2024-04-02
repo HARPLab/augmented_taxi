@@ -38,7 +38,7 @@ def visualize_planes_team(constraints, fig=None, ax=None, alpha=0.5, color=None)
     Plot the planes associated with the normal vectors contained within 'constraints'
     '''
 
-    cnst_to_restrict = np.array([[-5,  0,  2]])
+    cnst_to_restrict = np.array([[3,  0,  -2]])
 
     plot_normal_flag = False
 

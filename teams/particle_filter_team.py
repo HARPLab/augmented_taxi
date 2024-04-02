@@ -22,6 +22,9 @@ from policy_summarization import particle_filter as pf
 import teams.utils_teams as utils_teams
 import params_team as params
 
+import pandas as pd
+from collections import Counter
+
 
 # Used when particles_team_teacher class is derived from particles class
 # class Particles_team(pf.Particles):
@@ -798,16 +801,22 @@ class Particles_team():
 
     
     def plot(self, centroid=None, fig=None, ax=None, cluster_centers=None, cluster_weights=None,
-                       cluster_assignments=None, plot_prev=False):
+                       cluster_assignments=None, plot_prev=False, vis_scale_factor=10):
         if plot_prev:
             particle_positions = self.positions_prev
             particle_weights = self.weights_prev
+            # print('Plotting previous particles.')
+            # print('N Particle weights: ', len(particle_weights))
+            # print('N Particle positions: ', len(particle_positions))
         else:
             particle_positions = self.positions
             particle_weights = self.weights
+            # print('Plotting current particles.')
+            # print('N Particle weights: ', len(particle_weights))
+            # print('N Particle positions: ', len(particle_positions))
 
-        # vis_scale_factor = 10 * len(particle_positions) * (1/sum(particle_weights))
-        vis_scale_factor = 5000
+        vis_scale_factor = 10 * len(particle_positions) * (1/sum(particle_weights))
+        
         if fig == None:
             fig = plt.figure()
         if ax == None:
@@ -845,6 +854,7 @@ class Particles_team():
     def resample_from_index(self, indexes, model_type, K=1, constraint = None):
         
         original_positions = copy.deepcopy(self.positions)
+        original_weights = copy.deepcopy(self.weights)
         # print('model_type: ', model_type)
 
         # #################
@@ -857,6 +867,7 @@ class Particles_team():
 
         # resample
         self.positions = self.positions[indexes]
+        self.weights = self.weights[indexes]
 
         # sort particles into bins
         positions_spherical = cg.cart2sph(self.positions.squeeze())
@@ -864,6 +875,22 @@ class Particles_team():
         azimuths = positions_spherical[:, 1]
 
         ############## Calculate maximum noise
+        # # Original method
+        # max_ele_dist = max(elevations) - min(elevations)
+
+        # azimuths_sorted = np.sort(azimuths)
+        # azi_dists = np.empty(len(azimuths))
+        # azi_dists[0:-1] = np.diff(azimuths_sorted)
+        # azi_dists[-1] = min(2 * np.pi - (max(azimuths_sorted) - min(azimuths_sorted)), max(azimuths_sorted) - min(azimuths_sorted))
+
+        # if np.std(azi_dists[azi_dists > self.eps]) < 0.01 and np.std(azimuths_sorted) > 1:
+        #     # the particles are relatively evenly spaced out across the full range of azimuth
+        #     max_azi_dist = 2 * np.pi
+        # else:
+        #     # take the largest gap/azimuth distance between two consecutive particles
+        #     max_azi_dist = max(azi_dists)
+
+
         # # Method 1: use the maximum distance between any two particles in the current set of particles
         # max_ele_dist = max(elevations) - min(elevations)
         # max_azi_dist = max(azimuths) - min(azimuths)  # 12/10/23. Added to increase noise more equally in both elevation and azimuth directions
@@ -878,9 +905,11 @@ class Particles_team():
 
         if np.std(azi_dists[azi_dists > self.eps]) < 0.01 and np.std(azimuths_sorted) > 1:
             # the particles are relatively evenly spaced out across the full range of azimuth
+            print(colored('Particles are relatively evenly spaced out across the full range of azimuth.', 'red'))   
             max_azi_dist = 2 * np.pi
         else:
             # take the largest gap/azimuth distance between two consecutive particles
+            print(colored('Take the largest gap/azimuth distance between two consecutive particles.', 'red'))
             max_azi_dist = max(azi_dists)
 
         ######## 12/10/23. added to make noise more isotropic, based on elevation differences between points similar to azimuth
@@ -895,14 +924,17 @@ class Particles_team():
         
         if np.std(ele_dists[ele_dists > self.eps]) < 0.01 and np.std(elevations_sorted) > 1:
             # the particles are relatively evenly spaced out across the full range of elevation
+            print(colored('Particles are relatively evenly spaced out across the full range of elevation.', 'red'))
             max_ele_dist = np.pi
         else:
             # take the largest gap/elevation distance between two consecutive particles
+            print(colored('Take the largest gap/elevation distance between two consecutive particles.', 'red'))
             max_ele_dist = max(ele_dists)
         ###
 
         ##### Method 2b 12/17/23. Added to make noise more isotropic.
         max_azi_dist = max(max_azi_dist, max_ele_dist)  # make azimuth atleast as wide as elevation
+        max_ele_dist = max(max_azi_dist, max_ele_dist)  # make elevation atleast as wide as azimuth
         
         ########################################
 
@@ -938,9 +970,12 @@ class Particles_team():
 
         ########### added for debugging purposes - 12/10
         positions_before_noise = np.empty_like(self.positions)
+        particle_weights_before_noise = np.empty_like(self.weights)
         positions_spherical_before_noise = copy.deepcopy(positions_spherical)
         for aa in range(0, len(positions_spherical)):
             positions_before_noise[aa, :] = np.array(cg.sph2cart(positions_spherical_before_noise[aa, :])).reshape(1, -1)
+        
+        
         # #################
         #  added for debugging purposes - 12/21
         # print('Noise: ', noise)
@@ -948,11 +983,14 @@ class Particles_team():
         noise_norm = np.linalg.norm(noise, axis=1)
         self.noise_measures = [np.mean(noise_norm), np.std(noise_norm)]
         # print('Noise mean: ', self.noise_measures[0], '. Noise std: ', self.noise_measures[1])
+        ######################
 
         positions_spherical += noise
 
         for j in range(0, len(positions_spherical)):
             self.positions[j, :] = np.array(cg.sph2cart(positions_spherical[j, :])).reshape(1, -1)
+
+
 
         # reset the weights
         self.weights = np.ones(len(self.positions)) / len(self.positions)
@@ -965,18 +1003,33 @@ class Particles_team():
         ##############
 
         # ###### plots for debugging - 12/10/23 #######
-        # # # plot particles
+        # # plot particles
+        # vis_scale_factor = 1000
+        # vis_scale_factor=10 * len(self.positions) * (1/sum(self.weights))
         # fig = plt.figure()
         # ax1 = fig.add_subplot(1, 3, 1, projection='3d')
         # ax2 = fig.add_subplot(1, 3, 2, projection='3d')
         # ax3 = fig.add_subplot(1, 3, 3, projection='3d')
         # ax1.title.set_text('Original_positions')
-        # ax2.title.set_text('resampled particles before noise')
+        # ax2.title.set_text('Resampled particles before noise')
         # ax3.title.set_text('Resampled particles after noise')
-        # ax1.scatter(original_positions[:, 0, 0], original_positions[:, 0, 1], original_positions[:, 0, 2])
-        # ax2.scatter(positions_before_noise[:, 0, 0], positions_before_noise[:, 0, 1], positions_before_noise[:, 0, 2])
-        # ax3.scatter(self.positions[:, 0, 0], self.positions[:, 0, 1], self.positions[:, 0, 2])
 
+
+        # print('N original_positions: ', len(original_positions))
+        # print('N original_particle_weights: ', len(original_weights))
+
+        # print('N positions_before_noise: ', len(positions_before_noise))
+
+        # print('N self.positions: ', len(self.positions))
+        # print('N self.weights: ', len(self.weights))
+
+
+        # ax1.scatter(original_positions[:, 0, 0], original_positions[:, 0, 1], original_positions[:, 0, 2], s=original_weights*vis_scale_factor, color='tab:blue')
+        # ax2.scatter(positions_before_noise[:, 0, 0], positions_before_noise[:, 0, 1], positions_before_noise[:, 0, 2], s=particle_weights_before_noise*vis_scale_factor, color='tab:blue')
+        # ax3.scatter(self.positions[:, 0, 0], self.positions[:, 0, 1], self.positions[:, 0, 2], s=self.weights*vis_scale_factor, color='tab:blue')
+        
+
+        # plt.show()
 
         # plt.figure()
         # plt.scatter(noise[:,0], noise[:,1])
@@ -996,7 +1049,7 @@ class Particles_team():
         # # print("ele_dists: " + str(ele_dists))
 
 
-        # plt.show()
+        plt.show()
 
 
 
@@ -1091,14 +1144,42 @@ class Particles_team():
             if len(candidate_indexes) > 1:
                 index = candidate_indexes.pop()
             else:
+                
+                # # Debugging 04/01/24
+                # pos_tuple = [tuple(arr.flatten()) for arr in self.positions]
+                # pos_counts = Counter(pos_tuple)
+                # for item, count in pos_counts.items():
+                #     print('Positions: ', item, '. Count: ', count)
+
+                # for i in range(len(self.positions)):
+                #     print('Position: ', self.positions[i], 'Weight: ', self.weights[i])
+                
+                
                 # get another set of candidate indexes using systematic resampling
                 candidate_indexes = p_utils.systematic_resample(self.weights)
-                # print('Candidate indexes: ', candidate_indexes, '. len: ', len(candidate_indexes))
+                
+                # # debugging 04/01/24
+                # cand_ind_tuple = [tuple(arr.flatten()) for arr in self.positions[candidate_indexes]]
+                # cand_ind_counts = Counter(cand_ind_tuple)
+                # for item, count in cand_ind_counts.items():
+                #     print('Candidate indexes: ', item, '. Count: ', count)
+                ######################
+                
                 np.random.shuffle(candidate_indexes)
                 candidate_indexes = list(candidate_indexes)
                 index = candidate_indexes.pop()
 
             resample_indexes.append(index)
+
+            # # the index which has positive action cost!
+            # if self.positions[index, 0, 2] > 0:
+            #     print('Position: ', self.positions[index])
+            #     fig = plt.figure()
+            #     ax = fig.add_subplot(111, projection='3d')
+            #     ax.scatter(self.positions[resample_indexes, 0, 0], self.positions[resample_indexes, 0, 1], self.positions[resample_indexes, 0, 2], s=self.weights[resample_indexes] * 100)
+            #     ax.scatter(self.positions[index, 0, 0], self.positions[index, 0, 1], self.positions[index, 0, 2], s=self.weights[index] * 10000, c='r')
+            #     plt.show()
+
 
             position_spherical = cg.cart2sph(self.positions[index])
             elevation = position_spherical[0][0]
@@ -1204,7 +1285,7 @@ class Particles_team():
     ################################################################################################
 
 
-    def update(self, constraints, learning_factor, c=0.5, reset_threshold_prob=0.001, plot_title = None, model_type = 'low_noise', viz_flag = False, vars_filename = 'sim_run'):
+    def update(self, constraints, learning_factor, c=0.5, reset_threshold_prob=0.001, plot_title = None, model_type = 'low_noise', viz_flag = True, vars_filename = 'sim_run'):
         
         self.weights_prev = copy.deepcopy(self.weights)
         self.positions_prev = copy.deepcopy(self.positions)
@@ -1242,15 +1323,21 @@ class Particles_team():
                 elev=16
                 azim = -160
             ax.view_init(elev=elev, azim=azim)
+
+            ax.set_xlim(-1, 1)
+            ax.set_ylim(-1, 1)
+            ax.set_zlim(-1, 1)
         
 
         if viz_flag:
-            fig = plt.figure()
+            pf_fig = plt.figure()
             # fig2 = plt.figure()
             # ax2 = []
-            ax = []
+            pf_ax = []
             plt_id = 1
             N = len(constraints)
+            pf_ax = np.array([pf_fig.add_subplot(N, 3, i+1, projection='3d') for i in range(N*3)])   
+
         ##########################################
 
         # variables for debugging probability update
@@ -1259,10 +1346,12 @@ class Particles_team():
         prob_resample = []
         resample_flag = []
 
+        
+
 
 
         for cnst_id in range(len(constraints)):
-            # print('constraint: {}'.format(constraint))
+            
             constraint = constraints[cnst_id]
             self.calc_particles_probability([constraint])
             prob_initial.append(self.particles_prob_correct)
@@ -1283,35 +1372,44 @@ class Particles_team():
 
 
 
-
-
             self.reweight(constraint, cnst_lf)
             
+            # print('Plotting after reweighting for constraint: ', constraint)
+            # pf_reweight = plt.figure()
+            # ax_reweight = pf_reweight.add_subplot(1, 1, 1, projection='3d')
+            # # self.plot(fig=pf_reweight, ax=ax_reweight, vis_scale_factor=100000)
+            # particle_positions = copy.deepcopy(self.positions)
+            # ax_reweight.scatter(particle_positions[:, 0, 0], particle_positions[:, 0, 1], particle_positions[:, 0, 2],
+            #            s=10*np.ones(len(particle_positions)))
 
+            # plt.show()
 
             ########### plot
             if viz_flag and len(constraint) > 0:
-                ax.append(fig.add_subplot(N, 3, plt_id, projection='3d'))
-                plt_id += 1
-                ax.append(fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
+                # print('PLotting constraints and particle filter...')
+                # print('cnst id: ', cnst_id, '. constraint: ', constraint)
+                # pf_ax.append(pf_fig.add_subplot(N, 3, plt_id, projection='3d'))
+                # plt_id += 1
+                # pf_ax.append(pf_fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
                 # ax2.append(fig2.add_subplot(N, 3, plt_id))
-                plt_id += 1
-                ax.append(fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
+                # plt_id += 1
+                # pf_ax.append(pf_fig.add_subplot(N, 3, plt_id, projection='3d', sharex=ax[cnst_id*3], sharey=ax[cnst_id*3], sharez=ax[cnst_id*3]))
                 # ax2.append(fig2.add_subplot(N, 3, plt_id))
-                plt_id += 1
-                ax[cnst_id*3].title.set_text('Particles before reweighting')
-                ax[cnst_id*3 + 1].title.set_text('Particles after reweighting')
-                ax[cnst_id*3 + 2].title.set_text('Particles after resampling')
+                # plt_id += 1
+                pf_ax[cnst_id*3].title.set_text('Particles before reweighting')
+                pf_ax[cnst_id*3 + 1].title.set_text('Particles after reweighting')
+                pf_ax[cnst_id*3 + 2].title.set_text('Particles after resampling')
 
-                self.plot(fig=fig, ax=ax[cnst_id*3], plot_prev=True)
-                BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3])
+                # print('Plotting particles in axes: ', cnst_id*3, cnst_id*3 + 1, cnst_id*3 + 2)
+                self.plot(fig=pf_fig, ax=pf_ax[cnst_id*3], plot_prev=True)
+                BEC_viz.visualize_planes([constraint], fig=pf_fig, ax=pf_ax[cnst_id*3])
 
-                self.plot(fig=fig, ax=ax[cnst_id*3 + 1])
-                BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3 + 1])
+                self.plot(fig=pf_fig, ax=pf_ax[cnst_id*3 + 1])
+                BEC_viz.visualize_planes([constraint], fig=pf_fig, ax=pf_ax[cnst_id*3 + 1])
                 # plot the spherical polygon corresponding to the constraints
                 ieqs = BEC_helpers.constraints_to_halfspace_matrix_sage(constraint)
                 poly = Polyhedron.Polyhedron(ieqs=ieqs)
-                BEC_viz.visualize_spherical_polygon(poly, fig=fig, ax=ax[cnst_id*3 + 1], plot_ref_sphere=False, alpha=0.75)
+                BEC_viz.visualize_spherical_polygon(poly, fig=pf_fig, ax=pf_ax[cnst_id*3 + 1], plot_ref_sphere=False, alpha=0.5)
                 
                 # ## debug
                 # vis_scale_factor = 10 * len(self.positions) * (1/sum(self.weights))
@@ -1335,15 +1433,17 @@ class Particles_team():
                 else:
                     view_params = [16, -160]
 
-                label_axes(ax[cnst_id*3], params.mdp_class, params.weights['val'], view_params = view_params)
-                label_axes(ax[cnst_id*3 + 1], params.mdp_class, params.weights['val'], view_params = view_params)
-                label_axes(ax[cnst_id*3 + 2], params.mdp_class, params.weights['val'], view_params = view_params)
+                label_axes(pf_ax[cnst_id*3], params.mdp_class, params.weights['val'], view_params = view_params)
+                label_axes(pf_ax[cnst_id*3 + 1], params.mdp_class, params.weights['val'], view_params = view_params)
+                label_axes(pf_ax[cnst_id*3 + 2], params.mdp_class, params.weights['val'], view_params = view_params)
 
                 if plot_title is not None:
-                    fig.suptitle(plot_title, fontsize=16)
+                    pf_fig.suptitle(plot_title, fontsize=16)
+
+                
 
             #########################################
-
+            
 
             if sum(self.weights) < reset_threshold_prob:
                 print('Resetting... Constraint: {}'.format(constraint))
@@ -1367,7 +1467,10 @@ class Particles_team():
 
                 n_eff = self.calc_n_eff(self.weights)
                 # print('N_particles: ', len(self.weights), 'n_eff: ', n_eff)
-                if n_eff < c * len(self.weights):
+                
+                # if n_eff < c * len(self.weights):
+                if True:  # always resample
+                    
                     # a) use systematic resampling
                     # resample_indexes = p_utils.systematic_resample(self.weights)
                     # self.resample_from_index(resample_indexes)
@@ -1383,7 +1486,20 @@ class Particles_team():
                     # print(colored('Particles prob before resampling: ' + str(self.particles_prob_correct) + '. Clusters prob before resampling: ' + str(self.clusters_prob_correct), 'red'))
                     # self.plot(fig=fig, ax=ax[cnst_id*3 + 1], cluster_centers=self.cluster_centers, cluster_weights=self.cluster_weights)
 
+                    print('Resampling for constraint: ', constraint)
                     resample_indexes = self.KLD_resampling()
+
+                    if viz_flag:
+                        fig_before_resamp = plt.figure()
+                        ax_before_resamp = fig_before_resamp.add_subplot(1, 1, 1, projection='3d')
+                        particle_positions = copy.deepcopy(self.positions)
+                        particle_positions = particle_positions[resample_indexes]
+
+                        ax_before_resamp.scatter(particle_positions[:, 0, 0], particle_positions[:, 0, 1], particle_positions[:, 0, 2], s=10)
+                        ax_before_resamp.title.set_text('Particles after KLD sampling')
+                        plt.show()
+
+
                     self.resample_from_index(np.array(resample_indexes), model_type, constraint=constraint)
 
                     ### For debugging purposes
@@ -1395,9 +1511,9 @@ class Particles_team():
                     # print(colored('Constraint: ' + str(constraint) + '. Prob before reweighting: ' + str(prob_initial[cnst_id]) + '. Prob after reweighting: ' + str(prob_reweight[cnst_id]) + \
                     #               '. Prob after resampling: ' + str(prob_resample[cnst_id]), 'green' ))
                     
-                    if viz_flag:
-                        self.plot(fig=fig, ax=ax[cnst_id*3 + 2], cluster_centers=self.cluster_centers, cluster_weights=self.cluster_weights)
-                        BEC_viz.visualize_planes([constraint], fig=fig, ax=ax[cnst_id*3 + 2])
+                    # if viz_flag:
+                    #     self.plot(fig=pf_fig, ax=pf_ax[cnst_id*3 + 2], cluster_centers=self.cluster_centers, cluster_weights=self.cluster_weights)
+                    #     BEC_viz.visualize_planes([constraint], fig=pf_fig, ax=pf_ax[cnst_id*3 + 2])
                         
                         # # debug
                         # vis_scale_factor = 10 * len(self.positions) * (1/sum(self.weights))
@@ -1438,13 +1554,14 @@ class Particles_team():
             # Add what constraints are being shown in the demo to the plot
         
 
+        # plt.show()
         if viz_flag:
             if len(constraints) > 0:
                 x_loc = 0.5
                 y_loc = 0.1
-                fig.text(0.2, y_loc, 'Constraints in this demo: ', fontsize=20)
+                pf_fig.text(0.2, y_loc, 'Constraints in this demo: ', fontsize=20)
                 for cnst in constraints:
-                    fig.text(x_loc, y_loc, str(cnst), fontsize=20)
+                    pf_fig.text(x_loc, y_loc, str(cnst), fontsize=20)
                     y_loc -= 0.05
                 
                 # if learning_factor is not None:
@@ -1452,9 +1569,10 @@ class Particles_team():
                 # else:
                 #     fig.text(0.2, y_loc, 'Learning factor: ' + str(self.u_prob_mass_scaled), fontsize=20)
 
-                fig.text(0.2, y_loc, 'Learning factor: ' + str(learning_factor), fontsize=20)
+                pf_fig.text(0.2, y_loc, 'Learning factor: ' + str(learning_factor), fontsize=20)
 
         if viz_flag and params.show_plots_flag:
+            print('Showing updated PF...')
             plt.show()
         if viz_flag and params.save_plots_flag:
             plt.savefig('plots/' + vars_filename + '_' + plot_title +'.png', dpi=300)

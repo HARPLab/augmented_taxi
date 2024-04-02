@@ -834,16 +834,16 @@ def sample_human_models_pf(particles, n_models):
     #######################
     # Use cluster weights to directly get how many samples to get from each cluster
 
-    if len(particles.cluster_centers) > 30:
+    if len(particles.cluster_centers) >= n_models:
+        print('Sampling cluster centers directly')
         # if there are more clusters than number of sought human models, return the spherical centroids of the top n
         # most frequently counted cluster indexes selected by systematic resampling
-        loop_id = 0
         while len(sampled_human_model_idxs) < n_models:
-            # if loop_id < 300:
-            indexes = p_utils.systematic_resample(particles.cluster_weights)
+            indexes = p_utils.systematic_resample(particles.weights)
             unique_idxs, counts = np.unique(indexes, return_counts=True)
             # order the unique indexes via their frequency
             unique_idxs_sorted = [x for _, x in sorted(zip(counts, unique_idxs), reverse=True)]
+            print('Unique indexes: ', unique_idxs, 'Counts: ', counts)
             print('N models to sample: ', n_models, 'N unique cluster centers: ', len(unique_idxs_sorted), 'sampled_human_model_idxs: ', len(sampled_human_model_idxs))
             
             for idx in unique_idxs_sorted:
@@ -854,22 +854,22 @@ def sample_human_models_pf(particles, n_models):
     
                 if len(sampled_human_model_idxs) == n_models:
                     break
-        sampled_human_models = [particles.cluster_centers[i] for i in sampled_human_model_idxs]
-        sampled_human_model_weights = np.array([particles.cluster_weights[i] for i in sampled_human_model_idxs])
+        sampled_human_models = [particles.positions[i] for i in sampled_human_model_idxs]
+        sampled_human_model_weights = np.array([particles.weights[i] for i in sampled_human_model_idxs])
         sampled_human_model_weights /= np.sum(sampled_human_model_weights)  # normalize
     else:
     
         # indexes = p_utils.systematic_resample(particles.cluster_weights, N=n_models)
         # unique_idxs, counts = np.unique(indexes, return_counts=True)
         # unique_idxs_sorted = [x for _, x in sorted(zip(counts, unique_idxs), reverse=True)]
-
+        print('Sampling points from clusters')
 
         unique_idxs = np.arange(len(particles.cluster_weights))
         unique_idxs_sorted = [x for _, x in sorted(zip(particles.cluster_weights, unique_idxs), reverse=True)]
         counts = np.array([int(np.ceil(particles.cluster_weights[i]*n_models)) for i in unique_idxs_sorted])
 
-        print('Counts: ', counts)
-        print('Cluster assignments: ', particles.cluster_assignments)
+        # print('Counts: ', counts)
+        # print('Cluster assignments: ', particles.cluster_assignments)
         sampled_human_models = []
         sampled_human_model_weights = []
         unique_id = 0
