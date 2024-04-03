@@ -21,7 +21,7 @@ import csv
 
 # Other imports.
 sys.path.append("simple_rl")
-import params_team as params
+# import params_team as params
 from simple_rl.agents import FixedPolicyAgent
 from simple_rl.planning import ValueIteration
 from simple_rl.utils import make_mdp
@@ -100,8 +100,8 @@ def calc_common_knowledge(team_knowledge, team_size, weights, step_cost_flag, kc
 
 def check_opposing_constraints(test_constraints_team_expanded, opposing_constraints_count=0):
     
-    if params.debug_kl_calc:
-        print('Checking for opposing constraints in list: ', test_constraints_team_expanded)
+    # if params.debug_kl_calc:
+    #     print('Checking for opposing constraints in list: ', test_constraints_team_expanded)
     
     opposing_constraints_flag = False
     opposing_idx = []
@@ -309,9 +309,6 @@ def find_ascending_individual_knowledge(team_knowledge, min_BEC_constraints, par
 
 def check_for_non_intersecting_constraints(constraints, weights, step_cost_flag, non_intersecting_constraints_count=0):
 
-    if params.debug_kl_calc:
-        print('Checking for non-intersecting constraints in list:', constraints)
-
 
     if len(constraints) == 1:
         non_intersecting_constraints_flag = False
@@ -378,10 +375,6 @@ def check_for_non_intersecting_constraints(constraints, weights, step_cost_flag,
                         constraints_not_in_set = [cnst]
                     else:
                         constraints_not_in_set.append(cnst)
-            
-            if params.debug_kl_calc:
-                print('min_constraints: ', min_constraints)
-                print('constraints_not_in_set: ', constraints_not_in_set)
 
             # double check if these are unit norm - commented it because noticed that for some constraints the non-intersecting minimal constraints are not necessarily unit norm!
             # Example case for above: [np.array([[ 0,  0, -1]]), np.array([[ -1,  0, 4]]), np.array([[1, 1, 0]]), np.array([[ 0, -1, -4]]), np.array([[-1,  0,  2]])]
@@ -398,7 +391,7 @@ def check_for_non_intersecting_constraints(constraints, weights, step_cost_flag,
 
 
 
-def calc_expected_learning(team_knowledge_expected, teacher_learning_factor, kc_id, particles_team_teacher, min_BEC_constraints, demo_constraints, params, loop_count, kc_reset_flag = False, viz_flag = False, vars_filename='sim_run'):
+def calc_expected_learning(params, team_knowledge_expected, teacher_learning_factor, kc_id, particles_team_teacher, min_BEC_constraints, demo_constraints, loop_count, kc_reset_flag = False, viz_flag = False, vars_filename='sim_run'):
 
     # print(colored('Calculating expected learning for KC ' + str(kc_id) + 'in loop ' + str(loop_count) + '...', 'blue'))
     # # print('Current expected team knowledge: ', team_knowledge_expected)
@@ -448,7 +441,7 @@ def calc_expected_learning(team_knowledge_expected, teacher_learning_factor, kc_
 
 
 
-def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team_teacher = None, kc_id_list = None, weights = None, step_cost_flag = False, plot_flag = False, debug_flag=True, fig_title='', vars_filename = 'sim_run'):
+def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team_teacher = None, kc_id_list = None, weights = None, plot_flag=False, step_cost_flag = False, show_plots_flag = False, save_plots_flag = False, debug_flag=True, fig_title='', vars_filename = 'sim_run'):
     
     
     def plot_text_kl(knowledge, fig, i):
@@ -490,12 +483,12 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team_te
 # 
                 intersection_area += (-1)**(N_intersecting_sets+1) * np.array(BEC_helpers.calc_solid_angles([constraints]))
 
-            else:
-                if params.debug_kl_calc:
-                    print(colored('Non intersecting constraint set!', 'red'))
+            # else:
+            #     if params.debug_kl_calc:
+            #         print(colored('Non intersecting constraint set!', 'red'))
         
-        if params.debug_kl_calc:
-            print('N_intersecting_sets: ', N_intersecting_sets, 'intersection_area: ', intersection_area)
+        # if params.debug_kl_calc:
+        #     print('N_intersecting_sets: ', N_intersecting_sets, 'intersection_area: ', intersection_area)
             
 
 
@@ -505,22 +498,22 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team_te
 
     def calc_joint_knowledge_separately(ind_intersection_constraints,  min_unit_constraints, weights, step_cost_flag):
 
-        if params.debug_kl_calc:
-            print('ind_intersection_constraints: ', ind_intersection_constraints)
-            print('min_unit_constraints: ', min_unit_constraints)
+        # if params.debug_kl_calc:
+        #     print('ind_intersection_constraints: ', ind_intersection_constraints)
+        #     print('min_unit_constraints: ', min_unit_constraints)
 
         ind_union_constraints = copy.deepcopy(ind_intersection_constraints)
         ind_union_constraints.extend([min_unit_constraints])
 
-        if params.debug_kl_calc:
-            print('ind_union_constraints: ', ind_union_constraints)
+        # if params.debug_kl_calc:
+        #     print('ind_union_constraints: ', ind_union_constraints)
 
         min_unit_BEC_knowledge_union = calc_recursive_intersection_area(ind_union_constraints, 1, weights, step_cost_flag)
         min_unit_BEC_knowledge_intersection = calc_recursive_intersection_area(ind_intersection_constraints, 1, weights, step_cost_flag, fixed_constraint = min_unit_constraints)
         
-        if params.debug_kl_calc:
-            print('min_unit_BEC_knowledge_intersection :', min_unit_BEC_knowledge_intersection)
-            print('min_unit_BEC_knowledge_union :', min_unit_BEC_knowledge_union)
+        # if params.debug_kl_calc:
+        #     print('min_unit_BEC_knowledge_intersection :', min_unit_BEC_knowledge_intersection)
+        #     print('min_unit_BEC_knowledge_union :', min_unit_BEC_knowledge_union)
 
 
         # check for non-intersecting member knowledge
@@ -532,8 +525,8 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team_te
                 min_unit_BEC_knowledge_union += BEC_helpers.calc_solid_angles([params.team_prior[member_id]])
             m_id += 1
 
-        if params.debug_kl_calc:
-            print('min_unit_BEC_knowledge_union after correction for null member knowledge:', min_unit_BEC_knowledge_union)
+        # if params.debug_kl_calc:
+        #     print('min_unit_BEC_knowledge_union after correction for null member knowledge:', min_unit_BEC_knowledge_union)
         
 
         return min_unit_BEC_knowledge_intersection/min_unit_BEC_knowledge_union
@@ -648,10 +641,10 @@ def calc_knowledge_level(team_knowledge, min_unit_constraints, particles_team_te
             plot_text_kl(knowledge_level[knowledge_type], fig, plot_id)
             plot_id += 1
             
-    if params.show_plots_flag:
+    if show_plots_flag:
         plt.show()
     
-    if params.save_plots_flag:
+    if save_plots_flag:
         plt.savefig('plots/' + vars_filename + '_' + fig_title + '.png')
         plt.close()
 
@@ -807,8 +800,8 @@ def sample_valid_region_jk(joint_constraints, min_azi, max_azi, min_ele, max_ele
 
 
 
-def obtain_team_summary(data_loc, run_env_loc, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, lock, n_human_models, consistent_state_count,
-                        n_train_demos, particles_demo, teacher_uf_demo, knowledge_id, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, obj_func_proportion=1, vars_filename='sim_run'):
+def obtain_team_summary(params, data_loc, run_env_loc, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, lock, n_human_models, consistent_state_count,
+                        particles_demo, teacher_uf_demo, knowledge_id, variable_filter, nonzero_counter, BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, obj_func_proportion=1, vars_filename='sim_run'):
 
 
     summary_variant = 'counterfactual' # uses min_BEC_constraints_running to sample human models and could sample models from 
@@ -823,7 +816,7 @@ def obtain_team_summary(data_loc, run_env_loc, min_subset_constraints_record, mi
     #     summary_count = len(BEC_summary)
 
     if summary_variant == 'counterfactual':
-        BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, teacher_uf_demo, knowledge_id, variable_filter, nonzero_counter, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, lock, n_human_models, consistent_state_count,
+        BEC_summary, summary_count, min_BEC_constraints_running, visited_env_traj_idxs, particles_demo = obtain_summary_counterfactual_team(params, data_loc, run_env_loc, particles_demo, teacher_uf_demo, knowledge_id, variable_filter, nonzero_counter, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, lock, n_human_models, consistent_state_count,
                        BEC_summary, summary_count, min_BEC_constraints_running, params.BEC['n_human_models_precomputed'], visited_env_traj_idxs = visited_env_traj_idxs, n_train_demos=np.inf, downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=obj_func_proportion, vars_filename = vars_filename)
 
         
@@ -1059,7 +1052,8 @@ def visualize_spherical_polygon_jk(poly, fig=None, ax=None, alpha=1.0, color='y'
 
 
 
-def visualize_transition(constraints, particles, mdp_class, weights=None, fig=None, text=None, knowledge_type = 'common_knowledge', plot_filename = 'transition', vars_filename = 'sim_run'):
+def visualize_transition(constraints, particles, mdp_class, weights=None, fig=None, text=None, knowledge_type = 'common_knowledge', \
+                         plot_filename = 'transition', vars_filename = 'sim_run', show_plots_flag = False, save_plots_flag = False):
 
     # From BEC_viz.visualize_pf_transition function
    
@@ -1216,9 +1210,9 @@ def visualize_transition(constraints, particles, mdp_class, weights=None, fig=No
 
     fig.canvas.mpl_connect('motion_notify_event', on_move)
 
-    if params.show_plots_flag:
+    if show_plots_flag:
         plt.show()
-    if params.save_plots_flag:
+    if save_plots_flag:
         plt.savefig('plots/' + vars_filename + '_' + text +'.png', dpi=300)
         plt.close()
     # fig.savefig('plots/' + plot_filename +'.png', dpi=300)
@@ -1227,7 +1221,7 @@ def visualize_transition(constraints, particles, mdp_class, weights=None, fig=No
 
 
 
-def visualize_team_knowledge_constraints(team_knowledge, weights, step_cost_flag, particles_team_teacher = None, kc_id = None, fig=None, text=None, plot_min_constraints_flag = False, plot_text_flag = False, min_unit_constraints = [], plot_filename = 'team_knowledge_constraints', fig_title = None, vars_filename = 'sim_run'):
+def visualize_team_knowledge_constraints(params, team_knowledge, weights, step_cost_flag, particles_team_teacher = None, kc_id = None, fig=None, text=None, plot_min_constraints_flag = False, plot_text_flag = False, min_unit_constraints = [], plot_filename = 'team_knowledge_constraints', fig_title = None, vars_filename = 'sim_run'):
 
     ###########  functions ###################
     def label_axes(ax, mdp_class, weights=None):
@@ -1527,7 +1521,7 @@ def visualize_BEC_area(BEC_constraints, fig, ax1):
 
 
 
-def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, teacher_uf_demo, member_id, variable_filter, nonzero_counter, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, lock, n_human_models, consistent_state_count,
+def obtain_summary_counterfactual_team(params, data_loc, run_env_loc, particles_demo, teacher_uf_demo, member_id, variable_filter, nonzero_counter, min_subset_constraints_record, min_BEC_constraints, env_record, traj_record, mdp_features_record, weights, step_cost_flag, pool, lock, n_human_models, consistent_state_count,
                        summary, summary_count, min_BEC_constraints_running, n_human_models_precomputed, visited_env_traj_idxs=[], n_train_demos=3, downsample_threshold=float("inf"), consider_human_models_jointly=True, c=0.001, obj_func_proportion=1, vars_filename = 'sim_run'):
 
     
@@ -2031,7 +2025,7 @@ def obtain_summary_counterfactual_team(data_loc, run_env_loc, particles_demo, te
 
 
 
-def check_unit_learning_goal_reached(team_knowledge, min_unit_constraints, kc_id):
+def check_unit_learning_goal_reached(params, team_knowledge, min_unit_constraints, kc_id):
 
     print(colored('Checking if unit goal is reached...', 'blue'))
 
@@ -2521,9 +2515,9 @@ def obtain_diagnostic_tests(lock, data_loc, previous_demos, visited_env_traj_idx
     BEC_constraint_bookkeeping = BEC_helpers.perform_BEC_constraint_bookkeeping(BEC_constraints,
                                                                                 min_subset_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record, mdp_features_record, variable_filter=variable_filter)
     
-    if params.debug_hm_sampling:
-        print('BEC_constraints: {}'.format(BEC_constraints))
-        print('BEC_constraint_bookkeeping for generating diagnostic tests: {}'.format(BEC_constraint_bookkeeping))
+    # if params.debug_hm_sampling:
+    #     print('BEC_constraints: {}'.format(BEC_constraints))
+    #     print('BEC_constraint_bookkeeping for generating diagnostic tests: {}'.format(BEC_constraint_bookkeeping))
 
 
     # check for any exact matches in BEC_constraints_bookkeeping
@@ -2537,14 +2531,14 @@ def obtain_diagnostic_tests(lock, data_loc, previous_demos, visited_env_traj_idx
     if not exact_BEC_flag:
         nn_BEC_constraint_bookkeeping, minimal_distances = BEC_helpers.perform_nn_BEC_constraint_bookkeeping(BEC_constraints,
                                                                                             min_subset_constraints_record, visited_env_traj_idxs, traj_record, traj_features_record, mdp_features_record, variable_filter=variable_filter)
-        if params.debug_hm_sampling:
-            print('NN BEC_constraint_bookkeeping for generating diagnostic tests: {}'.format(BEC_constraint_bookkeeping))
+        # if params.debug_hm_sampling:
+        #     print('NN BEC_constraint_bookkeeping for generating diagnostic tests: {}'.format(BEC_constraint_bookkeeping))
 
         #Final BEC bookkeeping
         BEC_constraint_bookkeeping = [nn_BEC_constraint_bookkeeping[x] if x in nn_BEC_constraint_id else BEC_constraint_bookkeeping[x] for x in range(len(BEC_constraint_bookkeeping))]
 
-        if params.debug_hm_sampling:
-            print('Updated BEC_constraint_bookkeeping for generating diagnostic tests: {}'.format(BEC_constraint_bookkeeping))
+        # if params.debug_hm_sampling:
+        #     print('Updated BEC_constraint_bookkeeping for generating diagnostic tests: {}'.format(BEC_constraint_bookkeeping))
         
 
     # print(colored('Entering while loop to calculate BEC constraints', 'blue'))
@@ -2595,8 +2589,8 @@ def obtain_diagnostic_tests(lock, data_loc, previous_demos, visited_env_traj_idx
                 max_complexity_env_traj_tuple = (best_env_idx, best_traj_idx)
                 preliminary_test_info.append((max_complexity_env_traj_tuple, [BEC_constraints.pop()]))
 
-                if params.debug_hm_sampling:
-                    print('max_complexity_env_traj_tuple: ', max_complexity_env_traj_tuple)
+                # if params.debug_hm_sampling:
+                #     print('max_complexity_env_traj_tuple: ', max_complexity_env_traj_tuple)
 
         else:
             # filter for the most visually complex environment that can cover multiple constraints
@@ -2605,9 +2599,9 @@ def obtain_diagnostic_tests(lock, data_loc, previous_demos, visited_env_traj_idx
                                                                     traj_record, previous_demos, type='testing')
             max_complexity_env_traj_tuple = (best_env_idx, best_traj_idx)
 
-            if params.debug_hm_sampling:
-                print('env_constraint_mapping: ', env_constraint_mapping)
-                print('max_complexity_env_traj_tuple: ', max_complexity_env_traj_tuple)
+            # if params.debug_hm_sampling:
+            #     print('env_constraint_mapping: ', env_constraint_mapping)
+            #     print('max_complexity_env_traj_tuple: ', max_complexity_env_traj_tuple)
             
             constituent_constraints = []
             for idx in env_constraint_mapping[max_complexity_env_traj_tuple]:

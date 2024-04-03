@@ -7,9 +7,9 @@ import os
 # mdp_class = 'skateboard'
 
 # S22/IJCAI22 environments (doesn't allow exits)
-# mdp_class = 'augmented_taxi2'
+mdp_class = 'augmented_taxi2'
 # mdp_class = 'colored_tiles'
-mdp_class = 'skateboard2'
+# mdp_class = 'skateboard2'
 # mdp_class = 'two_goal2'
 
 # misc (allows exits)
@@ -17,6 +17,7 @@ mdp_class = 'skateboard2'
 # mdp_class = 'cookie_crumb'
 
 # mdp_class = 'augmented_navigation'
+
 
 w_norm_order = 2
 if mdp_class == 'augmented_taxi':

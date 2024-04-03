@@ -508,7 +508,7 @@ def run_reward_teaching(args):
             #############################################
 
             # calculate expected learning
-            team_knowledge_expected, particles_team_teacher, pf_update_args = team_helpers.calc_expected_learning(team_knowledge_expected, teacher_learning_factor, kc_id, particles_team_teacher, min_BEC_constraints, unit_constraints, params, loop_count, kc_reset_flag=True, viz_flag=knowledge_viz_flag, vars_filename=vars_filename)
+            team_knowledge_expected, particles_team_teacher, pf_update_args = team_helpers.calc_expected_learning(params, team_knowledge_expected, teacher_learning_factor, kc_id, particles_team_teacher, min_BEC_constraints, unit_constraints, loop_count, kc_reset_flag=True, viz_flag=knowledge_viz_flag, vars_filename=vars_filename)
             
             # simulate learning by team members (use unit constraints to simulate learning, instead of the minimum KC constraints)
             # particles_team_learner = team_helpers.simulate_team_learning(kc_id, particles_team_learner, min_KC_constraints, params, loop_count, viz_flag=knowledge_viz_flag, learner_update_type = learner_update_type, vars_filename=vars_filename)
@@ -962,7 +962,7 @@ def run_reward_teaching(args):
 
             # Check if unit knowledge is sufficient to move on to the next unit (unit learning goal reached)
             # print('team_knowledge: ', team_knowledge, 'min_KC_constraints: ', min_KC_constraints)
-            unit_learning_goal_reached = team_helpers.check_unit_learning_goal_reached(team_knowledge, min_KC_constraints, kc_id)
+            unit_learning_goal_reached = team_helpers.check_unit_learning_goal_reached(params, team_knowledge, min_KC_constraints, kc_id)
             print(colored('unit_learning_goal_reached: ', 'blue'), unit_learning_goal_reached)
 
             # Evaluate if next unit should be checked
@@ -1056,7 +1056,7 @@ def run_reward_teaching(args):
             if knowledge_viz_flag:
             # print('Visualizing team knowledge constraints for this teaching loop...')
                 plot_title =  'Interaction No.' + str(loop_count +1) + '. Team_knowledge_constraints'
-                team_helpers.visualize_team_knowledge_constraints(team_knowledge, params.weights['val'], params.step_cost_flag, particles_team_teacher = particles_team_teacher, min_unit_constraints = min_BEC_constraints, plot_filename = 'team_knowledge_constraints', fig_title = plot_title)
+                team_helpers.visualize_team_knowledge_constraints(params, team_knowledge, params.weights['val'], params.step_cost_flag, particles_team_teacher = particles_team_teacher, min_unit_constraints = min_BEC_constraints, plot_filename = 'team_knowledge_constraints', fig_title = plot_title)
         
 
             # Update variable filter for next loop
