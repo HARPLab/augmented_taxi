@@ -1,11 +1,11 @@
-# Augmented Taxi Domain
+# Improving the Transparency of Agent Decision Making Using Demonstrations
 
-This repository primarily consists of 
+This repository contains the raw code for all of the methods and environments (e.g. an augmented variant of the Taxi domain [Dietterich, JAIR2000]) described in the following [thesis](https://symikelee.github.io/papers/ml5_phd_ri_2024.pdf): 
 
-* An implementation of the original Taxi domain [Dietterich, JAIR2000] with additional environmental complexities. Built on David Abel's [simple_rl framework](https://github.com/david-abel/simple_rl). 
-* Methods of a) selecting demonstrations that effectively summarize the agent's policy (i.e. behavior) to a human, and b) requesting demonstrations of what the human believes an agent would do in specific environments. 
+- Michael S. Lee, **Improving the Transparency of Agent Decision Making Using Demonstrations**, Carnegie Mellon University, 2024,
 
-Required packages include [numpy](http://www.numpy.org/), [matplotlib](http://matplotlib.org/), [pypoman](https://github.com/stephane-caron/pypoman) to perform computational geometry with polytopes (i.e. BEC regions, see below), and [pygame](http://www.pygame.org/news) if you want to visualize some MDPs.
+which introduces a closed-loop teaching framework for teaching agent decision making to humans through demonstrations of key agent decisions, intermittent testing of human understanding, and provision of remedial instruction as necessary.
 
-The main file is augmented_taxi.py, which currently has functions for a) generating an agent in the Augmented Taxi MDP, b) obtaining a [Bayesian IRL summary](https://link.springer.com/article/10.1007/s10514-018-9771-0) of the agent's policy, c) obtaining a [BEC summary](https://arxiv.org/pdf/1805.07687.pdf) of the agent's policy, and d) obtaining test environments to query the human's understanding of the agent's policy. 
+Please find the code for the individual methods and user studies the comprise chapters/papers of the thesis on Mike's [website](https://symikelee.github.io/) or [Github](https://github.com/symikelee/), which will likely be more digestible. 
 
+Some of the required packages include [numpy](http://www.numpy.org/), [matplotlib](http://matplotlib.org/), [pypoman](https://github.com/stephane-caron/pypoman) to perform computational geometry with polytopes, and [pygame](http://www.pygame.org/news) if you want to visualize some MDPs.
