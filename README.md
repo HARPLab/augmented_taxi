@@ -4,7 +4,7 @@ This repository contains the raw code for all of the methods and environments (e
 
 - Michael S. Lee, **Improving the Transparency of Agent Decision Making Using Demonstrations**, Carnegie Mellon University, 2024,
 
-which introduces a closed-loop teaching framework for teaching agent decision making to humans through demonstrations of key agent decisions, intermittent testing of human understanding, and provision of remedial instruction as necessary.
+with the goal of helping humans generalize to the agent's overall decision making in a particular domain by showing key agent decisions and behaviors to humans.
 
 Please find the code for the individual methods and user studies the comprise chapters/papers of the thesis on Mike's [website](https://symikelee.github.io/) or [Github](https://github.com/symikelee/), which will likely be more digestible. 
 
